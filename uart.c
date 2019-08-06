@@ -1,5 +1,6 @@
 #include "uart.h"
 #include "gpio.h"
+#include "mbox.h"
 
 #define AUX_BASE        (MMIO_BASE + 0x00215000)
 

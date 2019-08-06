@@ -1,9 +1,13 @@
 #include "uart.h"
 #include "mbox.h"
+#include "lfb.h"
 
 void main()
 {
   uart_init();
+  lfb_init();
+
+  lfb_showpicture();
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
   mbox[2] = MBOX_TAG_GETSERIAL;
