@@ -66,3 +66,14 @@ void uart_puts(char *s)
     uart_send(*s++);
   }
 }
+
+void uart_hex(unsigned int d)
+{
+  unsigned int n;
+  int c;
+  for(c = 28; c >= 0; c -=4) {
+    n = (d>>c) & 0xf;
+    n += n > 9 ? 0x37 : 0x30;
+    uart_send(n);
+  }
+}
