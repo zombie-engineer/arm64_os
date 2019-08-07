@@ -1,11 +1,16 @@
 #include "uart.h"
 #include "mbox.h"
 #include "lfb.h"
+#include "rand.h"
+#include "delays.h"
 
 void main()
 {
   uart_init();
   lfb_init();
+
+  rand_init();
+
 
   lfb_showpicture();
   mbox[0] = 8 * 4;
@@ -26,6 +31,17 @@ void main()
     uart_puts("Unable to query serial!\n");
   }
 
+  uart_puts("waiting 20000 cycles\n");
+  wait_cycles(0x7ffffff);
+  uart_puts("wait complete.\n");
+
+  uart_puts("waiting 200000 cycles\n");
+  wait_msec(200000);
+  uart_puts("wait complete.\n");
+
+  uart_puts("waiting 200000 cycles\n");
+  wait_msec_st(4000000);
+  uart_puts("wait complete.\n");
   while(1) {
     char c = uart_getc();
     uart_send(c);

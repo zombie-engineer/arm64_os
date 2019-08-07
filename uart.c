@@ -106,7 +106,7 @@ void uart_init()
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
-void uart1_send(unsigned int c)
+void uart_send(unsigned int c)
 {
   do { asm volatile("nop"); } while(!(*AUX_MU_LSR & 0x20)); 
   *AUX_MU_IO = c;
@@ -118,13 +118,13 @@ void uart1_send(unsigned int c)
 /* Transmit FIFO full*/
 #define UART0_FR_TXFF (1<<5)
 
-void uart_send(unsigned int c)
+void uart0_send(unsigned int c)
 {
   do { asm volatile("nop"); } while(*UART0_FR & UART0_FR_TXFF); 
   *UART0_DR = c;
 }
 
-char uart1_getc()
+char uart_getc()
 {
   char r;
   do { asm volatile("nop"); } while(!(*AUX_MU_LSR & 0x1)); 
@@ -132,7 +132,7 @@ char uart1_getc()
   return r == '\r' ? '\n' : r;
 }
 
-char uart_getc()
+char uart0_getc()
 {
   char r;
   do { asm volatile("nop"); } while(*UART0_FR & UART0_FR_RXFE); 
