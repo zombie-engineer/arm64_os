@@ -17,8 +17,11 @@ start.o: start.S
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel8.img: start.o $(OBJS)
-	$(LD) -nostdlib -nostartfiles start.o $(OBJS) -T link.ld -o kernel8.elf
+font.o: font.psf
+	$(LD) -r -b binary -o font.o font.psf
+
+kernel8.img: start.o font.o $(OBJS)
+	$(LD) -nostdlib -nostartfiles start.o font.o $(OBJS) -T link.ld -o kernel8.elf
 	$(OBJCOPY) -O binary kernel8.elf kernel8.img
 
 clean:

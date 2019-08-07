@@ -42,8 +42,11 @@ void main()
   uart_puts("waiting 200000 cycles\n");
   wait_msec_st(4000000);
   uart_puts("wait complete.\n");
+  lfb_print(10, 5, "Hello!");
+  int i = 0;
   while(1) {
     char c = uart_getc();
+    lfb_print(10 + i++, 5, "t");
     uart_send(c);
   }
 }

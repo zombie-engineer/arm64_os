@@ -7,6 +7,20 @@
 unsigned int width, height, pitch;
 unsigned char *lfb;
 
+typedef struct {
+  unsigned int magic;
+  unsigned int version;
+  unsigned int headersize;
+  unsigned int flags;
+  unsigned int numglyph;
+  unsigned int bytesperglyph;
+  unsigned int height;
+  unsigned int width;
+  unsigned char glyphs;
+} __attribute__ ((packed)) psf_t;
+
+extern volatile unsigned char _binary_font_psf_start;
+
 
 void lfb_init()
 {
@@ -83,5 +97,44 @@ void lfb_showpicture()
       ptr += 4;
     }
     ptr += pitch - homer_width * 4;
+  }
+}
+
+void lfb_print(int x, int y, char *s)
+{
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  while(*s) {
+    // get offset to the glyph. Need to adjust this to support unicode..
+    unsigned char *glyph = (unsigned char*)&_binary_font_psf_start + font->headersize
+      + (*((unsigned char*)s) < font->numglyph ? *s : 0) * font->bytesperglyph;
+    // calculate offset on screen
+    int offs = (y * font->height * pitch) + (x * (font->width + 1) * 4);
+    
+    int i, j, line, mask, bytesperline = (font->width + 7) / 8;
+    // handle carriage return
+    if (*s == '\r') {
+      x = 0;
+    } else
+    // new line
+    if (*s == '\n') {
+      x = 0; y++;
+    } else {
+      // display character
+      for (j = 0; j < font->height; ++j) {
+        line = offs;
+        mask = 1 << (font->width - 1);
+        for (i = 0; i < font->width; ++i) {
+          *((unsigned int*)(lfb + line)) = ((int)*glyph) & mask ? 0xffffff : 0;
+          mask >>= 1;
+          line += 4;
+        }
+        // adjust to next line
+        glyph += bytesperline;
+        offs += pitch;
+      }
+      x++;
+    }
+    // next character
+    s++;
   }
 }
