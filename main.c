@@ -6,13 +6,18 @@
 
 void main()
 {
+  unsigned long el;
   uart_init();
   lfb_init();
 
   rand_init();
-
+  asm volatile("mrs %0, CurrentEL" : "=r"(el));
+  uart_puts("Current EL is: ");
+  uart_hex((el >> 2) & 3);
+  uart_puts("\n");
 
   lfb_showpicture();
+  lfb_print(10, 5, "Hello!");
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
   mbox[2] = MBOX_TAG_GETSERIAL;
@@ -32,17 +37,16 @@ void main()
   }
 
   uart_puts("waiting 20000 cycles\n");
-  wait_cycles(0x7ffffff);
+  wait_cycles(0x7ffff);
   uart_puts("wait complete.\n");
 
   uart_puts("waiting 200000 cycles\n");
-  wait_msec(200000);
+  wait_msec(2000);
   uart_puts("wait complete.\n");
 
   uart_puts("waiting 200000 cycles\n");
-  wait_msec_st(4000000);
+  wait_msec_st(40000);
   uart_puts("wait complete.\n");
-  lfb_print(10, 5, "Hello!");
   int i = 0;
   while(1) {
     char c = uart_getc();
