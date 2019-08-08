@@ -15,6 +15,7 @@ void main()
   // mmu_init();
 
   lfb_showpicture();
+  el = *(unsigned long*)0xffffffff;
 
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
