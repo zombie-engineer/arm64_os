@@ -138,3 +138,18 @@ void lfb_print(int x, int y, char *s)
     s++;
   }
 }
+
+void lfb_print_long_hex(int x, int y, unsigned long val)
+{
+  char* dump_place = (char*)0x90000;
+  char* ptr = dump_place;
+  unsigned long n;
+  int c;
+  for(c = 60; c >= 0; c -=4) {
+    n = (val >> c) & 0xf;
+    n += n > 9 ? 0x37 : 0x30;
+    *ptr++ = n;
+  }
+  *ptr = 0;
+  lfb_print(x, y, dump_place);
+}

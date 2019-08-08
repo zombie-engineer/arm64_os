@@ -3,6 +3,7 @@
 #include "lfb.h"
 #include "rand.h"
 #include "delays.h"
+#include "mmu.h"
 
 void main()
 {
@@ -11,13 +12,10 @@ void main()
   lfb_init();
 
   rand_init();
-  asm volatile("mrs %0, CurrentEL" : "=r"(el));
-  uart_puts("Current EL is: ");
-  uart_hex((el >> 2) & 3);
-  uart_puts("\n");
+  // mmu_init();
 
   lfb_showpicture();
-  lfb_print(10, 5, "Hello!");
+
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
   mbox[2] = MBOX_TAG_GETSERIAL;
@@ -26,6 +24,23 @@ void main()
   mbox[5] = 0;
   mbox[6] = 0;
   mbox[7] = MBOX_TAG_LAST;
+
+  asm volatile("mrs %0, CurrentEL" : "=r"(el));
+  uart_puts("Current EL is: ");
+  uart_hex((el >> 2) & 3);
+  uart_puts("\n");
+  
+  unsigned long ttbr0, ttbr1, ttbcr;
+  asm volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));
+  // 0x936dd22509d4006a
+  // 
+  asm volatile("mrs %0, ttbr1_el1" : "=r"(ttbr1));
+  // asm volatile("mrs %0, tcr_el1" : "=r"(ttbcr));
+  lfb_print(10, 5, "Hello!");
+  lfb_print_long_hex(10, 6, ttbr0);
+  lfb_print_long_hex(10, 7, ttbr1);
+  lfb_print_long_hex(10, 8, ttbcr);
+  while(1);
 
   if (mbox_call(MBOX_CH_PROP)) {
     uart_puts("My serial number is: ");
