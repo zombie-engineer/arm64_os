@@ -16,7 +16,7 @@ _start:
   ldr   x1, =_start
 
   // set up EL1
-  mrs   x0, CurrentEL
+  mrs   x0, currentel
   and   x0, x0, #0xc // clear reserved bits
   cmp   x0, #0xc
   bne 5f
@@ -31,6 +31,7 @@ _start:
   orr   x0, x0, #3
   msr   cnthctl_el2, x0
   msr   cntvoff_el2, xzr
+  bl    _disable_coproc_traps
   // enable AArch64 in EL1
   mov   x0, #(1 << 31)    // AArch64
   orr   x0, x0, #(1 << 1) // SWIO hardwired on Pi3
@@ -104,3 +105,15 @@ _vectors:
   mrs   x4, far_el1
   b exc_handler
   
+_disable_coproc_traps:
+  // [9:0] -> RES1
+  // [10]  => 0 to disable FPU trap
+  // [13:12] -> RES1
+  // => 0x33ff
+  mov   x0, #0x33ff
+  msr   cptr_el2, x0
+  msr   hstr_el2, xzr
+  mov   x0, #(3 << 20)
+  msr   cpacr_el1, x0
+  ret
+

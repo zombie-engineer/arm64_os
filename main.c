@@ -4,18 +4,11 @@
 #include "rand.h"
 #include "delays.h"
 #include "mmu.h"
+#include "sprintf.h"
 
-void main()
+unsigned long get_serial()
 {
-  unsigned long el;
-  uart_init();
-  lfb_init();
-
-  rand_init();
-  // mmu_init();
-
-  lfb_showpicture();
-  el = *(unsigned long*)0xffffffff;
+  unsigned long res;
 
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
@@ -25,11 +18,49 @@ void main()
   mbox[5] = 0;
   mbox[6] = 0;
   mbox[7] = MBOX_TAG_LAST;
+  res = mbox[5] << 32 | mbox[6];
+  return res;
+}
 
+void print_current_ex_level()
+{
+  unsigned long el;
   asm volatile("mrs %0, CurrentEL" : "=r"(el));
-  uart_puts("Current EL is: ");
-  uart_hex((el >> 2) & 3);
-  uart_puts("\n");
+  lfb_print(0, 0, "current_el:");
+  lfb_print_long_hex(0, 1, el);
+}
+
+void main()
+{
+  lfb_init();
+  print_current_ex_level();
+
+  char buf[256];
+  sprintf(buf, "my some: %x \n", 345);
+  unsigned long el;
+  uart_init();
+
+  rand_init();
+  mmu_init();
+
+  lfb_showpicture();
+  // generate exception here
+  // el = *(unsigned long*)0xffffffff;
+
+
+  asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));
+  lfb_print(0, 2, "id_aa64mmfr0_el1 is: ");
+  // 0x0000000000001122
+  // PARange  2: 40 bits, 1TB 0x2
+  // ASIDBits 2: 16 bits
+  // BigEnd   1: Mixed-endian support
+  // SNSMem   1: Secure versus Non-secure Memory
+  // TGran16  0: 16KB granule not supported
+  // TGran64  0: 64KB granule is supported
+  // TGran4   0: 4KB granule is supported
+
+  lfb_print_long_hex(0, 3, el);
+  while(1);
   
   unsigned long ttbr0, ttbr1, ttbcr;
   asm volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));
@@ -41,7 +72,6 @@ void main()
   lfb_print_long_hex(10, 6, ttbr0);
   lfb_print_long_hex(10, 7, ttbr1);
   lfb_print_long_hex(10, 8, ttbcr);
-  while(1);
 
   if (mbox_call(MBOX_CH_PROP)) {
     uart_puts("My serial number is: ");

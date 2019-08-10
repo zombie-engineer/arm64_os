@@ -33,6 +33,18 @@ extern volatile unsigned char _end;
  */
 void mmu_init()
 {
+  unsigned long ttbr0_el1 = (unsigned long)0x100000;
+  unsigned long ttbr1_el1 = (unsigned long)0x100008;
+  unsigned long tcr_el1 = 0x0;
+  asm volatile("msr ttbr0_el1, %0\n"::"r"(ttbr0_el1));
+  asm volatile("msr ttbr1_el1, %0\n"::"r"(ttbr1_el1));
+  asm volatile("msr tcr_el1, %0\n"::"r"(tcr_el1));
+  asm volatile("isb\n");
+  asm volatile("mrs x0, sctlr_el1\n");
+  asm volatile("orr x0, x0, #1\n");
+  asm volatile("msr sctlr_el1, x0\n");
+  asm volatile("isb\n");
+  return;
   unsigned long data_page = (unsigned long)&_data / PAGE_SIZE;
   unsigned long r, b, *paging = (unsigned long*)&_end;
 

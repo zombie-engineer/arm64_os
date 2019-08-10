@@ -33,5 +33,5 @@ run:
 rundebug:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s -S
 
-gdbattach:
-	gdb-multiarch -ex 'targ remo localhost:1234' -ex 'fil kernel8.elf' -ex 'b main'
+gdb:
+	gdb-multiarch -x rungdb.gdb
