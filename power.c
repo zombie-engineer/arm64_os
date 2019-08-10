@@ -16,7 +16,7 @@ void power_off()
   for (r = 0; r < 16; ++r) {
     mbox[0] = 8 * 4;
     mbox[1] = MBOX_REQUEST;
-    mbox[2] = MBOX_TAG_SETPOWER;
+    mbox[2] = MBOX_TAG_SET_POWER;
     mbox[3] = 8;
     mbox[4] = 8;
     mbox[5] = (unsigned int)r;

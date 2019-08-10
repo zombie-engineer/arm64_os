@@ -6,6 +6,7 @@
 
 unsigned int width, height, pitch;
 unsigned char *lfb;
+static int lfb_initialized = 0;
 
 typedef struct {
   unsigned int magic;
@@ -21,19 +22,23 @@ typedef struct {
 
 extern volatile unsigned char _binary_font_psf_start;
 
+int lfb_is_initialized()
+{
+  return lfb_initialized;
+}
 
 void lfb_init()
 {
   mbox[0] = 35 * 4;
   mbox[1] = MBOX_REQUEST;
 
-  mbox[2] = 0x48003;
+  mbox[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
   mbox[3] = 8;
   mbox[4] = 8;
   mbox[5] = 1024;
   mbox[6] = 768;
 
-  mbox[7] = 0x48004;
+  mbox[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
   mbox[8] = 8;
   mbox[9] = 8;
   mbox[10] = 1024;
@@ -80,6 +85,7 @@ void lfb_init()
   {
     uart_puts("Unable to set screen resolution to 1024x768x32\n");
   }
+  lfb_initialized = 1;
 }
 
 void lfb_showpicture()
@@ -153,3 +159,84 @@ void lfb_print_long_hex(int x, int y, unsigned long val)
   *ptr = 0;
   lfb_print(x, y, dump_place);
 }
+
+static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_off, int pitch)
+{
+  int x, y;
+  int mask;
+  unsigned int *pixel_addr;
+  unsigned int glyph_pixel;
+  int bytes_per_line = (font->width + 7) / 8;
+  for (y = 0; y < font->height; ++y) {
+    mask = 1 << (font->width - 1);
+    for (x = 0; x < font->width; ++x) {
+      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
+      glyph_pixel = (int)*glyph_off & mask ? 0xffffff : 0;
+      *pixel_addr = glyph_pixel;
+      mask >>= 1;
+    }
+    glyph_off += bytes_per_line;
+  }
+}
+
+void lfb_putc(int* x, int* y, char chr)
+{
+  unsigned char *glyphs, *glyph;
+  int glyph_idx;
+  int framebuf_off;
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+
+  // get offset to the glyph. Need to adjust this to support unicode..
+  glyphs = (unsigned char*)&_binary_font_psf_start + font->headersize;
+  glyph_idx = 0;
+  if (chr < font->numglyph)
+    glyph_idx = chr;
+  glyph = glyphs + glyph_idx * font->bytesperglyph;
+  // calculate offset on screen
+  framebuf_off = (*y * font->height * pitch) + (*x * (font->width + 1) * 4);
+  
+  // handle carriage return
+  if (chr == '\r')
+    *x = 0;
+  else
+  // new line
+  if (chr == '\n') {
+    *x = 0; 
+    (*y)++;
+  } else {
+    print_glyph(glyph, font, ((char*)lfb) + framebuf_off, pitch);
+    (*x)++;
+  }
+}
+
+
+void lfb_puts(int *x, int *y, const char *s)
+{
+  while(*s) {
+    lfb_putc(x, y, *s++);
+  }
+}
+
+int lfb_get_width_height(int *width, int *height)
+{
+  mbox[0] = 8 * 4;
+  mbox[1] = MBOX_REQUEST;
+
+  mbox[2] = MBOX_TAG_GET_VIRT_WIDTH_HEIGHT;
+  mbox[3] = 8;
+  mbox[4] = 8;
+  mbox[5] = 0;
+  mbox[6] = 0;
+  mbox[7] = MBOX_TAG_LAST;
+
+  if (mbox_call(MBOX_CH_PROP))
+  {
+    *width = mbox[5];
+    *height = mbox[6];
+    return 0;
+  }
+
+  uart_puts("Unable to set screen resolution to 1024x768x32\n");
+  return -1;
+}
+

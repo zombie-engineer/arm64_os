@@ -1,6 +1,6 @@
 #include "sprintf.h"
 
-unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args)
+unsigned int vsprintf(char *dst, const char *fmt, __builtin_va_list args)
 {
   long int arg;
   int len, sign, i;
@@ -62,7 +62,7 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args)
         goto copystring;
       } 
       // if hex number
-      else if (*fmt == 'x') {
+      else if (*fmt == 'x' || *fmt == 'X') {
         arg = __builtin_va_arg(args, long int);
         // convert to string
         i = 16;
@@ -70,7 +70,10 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args)
         do {
           char n = arg & 0xf;
           // 0-9 >= '0' - '9', 10-15 => 'A' - 'F'
-          tmpstr[--i] = n + (n <= 9 ? '0' : 0x37);
+          n += (n <= 9 ? '0' : 0x37);
+          if (n >= 'A' && *fmt == 'x')
+            n += 0x20;
+          tmpstr[--i] = n;
           arg >>= 4;
         } while (arg != 0 && i > 0);
         // padding, only leading zeroes
@@ -101,7 +104,7 @@ put:
   return dst - orig;
 }
 
-unsigned int sprintf(char *dst, char *fmt, ...)
+unsigned int sprintf(char *dst, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);

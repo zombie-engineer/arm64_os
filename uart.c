@@ -74,7 +74,7 @@ void uart_init()
   /* set up clock for consistent divisor values */
   mbox[0] = 9 * 4;
   mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_SETCLKRATE;
+  mbox[2] = MBOX_TAG_SET_CLOCK_RATE;
   mbox[3] = 12;
   mbox[4] = 8;
   mbox[5] = 2;       // UART clock
@@ -140,7 +140,12 @@ char uart0_getc()
   return r == '\r' ? '\n' : r;
 }
 
-void uart_puts(char *s)
+void uart_putc(char c)
+{
+  uart_send(c);
+}
+
+void uart_puts(const char *s)
 {
   while(*s)
   {
