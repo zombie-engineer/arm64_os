@@ -44,29 +44,29 @@ void lfb_init()
   mbox[10] = 1024;
   mbox[11] = 768;
 
-  mbox[12] = 0x48009;
+  mbox[12] = MBOX_TAG_SET_VIRT_OFFSET;
   mbox[13] = 8;
   mbox[14] = 8;
   mbox[15] = 0;
   mbox[16] = 0;
 
-  mbox[17] = 0x48005;
+  mbox[17] = MBOX_TAG_SET_DEPTH;
   mbox[18] = 4;
   mbox[19] = 4;
   mbox[20] = 32;
 
-  mbox[21] = 0x48006;
+  mbox[21] = MBOX_TAG_SET_PIXEL_ORDER;
   mbox[22] = 4;
   mbox[23] = 4;
   mbox[24] = 1;
 
-  mbox[25] = 0x40001;
+  mbox[25] = MBOX_TAG_ALLOCATE_BUFFER;
   mbox[26] = 8;
   mbox[27] = 8;
   mbox[28] = 4096;
   mbox[29] = 0;
 
-  mbox[30] = 0x40008;
+  mbox[30] = MBOX_TAG_GET_PITCH;
   mbox[31] = 4;
   mbox[32] = 4;
   mbox[33] = 0;
