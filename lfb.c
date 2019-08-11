@@ -5,7 +5,7 @@
 #include "homer.h"
 #include "exception.h"
 
-unsigned int width, height, pitch;
+unsigned int fb_width, fb_height, fb_pitch;
 unsigned char *lfb;
 static int lfb_initialized = 0;
 
@@ -28,7 +28,7 @@ int lfb_is_initialized()
   return lfb_initialized;
 }
 
-void lfb_init()
+void lfb_init(int width, int height)
 {
   mbox[0] = 35 * 4;
   mbox[1] = MBOX_REQUEST;
@@ -36,14 +36,14 @@ void lfb_init()
   mbox[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
   mbox[3] = 8;
   mbox[4] = 8;
-  mbox[5] = 1024;
-  mbox[6] = 768;
+  mbox[5] = width;
+  mbox[6] = height;
 
   mbox[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
   mbox[8] = 8;
   mbox[9] = 8;
-  mbox[10] = 1024;
-  mbox[11] = 768;
+  mbox[10] = width;
+  mbox[11] = height;
 
   mbox[12] = MBOX_TAG_SET_VIRT_OFFSET;
   mbox[13] = 8;
@@ -77,9 +77,9 @@ void lfb_init()
   if (mbox_call(MBOX_CH_PROP) && mbox[20] == 32 && mbox[28] != 0)
   {
     mbox[28] &= 0x3fffffff;
-    width = mbox[5];
-    height = mbox[6];
-    pitch = mbox[33];
+    fb_width = mbox[5];
+    fb_height = mbox[6];
+    fb_pitch = mbox[33];
     lfb = (void*)((unsigned long)mbox[28]);
   }
   else
@@ -94,7 +94,7 @@ void lfb_showpicture()
   int x,y;
   unsigned char *ptr = lfb;
   char *data = homer_data, pixel[4];
-  ptr += (height - homer_height) / 2 * pitch + (width - homer_width) * 2;
+  ptr += (fb_height - homer_height) / 2 * fb_pitch + (fb_width - homer_width) * 2;
   for (y = 0; y < homer_height; ++y)
   {
     for (x = 0; x < homer_width; ++x)
@@ -103,7 +103,7 @@ void lfb_showpicture()
       *((unsigned int*)ptr) = *((unsigned int*)&pixel);
       ptr += 4;
     }
-    ptr += pitch - homer_width * 4;
+    ptr += fb_pitch - homer_width * 4;
   }
 }
 
@@ -115,7 +115,7 @@ void lfb_print(int x, int y, char *s)
     unsigned char *glyph = (unsigned char*)&_binary_font_psf_start + font->headersize
       + (*((unsigned char*)s) < font->numglyph ? *s : 0) * font->bytesperglyph;
     // calculate offset on screen
-    int offs = (y * font->height * pitch) + (x * (font->width + 1) * 4);
+    int offs = (y * font->height * fb_pitch) + (x * (font->width + 1) * 4);
     
     int i, j, line, mask, bytesperline = (font->width + 7) / 8;
     // handle carriage return
@@ -137,7 +137,7 @@ void lfb_print(int x, int y, char *s)
         }
         // adjust to next line
         glyph += bytesperline;
-        offs += pitch;
+        offs += fb_pitch;
       }
       x++;
     }
@@ -194,7 +194,7 @@ void lfb_putc(int* x, int* y, char chr)
     glyph_idx = chr;
   glyph = glyphs + glyph_idx * font->bytesperglyph;
   // calculate offset on screen
-  framebuf_off = (*y * font->height * pitch) + (*x * (font->width + 1) * 4);
+  framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
   
   // handle carriage return
   if (chr == '\r')
@@ -205,7 +205,7 @@ void lfb_putc(int* x, int* y, char chr)
     *x = 0; 
     (*y)++;
   } else {
-    print_glyph(glyph, font, ((char*)lfb) + framebuf_off, pitch);
+    print_glyph(glyph, font, ((char*)lfb) + framebuf_off, fb_pitch);
     (*x)++;
   }
 }
@@ -222,8 +222,8 @@ void lfb_puts(int *x, int *y, const char *s)
   if (lfb_get_width_height(&width_limit, &height_limit))
     generate_exception();
 
-  width_limit /= font->width;
-  height_limit /= font->height;
+  width_limit /= (font->width + 1);
+  height_limit /= (font->height + 1);
 
   while(*s) {
     if (*x >= (width_limit - 1)) {

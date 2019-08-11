@@ -1,6 +1,6 @@
 #pragma once
 
-void lfb_init();
+void lfb_init(int width, int height);
 
 int lfb_is_initialized();
 

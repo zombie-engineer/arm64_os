@@ -73,10 +73,13 @@ void console_puts(const char* str)
 
 void init_consoles()
 {
+  console_dev_t dev;
+
   console_init();
 
-  video_console_init();
-  console_dev_t dev;
+  if (video_console_init())
+    generate_exception();
+
   dev.puts = video_console_puts;
   dev.putc = video_console_putc;
   if (console_add_device(&dev, VIDEO_CONSOLE_NAME))

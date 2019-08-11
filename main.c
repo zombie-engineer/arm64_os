@@ -10,6 +10,9 @@
 #include "mbox_props.h"
 #include "gpio.h"
 
+#define DISPLAY_WIDTH 1824
+#define DISPLAY_HEIGHT 984
+
 void print_current_ex_level()
 {
   unsigned long el;
@@ -67,6 +70,7 @@ void print_cmdline()
 {
   volatile unsigned int *tag_base_ptr = (volatile unsigned int *)0x100;
   volatile tag_t *tag = (volatile tag_t *)tag_base_ptr;
+  // printf("0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz");
   while(1)
   {
     if ((tag->size & 0xff) == 0)
@@ -85,7 +89,7 @@ void print_cmdline()
 
 void main()
 {
-  lfb_init();
+  lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   uart_init();
   init_consoles();
   print_current_ex_level();

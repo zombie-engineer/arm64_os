@@ -13,7 +13,7 @@ static console_screen_t sc;
 int video_console_init()
 {
   if (!lfb_is_initialized())
-    lfb_init();
+    return -1;
 
   sc.x = 0;
   sc.y = 0;
@@ -24,7 +24,6 @@ int video_console_init()
 
 void video_console_puts(const char *str)
 {
-  // lfb_print(0, 0, "hello");
   lfb_puts(&sc.x, &sc.y, str);
 }
 
