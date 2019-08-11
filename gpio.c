@@ -30,7 +30,7 @@ int gpio_set_off(int gpio_num)
   unsigned int volatile *gpio_set_reg;
   if (gpio_num > 53)
     return -1;
-  gpio_set_reg = GPSET0 + gpio_num / 32;
-  *gpio_set_reg &= ~(1 << (gpio_num % 32));
+  gpio_set_reg = GPCLR0 + gpio_num / 32;
+  *gpio_set_reg |= (1 << (gpio_num % 32));
   return 0;
 }

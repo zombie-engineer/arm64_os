@@ -3,6 +3,7 @@
 #include "uart.h"
 #include "mbox.h"
 #include "homer.h"
+#include "exception.h"
 
 unsigned int width, height, pitch;
 unsigned char *lfb;
@@ -212,7 +213,26 @@ void lfb_putc(int* x, int* y, char chr)
 
 void lfb_puts(int *x, int *y, const char *s)
 {
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  int width_limit, height_limit;
+
+  if (x == 0 || y == 0 || s == 0)
+    generate_exception();
+
+  if (lfb_get_width_height(&width_limit, &height_limit))
+    generate_exception();
+
+  width_limit /= font->width;
+  height_limit /= font->height;
+
   while(*s) {
+    if (*x >= (width_limit - 1)) {
+      if (*y >= (height_limit - 1)) 
+        break;
+      *x = 0;
+      (*y)++;
+    }
+
     lfb_putc(x, y, *s++);
   }
 }
