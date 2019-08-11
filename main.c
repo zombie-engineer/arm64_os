@@ -8,6 +8,7 @@
 #include "sprintf.h"
 #include "console.h"
 #include "mbox_props.h"
+#include "gpio.h"
 
 void print_current_ex_level()
 {
@@ -31,7 +32,7 @@ void print_mbox_props()
   if (mbox_get_mac_addr(&buf[0], &buf[7]))
     printf("failed to get MAC addr\n");
   else
-    printf("MAC:             %x:%x:%x:%x:%x:%x\n", 
+    printf("mac address:     %x:%x:%x:%x:%x:%x\n", 
       (int)(buf[0]),
       (int)(buf[1]),
       (int)(buf[2]),
@@ -84,6 +85,10 @@ void main()
   // TGran64  0: 64KB granule is supported
   // TGran4   0: 4KB granule is supported
 
+  wait_msec(200000);
+  printf("entering loop...\n");
+  gpio_set_function(21, GPIO_FUNC_OUT);
+  gpio_set_on(21);
   while(1);
   
   unsigned long ttbr0, ttbr1, ttbcr;

@@ -44,3 +44,8 @@ void wait_msec_st(unsigned int n)
   if (t) 
     while (get_system_timer() < t + n);
 }
+
+void set_timer(unsigned int ms)
+{
+
+}

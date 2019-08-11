@@ -21,3 +21,10 @@
 #define GPPUD           ((volatile unsigned int*)(GPIO_BASE + 0x94))
 #define GPPUDCLK0       ((volatile unsigned int*)(GPIO_BASE + 0x98))
 #define GPPUDCLK1       ((volatile unsigned int*)(GPIO_BASE + 0x9C))
+
+#define GPIO_FUNC_IN  0
+#define GPIO_FUNC_OUT 1
+
+int gpio_set_function(int gpio_num, int func);
+int gpio_set_on(int gpio_num);
+int gpio_set_off(int gpio_num);
