@@ -14,3 +14,21 @@ const char * printf(const char* fmt, ...)
   console_puts(printfbuf);
   return res;
 }
+
+void hexdump_addr(unsigned int *addr)
+{
+  int i;
+  volatile unsigned int *base_ptr = (volatile unsigned int *)addr;
+  for (i = 0; i < 32; ++i)
+  {
+    printf("%08x: %08x %08x %08x %08x\n", 
+        base_ptr + i * 4,
+        *(base_ptr + i * 4 + 0),
+        *(base_ptr + i * 4 + 1),
+        *(base_ptr + i * 4 + 2),
+        *(base_ptr + i * 4 + 3)
+    );
+  }
+}
+
+

@@ -5,6 +5,7 @@
 #include "rand.h"
 #include "timer.h"
 #include "delays.h"
+#include "tags.h"
 #include "mmu.h"
 #include "common.h"
 #include "sprintf.h"
@@ -86,130 +87,6 @@ void c_irq_handler(void)
 // clear_timer_irq();
 }
 
-#define print_reg32(regname) printf(#regname " %08x\n",  regname)
-
-void arm_timer_dump_regs(const char* tag)
-{
-  printf("ARM_TIMER_REGS: tag: %s\n", tag);
-  print_reg32(ARM_TIMER_LOAD_REG);
-  print_reg32(ARM_TIMER_VALUE_REG);
-  print_reg32(ARM_TIMER_CONTROL_REG);
-  print_reg32(ARM_TIMER_IRQ_CLEAR_ACK_REG);
-  print_reg32(ARM_TIMER_RAW_IRQ_REG);
-  print_reg32(ARM_TIMER_MASKED_IRQ_REG);
-  print_reg32(ARM_TIMER_RELOAD_REG);
-  print_reg32(ARM_TIMER_PRE_DIVIDED_REG);
-  print_reg32(ARM_TIMER_FREE_RUNNING_COUNTER_REG);
-  printf("---------\n");
-}
-
-
-#define MICROSECONDS_PER_SECOND 1000000
-
-void set_timer_with_irq(unsigned period_in_us, void(*irq_timer_handler)(void))
-{
-  unsigned clock_rate;
-  unsigned clocks_per_us;
-  // clock rate - is HZ : number of clocks per sec
-  // clocks_per_us : number of clocks per us
-  if (mbox_get_clock_rate(4, &clock_rate))
-     generate_exception();
-
-  clocks_per_us = clock_rate / MICROSECONDS_PER_SECOND;
-  // arm_timer_dump_regs("before");
-  ARM_TIMER_LOAD_REG = period_in_us / clocks_per_us;
-  ARM_TIMER_LOAD_REG = 0x00e00000;
-  // arm_timer_dump_regs("after load");
-  ARM_TIMER_CONTROL_REG &= ~(1 << ARM_TMR_CTRL_R_TMR_EN_BP);
-  // arm_timer_dump_regs("after disable");
-  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_WIDTH_BP);
-  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_IRQ_EN_BP);
-  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_TMR_EN_BP);
-  ARM_TIMER_IRQ_CLEAR_ACK_REG = 0xffffffff;
-  // arm_timer_dump_regs("after enable");
-}
-
-#define INT_CTRL_BASE 0x3f00b200
-#define INT_CTRL_IRQ_BASIC_PENDING      *(volatile unsigned int*)(INT_CTRL_BASE + 0x00)
-#define INT_CTRL_IRQ_PENDING_1          *(volatile unsigned int*)(INT_CTRL_BASE + 0x04)
-#define INT_CTRL_IRQ_PENDING_2          *(volatile unsigned int*)(INT_CTRL_BASE + 0x08)
-#define INT_CTRL_IRQ_FIQ_CONTROL        *(volatile unsigned int*)(INT_CTRL_BASE + 0x0c)
-#define INT_CTRL_IRQ_ENABLE_IRQS_1      *(volatile unsigned int*)(INT_CTRL_BASE + 0x10)
-#define INT_CTRL_IRQ_ENABLE_IRQS_2      *(volatile unsigned int*)(INT_CTRL_BASE + 0x14)
-#define INT_CTRL_IRQ_ENABLE_BASIC_IRQS  *(volatile unsigned int*)(INT_CTRL_BASE + 0x18)
-#define INT_CTRL_IRQ_DISABLE_IRQS_1     *(volatile unsigned int*)(INT_CTRL_BASE + 0x1c)
-#define INT_CTRL_IRQ_DISABLE_IRQS_2     *(volatile unsigned int*)(INT_CTRL_BASE + 0x20)
-#define INT_CTRL_IRQ_DISABLE_BASIC_IRQS *(volatile unsigned int*)(INT_CTRL_BASE + 0x24)
-
-void interrupt_ctrl_dump_regs(const char* tag)
-{
-  printf("ARM_TIMER_REGS: tag: %s\n", tag);
-  print_reg32(INT_CTRL_IRQ_BASIC_PENDING);
-  print_reg32(INT_CTRL_IRQ_PENDING_1);
-  print_reg32(INT_CTRL_IRQ_PENDING_2);
-  print_reg32(INT_CTRL_IRQ_FIQ_CONTROL);
-  print_reg32(INT_CTRL_IRQ_ENABLE_IRQS_1);
-  print_reg32(INT_CTRL_IRQ_ENABLE_IRQS_2);
-  print_reg32(INT_CTRL_IRQ_ENABLE_BASIC_IRQS);
-  print_reg32(INT_CTRL_IRQ_DISABLE_IRQS_1);
-  print_reg32(INT_CTRL_IRQ_DISABLE_IRQS_2);
-  print_reg32(INT_CTRL_IRQ_DISABLE_BASIC_IRQS);
-  printf("---------\n");
-}
-
-
-void interrupt_ctrl_enable_timer_irq(void)
-{
-  DECL_INTERRUPT_CONTROLLER(irq);
-  INT_CTRL_IRQ_ENABLE_BASIC_IRQS |= 1;
-
-  interrupt_ctrl_dump_regs("before");
-}
-
-typedef struct tag {
-  unsigned int size;
-  unsigned short id;
-  unsigned short magic;
-  char data[0];
-} __attribute__((packed)) tag_t;
-
-void print_cmdline()
-{
-  volatile unsigned int *tag_base_ptr = (volatile unsigned int *)0x100;
-  volatile tag_t *tag = (volatile tag_t *)tag_base_ptr;
-  while(1)
-  {
-    if ((tag->size & 0xff) == 0)
-      break;
-    if (tag->id == 9)
-    {
-      printf("0x%08x: tag cmdline=%s\n", *(volatile unsigned int*)(tag->data), (volatile const char*)tag->data);
-      break;
-    }
-    else
-    {
-      tag = (volatile tag_t*)(((volatile unsigned int*)(tag)) + tag->size);
-    }
-  }
-}
-
-void hexdump_addr(unsigned int *addr)
-{
-  int i;
-  volatile unsigned int *base_ptr = (volatile unsigned int *)addr;
-  for (i = 0; i < 32; ++i)
-  {
-    printf("%08x: %08x %08x %08x %08x\n", 
-        base_ptr + i * 4,
-        *(base_ptr + i * 4 + 0),
-        *(base_ptr + i * 4 + 1),
-        *(base_ptr + i * 4 + 2),
-        *(base_ptr + i * 4 + 3)
-    );
-  }
-}
-
-
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
@@ -226,7 +103,7 @@ void main()
   lfb_showpicture();
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
-  print_cmdline();
+  tags_print_cmdline();
 
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));
   printf("id_aa64mmfr0_el1 is: %08x\n", el);
@@ -244,7 +121,7 @@ void main()
   interrupt_ctrl_enable_timer_irq();
   if (is_irq_enabled())
     printf("irq enabled\n");
-  set_timer_with_irq(500000, c_irq_handler);
+  arm_timer_set(500000, c_irq_handler);
   // while(1);
 
   // wait_msec(200000);

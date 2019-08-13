@@ -67,3 +67,7 @@ typedef struct {
 } __attribute__((packed)) arm_timer_regs_t;
 
 #define DECL_ARM_TIMER(var) DECL_PERIPH_BASE(arm_timer_regs_t, var, (MMIO_BASE + 0xb400))
+
+void arm_timer_dump_regs(const char* tag);
+
+void arm_timer_set(unsigned period_in_us, void(*irq_timer_handler)(void));

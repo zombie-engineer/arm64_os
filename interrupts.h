@@ -35,3 +35,20 @@ typedef struct {
 } __attribute__((packed)) irq_controller_t;
 
 #define DECL_INTERRUPT_CONTROLLER(v) DECL_PERIPH_BASE(irq_controller_t, v, MMIO_BASE + 0xb200)
+
+#define INT_CTRL_BASE 0x3f00b200
+#define INT_CTRL_IRQ_BASIC_PENDING      *(volatile unsigned int*)(INT_CTRL_BASE + 0x00)
+#define INT_CTRL_IRQ_PENDING_1          *(volatile unsigned int*)(INT_CTRL_BASE + 0x04)
+#define INT_CTRL_IRQ_PENDING_2          *(volatile unsigned int*)(INT_CTRL_BASE + 0x08)
+#define INT_CTRL_IRQ_FIQ_CONTROL        *(volatile unsigned int*)(INT_CTRL_BASE + 0x0c)
+#define INT_CTRL_IRQ_ENABLE_IRQS_1      *(volatile unsigned int*)(INT_CTRL_BASE + 0x10)
+#define INT_CTRL_IRQ_ENABLE_IRQS_2      *(volatile unsigned int*)(INT_CTRL_BASE + 0x14)
+#define INT_CTRL_IRQ_ENABLE_BASIC_IRQS  *(volatile unsigned int*)(INT_CTRL_BASE + 0x18)
+#define INT_CTRL_IRQ_DISABLE_IRQS_1     *(volatile unsigned int*)(INT_CTRL_BASE + 0x1c)
+#define INT_CTRL_IRQ_DISABLE_IRQS_2     *(volatile unsigned int*)(INT_CTRL_BASE + 0x20)
+#define INT_CTRL_IRQ_DISABLE_BASIC_IRQS *(volatile unsigned int*)(INT_CTRL_BASE + 0x24)
+
+void interrupt_ctrl_dump_regs(const char* tag);
+
+void interrupt_ctrl_enable_timer_irq(void);
+
