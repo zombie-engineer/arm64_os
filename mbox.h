@@ -27,6 +27,7 @@ extern volatile unsigned int mbox[36];
 #define MBOX_TAG_ALLOCATE_BUFFER       0x40001
 #define MBOX_TAG_BLANK_SCREEN          0x40002
 #define MBOX_TAG_SET_POWER             0x28001
+#define MBOX_TAG_GET_CLOCK_RATE        0x30002
 #define MBOX_TAG_SET_CLOCK_RATE        0x38002
 #define MBOX_TAG_GET_PHYS_WIDTH_HEIGHT 0x40003
 #define MBOX_TAG_SET_PHYS_WIDTH_HEIGHT 0x48003

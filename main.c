@@ -1,7 +1,9 @@
 #include "uart.h"
 #include "mbox.h"
+#include "armv8.h"
 #include "lfb.h"
 #include "rand.h"
+#include "timer.h"
 #include "delays.h"
 #include "mmu.h"
 #include "common.h"
@@ -9,6 +11,9 @@
 #include "console.h"
 #include "mbox_props.h"
 #include "gpio.h"
+#include "interrupts.h"
+#include "exception.h"
+#include "timer.h"
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -22,7 +27,8 @@ void print_current_ex_level()
 
 void print_mbox_props()
 {
-  int val, val2;
+  int val, val2, i;
+  unsigned clock_rate;
   char buf[6];
   val = mbox_get_firmware_rev();
   printf("firmware rev:    %08x\n", val);
@@ -57,6 +63,107 @@ void print_mbox_props()
     printf("vc memory base:  %08x\n", val);  
     printf("vc memory size:  %08x\n", val2);  
   }
+  for (i = 0; i < 8; ++i) {
+    if (mbox_get_clock_rate(i, &clock_rate))
+      printf("failed to get clock rate for clock_id %d\n", i);
+    else
+      printf("clock %d rate: %08x\n", i, clock_rate);
+  }
+}
+
+void set_timer_irq_address(void(*irq_addr)(void))
+{
+  asm volatile("msr daifset, #2\nldr x1, _vectors_irq\nldr x2, [x1]\nstr x0, [x1]\nmov x0, x2\nret\n");
+}
+
+int lit = 0;
+
+void c_irq_handler(void)
+{
+  gpio_set_on(21);
+  // if (lit) lit = 0; else lit = 1;
+//  set_activity_led(lit);
+// clear_timer_irq();
+}
+
+#define print_reg32(regname) printf(#regname " %08x\n",  regname)
+
+void arm_timer_dump_regs(const char* tag)
+{
+  printf("ARM_TIMER_REGS: tag: %s\n", tag);
+  print_reg32(ARM_TIMER_LOAD_REG);
+  print_reg32(ARM_TIMER_VALUE_REG);
+  print_reg32(ARM_TIMER_CONTROL_REG);
+  print_reg32(ARM_TIMER_IRQ_CLEAR_ACK_REG);
+  print_reg32(ARM_TIMER_RAW_IRQ_REG);
+  print_reg32(ARM_TIMER_MASKED_IRQ_REG);
+  print_reg32(ARM_TIMER_RELOAD_REG);
+  print_reg32(ARM_TIMER_PRE_DIVIDED_REG);
+  print_reg32(ARM_TIMER_FREE_RUNNING_COUNTER_REG);
+  printf("---------\n");
+}
+
+
+#define MICROSECONDS_PER_SECOND 1000000
+
+void set_timer_with_irq(unsigned period_in_us, void(*irq_timer_handler)(void))
+{
+  unsigned clock_rate;
+  unsigned clocks_per_us;
+  // clock rate - is HZ : number of clocks per sec
+  // clocks_per_us : number of clocks per us
+  if (mbox_get_clock_rate(4, &clock_rate))
+     generate_exception();
+
+  clocks_per_us = clock_rate / MICROSECONDS_PER_SECOND;
+  // arm_timer_dump_regs("before");
+  ARM_TIMER_LOAD_REG = period_in_us / clocks_per_us;
+  ARM_TIMER_LOAD_REG = 0x00e00000;
+  // arm_timer_dump_regs("after load");
+  ARM_TIMER_CONTROL_REG &= ~(1 << ARM_TMR_CTRL_R_TMR_EN_BP);
+  // arm_timer_dump_regs("after disable");
+  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_WIDTH_BP);
+  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_IRQ_EN_BP);
+  ARM_TIMER_CONTROL_REG |= (1 << ARM_TMR_CTRL_R_TMR_EN_BP);
+  ARM_TIMER_IRQ_CLEAR_ACK_REG = 0xffffffff;
+  // arm_timer_dump_regs("after enable");
+}
+
+#define INT_CTRL_BASE 0x3f00b200
+#define INT_CTRL_IRQ_BASIC_PENDING      *(volatile unsigned int*)(INT_CTRL_BASE + 0x00)
+#define INT_CTRL_IRQ_PENDING_1          *(volatile unsigned int*)(INT_CTRL_BASE + 0x04)
+#define INT_CTRL_IRQ_PENDING_2          *(volatile unsigned int*)(INT_CTRL_BASE + 0x08)
+#define INT_CTRL_IRQ_FIQ_CONTROL        *(volatile unsigned int*)(INT_CTRL_BASE + 0x0c)
+#define INT_CTRL_IRQ_ENABLE_IRQS_1      *(volatile unsigned int*)(INT_CTRL_BASE + 0x10)
+#define INT_CTRL_IRQ_ENABLE_IRQS_2      *(volatile unsigned int*)(INT_CTRL_BASE + 0x14)
+#define INT_CTRL_IRQ_ENABLE_BASIC_IRQS  *(volatile unsigned int*)(INT_CTRL_BASE + 0x18)
+#define INT_CTRL_IRQ_DISABLE_IRQS_1     *(volatile unsigned int*)(INT_CTRL_BASE + 0x1c)
+#define INT_CTRL_IRQ_DISABLE_IRQS_2     *(volatile unsigned int*)(INT_CTRL_BASE + 0x20)
+#define INT_CTRL_IRQ_DISABLE_BASIC_IRQS *(volatile unsigned int*)(INT_CTRL_BASE + 0x24)
+
+void interrupt_ctrl_dump_regs(const char* tag)
+{
+  printf("ARM_TIMER_REGS: tag: %s\n", tag);
+  print_reg32(INT_CTRL_IRQ_BASIC_PENDING);
+  print_reg32(INT_CTRL_IRQ_PENDING_1);
+  print_reg32(INT_CTRL_IRQ_PENDING_2);
+  print_reg32(INT_CTRL_IRQ_FIQ_CONTROL);
+  print_reg32(INT_CTRL_IRQ_ENABLE_IRQS_1);
+  print_reg32(INT_CTRL_IRQ_ENABLE_IRQS_2);
+  print_reg32(INT_CTRL_IRQ_ENABLE_BASIC_IRQS);
+  print_reg32(INT_CTRL_IRQ_DISABLE_IRQS_1);
+  print_reg32(INT_CTRL_IRQ_DISABLE_IRQS_2);
+  print_reg32(INT_CTRL_IRQ_DISABLE_BASIC_IRQS);
+  printf("---------\n");
+}
+
+
+void interrupt_ctrl_enable_timer_irq(void)
+{
+  DECL_INTERRUPT_CONTROLLER(irq);
+  INT_CTRL_IRQ_ENABLE_BASIC_IRQS |= 1;
+
+  interrupt_ctrl_dump_regs("before");
 }
 
 typedef struct tag {
@@ -70,7 +177,6 @@ void print_cmdline()
 {
   volatile unsigned int *tag_base_ptr = (volatile unsigned int *)0x100;
   volatile tag_t *tag = (volatile tag_t *)tag_base_ptr;
-  // printf("0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz0123456789abcdefghijklmnopquvwxyz");
   while(1)
   {
     if ((tag->size & 0xff) == 0)
@@ -86,6 +192,23 @@ void print_cmdline()
     }
   }
 }
+
+void hexdump_addr(unsigned int *addr)
+{
+  int i;
+  volatile unsigned int *base_ptr = (volatile unsigned int *)addr;
+  for (i = 0; i < 32; ++i)
+  {
+    printf("%08x: %08x %08x %08x %08x\n", 
+        base_ptr + i * 4,
+        *(base_ptr + i * 4 + 0),
+        *(base_ptr + i * 4 + 1),
+        *(base_ptr + i * 4 + 2),
+        *(base_ptr + i * 4 + 3)
+    );
+  }
+}
+
 
 void main()
 {
@@ -115,30 +238,37 @@ void main()
   // TGran16  0: 16KB granule not supported
   // TGran64  0: 64KB granule is supported
   // TGran4   0: 4KB granule is supported
-  int i;
-  volatile unsigned int *base_ptr = (volatile unsigned int *)0x100;
-  for (i = 0; i < 32; ++i)
-  {
-    printf("%08x: %08x %08x %08x %08x\n", 
-        base_ptr + i * 4,
-        *(base_ptr + i * 4 + 0),
-        *(base_ptr + i * 4 + 1),
-        *(base_ptr + i * 4 + 2),
-        *(base_ptr + i * 4 + 3)
-    );
-  }
-
-
-  wait_msec(200000);
-  printf("entering loop...\n");
   gpio_set_function(21, GPIO_FUNC_OUT);
+  // hexdump_addr(0x100);
+  enable_irq();
+  interrupt_ctrl_enable_timer_irq();
+  if (is_irq_enabled())
+    printf("irq enabled\n");
+  set_timer_with_irq(500000, c_irq_handler);
+  // while(1);
+
+  // wait_msec(200000);
+  // printf("entering loop...\n");
   while(1)
   {
+    // timer_ctrl_t *timer = (timer_ctrl_t *)0x3f003000;
+    // timer->cs = 0;
+    // timer->c0 = timer->clo + 0x1800000;
+
     wait_cycles(0x1800000);
-    printf(".");
+    print_reg32(ARM_TIMER_VALUE_REG);
+    print_reg32(ARM_TIMER_RAW_IRQ_REG);
+    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
+    printf(">>\n");
     gpio_set_on(21);
     wait_cycles(0x1800000);
+    print_reg32(ARM_TIMER_VALUE_REG);
+    print_reg32(ARM_TIMER_RAW_IRQ_REG);
+    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
+    printf(">>\n");
     gpio_set_off(21);
+    if (ARM_TIMER_RAW_IRQ_REG)
+      ARM_TIMER_IRQ_CLEAR_ACK_REG = 1;
   }
   
   unsigned long ttbr0, ttbr1, ttbcr;

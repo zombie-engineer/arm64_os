@@ -128,3 +128,22 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size)
   }
   return -1;
 }
+
+int mbox_get_clock_rate(int clock_id, unsigned *clock_rate)
+{
+  mbox[0] = 8 * 4;
+  mbox[1] = MBOX_REQUEST;
+  mbox[2] = MBOX_TAG_GET_CLOCK_RATE;
+  mbox[3] = 8;
+  mbox[4] = 8;
+  mbox[5] = clock_id;
+  mbox[6] = 0;
+  mbox[7] = MBOX_TAG_LAST;
+  if (mbox_call(MBOX_CH_PROP) && mbox[5] == clock_id)
+  {
+    *clock_rate= mbox[6];
+    return 0;
+  }
+  return -1;
+}
+

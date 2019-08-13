@@ -14,15 +14,18 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 start.o: start.S
 	$(CC) $(CFLAGS) -c start.S -o start.o
 
+armv8.o: armv8.S
+	$(CC) $(CFLAGS) -c $? -o $@
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 font.o: font.psf
 	$(LD) -r -b binary -o font.o font.psf
 
-kernel8.img: start.o font.o $(OBJS)
-	$(LD) -nostdlib -nostartfiles start.o font.o $(OBJS) -T link.ld -o kernel8.elf
-	$(OBJCOPY) -O binary kernel8.elf kernel8.img
+kernel8.img: start.o armv8.o font.o $(OBJS)
+	$(LD) -nostdlib -nostartfiles $? -T link.ld -o kernel8.elf
+	$(OBJCOPY) -O binary kernel8.elf $@
 
 clean:
 	rm kernel8.elf *.o > /dev/nell 2>/dev/null || true
