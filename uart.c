@@ -40,18 +40,18 @@ void uart_init_simple()
   *AUX_MU_IIR  = 0xc6;
   *AUX_MU_BAUD = 270;
 
-  r = *GPFSEL1;
+  r = GPFSEL1;
   // pins gpio14, gpio15
   r &= ~(7<<12|7<<15);
   r |= (2<<12|2<<15);
-  *GPFSEL1 = r;
-  *GPPUD = 0;
+  GPFSEL1 = r;
+  GPPUD = 0;
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *GPPUDCLK0 = (1<<14|1<<15);
+  GPPUDCLK0 = (1<<14|1<<15);
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *GPPUDCLK0 = 0;
+  GPPUDCLK0 = 0;
   *AUX_MU_CNTL = 3; // enable Tx,Rx
 }
 
@@ -84,17 +84,17 @@ void uart_init()
   mbox_call(MBOX_CH_PROP);
 
   /* map UART0 to GPIO pins */
-  r = *GPFSEL1;
+  r = GPFSEL1;
   r &= ~((7 << 12) | (7 << 15)); // gpio14, gpio15
   r |= (4 << 12) | (4 << 15);    // alt0
-  *GPFSEL1 = r;
-  *GPPUD = 0;
+  GPFSEL1 = r;
+  GPPUD = 0;
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *GPPUDCLK0 = (1<<14|1<<15);
+  GPPUDCLK0 = (1<<14|1<<15);
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *GPPUDCLK0 = 0;
+  GPPUDCLK0 = 0;
 
   *UART0_ICR = 0x7ff;      // clear interrupts
   *UART0_IBRD = 2;         // 115200 baud

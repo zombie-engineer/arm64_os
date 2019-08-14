@@ -87,6 +87,58 @@ void c_irq_handler(void)
 // clear_timer_irq();
 }
 
+void wait_timer()
+{
+  gpio_set_function(21, GPIO_FUNC_OUT);
+  enable_irq();
+  interrupt_ctrl_enable_timer_irq();
+  if (is_irq_enabled())
+    printf("irq enabled\n");
+  arm_timer_set(500000, c_irq_handler);
+  while(1)
+  {
+    interrupt_ctrl_dump_regs("after set\n");
+    print_reg32(GPEDS0);
+    wait_cycles(0x1800000);
+    print_reg32(GPEDS0);
+    print_reg32(ARM_TIMER_VALUE_REG);
+    print_reg32(ARM_TIMER_RAW_IRQ_REG);
+    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
+    printf(">>\n");
+    gpio_set_on(21);
+    wait_cycles(0x1800000);
+    print_reg32(ARM_TIMER_VALUE_REG);
+    print_reg32(ARM_TIMER_RAW_IRQ_REG);
+    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
+    printf(">>\n");
+    gpio_set_off(21);
+    if (ARM_TIMER_RAW_IRQ_REG)
+      ARM_TIMER_IRQ_CLEAR_ACK_REG = 1;
+  }
+}
+
+void wait_gpio()
+{
+  interrupt_ctrl_dump_regs("before set\n");
+  interrupt_ctrl_enable_gpio_irq(20);
+  enable_irq();
+  // gpio_set_function(20, GPIO_FUNC_IN);
+  // gpio_set_detect_high(20);
+  // GPLEN0 |= 1 << 2;
+  GPPAFEN0 |= 1 << 2;
+  
+  interrupt_ctrl_dump_regs("after set\n");
+  while(1) {
+    // f: 1111 b: 1011
+    wait_cycles(0x300000);
+    print_reg32(INT_CTRL_IRQ_PENDING_2);
+    print_reg32(GPLEV0);
+    print_reg32(GPEDS0);
+  }
+}
+
+
+
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
@@ -105,6 +157,7 @@ void main()
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
 
+  // hexdump_addr(0x100);
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));
   printf("id_aa64mmfr0_el1 is: %08x\n", el);
   // 0x0000000000001122
@@ -115,38 +168,9 @@ void main()
   // TGran16  0: 16KB granule not supported
   // TGran64  0: 64KB granule is supported
   // TGran4   0: 4KB granule is supported
-  gpio_set_function(21, GPIO_FUNC_OUT);
-  // hexdump_addr(0x100);
-  enable_irq();
-  interrupt_ctrl_enable_timer_irq();
-  if (is_irq_enabled())
-    printf("irq enabled\n");
-  arm_timer_set(500000, c_irq_handler);
-  // while(1);
+  // wait_timer();
+  wait_gpio();
 
-  // wait_msec(200000);
-  // printf("entering loop...\n");
-  while(1)
-  {
-    // timer_ctrl_t *timer = (timer_ctrl_t *)0x3f003000;
-    // timer->cs = 0;
-    // timer->c0 = timer->clo + 0x1800000;
-
-    wait_cycles(0x1800000);
-    print_reg32(ARM_TIMER_VALUE_REG);
-    print_reg32(ARM_TIMER_RAW_IRQ_REG);
-    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
-    printf(">>\n");
-    gpio_set_on(21);
-    wait_cycles(0x1800000);
-    print_reg32(ARM_TIMER_VALUE_REG);
-    print_reg32(ARM_TIMER_RAW_IRQ_REG);
-    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
-    printf(">>\n");
-    gpio_set_off(21);
-    if (ARM_TIMER_RAW_IRQ_REG)
-      ARM_TIMER_IRQ_CLEAR_ACK_REG = 1;
-  }
   
   unsigned long ttbr0, ttbr1, ttbcr;
   asm volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));
