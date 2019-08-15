@@ -31,7 +31,6 @@
 
 void uart_init_simple()
 {
-  register unsigned int r;
   *AUX_ENABLE |= 1;
   *AUX_MU_CNTL = 0;
   *AUX_MU_LCR  = 3;
@@ -40,18 +39,12 @@ void uart_init_simple()
   *AUX_MU_IIR  = 0xc6;
   *AUX_MU_BAUD = 270;
 
-  r = GPFSEL1;
   // pins gpio14, gpio15
-  r &= ~(7<<12|7<<15);
-  r |= (2<<12|2<<15);
-  GPFSEL1 = r;
-  GPPUD = 0;
-  r = 150;
-  while(r--) { asm volatile("nop"); } 
-  GPPUDCLK0 = (1<<14|1<<15);
-  r = 150;
-  while(r--) { asm volatile("nop"); } 
-  GPPUDCLK0 = 0;
+  gpio_set_function(14, GPIO_FUNC_ALT_5);
+  gpio_set_function(15, GPIO_FUNC_ALT_5);
+  gpio_set_pullupdown(14, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(15, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+
   *AUX_MU_CNTL = 3; // enable Tx,Rx
 }
 
@@ -68,7 +61,6 @@ void uart_init_simple()
 #define UART0_LCRH_WLEN(x) (x<<5)
 void uart_init()
 {
-  register unsigned int r;
   *UART0_CR = 0; // turn off UART0
 
   /* set up clock for consistent divisor values */
@@ -84,17 +76,11 @@ void uart_init()
   mbox_call(MBOX_CH_PROP);
 
   /* map UART0 to GPIO pins */
-  r = GPFSEL1;
-  r &= ~((7 << 12) | (7 << 15)); // gpio14, gpio15
-  r |= (4 << 12) | (4 << 15);    // alt0
-  GPFSEL1 = r;
-  GPPUD = 0;
-  r = 150;
-  while(r--) { asm volatile("nop"); } 
-  GPPUDCLK0 = (1<<14|1<<15);
-  r = 150;
-  while(r--) { asm volatile("nop"); } 
-  GPPUDCLK0 = 0;
+  gpio_set_function(14, GPIO_FUNC_ALT_0);
+  gpio_set_function(15, GPIO_FUNC_ALT_0);
+
+  gpio_set_pullupdown(14, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(15, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
 
   *UART0_ICR = 0x7ff;      // clear interrupts
   *UART0_IBRD = 2;         // 115200 baud
