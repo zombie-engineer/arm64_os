@@ -138,6 +138,44 @@ void wait_gpio()
 }
 
 
+void print_cache_stats_for_type(int cache_level, int cache_type)
+{
+  char cache_type_s = 'U';
+  if (cache_type == CACHE_TYPE_I)
+    cache_type_s = 'i';
+  if (cache_type == CACHE_TYPE_D)
+    cache_type_s = 'd';
+
+  printf("[Memory model][L%d %c-cache] sets:%4d ways:%4d linesize:%4d\n",
+    cache_level + 1,
+    cache_type_s,
+    mem_cache_get_num_sets(cache_level, cache_type),
+    mem_cache_get_num_ways(cache_level, cache_type),
+    mem_cache_get_line_size(cache_level, cache_type)
+  );
+}
+
+void print_cache_stats()
+{
+  int cl, ct;
+  printf("CPU mem features: max phys addr bits: %d, asid bits: %d, "
+         "4k: %d, 16k: %d, 64k: %d, "
+         "st2_4k: %d, st2_16k: %d, st2_64k: %d, "
+         "\n",
+    mem_model_max_pa_bits(),
+    mem_model_num_asid_bits(),
+    mem_model_4k_granule_support(),
+    mem_model_16k_granule_support(),
+    mem_model_64k_granule_support(),
+    mem_model_st2_4k_granule_support(),
+    mem_model_st2_16k_granule_support(),
+    mem_model_st2_64k_granule_support()
+  );
+  for (ct = 0; ct <= CACHE_TYPE_MAX; ct++) {
+    for (cl = 0; cl <= CACHE_LEVEL_MAX; cl++)
+      print_cache_stats_for_type(cl, ct);
+  }
+}
 
 void main()
 {
@@ -146,7 +184,7 @@ void main()
   init_consoles();
   print_current_ex_level();
   print_mbox_props();
-
+ // disable_l1_caches();
   unsigned long el;
 
   rand_init();
@@ -156,6 +194,7 @@ void main()
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
+  print_cache_stats();
 
   // hexdump_addr(0x100);
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));

@@ -34,6 +34,7 @@ unsigned int vsprintf(char *dst, const char *fmt, __builtin_va_list args)
       if (*fmt == 'c') {
         arg = __builtin_va_arg(args, int);
         *dst++ = (char)arg;
+        fmt++;
         continue;
       } 
       // if decimal number
