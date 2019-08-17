@@ -72,11 +72,6 @@ void print_mbox_props()
   }
 }
 
-void set_timer_irq_address(void(*irq_addr)(void))
-{
-  asm volatile("msr daifset, #2\nldr x1, _vectors_irq\nldr x2, [x1]\nstr x0, [x1]\nmov x0, x2\nret\n");
-}
-
 int lit = 0;
 
 void c_irq_handler(void)
@@ -177,24 +172,37 @@ void print_cache_stats()
   }
 }
 
+void print_mmu_stats()
+{
+  printf("ttbr0_el1: 0x%016lx ttbr1_el1: 0x%016lx, tcr_el1: 0x%016lx\n", 
+    arm_get_ttbr0_el1(), 
+    arm_get_ttbr1_el1(), 
+    arm_get_tcr_el1());
+}
+
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   uart_init();
   init_consoles();
+  // mmu_init();
   print_current_ex_level();
   print_mbox_props();
- // disable_l1_caches();
+  disable_l1_caches();
   unsigned long el;
 
   rand_init();
-  // mmu_init();
 
   lfb_showpicture();
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
+
+
   print_cache_stats();
+  print_mmu_stats();
+  arm_mmu_init();
+  arm_mmu_enable();
 
   // hexdump_addr(0x100);
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));

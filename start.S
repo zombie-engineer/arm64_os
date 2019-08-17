@@ -97,48 +97,38 @@ timer_irq_init:
   str   w1, [x0, #4]
   ret
 
-  
-
-// importand, code has to be properly aligned
-.align 11
-_vectors:
-  // synchronous
+.macro vector_entry symbol
   .align 7
+  .globl \symbol
   mov   x0, #0
   mrs   x1, esr_el1
   mrs   x2, elr_el1
   mrs   x3, spsr_el1
   mrs   x4, far_el1
   b exc_handler
+.endm
+  
 
-  // IRQ
-  .align 7
-.globl _vectors_irq
-_vectors_irq:
-  mov   x0, #1
-  mrs   x1, esr_el1
-  mrs   x2, elr_el1
-  mrs   x3, spsr_el1
-  mrs   x4, far_el1
-  b exc_handler
+// important, code has to be properly aligned
+.align 11
+_vectors:
+vector_entry __interrupt_sp0_synchronous
+vector_entry __interrupt_sp0_irq
+vector_entry __interrupt_sp0_fiq
+vector_entry __interrupt_sp0_serror
+vector_entry __interrupt_spx_synchronous
+vector_entry __interrupt_spx_irq
+vector_entry __interrupt_spx_fiq
+vector_entry __interrupt_spx_serror
+vector_entry __interrupt_l_sp0_synchronous
+vector_entry __interrupt_l_sp0_irq
+vector_entry __interrupt_l_sp0_fiq
+vector_entry __interrupt_l_sp0_serror
+vector_entry __interrupt_l_spx_synchronous
+vector_entry __interrupt_l_spx_irq
+vector_entry __interrupt_l_spx_fiq
+vector_entry __interrupt_l_spx_serror
 
-  // FIQ 
-  .align 7
-  mov   x0, #2
-  mrs   x1, esr_el1
-  mrs   x2, elr_el1
-  mrs   x3, spsr_el1
-  mrs   x4, far_el1
-  b exc_handler
-
-  // SError
-  .align 7
-  mov   x0, #3
-  mrs   x1, esr_el1
-  mrs   x2, elr_el1
-  mrs   x3, spsr_el1
-  mrs   x4, far_el1
-  b exc_handler
   
 _disable_coproc_traps:
   // [9:0] -> RES1

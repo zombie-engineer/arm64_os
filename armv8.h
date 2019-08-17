@@ -27,3 +27,14 @@ void disable_l1_caches(void);
 int mem_cache_get_line_size(int cache_level, int cache_type);
 int mem_cache_get_num_sets(int cache_level, int cache_type);
 int mem_cache_get_num_ways(int cache_level, int cache_type);
+
+unsigned long arm_get_ttbr0_el1();
+unsigned long arm_get_ttbr1_el1();
+unsigned long arm_get_tcr_el1();
+
+void arm_set_ttbr0_el1(unsigned long);
+void arm_set_ttbr1_el1(unsigned long);
+void arm_set_tcr_el1(unsigned long );
+
+void arm_mmu_init(void);
+void arm_mmu_enable(void);
