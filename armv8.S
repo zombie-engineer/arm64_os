@@ -462,6 +462,9 @@ FUNC(arm_set_tcr_el1):
     //          0b11RW              Normal mem, Outer Write-Back Non-transient
     //    iiii: 0b0000
 
+    // Search "Table D5-33 Stage 1 access permissions for instruction execution for a translation regime that applies to EL0 and a
+    // higher Exception level"
+
 
 FUNC(arm_mmu_enable):
   mrs   x0, s3_1_c15_c2_1 // Read CPUECTLR_EL1 register
@@ -473,9 +476,26 @@ FUNC(arm_mmu_enable):
   orr   x0, x0, #(1 << 2)  // C bit (data cache)
   orr   x0, x0, #(1 << 12) // I bit (instruction cache)
   orr   x0, x0, #1         // M bit (MMU)
+  bic   x0, x0, #(3 << 19) // UWXN, WXN
   msr   SCTLR_EL1, x0
   dsb   sy // Full system DMB operation
   ret
+
+.macro ORR_BIT Rd, Rtmp, V, Mask, Pos
+  mov   \Rtmp,  #\V
+  and   \Rtmp, \Rtmp, \Mask
+  orr   \Rd, \Rd, \Rtmp, lsl #\Pos
+.endm
+
+.macro SET_LOWER_ATTRS Rd, Rtmp, AttrIdx, NS, AP, SH, AF, nG
+  bic   \Rd, \Rd, #0x3ff
+  ORR_BIT \Rd, \Rtmp, \AttrIdx, 3, 2
+  ORR_BIT \Rd, \Rtmp, \NS, 1, 5
+  ORR_BIT \Rd, \Rtmp, \AP, 3, 6
+  ORR_BIT \Rd, \Rtmp, \SH, 3, 8
+  ORR_BIT \Rd, \Rtmp, \AF, 1, 10
+  ORR_BIT \Rd, \Rtmp, \nG, 1, 11
+.endm
 
 FUNC(arm_mmu_init):
   ldr   x1, =0x3520     // [5:0]   = 32 region size is pow(2, 64 - 32) = pow(2,32) = 4GB
@@ -483,10 +503,10 @@ FUNC(arm_mmu_init):
                         // [11:10] = 1 Normal Outer cacheable
                         // [12:13] = 3 Inner-shareable
   msr   TCR_EL1, x1
-  ldr   x1, =0xff440400 // ATTR0 - Device-nGnRnE ATTR1 Device
-  msr   MAIR_EL1, x1    // ATTR2 - Normal Non-Cacheeable
+  ldr   x1, =0xff440400 // Attr0 - Device-nGnRnE, Attr1 Device, Attr2 - Normal Non-Cacheeable
+  msr   MAIR_EL1, x1    // Attr2 - Normal Non-Cacheeable
   adr   x0, ttb0_base   // 4kb-aligned address
-  msr   ttbr0_el1, x0
+  msr   TTBR0_EL1, x0
 
   // Set up translation table entries in memory with looped store
   // instructions
@@ -496,31 +516,16 @@ FUNC(arm_mmu_init):
   ldr   x2, =0x00000000fffff000
   and   x2, x1, x2            // NSTable=0 APTable=0 XNTable=0 PXNTable=0
   orr   x2, x2, #3
-  str   x2, [x0], #8
-  // The second entry is 1GB block from 0x40000000 to 0x7fffffff.
-  ldr   x2, =0x40000741       // Executable Inner and Outer Shareble.
-  str   x2, [x0], #8          // R/W at all ELs secure memory
-                              // AttrIdx=000 Device-nGnRnE 
-  // The third entry is 1GB block from 0x80000000 to 0xbfffffff.
-  ldr   x2, =0x80000741
-  str   x2, [x0], #8
-  // The fourch entry is 1GB block from 0xc0000000 to 0xffffffff.
-  ldr   x2, =0xc0000741
-  str   x2, [x0], #8
+  str   x2, [x0]              // Long Format Table Descriptor
   
   // Set level 2 translation table
   ldr   x0, =level2_pagetable // Base address of level2_pagetable.
   ldr   x2, =0x0000074d       // Executale Inner and Outer Shareable.
-                              // R/W at all ELs secure memory.
+  bic   x2, x2, #(3<<6)       // R/W at all ELs secure memory.
                               // AttrIdx=011 Normal Cacheable.
-  mov   x4, #512              // Set 512 level2 block entries.
-  ldr   x5, =0x00200000       // Increase 2MB address each time
-0: // loop
-  str   x2, [x0], #8          // Each entry occupies 2 words.
-  add   x2, x2, x5
-  subs  x4, x4, #1
-  bne   0b
+  str   x2, [x0]              // Long Format Block Descriptor
   ret   
+
   // Put a 64-bit value with little endianness.
   .macro PUT_64B high, low
     .word \low
@@ -532,28 +537,19 @@ FUNC(arm_mmu_init):
     PUT_64B \ATTR, (\PA) + 0x3
   .endm
 
-  // Create an entry for a 1GB block.
-  .macro BLOCK_1GB PA, ATTR_HI, ATTR_LO
-    PUT_64B \ATTR_HI, ((\PA) & 0xc0000000) | \ATTR_LO | 0x1
-  .endm
-
-  // Create an entry for a 2MB block.
-  .macro BLOCK_2MB PA, ATTR_HI, ATTR_LO
-    PUT_64B \ATTR_HI, ((\PA) & 0xffe00000) | \ATTR_LO | 0x1
+  .macro BLOCK_2MB PHYS_ADDR, ATTR_HI, ATTR_LO
+    PUT_64B \ATTR_HI, (\PHYS_ADDR & 0xffe00000)| \ATTR_LO | 0x1
   .endm
 
   .align 12      // 12 for 4kb granule
   ttb0_base:
   TABLE_ENTRY level2_pagetable, 0
-  BLOCK_1GB 0x40000000, 0, 0x740
-  BLOCK_1GB 0x80000000, 0, 0x740
-  BLOCK_1GB 0xc0000000, 0, 0x740
 
   .align 12      // 12 for 4kb granule
   level2_pagetable:
-  .set ADDR, 0x000   // The current page address.
+  .set ADDR, 0x000
   .rept 0x200
   BLOCK_2MB (ADDR << 20), 0, 0x74c
-  .set ADDR, ADDR+2
+  .set ADDR, ADDR+2 
   .endr
 

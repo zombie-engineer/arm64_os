@@ -22,8 +22,8 @@
 void print_current_ex_level()
 {
   unsigned long el;
-  asm volatile("mrs %0, CurrentEL" : "=r"(el));
-  printf("current_el: 0x%016x\n", el);
+  asm volatile("mrs %0, CurrentEL; lsr %0, %0, #2" : "=r"(el));
+  printf("Executing at EL%d\n", el);
 }
 
 void print_mbox_props()
