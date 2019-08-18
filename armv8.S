@@ -396,6 +396,10 @@ FUNC(arm_set_tcr_el1):
   msr tcr_el1, x0
   ret
 
+    // G8.2.162 TTBCR, Translation Table Base Control Register
+    // 
+
+
     // D13.2.112 TCR_EL1, Translation Control Register (EL1)
     // The control register for stage 1 of the EL1&0 translation regime.
     // T0SZ, bits  [5:0] The size offset of the memory region addressed by TTBR0_EL
@@ -433,6 +437,9 @@ FUNC(arm_set_tcr_el1):
     // AS,    bit[35]   ASID Size.  0 - 8 bit, 1 - 16 bit
     // TBI0,  bit[37]   Top Byte ignored
     // TBI1,  bit[38]   Top Byte ignored
+    // NFD0,  bit[53]   Non-fault translation table walk disable for stage 1 tranlations
+    //                  for TTBR0_EL1
+    // NFD1,  bit[54]   Non-fault translation table disable for stage 1 TTBR1_EL1
 
 
     // D13.2.84 MAIR_EL1, Memory Attribute Indirection Register (EL1)
@@ -480,14 +487,15 @@ FUNC(arm_mmu_init):
   msr   MAIR_EL1, x1    // ATTR2 - Normal Non-Cacheeable
   adr   x0, ttb0_base   // 4kb-aligned address
   msr   ttbr0_el1, x0
+
   // Set up translation table entries in memory with looped store
   // instructions
   // Set level 1 translation table
   // The first entry points to level2_pagetable
   ldr   x1, =level2_pagetable // 4kb aligned
-  ldr   x2, =0xfffff000
+  ldr   x2, =0x00000000fffff000
   and   x2, x1, x2            // NSTable=0 APTable=0 XNTable=0 PXNTable=0
-  orr   x2, x2, x3
+  orr   x2, x2, #3
   str   x2, [x0], #8
   // The second entry is 1GB block from 0x40000000 to 0x7fffffff.
   ldr   x2, =0x40000741       // Executable Inner and Outer Shareble.
