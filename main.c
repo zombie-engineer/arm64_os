@@ -185,7 +185,7 @@ void main()
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   uart_init();
   init_consoles();
-  // mmu_init();
+  mmu_init();
   print_current_ex_level();
   print_mbox_props();
   disable_l1_caches();
@@ -202,12 +202,8 @@ void main()
 
   print_cache_stats();
   print_mmu_stats();
-  arm_mmu_init();
-  arm_mmu_enable();
-  while(1)
-  {
-    gpio_set_on(21);
-  }
+  // arm_mmu_init();
+  // arm_mmu_enable();
 
   // hexdump_addr(0x100);
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));

@@ -473,7 +473,6 @@ FUNC(arm_set_tcr_el1):
 .endm
 
 FUNC(arm_mmu_enable):
-  LED_ON
   mrs   x0, s3_1_c15_c2_1 // Read CPUECTLR_EL1 register
   orr   x0, x0, #(1 << 6) // SMPEN bit enable data coherency with other cores in the cluster.
   msr   s3_1_c15_c2_1, x0
@@ -485,7 +484,7 @@ FUNC(arm_mmu_enable):
   orr   x0, x0, #1         // M bit (MMU)
   bic   x0, x0, #(3 << 19) // UWXN, WXN
   msr   SCTLR_EL1, x0
-  dsb   sy // Full system DMB operation
+  // dsb   sy // Full system DMB operation
   ret
 
 .macro ORR_BIT Rd, Rtmp, V, Mask, Pos
