@@ -198,11 +198,16 @@ void main()
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
 
+  gpio_set_function(21, GPIO_FUNC_OUT);
 
   print_cache_stats();
   print_mmu_stats();
   arm_mmu_init();
   arm_mmu_enable();
+  while(1)
+  {
+    gpio_set_on(21);
+  }
 
   // hexdump_addr(0x100);
   asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));

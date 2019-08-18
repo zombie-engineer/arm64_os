@@ -466,7 +466,14 @@ FUNC(arm_set_tcr_el1):
     // higher Exception level"
 
 
+.macro LED_ON
+  ldr   x6, =0x3F20001c
+  mov   w7, #(1<<21)
+  str   w7, [x6]
+.endm
+
 FUNC(arm_mmu_enable):
+  LED_ON
   mrs   x0, s3_1_c15_c2_1 // Read CPUECTLR_EL1 register
   orr   x0, x0, #(1 << 6) // SMPEN bit enable data coherency with other cores in the cluster.
   msr   s3_1_c15_c2_1, x0

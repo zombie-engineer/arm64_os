@@ -11,10 +11,21 @@
 // @ 0124f800 @ 00000000 @ 30c50830 @ 00000000
 // @ 
 // @ same, but singled lined 
+
 .section ".text.boot"
 .global _start
 
+// Bootstap code at 0x0 first runs at EL3, it goes through the followind setup steps:
+// - Sets EL0, EL1 to Non-Secure mode, no access to Secure Memory
+// - Disables interrupt routing to EL3 from non-EL3
+// - Enables HYP call
+// - Sets EL2 to AArch64 state
+// - Sets SCTLR_EL2 to basic non-MMU non-cached state
+// - Sets SPSR_EL3: all exceptions masked, exception level EL2/SP_EL2
+// - ERETs from EL3 to EL2/SP_EL2
+// - Branches to _start
 _start:
+  // Start in EL2/SP_EL2, exceptions masked, non-MMU
   // read cpu id, stop slave cores
   mrs   x1, mpidr_el1
   and   x1, x1, #3        // get CPU core number
@@ -29,12 +40,7 @@ _start:
   ldr   x1, =_start
 
   // set up EL1
-  mrs   x0, currentel
-
-  // DEBUG: save current el to 0x1b0 
-  mov   x2, #0x1b0
-  str   x0, [x2]
-  // DEBUG end: currenel = 0x00000008 -> 1000
+  mrs   x0, CurrentEl
   and   x0, x0, #0xc // clear reserved bits
   cmp   x0, #0xc
   bne 5f

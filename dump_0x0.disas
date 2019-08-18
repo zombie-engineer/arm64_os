@@ -1,3 +1,4 @@
+// Starting at EL3, because el3 registers are only accessible from EL3
 0x0000: mov x0, #0x40000000
 0x0004: str wzr, [x0]
 0x0008: mov w1, #0x80000000      @ *(int*)0x40000000 = 0
@@ -6,7 +7,7 @@
 0x0014: msr cntfrq_el0, x0       @ Counter-timer Frequency register = 0x0124f800 = 19200000
 0x0018: msr cntvoff_el2, xzr     @ Counter-timer Virtual Offset register = 0
 0x001c: mov x0, #0x33ff          @ x0 = 0x33ff
-0x0020: msr cptr_el3, x0         @ cptr_el3 = 0x33ff
+0x0020: msr cptr_el3, x0         @ cptr_el3 = 0x33ff  TRAP REGISTER
 0x0024: mov x0, #0x5b1           @ 
 0x0028: msr scr_el3, x0          @ scr_el3 = 0x5b1 Secure Configuration Register 
                                  @ [0] NS  - 1 - EL0 and EL1 are in Non-secure state, memory accesses from those exception levels cannot access Secure memory.
@@ -33,9 +34,16 @@
                                  @ [5:4] - RES1
                                  @ [10:6] - RES0
                                  @ [11] - RES1
-                                 @ [12] - I - 1 - Instruction cache enabled
+                                 @ [12] - I - 0 - Instruction cache disabled
 0x003c: mov x0, #0x3c9           @ spsr_el3 = 0x3c9
 0x0040: msr spsr_el3, x0         @ spsr mode - el3 stack el3
+                                 @ [0:3] - AArch64 Exception level and selected SP:0b1001 "EL2h", that means EL2 / SP_EL2
+                                 @ [4]   - PSTATE.nRW
+                                 @ [6]   - FIQ int mask.
+                                 @ [7]   - IRQ int mask.
+                                 @ [8]   - SError int mask.
+                                 @ [9]   - Debug exception mask
+                                 @ 
 0x0044: adr x0, 0x8b870 <bytecode+80> 
 0x0048: msr elr_el3, x0          @ return to 0x80 after exception
 0x004c: eret                     @ take exception

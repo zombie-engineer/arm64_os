@@ -33,9 +33,11 @@ clean:
 run:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s
 
-rundebug:
-	# ./qemu.sh
+rungdb:
 	/root/qemu/bin/qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s -S
+
+rungdbq:
+	./qemu.sh
 
 gdb:
 	gdb-multiarch -x rungdb.gdb
