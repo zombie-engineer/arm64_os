@@ -512,7 +512,9 @@ FUNC(arm_mmu_init):
   ldr   x1, =0xff440400 // Attr0 - Device-nGnRnE, Attr1 Device, Attr2 - Normal Non-Cacheeable
   msr   MAIR_EL1, x1    // Attr2 - Normal Non-Cacheeable
   adr   x0, ttb0_base   // 4kb-aligned address
+  add   x0, x0, #1      // 
   msr   TTBR0_EL1, x0
+  bic   x0, x0, #1
 
   // Set up translation table entries in memory with looped store
   // instructions
