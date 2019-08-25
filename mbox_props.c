@@ -114,7 +114,7 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size)
 
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_ARM_MEMORY;
+  mbox[2] = MBOX_TAG_GET_VC_MEMORY;
   mbox[3] = 8;
   mbox[4] = 8;
   mbox[5] = 0;

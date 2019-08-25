@@ -17,26 +17,27 @@ set pagination off
 # b select_tt
 # b aarch64_a53_initfn
 # b tb_htable_lookup
-b get_page_addr_code
-b vmsa_tcr_el1_write
-b vmsa_ttbr_write
-b tlb_hit
-b tlb_entry
-commands
-  silent
-  printf "tlb_entry 0x%x\n", addr
-  if addr < 0x81354
-    c
-  end
-  r
-end
-b cpu-exec.c:732
-# b cpu_exec 
-commands
-  if tb->pc != 0x88110
-    c
-  end
-end
-b arm_cpu_do_interrupt_aarch64
+#b vmsa_tcr_el1_write
+#b vmsa_ttbr_write
+#b tlb_hit
+#b tlb_entry
+# commands
+#   silent
+#   printf "tlb_entry 0x%x\n", addr
+#   if addr < 0x81354
+#     c
+#   end
+#   r
+# end
+# b cpu-exec.c:732
+# # b cpu_exec 
+# commands
+#   if tb->pc != 0x88110
+#     c
+#   end
+# end
+# 
+# b arm_cpu_do_interrupt_aarch64
+
 b get_phys_addr_lpae
 r

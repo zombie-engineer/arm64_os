@@ -1,0 +1,138 @@
+aarch64/translation/translation/AArch64.FirstStageTranslate
+//
+//
+//
+//
+AArch64.FirstStageTranslate()
+=============================
+Perform a stage 1 translation walk. The function used by Address Translation operations is
+similar except it uses the translation regime specified for the instruction.
+
+AddressDescriptor AArch64.FirstStageTranslate(
+  bits(64) vaddress, 
+  AccType acctype, 
+  boolean iswrite,
+  boolean wasaligned, 
+  integer size)
+  
+  if HaveNV2Ext() && acctype == AccType_NV2REGISTER then
+    s1_enabled = SCTLR_EL2.M == '1';
+  elsif HasS2Translation() then
+    s1_enabled = HCR_EL2.TGE == '0' && HCR_EL2.DC == '0' && SCTLR_EL1.M == '1';
+  else
+    s1_enabled = SCTLR[].M == '1';
+  
+  ipaddress = bits(52) UNKNOWN;
+  secondstage = FALSE;
+  s2fs1walk = FALSE;
+  if s1_enabled then // First stage enabled
+    S1 = AArch64.TranslationTableWalk(ipaddress, TRUE, vaddress, acctype, iswrite, secondstage,
+                                      s2fs1walk, size);
+    permissioncheck = TRUE;
+    if acctype == AccType_IFETCH then
+      InGuardedPage = S1.GP == '1'; // Global state updated on instruction fetch that denotes
+                                    // if the fetched instruction is from a guarded page.
+    else
+      S1 = AArch64.TranslateAddressS1Off(vaddress, acctype, iswrite);
+      permissioncheck = FALSE;
+    
+    if UsingAArch32() && HaveTrapLoadStoreMultipleDeviceExt() && AArch32.ExecutingLSMInstr() then
+      if S1.addrdesc.memattrs.memtype == MemType_Device && S1.addrdesc.memattrs.device != DeviceType_GRE then
+        nTLSMD = if S1TranslationRegime() == EL2 then SCTLR_EL2.nTLSMD else SCTLR_EL1.nTLSMD;
+        if nTLSMD == '0' then
+          S1.addrdesc.fault = AArch64.AlignmentFault(acctype, iswrite, secondstage);
+
+        // Check for unaligned data accesses to Device memory
+  if ((!wasaligned && acctype != AccType_IFETCH) || (acctype == AccType_DCZVA))
+    && S1.addrdesc.memattrs.memtype == MemType_Device && !IsFault(S1.addrdesc) then
+    S1.addrdesc.fault = AArch64.AlignmentFault(acctype, iswrite, secondstage);
+  if !IsFault(S1.addrdesc) && permissioncheck then
+    S1.addrdesc.fault = AArch64.CheckPermission(S1.perms, vaddress, S1.level,
+                                                S1.addrdesc.paddress.NS,
+                                                acctype, iswrite);
+    
+  // Check for instruction fetches from Device memory not marked as execute-never. If there has
+  // not been a Permission Fault then the memory is not marked execute-never.
+  if (!IsFault(S1.addrdesc) && S1.addrdesc.memattrs.memtype == MemType_Device &&
+  acctype == AccType_IFETCH) then
+  S1.addrdesc = AArch64.InstructionDevice(S1.addrdesc, vaddress, ipaddress, S1.level,
+                                          acctype, iswrite,
+                                          secondstage, s2fs1walk);
+  // Check and update translation table descriptor if required
+  hwupdatewalk = FALSE;
+  s2fs1walk = FALSE;
+  S1.addrdesc.fault = AArch64.CheckAndUpdateDescriptor(S1.descupdate, S1.addrdesc.fault,
+                                                      secondstage, vaddress, acctype,
+                                                      iswrite, s2fs1walk, hwupdatewalk);
+  return S1.addrdesc;
+
+
+
+
+
+aarch64/translation/checks/AArch64.CheckPermission
+// AArch64.CheckPermission()
+// =========================
+// Function used for permission checking from AArch64 stage 1 translations
+FaultRecord AArch64.CheckPermission(Permissions perms, bits(64) vaddress, integer level,
+bit NS, AccType acctype, boolean iswrite)
+assert !ELUsingAArch32(S1TranslationRegime());
+wxn = SCTLR[].WXN == '1';
+if (PSTATE.EL == EL0 ||
+IsInHost() ||
+(PSTATE.EL == EL1 && !HaveNV2Ext()) ||
+(PSTATE.EL == EL1 && HaveNV2Ext() && (acctype != AccType_NV2REGISTER || !ELIsInHost(EL2)))) then
+priv_r = TRUE;
+priv_w = perms.ap<2> == '0';
+user_r = perms.ap<1> == '1';
+user_w = perms.ap<2:1> == '01';
+ispriv = AArch64.AccessIsPrivileged(acctype);
+pan = if HavePANExt() then PSTATE.PAN else '0';
+if (EL2Enabled() && ((PSTATE.EL == EL1 && HaveNVExt() && HCR_EL2.<NV, NV1> == '11') ||
+(HaveNV2Ext() && acctype == AccType_NV2REGISTER && HCR_EL2.NV2 == '1'))) then
+pan = '0';
+is_ldst
+= !(acctype IN {AccType_DC, AccType_DC_UNPRIV, AccType_AT, AccType_IFETCH});
+is_ats1xp = (acctype == AccType_AT && AArch64.ExecutingATS1xPInstr());
+if pan == '1' && user_r && ispriv && (is_ldst || is_ats1xp) then
+priv_r = FALSE;
+priv_w = FALSE;
+user_xn = perms.xn == '1' || (user_w && wxn);
+priv_xn = perms.pxn == '1' || (priv_w && wxn) || user_w;
+if ispriv then
+(r, w, xn) = (priv_r, priv_w, priv_xn);
+else
+(r, w, xn) = (user_r, user_w, user_xn);
+else
+// Access from EL2 or EL3
+r = TRUE;
+w = perms.ap<2> == '0';
+xn = perms.xn == '1' || (w && wxn);
+// Restriction on Secure instruction fetch
+if HaveEL(EL3) && IsSecure() && NS == '1' && SCR_EL3.SIF == '1' then
+xn = TRUE;
+if acctype == AccType_IFETCH then
+fail = xn;
+failedread = TRUE;
+elsif acctype IN { AccType_ATOMICRW, AccType_ORDEREDRW, AccType_ORDEREDATOMICRW } then
+fail = !r || !w;
+failedread = !r;
+elsif iswrite then
+fail = !w;
+failedread = FALSE;
+elsif acctype == AccType_DC && PSTATE.EL != EL0 then
+// DC maintenance instructions operating by VA, cannot fault from stage 1 translation,
+// other than DC IVAC, which requires write permission, and operations executed at EL0,
+// which require read permission.
+fail = FALSE;
+else
+fail = !r;
+failedread = TRUE;
+if fail then
+secondstage = FALSE;
+s2fs1walk = FALSE;
+ipaddress = bits(52) UNKNOWN;
+return AArch64.PermissionFault(ipaddress,boolean UNKNOWN, level, acctype,
+!failedread, secondstage, s2fs1walk);
+else
+return AArch64.NoFault();

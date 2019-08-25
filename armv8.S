@@ -560,4 +560,3 @@ FUNC(arm_mmu_init):
   BLOCK_2MB (ADDR << 20), 0, 0x74c
   .set ADDR, ADDR+2 
   .endr
-
