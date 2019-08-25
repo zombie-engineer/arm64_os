@@ -187,42 +187,28 @@ void print_arm_features()
   printf("id_aa64mmfr0_el1 is: %08x\n", el);
 }
 
-void vibration_sensor_test(int gpio_num_dout)
+void vibration_sensor_test(int gpio_num_dout, int poll)
 {
   // gpio_num_dout - digital output
+  // poll          - poll for gpio values instead of interrupts
   printf("virbration sensor test\n");
   gpio_set_function(gpio_num_dout, GPIO_FUNC_IN);
-  while(1)
-  {
-    wait_cycles(0x2000);
-    if (*(reg32_t)GPIO_REG_GPLEV0 & (1<< gpio_num_dout))
-      printf("-");
-    continue;
-    print_reg32_at(GPIO_REG_GPLEV0);
-
-    printf("%x-", gpio_is_set(26));
-    continue;
-      printf("1");
-    if (gpio_is_set(19) > 0)
-      printf("2");
+  if (poll) {
+    while(1) {
+      if (gpio_is_set(gpio_num_dout)) {
+        printf("-");
+      }
+    }
   }
 
-  interrupt_ctrl_dump_regs("before set\n");
   interrupt_ctrl_enable_gpio_irq(gpio_num_dout);
-  interrupt_ctrl_enable_gpio_irq(19);
-  gpio_set_detect_high(20);
-  // GPLEN0 |= 1 << 2;
-  gpio_set_detect_falling_edge(2);
-
+  gpio_set_detect_rising_edge(gpio_num_dout);
+  gpio_set_detect_falling_edge(gpio_num_dout);
   enable_irq();
   
   interrupt_ctrl_dump_regs("after set\n");
   while(1) {
-    // f: 1111 b: 1011
     wait_cycles(0x300000);
-    print_reg32(INT_CTRL_IRQ_PENDING_2);
-    print_reg32_at(GPIO_REG_GPLEV0);
-    print_reg32_at(GPIO_REG_GPEDS0);
   }
 }
 
@@ -240,7 +226,7 @@ void main()
   rand_init();
 
   lfb_showpicture();
-  vibration_sensor_test(19);
+  vibration_sensor_test(19, 0 /* no poll, use interrupts */);
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();

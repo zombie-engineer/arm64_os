@@ -46,7 +46,7 @@ int gpio_set_function(int gpio_num, int func)
 int gpio_is_set(int gpio_num)
 {
   GPIO_CHECK_GPIO_NUM(gpio_num);
-  return GPIO_REG_32PIN_REG(gpio_num, GPIO_REG_GPLEV0) == 0 ? 0 : 1;
+  return (*(reg32_t)(GPIO_REG_GPLEV0 + (gpio_num / 32)) & (1<<(gpio_num % 32))) ? 1 : 0;
 }
 
 int gpio_set_on(int gpio_num)
