@@ -180,20 +180,67 @@ void print_mmu_stats()
     arm_get_tcr_el1());
 }
 
+void print_arm_features()
+{
+  unsigned long el;
+  asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));
+  printf("id_aa64mmfr0_el1 is: %08x\n", el);
+}
+
+void vibration_sensor_test(int gpio_num_dout)
+{
+  // gpio_num_dout - digital output
+  printf("virbration sensor test\n");
+  gpio_set_function(gpio_num_dout, GPIO_FUNC_IN);
+  while(1)
+  {
+    wait_cycles(0x2000);
+    if (*(reg32_t)GPIO_REG_GPLEV0 & (1<< gpio_num_dout))
+      printf("-");
+    continue;
+    print_reg32_at(GPIO_REG_GPLEV0);
+
+    printf("%x-", gpio_is_set(26));
+    continue;
+      printf("1");
+    if (gpio_is_set(19) > 0)
+      printf("2");
+  }
+
+  interrupt_ctrl_dump_regs("before set\n");
+  interrupt_ctrl_enable_gpio_irq(gpio_num_dout);
+  interrupt_ctrl_enable_gpio_irq(19);
+  gpio_set_detect_high(20);
+  // GPLEN0 |= 1 << 2;
+  gpio_set_detect_falling_edge(2);
+
+  enable_irq();
+  
+  interrupt_ctrl_dump_regs("after set\n");
+  while(1) {
+    // f: 1111 b: 1011
+    wait_cycles(0x300000);
+    print_reg32(INT_CTRL_IRQ_PENDING_2);
+    print_reg32_at(GPIO_REG_GPLEV0);
+    print_reg32_at(GPIO_REG_GPEDS0);
+  }
+}
+
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   uart_init();
   init_consoles();
-  mmu_init();
+  // mmu_init();
   print_current_ex_level();
   print_mbox_props();
+  print_arm_features();
   disable_l1_caches();
-  unsigned long el;
 
   rand_init();
 
   lfb_showpicture();
+  vibration_sensor_test(19);
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
@@ -202,12 +249,8 @@ void main()
 
   print_cache_stats();
   print_mmu_stats();
-  // arm_mmu_init();
-  // arm_mmu_enable();
 
   // hexdump_addr(0x100);
-  asm volatile("mrs %0, id_aa64mmfr0_el1" : "=r"(el));
-  printf("id_aa64mmfr0_el1 is: %08x\n", el);
   // 0x0000000000001122
   // PARange  2: 40 bits, 1TB 0x2
   // ASIDBits 2: 16 bits
@@ -220,14 +263,6 @@ void main()
   wait_gpio();
 
   
-  unsigned long ttbr0, ttbr1, ttbcr;
-  asm volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));
-  // 0x936dd22509d4006a
-  // 
-  asm volatile("mrs %0, ttbr1_el1" : "=r"(ttbr1));
-  // asm volatile("mrs %0, tcr_el1" : "=r"(ttbcr));
-  printf("ttbr1_el1: %016x\n", ttbr1);
-
   if (mbox_call(MBOX_CH_PROP)) {
     uart_puts("My serial number is: ");
     uart_hex(mbox[6]);

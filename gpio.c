@@ -5,9 +5,11 @@
 
 #define GPIO_REG_32PIN_BIT(gpio_num) (gpio_num % 32)
 
-#define GPIO_32PIN_REG_SET_PIN(gpio_num, reg0) *GPIO_REG_32PIN_REG(gpio_num, reg0) |= 1 << GPIO_REG_32PIN_BIT(gpio_num);
+#define GPIO_32PIN_REG_SET_PIN(gpio_num, reg0) (*GPIO_REG_32PIN_REG(gpio_num, reg0) |= (1 << GPIO_REG_32PIN_BIT(gpio_num)));
 
-#define GPIO_32PIN_REG_CLR_PIN(gpio_num, reg0) *GPIO_REG_32PIN_REG(gpio_num, reg0) &= ~(1 << GPIO_REG_32PIN_BIT(gpio_num));
+#define GPIO_32PIN_REG_GET(gpio_num) (*GPIO_REG_32PIN_REG(gpio_num, GPIO_REG_GPLEV0) & (1 << GPIO_REG_32PIN_BIT(gpio_num)));
+
+#define GPIO_32PIN_REG_CLR_PIN(gpio_num, reg0) (*GPIO_REG_32PIN_REG(gpio_num, reg0) &= ~(1 << GPIO_REG_32PIN_BIT(gpio_num)));
 
 #define GPIO_CHECK_GPIO_NUM(gpio_num) \
   if (gpio_num > GPIO_MAX_PIN_IDX) \
@@ -39,6 +41,12 @@ int gpio_set_function(int gpio_num, int func)
     *gpio_sel_reg = regval;
   }
   return 0;
+}
+
+int gpio_is_set(int gpio_num)
+{
+  GPIO_CHECK_GPIO_NUM(gpio_num);
+  return GPIO_REG_32PIN_REG(gpio_num, GPIO_REG_GPLEV0) == 0 ? 0 : 1;
 }
 
 int gpio_set_on(int gpio_num)

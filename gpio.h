@@ -60,6 +60,8 @@
 #define GPIO_PULLUPDOWN_EN_PULLDOWN   0b01
 #define GPIO_PULLUPDOWN_EN_PULLUP     0b10
 
+int gpio_is_set(int gpio_num);
+
 int gpio_set_function(int gpio_num, int func);
 
 int gpio_set_on(int gpio_num);
