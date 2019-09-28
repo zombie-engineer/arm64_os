@@ -2,6 +2,8 @@
 
 void lfb_init(int width, int height);
 
+void lfb_set_bgcolor(int value);
+
 int lfb_is_initialized();
 
 void lfb_showpicture();

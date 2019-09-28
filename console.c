@@ -59,6 +59,18 @@ void console_disable_device(const char* devname)
   // TODO
 }
 
+void console_putc(char ch)
+{
+  int i = 0;
+  console_dev_ent_t *con;
+  for (; i < MAX_CONSOLE_DEVICES; ++i)
+  {
+    con = &console_devices[i];
+    if (con->enabled)
+      con->dev.putc(ch);
+  }
+}
+
 void console_puts(const char* str)
 {
   int i = 0;

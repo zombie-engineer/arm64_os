@@ -16,6 +16,7 @@
 #include <interrupts.h>
 #include <exception.h>
 #include <timer.h>
+#include <cmdrunner.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -213,11 +214,18 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
+int do_ls(const char *arg_start, const char *args_end)
+{
+  printf("do_ls\n");
+  return 0;
+}
+
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  lfb_set_bgcolor(0xff000000);
+
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
-  // uart_init_simple();
   init_consoles();
   // mmu_init();
   print_current_ex_level();
@@ -228,7 +236,7 @@ void main()
   rand_init();
 
   lfb_showpicture();
-  vibration_sensor_test(19, 0 /* no poll, use interrupts */);
+  // vibration_sensor_test(19, 0 /* no poll, use interrupts */);
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
@@ -248,9 +256,13 @@ void main()
   // TGran64  0: 64KB granule is supported
   // TGran4   0: 4KB granule is supported
   // wait_timer();
+
+  cmdrunner_init();
+  cmdrunner_add_cmd("ls", 2, do_ls);
+  cmdrunner_run_interactive_loop();
+
   wait_gpio();
 
-  
   if (mbox_call(MBOX_CH_PROP)) {
     uart_puts("My serial number is: ");
     uart_hex(mbox[6]);

@@ -1,6 +1,12 @@
 #pragma once
 
-const char * printf(const char* fmt, ...);
+#define min(a, b) (a < b ? a : b)
+
+const char * printf(const char *fmt, ...);
+
+void puts(const char *str);
+
+void putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
 

@@ -1,5 +1,25 @@
 #include "string.h"
 
+
+int strcmp(const char *s1, const char *s2)
+{
+  while (*s1 && *s2 && *s1 == *s2) {
+    s1++;
+    s2++;
+  }
+  return *s1 - *s2;
+}
+
+int strncmp(const char *s1, const char *s2, unsigned int n)
+{
+  while (n && *s1 && *s2 && *s1 == *s2) {
+    s1++;
+    s2++;
+    n--;
+  }
+  return *s1 - *s2;
+}
+
 int strlen(const char* ptr)
 {
   int res;
@@ -34,16 +54,11 @@ char * strncpy(char *dst, const char *src, int n)
   return res;
 }
 
-
- //void * memset(void *dst, int value, size_t num)
- //{
- //  void *res = dst;
- //  int rest = num;
- //  int i;
- //  while (rest > sizeof(long long))
- //  {
- //    rest -= sizeof(long long);
- //    *(long long *)(dst) = 
- //  }
- //  return res;
- //}
+void * memset(void *dst, char value, unsigned int n)
+{
+  char *ptr = (char *)dst;
+  while (n--) {
+    *ptr++ = value;
+  }
+  return dst;
+}

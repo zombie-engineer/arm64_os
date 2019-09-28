@@ -13,8 +13,9 @@ all: clean kernel8.img
 include uart/Makefile
 include mbox/Makefile
 include arch/armv8/Makefile
+include commands/Makefile
 
-OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8)
+OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8) $(OBJS_COMMANDS)
 OBJS += font.o start.o
 
 CC      = $(CROSS_COMPILE)gcc

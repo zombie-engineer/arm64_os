@@ -7,6 +7,7 @@
 unsigned int fb_width, fb_height, fb_pitch;
 unsigned char *lfb;
 static int lfb_initialized = 0;
+static int lfb_bgcolor;
 
 typedef struct {
   unsigned int magic;
@@ -88,6 +89,11 @@ void lfb_init(int width, int height)
   lfb_initialized = 1;
 }
 
+void lfb_set_bgcolor(int value)
+{
+  lfb_bgcolor = value;
+}
+
 void lfb_showpicture()
 {
   int x,y;
@@ -160,6 +166,18 @@ void lfb_print_long_hex(int x, int y, unsigned long val)
   lfb_print(x, y, dump_place);
 }
 
+static void fill_background(psf_t *font, char *framebuf_off, int pitch)
+{
+  int x, y;
+  unsigned int *pixel_addr;
+  for (y = 0; y < font->height; ++y) {
+    for (x = 0; x < font->width; ++x) {
+      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
+      *pixel_addr = lfb_bgcolor;
+    }
+  }
+}
+
 static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_off, int pitch)
 {
   int x, y;
@@ -171,7 +189,7 @@ static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_of
     mask = 1 << (font->width - 1);
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      glyph_pixel = (int)*glyph_off & mask ? 0xffffff : 0;
+      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : lfb_bgcolor;
       *pixel_addr = glyph_pixel;
       mask >>= 1;
     }
@@ -195,14 +213,19 @@ void lfb_putc(int* x, int* y, char chr)
   // calculate offset on screen
   framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
   
-  // handle carriage return
-  if (chr == '\r')
+  if (chr == '\r') {
+    // carriage return
     *x = 0;
-  else
-  // new line
-  if (chr == '\n') {
+  } else if (chr == '\n') {
+    // new line
     *x = 0; 
     (*y)++;
+  } else if (chr == 8 || chr == 127) {
+    // backspace
+    if (*x > 0)
+      (*x)--;
+    framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
+    fill_background(font, ((char*)lfb) + framebuf_off, fb_pitch);
   } else {
     print_glyph(glyph, font, ((char*)lfb) + framebuf_off, fb_pitch);
     (*x)++;

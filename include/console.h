@@ -11,6 +11,7 @@ void console_rm_device(const char* devname);
 void console_enable_device(const char* devname);
 void console_disable_device(const char* devname);
 
+void console_putc(char);
 void console_puts(const char*);
 
 void init_consoles();

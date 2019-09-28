@@ -1,9 +1,20 @@
-#include "common.h"
-#include "sprintf.h"
-#include "console.h"
+#include <common.h>
+#include <sprintf.h>
+#include <console.h>
 
 #define PRINTF_BUF_SIZE 512
+
 char printfbuf[PRINTF_BUF_SIZE];
+
+void putc(char ch)
+{
+  console_putc(ch);
+}
+
+void puts(const char *str)
+{
+  console_puts(str);
+}
 
 const char * printf(const char* fmt, ...)
 {
