@@ -1,8 +1,8 @@
 #include <gpio.h>
 #include <mmu.h>
 #include <uart/uart.h>
-#include "common.h"
-#include "types.h"
+#include <common.h>
+#include <types.h>
 #include "armv8_tcr.h"
 #include "armv8_sctlr.h"
 #include "mmu_memattr.h"

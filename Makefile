@@ -1,17 +1,21 @@
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
 INCLUDES = include
-CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
-CFLAGS = -Wall -g -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
+
+OPTIMIZATION_FLAGS = -O2
+OPTIMIZATION_FLAGS = -g
+
+CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 
 all: clean kernel8.img
 
 include uart/Makefile
 include mbox/Makefile
+include arch/armv8/Makefile
 
-OBJS += $(OBJS_UART) $(OBJS_MBOX)
-OBJS += font.o start.o armv8.o
+OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8)
+OBJS += font.o start.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
@@ -19,9 +23,6 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 
 start.o: start.S
 	$(CC) $(CFLAGS) -c start.S -o start.o
-
-armv8.o: armv8.S
-	$(CC) $(CFLAGS) -c $? -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
