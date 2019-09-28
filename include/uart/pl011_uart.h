@@ -1,7 +1,5 @@
 #pragma once
 
-/* Init PL011 UART 
- * freq: clock frequency in herz
- */
-void pl011_uart_init(int freq, int unused);
+/* Init PL011 UART */
+void pl011_uart_init(int baudrate, int unused);
 

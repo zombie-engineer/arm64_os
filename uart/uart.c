@@ -17,9 +17,9 @@
 #define _uart_init mini_uart_init
 #endif
 
-void uart_init(int freq, int system_clock)
+void uart_init(int baudrate, int system_clock)
 {
-  _uart_init(freq, system_clock);
+  _uart_init(baudrate, system_clock);
 }
 
 void uart_putc(char c)

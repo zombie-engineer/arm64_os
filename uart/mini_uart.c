@@ -39,7 +39,7 @@ static int get_baud_reg_value(int target_baudrate, int system_clock)
   return system_clock / target_baudrate / 8  - 1;
 }
 
-void mini_uart_init(int target_baudrate, int system_clock)
+void mini_uart_init(int baudrate, int system_clock)
 {
   *AUX_ENABLE |= 1;
   *AUX_MU_CNTL = 0;
@@ -47,7 +47,7 @@ void mini_uart_init(int target_baudrate, int system_clock)
   *AUX_MU_MCR  = 0;
   *AUX_MU_IER  = 0;
   *AUX_MU_IIR  = AUX_MU_IIR_NO_INTERRUPTS | AUX_MU_IIR_FIFO_ENABLED;
-  *AUX_MU_BAUD = get_baud_reg_value(target_baudrate, system_clock);
+  *AUX_MU_BAUD = get_baud_reg_value(baudrate, system_clock);
 
   // pins gpio14, gpio15
   gpio_set_function(14, GPIO_FUNC_ALT_5);

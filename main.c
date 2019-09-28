@@ -216,7 +216,7 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-  uart_init(4000000, BCM2825_SYSTEM_CLOCK);
+  uart_init(115200, BCM2825_SYSTEM_CLOCK);
   // uart_init_simple();
   init_consoles();
   // mmu_init();

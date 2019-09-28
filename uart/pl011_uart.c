@@ -1,6 +1,6 @@
 #include <uart/pl011_uart.h>
 #include <gpio.h>
-#include <mbox.h>
+#include <mbox/mbox.h>
 
 
 #define UART0_BASE  (MMIO_BASE + 0x00201000)
@@ -33,7 +33,7 @@
 #define UART0_FR_TXFF (1<<5)
 
 
-void pl011_uart_init(int freq, int unused)
+void pl011_uart_init(int baudrate, int unused)
 {
   *UART0_CR = 0; // turn off UART0
 
