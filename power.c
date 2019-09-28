@@ -1,8 +1,8 @@
-#include "power.h"
+#include <power.h>
 
-#include "gpio.h"
-#include "mbox.h"
-#include "delays.h"
+#include <gpio.h>
+#include <mbox/mbox.h>
+#include <delays.h>
 
 #define PM_RSTC ((volatile unsigned int*)(MMIO_BASE + 0x0010001c))
 #define PM_RSTS ((volatile unsigned int*)(MMIO_BASE + 0x00100020))

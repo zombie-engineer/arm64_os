@@ -1,20 +1,21 @@
-#include "uart.h"
-#include "mbox.h"
-#include "armv8.h"
-#include "lfb.h"
-#include "rand.h"
-#include "timer.h"
-#include "delays.h"
-#include "tags.h"
-#include "mmu.h"
-#include "common.h"
-#include "sprintf.h"
-#include "console.h"
-#include "mbox_props.h"
-#include "gpio.h"
-#include "interrupts.h"
-#include "exception.h"
-#include "timer.h"
+#include <config.h>
+#include <uart/uart.h>
+#include <gpio.h>
+#include <mbox/mbox.h>
+#include <mbox/mbox_props.h>
+#include <arch/armv8/armv8.h>
+#include <lfb.h>
+#include <rand.h>
+#include <timer.h>
+#include <delays.h>
+#include <tags.h>
+#include <mmu.h>
+#include <common.h>
+#include <sprintf.h>
+#include <console.h>
+#include <interrupts.h>
+#include <exception.h>
+#include <timer.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -215,7 +216,8 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
 void main()
 {
   lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-  uart_init();
+  uart_init(4000000, BCM2825_SYSTEM_CLOCK);
+  // uart_init_simple();
   init_consoles();
   // mmu_init();
   print_current_ex_level();

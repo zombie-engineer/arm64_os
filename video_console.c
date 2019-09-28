@@ -1,5 +1,5 @@
-#include "video_console.h"
-#include "lfb.h"
+#include <video_console.h>
+#include <lfb.h>
 
 typedef struct console_screen {
   int x;

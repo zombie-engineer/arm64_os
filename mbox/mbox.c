@@ -1,6 +1,5 @@
-#include "mbox.h"
-
-#include "gpio.h"
+#include <mbox/mbox.h>
+#include <gpio.h>
 
 volatile unsigned int __attribute__ ((aligned(16))) mbox[36];
 

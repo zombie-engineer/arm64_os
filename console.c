@@ -1,7 +1,7 @@
 #include "console.h"
 #include "exception.h"
 #include "string.h"
-#include "uart.h"
+#include <uart/uart.h>
 #include "video_console.h"
 
 #define MAX_CONSOLE_DEVICES 4

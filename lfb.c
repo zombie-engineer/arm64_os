@@ -1,7 +1,6 @@
-#include "lfb.h"
-
-#include "uart.h"
-#include "mbox.h"
+#include <lfb.h>
+#include <uart/uart.h>
+#include <mbox/mbox.h>
 #include "homer.h"
 #include "exception.h"
 

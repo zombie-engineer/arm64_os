@@ -1,5 +1,6 @@
-#include "gpio.h"
-#include "uart.h"
+#include <gpio.h>
+#include <mmu.h>
+#include <uart/uart.h>
 #include "common.h"
 #include "types.h"
 #include "armv8_tcr.h"

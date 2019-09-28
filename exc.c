@@ -1,4 +1,4 @@
-#include "uart.h"
+#include <uart/uart.h>
 #include "lfb.h"
 #include "delays.h"
 #include "sprintf.h"

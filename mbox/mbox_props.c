@@ -1,5 +1,5 @@
-#include "mbox_props.h"
-#include "mbox.h"
+#include <mbox/mbox_props.h>
+#include <mbox/mbox.h>
 
 int mbox_get_firmware_rev()
 {
