@@ -3,15 +3,9 @@
 #include <string.h>
 #include <common.h>
 
-#define COMMAND_NAME_MAXLEN 16
-#define COMMAND_MAX_COUNT 256
-#define CMDLINE_BUF_SIZE 1024
-
-typedef struct command {
-  char name[COMMAND_NAME_MAXLEN];
-  unsigned int namelen;
-  cmd_func func;
-} command_t;
+CMDRUNNER_DECL_CMD(ls);
+CMDRUNNER_DECL_CMD(memdump);
+CMDRUNNER_DECL_CMD(help);
 
 static command_t commands[COMMAND_MAX_COUNT];
 static unsigned int num_commands;
@@ -20,13 +14,16 @@ static char inputbuf[CMDLINE_BUF_SIZE];
 static char *inputbuf_end;
 static char *inputbuf_carret;
 
+#define MAX_CMD_STRCMP_LEN 16
+
+
 static void cmdrunner_on_newline(void)
 {
   unsigned int i, maxarglen, cmplen, res;
   maxarglen = inputbuf_end - inputbuf;
   for (i = 0; i < num_commands; ++i) {
     command_t *cmd = &commands[i];
-    cmplen = min(maxarglen, cmd->namelen);
+    cmplen = min(maxarglen, MAX_CMD_STRCMP_LEN);
     if (strncmp(cmd->name, inputbuf, cmplen) == 0) {
       res = cmd->func(inputbuf_carret, inputbuf_end);
       if (res) {
@@ -63,19 +60,23 @@ void cmdrunner_init(void)
   inputbuf_end = inputbuf + CMDLINE_BUF_SIZE;
   cmdrunner_flush_inputbuf();
   num_commands = 0;
+
+  CMDRUNNER_ADD_CMD(ls);
+  CMDRUNNER_ADD_CMD(memdump);
+  CMDRUNNER_ADD_CMD(help);
 }
 
-int cmdrunner_add_cmd(const char* name, unsigned int namelen, cmd_func func)
+int cmdrunner_add_cmd(
+  const char *name, 
+  const char *description, 
+  cmd_func func)
 {
   if (num_commands == COMMAND_MAX_COUNT)
     return CMDRUNNER_ERR_MAXCOMMANDSREACHED;
-  if (namelen > COMMAND_NAME_MAXLEN)
-    return CMDRUNNER_ERR_NAMETOOLONG;
 
   command_t *newcmd = &commands[num_commands++];
-  memset(newcmd, 0, sizeof(command_t));
-  strncpy(newcmd->name, name, namelen);
-  newcmd->namelen = namelen;
+  newcmd->name = name;
+  newcmd->description = description;
   newcmd->func = func;
   return 0;
 }
@@ -100,5 +101,16 @@ void cmdrunner_run_interactive_loop(void)
         *inputbuf_carret++ = ch;
       putc(ch);
     }
+  }
+}
+
+void cmdrunner_iterate_commands(iter_cmd_cb cb)
+{
+  unsigned int i;
+  command_t *cmd;
+  for (i = 0; i < num_commands; ++i) {
+    cmd = &commands[i];
+    if (cb(cmd))
+      break;
   }
 }

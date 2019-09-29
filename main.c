@@ -258,7 +258,6 @@ void main()
   // wait_timer();
 
   cmdrunner_init();
-  cmdrunner_add_cmd("ls", 2, do_ls);
   cmdrunner_run_interactive_loop();
 
   wait_gpio();
