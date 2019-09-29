@@ -222,7 +222,6 @@ int do_ls(const char *arg_start, const char *args_end)
 
 void main()
 {
-  viewport_t *viewport;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000000);
@@ -260,11 +259,8 @@ void main()
   // TGran4   0: 4KB granule is supported
   // wait_timer();
 
-  vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
-  vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
-  viewport = vcanvas_make_viewport(20, 20, 400, 400);
-  viewport_fill(viewport, 0x00101010);
-  viewport_draw_text(viewport, 0, 0, 0x0000ff00, 0x00000000, "hello", 5);
+  // vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
+  // vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
   cmdrunner_init();
   cmdrunner_run_interactive_loop();
 

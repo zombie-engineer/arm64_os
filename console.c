@@ -89,7 +89,7 @@ void init_consoles()
   console_dev_t dev;
 
   console_init();
-
+  /*
   if (video_console_init())
     generate_exception();
 
@@ -97,7 +97,7 @@ void init_consoles()
   dev.putc = video_console_putc;
   if (console_add_device(&dev, VIDEO_CONSOLE_NAME))
     generate_exception();
-
+  */
   dev.puts = uart_puts;
   dev.putc = uart_putc;
   if (console_add_device(&dev, UART_CONSOLE_NAME))

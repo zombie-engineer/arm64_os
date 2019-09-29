@@ -324,19 +324,37 @@ void viewport_fill(viewport_t *v, int color)
   viewport_fill_rect(v, 0, 0, v->size_x, v->size_y, color);
 }
 
+void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color, char c)
+{
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  unsigned char *glyph;
+
+  // ax, ay - absolute x and y positions
+  int ax, ay;
+  // size_x, size_y - max sizes of glyphs to draw
+  unsigned int size_x, size_y;
+  if (x >= v->size_x || y >= v->size_y)
+    return;
+
+  size_x = (x + font->width  > v->size_x) ? v->size_x - x : font->width;
+  size_y = (y + font->height > v->size_y) ? v->size_y - y : font->height;
+
+  ax = v->pos_x + x;
+  ay = v->pos_y + y;
+  // printf("ax, ay: %d, %d, size_x, size_y: %d %d\n", ax, ay, size_x, size_y);
+
+  glyph = font_get_glyph(font, c);
+  vcanvas_draw_glyph(font, glyph, ax, ay, size_x, size_y, fg_color, bg_color);
+}
+
 void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen)
 {
   psf_t *font = (psf_t*)&_binary_font_psf_start;
   const char *c;
-  unsigned char *glyph;
   unsigned int char_idx;
 
-  // ax, ay - absolute x and y positions
-  int ax, ay;
   // rx, ry - relative to viewport 'v' x and y positions
   int rx, ry;
-  // size_x, size_y - max sizes of glyphs to draw
-  unsigned int size_x, size_y;
 
   if (x >= v->size_x || y >= v->size_y)
     return;
@@ -347,19 +365,11 @@ void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color,
     rx = x + char_idx * font->width;
     ry = y;
 
-    printf("rx, ry: %d, %d\n", rx, ry);
+    // printf("rx, ry: %d, %d\n", rx, ry);
     if (rx >= v->size_x || ry >= v->size_y)
       return;
-    
-    size_x = (rx + font->width  > v->size_x) ? v->size_x - rx : font->width;
-    size_y = (ry + font->height > v->size_y) ? v->size_y - ry : font->height;
 
-    ax = v->pos_x + rx;
-    ay = v->pos_y + ry;
-    printf("ax, ay: %d, %d, size_x, size_y: %d %d\n", ax, ay, size_x, size_y);
-
-    glyph = font_get_glyph(font, *c);
-    vcanvas_draw_glyph(font, glyph, ax, ay, size_x, size_y, fg_color, bg_color);
+    viewport_draw_char(v, rx, ry, fg_color, bg_color, *c);
 
     char_idx++;
     c++;

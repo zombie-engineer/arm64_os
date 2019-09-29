@@ -44,3 +44,8 @@ void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsign
  * coordinates x and y are relative to this viewport
  */
 void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen);
+
+/* draws a single char in viewport.
+ * coordinates x and y are relative to this viewport
+ */
+void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color, char);
