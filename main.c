@@ -4,7 +4,7 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
-#include <lfb.h>
+#include <video_canvas.h>
 #include <rand.h>
 #include <timer.h>
 #include <delays.h>
@@ -222,8 +222,8 @@ int do_ls(const char *arg_start, const char *args_end)
 
 void main()
 {
-  lfb_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-  lfb_set_bgcolor(0xff000000);
+  video_canvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  video_canvas_set_bgcolor(0xff000000);
 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
@@ -235,7 +235,7 @@ void main()
 
   rand_init();
 
-  lfb_showpicture();
+  video_canvas_showpicture();
   // vibration_sensor_test(19, 0 /* no poll, use interrupts */);
   // generate exception here
   // el = *(unsigned long*)0xffffffff;

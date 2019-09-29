@@ -1,4 +1,4 @@
-#include <lfb.h>
+#include <video_canvas.h>
 #include <uart/uart.h>
 #include <mbox/mbox.h>
 #include <console_char.h>
@@ -6,10 +6,10 @@
 #include "exception.h"
 
 unsigned int fb_width, fb_height, fb_pitch;
-unsigned char *lfb;
-static int lfb_initialized = 0;
-static int lfb_bgcolor = 0;
-static int lfb_tabwidth = 1;
+unsigned char *video_canvas;
+static int video_canvas_initialized = 0;
+static int video_canvas_bgcolor = 0;
+static int video_canvas_tabwidth = 1;
 
 typedef struct {
   unsigned int magic;
@@ -25,12 +25,12 @@ typedef struct {
 
 extern volatile unsigned char _binary_font_psf_start;
 
-int lfb_is_initialized()
+int video_canvas_is_initialized()
 {
-  return lfb_initialized;
+  return video_canvas_initialized;
 }
 
-void lfb_init(int width, int height)
+void video_canvas_init(int width, int height)
 {
   mbox[0] = 35 * 4;
   mbox[1] = MBOX_REQUEST;
@@ -82,15 +82,15 @@ void lfb_init(int width, int height)
     fb_width = mbox[5];
     fb_height = mbox[6];
     fb_pitch = mbox[33];
-    lfb = (void*)((unsigned long)mbox[28]);
+    video_canvas = (void*)((unsigned long)mbox[28]);
   }
   else
   {
     uart_puts("Unable to set screen resolution to 1024x768x32\n");
   }
 
-  lfb_tabwidth = 4;
-  lfb_initialized = 1;
+  video_canvas_tabwidth = 4;
+  video_canvas_initialized = 1;
 }
 
 static void fill_background(psf_t *font, char *framebuf_off, int pitch)
@@ -100,7 +100,7 @@ static void fill_background(psf_t *font, char *framebuf_off, int pitch)
   for (y = 0; y < font->height; ++y) {
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      *pixel_addr = lfb_bgcolor;
+      *pixel_addr = video_canvas_bgcolor;
     }
   }
 }
@@ -116,7 +116,7 @@ static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_of
     mask = 1 << (font->width - 1);
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : lfb_bgcolor;
+      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : video_canvas_bgcolor;
       *pixel_addr = glyph_pixel;
       mask >>= 1;
     }
@@ -125,16 +125,16 @@ static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_of
 }
 
 
-void lfb_set_bgcolor(int value)
+void video_canvas_set_bgcolor(int value)
 {
-  lfb_bgcolor = value;
+  video_canvas_bgcolor = value;
 }
 
 
-void lfb_showpicture()
+void video_canvas_showpicture()
 {
   int x,y;
-  unsigned char *ptr = lfb;
+  unsigned char *ptr = video_canvas;
   char *data = homer_data, pixel[4];
   ptr += (fb_height - homer_height) / 2 * fb_pitch + (fb_width - homer_width) * 2;
   for (y = 0; y < homer_height; ++y)
@@ -150,7 +150,7 @@ void lfb_showpicture()
 }
 
 
-void lfb_putc(int* x, int* y, char chr)
+void video_canvas_putc(int* x, int* y, char chr)
 {
   unsigned char *glyphs, *glyph;
   int glyph_idx;
@@ -175,24 +175,24 @@ void lfb_putc(int* x, int* y, char chr)
       (*y)++;
       break;
     case CONSOLE_CHAR_HORIZONTAL_TAB:
-      *x += lfb_tabwidth;
+      *x += video_canvas_tabwidth;
       break;
     case CONSOLE_CHAR_BACKSPACE:
     case CONSOLE_CHAR_DEL:
       if (*x > 0)
         (*x)--;
       framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
-      fill_background(font, ((char*)lfb) + framebuf_off, fb_pitch);
+      fill_background(font, ((char*)video_canvas) + framebuf_off, fb_pitch);
       break;
     default:
-      print_glyph(glyph, font, ((char*)lfb) + framebuf_off, fb_pitch);
+      print_glyph(glyph, font, ((char*)video_canvas) + framebuf_off, fb_pitch);
       (*x)++;
       break;
   }
 }
 
 
-void lfb_puts(int *x, int *y, const char *s)
+void video_canvas_puts(int *x, int *y, const char *s)
 {
   psf_t *font = (psf_t*)&_binary_font_psf_start;
   int width_limit, height_limit;
@@ -200,7 +200,7 @@ void lfb_puts(int *x, int *y, const char *s)
   if (x == 0 || y == 0 || s == 0)
     generate_exception();
 
-  if (lfb_get_width_height(&width_limit, &height_limit))
+  if (video_canvas_get_width_height(&width_limit, &height_limit))
     generate_exception();
 
   width_limit /= (font->width + 1);
@@ -214,11 +214,11 @@ void lfb_puts(int *x, int *y, const char *s)
       (*y)++;
     }
 
-    lfb_putc(x, y, *s++);
+    video_canvas_putc(x, y, *s++);
   }
 }
 
-int lfb_get_width_height(int *width, int *height)
+int video_canvas_get_width_height(int *width, int *height)
 {
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;

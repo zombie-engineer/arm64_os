@@ -1,10 +1,10 @@
 #include <uart/uart.h>
-#include "lfb.h"
-#include "delays.h"
-#include "sprintf.h"
+#include <video_canvas.h>
+#include <delays.h>
+#include <sprintf.h>
 
 #define puts(txt) \
-  uart_puts(txt); lfb_puts(&x, &y, txt);
+  uart_puts(txt); video_canvas_puts(&x, &y, txt);
 
 void exc_handler(
   unsigned long type, 
@@ -59,16 +59,16 @@ void exc_handler(
   char buf[64];
   sprintf(buf, "esr: %08x", (int)esr);
   x = 40, y = 1;
-  lfb_puts(&x, &y, buf);
+  video_canvas_puts(&x, &y, buf);
   sprintf(buf, "elr: %08x", (int)elr);
   x = 40, y = 2;
-  lfb_puts(&x, &y, buf);
+  video_canvas_puts(&x, &y, buf);
   sprintf(buf, "spsr: %08x", (int)spsr);
   x = 40, y = 3;
-  lfb_puts(&x, &y, buf);
+  video_canvas_puts(&x, &y, buf);
   sprintf(buf, "far: %08x", (int)far);
   x = 40, y = 4;
-  lfb_puts(&x, &y, buf);
+  video_canvas_puts(&x, &y, buf);
   return;
 
   uart_hex(esr>>32);
