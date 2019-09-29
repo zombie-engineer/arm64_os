@@ -302,7 +302,7 @@ viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned i
   return v;
 }
 
-void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int rgba)
+void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int color)
 {
   int _x, _y;
   unsigned int _size_x, _size_y;
@@ -316,7 +316,12 @@ void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsign
   _size_x = (x + size_x > v->size_x) ? v->size_x - x : size_x;
   _size_y = (y + size_y > v->size_y) ? v->size_y - y : size_y;
   
-  vcanvas_fill_rect(_x, _y, _size_x, _size_y, rgba);
+  vcanvas_fill_rect(_x, _y, _size_x, _size_y, color);
+}
+
+void viewport_fill(viewport_t *v, int color)
+{
+  viewport_fill_rect(v, 0, 0, v->size_x, v->size_y, color);
 }
 
 void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen)

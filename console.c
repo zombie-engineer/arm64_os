@@ -1,11 +1,12 @@
-#include "console.h"
-#include "exception.h"
-#include "string.h"
+#include <console.h>
+#include <exception.h>
+#include <string.h>
 #include <uart/uart.h>
-#include "video_console.h"
+#include <video_console.h>
+#include <viewport_console.h>
 
 #define MAX_CONSOLE_DEVICES 4
-#define MAX_DEVNAME_SIZE 11
+#define MAX_DEVNAME_SIZE 14
 
 typedef struct console_dev_ent {
   console_dev_t dev;
@@ -100,5 +101,13 @@ void init_consoles()
   dev.puts = uart_puts;
   dev.putc = uart_putc;
   if (console_add_device(&dev, UART_CONSOLE_NAME))
+    generate_exception();
+
+  if (viewport_console_init())
+    generate_exception();
+
+  dev.puts = viewport_console_puts;
+  dev.putc = viewport_console_putc;
+  if (console_add_device(&dev, VIEWPORT_CONSOLE_NAME))
     generate_exception();
 }

@@ -29,6 +29,18 @@ typedef struct viewport {
 
 viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned int size_y);
 
-void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int rgba);
+/* fills whole viewport with given color */
+void viewport_fill(viewport_t *v, int color);
 
-void viewport_draw_text(viewport_t *v, int x, int y, int text_color, int bg_color, const char* text, int textlen);
+/* fills rectangle in viewport with given color 
+ * x, y - rectangle starting position, given in coordinates,
+ * relative to viewport 'v'. 
+ * size_x, size_y - rectangle with and height
+ * color - rectangle color
+ */
+void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int color);
+
+/* draws line of text in viewport.
+ * coordinates x and y are relative to this viewport
+ */
+void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen);

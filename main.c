@@ -263,11 +263,7 @@ void main()
   vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
   vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
   viewport = vcanvas_make_viewport(20, 20, 400, 400);
-  viewport_fill_rect(viewport, 0,  0, 400, 20, 0x00ff0000);
-  vcanvas_fill_rect(10, 30, 100, 10, 0x0000ff00);
-  vcanvas_fill_rect(10, 40, 100, 10, 0x000000ff);
-  viewport_fill_rect(viewport, 0, 20, 400, 20, 0x0000ff00);
-  viewport_fill_rect(viewport, 0, 40, 400, 20, 0x000000ff);
+  viewport_fill(viewport, 0x00101010);
   viewport_draw_text(viewport, 0, 0, 0x0000ff00, 0x00000000, "hello", 5);
   cmdrunner_init();
   cmdrunner_run_interactive_loop();
