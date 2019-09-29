@@ -1,4 +1,5 @@
-#include <video_canvas.h>
+#include <vcanvas.h>
+#include <common.h>
 #include <uart/uart.h>
 #include <mbox/mbox.h>
 #include <console_char.h>
@@ -6,10 +7,10 @@
 #include "exception.h"
 
 unsigned int fb_width, fb_height, fb_pitch;
-unsigned char *video_canvas;
-static int video_canvas_initialized = 0;
-static int video_canvas_bgcolor = 0;
-static int video_canvas_tabwidth = 1;
+unsigned char *framebuf;
+static int vcanvas_initialized = 0;
+static int vcanvas_bgcolor = 0;
+static int vcanvas_tabwidth = 1;
 
 typedef struct {
   unsigned int magic;
@@ -25,12 +26,12 @@ typedef struct {
 
 extern volatile unsigned char _binary_font_psf_start;
 
-int video_canvas_is_initialized()
+int vcanvas_is_initialized()
 {
-  return video_canvas_initialized;
+  return vcanvas_initialized;
 }
 
-void video_canvas_init(int width, int height)
+void vcanvas_init(int width, int height)
 {
   mbox[0] = 35 * 4;
   mbox[1] = MBOX_REQUEST;
@@ -82,15 +83,15 @@ void video_canvas_init(int width, int height)
     fb_width = mbox[5];
     fb_height = mbox[6];
     fb_pitch = mbox[33];
-    video_canvas = (void*)((unsigned long)mbox[28]);
+    framebuf = (void*)((unsigned long)mbox[28]);
   }
   else
   {
     uart_puts("Unable to set screen resolution to 1024x768x32\n");
   }
 
-  video_canvas_tabwidth = 4;
-  video_canvas_initialized = 1;
+  vcanvas_tabwidth = 4;
+  vcanvas_initialized = 1;
 }
 
 static void fill_background(psf_t *font, char *framebuf_off, int pitch)
@@ -100,7 +101,7 @@ static void fill_background(psf_t *font, char *framebuf_off, int pitch)
   for (y = 0; y < font->height; ++y) {
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      *pixel_addr = video_canvas_bgcolor;
+      *pixel_addr = vcanvas_bgcolor;
     }
   }
 }
@@ -116,7 +117,7 @@ static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_of
     mask = 1 << (font->width - 1);
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : video_canvas_bgcolor;
+      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : vcanvas_bgcolor;
       *pixel_addr = glyph_pixel;
       mask >>= 1;
     }
@@ -125,16 +126,16 @@ static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_of
 }
 
 
-void video_canvas_set_bgcolor(int value)
+void vcanvas_set_bgcolor(int value)
 {
-  video_canvas_bgcolor = value;
+  vcanvas_bgcolor = value;
 }
 
 
-void video_canvas_showpicture()
+void vcanvas_showpicture()
 {
   int x,y;
-  unsigned char *ptr = video_canvas;
+  unsigned char *ptr = framebuf;
   char *data = homer_data, pixel[4];
   ptr += (fb_height - homer_height) / 2 * fb_pitch + (fb_width - homer_width) * 2;
   for (y = 0; y < homer_height; ++y)
@@ -150,7 +151,7 @@ void video_canvas_showpicture()
 }
 
 
-void video_canvas_putc(int* x, int* y, char chr)
+void vcanvas_putc(int* x, int* y, char chr)
 {
   unsigned char *glyphs, *glyph;
   int glyph_idx;
@@ -175,24 +176,24 @@ void video_canvas_putc(int* x, int* y, char chr)
       (*y)++;
       break;
     case CONSOLE_CHAR_HORIZONTAL_TAB:
-      *x += video_canvas_tabwidth;
+      *x += vcanvas_tabwidth;
       break;
     case CONSOLE_CHAR_BACKSPACE:
     case CONSOLE_CHAR_DEL:
       if (*x > 0)
         (*x)--;
       framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
-      fill_background(font, ((char*)video_canvas) + framebuf_off, fb_pitch);
+      fill_background(font, ((char*)framebuf) + framebuf_off, fb_pitch);
       break;
     default:
-      print_glyph(glyph, font, ((char*)video_canvas) + framebuf_off, fb_pitch);
+      print_glyph(glyph, font, ((char*)framebuf) + framebuf_off, fb_pitch);
       (*x)++;
       break;
   }
 }
 
 
-void video_canvas_puts(int *x, int *y, const char *s)
+void vcanvas_puts(int *x, int *y, const char *s)
 {
   psf_t *font = (psf_t*)&_binary_font_psf_start;
   int width_limit, height_limit;
@@ -200,7 +201,7 @@ void video_canvas_puts(int *x, int *y, const char *s)
   if (x == 0 || y == 0 || s == 0)
     generate_exception();
 
-  if (video_canvas_get_width_height(&width_limit, &height_limit))
+  if (vcanvas_get_width_height(&width_limit, &height_limit))
     generate_exception();
 
   width_limit /= (font->width + 1);
@@ -214,11 +215,11 @@ void video_canvas_puts(int *x, int *y, const char *s)
       (*y)++;
     }
 
-    video_canvas_putc(x, y, *s++);
+    vcanvas_putc(x, y, *s++);
   }
 }
 
-int video_canvas_get_width_height(int *width, int *height)
+int vcanvas_get_width_height(int *width, int *height)
 {
   mbox[0] = 8 * 4;
   mbox[1] = MBOX_REQUEST;
@@ -241,3 +242,18 @@ int video_canvas_get_width_height(int *width, int *height)
   return -1;
 }
 
+void vcanvas_fill_rect(int x, int y, int width, int height, int rgba)
+{
+  int _x, _y, xend, yend;
+
+  xend = min(x + width, fb_width);
+  yend = min(y + height, fb_height);
+
+  int *p_pixel;
+  for (_x = 0; _x < xend; ++_x) {
+    for (_y = 0; _y < yend; ++_y) {
+      p_pixel = (int*)(((char*)framebuf) + _x * sizeof(rgba) + _y * fb_pitch);
+      *p_pixel = rgba;
+    }
+  }
+}
