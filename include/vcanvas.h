@@ -2,7 +2,9 @@
 
 void vcanvas_init(int width, int height);
 
-void vcanvas_set_bgcolor(int value);
+void vcanvas_set_fg_color(int value);
+
+void vcanvas_set_bg_color(int value);
 
 int vcanvas_is_initialized();
 
@@ -28,3 +30,5 @@ typedef struct viewport {
 viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned int size_y);
 
 void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int rgba);
+
+void viewport_draw_text(viewport_t *v, int x, int y, int text_color, int bg_color, const char* text, int textlen);

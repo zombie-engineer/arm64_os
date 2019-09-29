@@ -11,7 +11,8 @@
 unsigned int fb_width, fb_height, fb_pitch;
 unsigned char *framebuf;
 static int vcanvas_initialized = 0;
-static int vcanvas_bgcolor = 0;
+static int vcanvas_fg_color = 0;
+static int vcanvas_bg_color = 0;
 static int vcanvas_tabwidth = 1;
 
 static unsigned int num_viewports = 0;
@@ -108,36 +109,56 @@ static void fill_background(psf_t *font, char *framebuf_off, int pitch)
   for (y = 0; y < font->height; ++y) {
     for (x = 0; x < font->width; ++x) {
       pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      *pixel_addr = vcanvas_bgcolor;
+      *pixel_addr = vcanvas_bg_color;
     }
   }
 }
 
-static void print_glyph(unsigned char* glyph_off, psf_t *font, char *framebuf_off, int pitch)
+static unsigned int * fb_get_pixel_addr(int x, int y)
 {
-  int x, y;
+  return (unsigned int*)(framebuf + y * fb_pitch + x * sizeof(int));
+}
+
+static void vcanvas_draw_glyph(
+  psf_t *font, 
+  unsigned char *glyph, 
+  int x, 
+  int y, 
+  unsigned int max_size_x, 
+  unsigned int max_size_y, 
+  int fg_color, 
+  int bg_color)
+{
+  unsigned int _x, _y;
+  unsigned limit_x, limit_y;
   int mask;
   unsigned int *pixel_addr;
-  unsigned int glyph_pixel;
+
+  limit_x = min(font->width, max_size_x);
+  limit_y = min(font->height, max_size_y);
+
   int bytes_per_line = (font->width + 7) / 8;
-  for (y = 0; y < font->height; ++y) {
+  for (_y = 0; _y < limit_y; ++_y) {
     mask = 1 << (font->width - 1);
-    for (x = 0; x < font->width; ++x) {
-      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      glyph_pixel = (int)*glyph_off & mask ? 0x00ffffff : vcanvas_bgcolor;
-      *pixel_addr = glyph_pixel;
+    for (_x = 0; _x < limit_x; ++_x) {
+      pixel_addr = fb_get_pixel_addr(x + _x, y + _y);
+      *pixel_addr = (int)*glyph & mask ? fg_color : bg_color;
       mask >>= 1;
     }
-    glyph_off += bytes_per_line;
+    glyph += bytes_per_line;
   }
 }
 
 
-void vcanvas_set_bgcolor(int value)
+void vcanvas_set_fg_color(int value)
 {
-  vcanvas_bgcolor = value;
+  vcanvas_fg_color = value;
 }
 
+void vcanvas_set_bg_color(int value)
+{
+  vcanvas_bg_color = value;
+}
 
 void vcanvas_showpicture()
 {
@@ -157,20 +178,23 @@ void vcanvas_showpicture()
   }
 }
 
+unsigned char * font_get_glyph(psf_t *font, char c)
+{
+  int glyph_idx;
+  unsigned char *glyphs;
+  
+  // get offset to the glyph. Need to adjust this to support unicode..
+  glyphs = ((unsigned char*)font) + font->headersize;
+  glyph_idx = (c < font->numglyph) ? c : 0;
+  return glyphs + glyph_idx * font->bytesperglyph;
+}
 
 void vcanvas_putc(int* x, int* y, char chr)
 {
-  unsigned char *glyphs, *glyph;
-  int glyph_idx;
+  unsigned char *glyph;
   int framebuf_off;
   psf_t *font = (psf_t*)&_binary_font_psf_start;
-
-  // get offset to the glyph. Need to adjust this to support unicode..
-  glyphs = (unsigned char*)&_binary_font_psf_start + font->headersize;
-  glyph_idx = 0;
-  if (chr < font->numglyph)
-    glyph_idx = chr;
-  glyph = glyphs + glyph_idx * font->bytesperglyph;
+  glyph = font_get_glyph(font, chr);
   // calculate offset on screen
   framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
   
@@ -193,7 +217,7 @@ void vcanvas_putc(int* x, int* y, char chr)
       fill_background(font, ((char*)framebuf) + framebuf_off, fb_pitch);
       break;
     default:
-      print_glyph(glyph, font, ((char*)framebuf) + framebuf_off, fb_pitch);
+      vcanvas_draw_glyph(font, glyph, *x * font->width, *y * font->height, font->width, font->height, vcanvas_fg_color, vcanvas_bg_color);
       (*x)++;
       break;
   }
@@ -293,4 +317,46 @@ void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsign
   _size_y = (y + size_y > v->size_y) ? v->size_y - y : size_y;
   
   vcanvas_fill_rect(_x, _y, _size_x, _size_y, rgba);
+}
+
+void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen)
+{
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  const char *c;
+  unsigned char *glyph;
+  unsigned int char_idx;
+
+  // ax, ay - absolute x and y positions
+  int ax, ay;
+  // rx, ry - relative to viewport 'v' x and y positions
+  int rx, ry;
+  // size_x, size_y - max sizes of glyphs to draw
+  unsigned int size_x, size_y;
+
+  if (x >= v->size_x || y >= v->size_y)
+    return;
+
+  c = text;
+  char_idx = 0;
+  while(*c && char_idx < textlen) {
+    rx = x + char_idx * font->width;
+    ry = y;
+
+    printf("rx, ry: %d, %d\n", rx, ry);
+    if (rx >= v->size_x || ry >= v->size_y)
+      return;
+    
+    size_x = (rx + font->width  > v->size_x) ? v->size_x - rx : font->width;
+    size_y = (ry + font->height > v->size_y) ? v->size_y - ry : font->height;
+
+    ax = v->pos_x + rx;
+    ay = v->pos_y + ry;
+    printf("ax, ay: %d, %d, size_x, size_y: %d %d\n", ax, ay, size_x, size_y);
+
+    glyph = font_get_glyph(font, *c);
+    vcanvas_draw_glyph(font, glyph, ax, ay, size_x, size_y, fg_color, bg_color);
+
+    char_idx++;
+    c++;
+  }
 }
