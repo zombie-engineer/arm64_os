@@ -83,12 +83,16 @@ int cmdrunner_add_cmd(const char* name, unsigned int namelen, cmd_func func)
 void cmdrunner_run_interactive_loop(void)
 {
   char ch;
+  cmdrunner_newline();
+  puts(" >");
+
   while(1) {
     ch = uart_getc();
     if (ch == '\n') {
       cmdrunner_newline();
       cmdrunner_on_newline();
       cmdrunner_flush_inputbuf();
+      puts(" >");
     } else if (ch == 8) {
       cmdrunner_backspace();
     } else {
