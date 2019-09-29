@@ -16,4 +16,15 @@ void vcanvas_puts(int *x, int *y, const char *s);
 
 int vcanvas_get_width_height(int *width, int *height);
 
-void vcanvas_fill_rect(int x, int y, int width, int height, int rgba);
+void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, int rgba);
+
+typedef struct viewport {
+  int pos_x;
+  int pos_y;
+  unsigned int size_x;
+  unsigned int size_y;
+} viewport_t;
+
+viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned int size_y);
+
+void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int rgba);

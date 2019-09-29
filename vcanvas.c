@@ -6,11 +6,17 @@
 #include "homer.h"
 #include "exception.h"
 
+#define MAX_VIEWPORTS 16
+
 unsigned int fb_width, fb_height, fb_pitch;
 unsigned char *framebuf;
 static int vcanvas_initialized = 0;
 static int vcanvas_bgcolor = 0;
 static int vcanvas_tabwidth = 1;
+
+static unsigned int num_viewports = 0;
+static viewport_t viewports[MAX_VIEWPORTS];
+
 
 typedef struct {
   unsigned int magic;
@@ -92,6 +98,7 @@ void vcanvas_init(int width, int height)
 
   vcanvas_tabwidth = 4;
   vcanvas_initialized = 1;
+  num_viewports = 0;
 }
 
 static void fill_background(psf_t *font, char *framebuf_off, int pitch)
@@ -242,18 +249,48 @@ int vcanvas_get_width_height(int *width, int *height)
   return -1;
 }
 
-void vcanvas_fill_rect(int x, int y, int width, int height, int rgba)
+void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, int rgba)
 {
   int _x, _y, xend, yend;
 
-  xend = min(x + width, fb_width);
-  yend = min(y + height, fb_height);
+  xend = min(x + size_x, fb_width);
+  yend = min(y + size_y, fb_height);
 
   int *p_pixel;
-  for (_x = 0; _x < xend; ++_x) {
-    for (_y = 0; _y < yend; ++_y) {
+  for (_x = x; _x < xend; ++_x) {
+    for (_y = y; _y < yend; ++_y) {
       p_pixel = (int*)(((char*)framebuf) + _x * sizeof(rgba) + _y * fb_pitch);
       *p_pixel = rgba;
     }
   }
+}
+
+viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned int size_y)
+{
+  if (num_viewports >= MAX_VIEWPORTS)
+    return 0;
+
+  viewport_t *v = &viewports[num_viewports++];
+  v->pos_x = x;
+  v->pos_y = y;
+  v->size_x = size_x;
+  v->size_y = size_y;
+  return v;
+}
+
+void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsigned int size_y, int rgba)
+{
+  int _x, _y;
+  unsigned int _size_x, _size_y;
+
+  if (x >= v->size_x || y >= v->size_y)
+    return;
+
+  _x = v->pos_x + x;
+  _y = v->pos_y + y;
+
+  _size_x = (x + size_x > v->size_x) ? v->size_x - x : size_x;
+  _size_y = (y + size_y > v->size_y) ? v->size_y - y : size_y;
+  
+  vcanvas_fill_rect(_x, _y, _size_x, _size_y, rgba);
 }
