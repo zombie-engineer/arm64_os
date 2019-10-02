@@ -49,3 +49,5 @@ void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color,
  * coordinates x and y are relative to this viewport
  */
 void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color, char);
+
+int vcanvas_get_fontsize(int *size_x, int *size_y);

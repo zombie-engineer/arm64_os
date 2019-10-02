@@ -224,7 +224,7 @@ void main()
 {
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
-  vcanvas_set_bg_color(0x00000000);
+  vcanvas_set_bg_color(0x00000010);
   
 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);

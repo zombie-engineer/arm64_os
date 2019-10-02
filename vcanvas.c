@@ -375,3 +375,14 @@ void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color,
     c++;
   }
 }
+
+int vcanvas_get_fontsize(int *size_x, int *size_y)
+{
+  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  if (!font)
+    return -1;
+
+  *size_x = font->width;
+  *size_y = font->height;
+  return 0;
+}
