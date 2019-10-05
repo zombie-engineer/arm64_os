@@ -1,4 +1,6 @@
 #include <rectangle.h>
+#include <string.h>
+
 
 /* r0       - rectangle to clip
  * r1       - boundary rectangle 
@@ -81,10 +83,11 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
     return 0;
 
   memset(rs, 0, sizeof(*rs));
-
   RGN(1, 1)->exists = 1;
-  *RCT(1, 1) = *r0;
-  RCT(1, 0)->x = RCT(1, 2)->x = r0->x;
+  RCT(1, 1)->x = r0->x;
+  RCT(1, 1)->y = r0->y;
+  RCT(1, 0)->x = r0->x;
+  RCT(1, 2)->x = r0->x;
   RCT(0, 1)->y = RCT(2, 1)->y = r0->y;
 
   // Check interection from the left size
