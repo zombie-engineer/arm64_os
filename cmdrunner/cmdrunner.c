@@ -43,7 +43,6 @@ static void cmdrunner_flush_inputbuf(void)
 
 static void cmdrunner_newline(void)
 {
-  putc('\r');
   putc('\n');
 }
 

@@ -43,7 +43,7 @@ void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsign
 /* draws line of text in viewport.
  * coordinates x and y are relative to this viewport
  */
-void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen);
+void viewport_draw_text(viewport_t *v, int x0, int y, int fg_color, int bg_color, const char* text, int textlen);
 
 /* draws a single char in viewport.
  * coordinates x and y are relative to this viewport
@@ -51,3 +51,8 @@ void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color,
 void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color, char);
 
 int vcanvas_get_fontsize(int *size_x, int *size_y);
+
+/* copyes rectangle from position [x0:y0, x0+size_x:y0+size_y] 
+ * to [x1:y1, x1+size_x:y2+sizey]
+ */
+void viewport_copy_rect(viewport_t *v, int x, int y0, int size_x, int size_y, int x1, int y1);

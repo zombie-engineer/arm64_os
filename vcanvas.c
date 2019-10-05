@@ -5,10 +5,11 @@
 #include <console_char.h>
 #include "homer.h"
 #include "exception.h"
+#include <string.h>
 
 #define MAX_VIEWPORTS 16
 
-unsigned int fb_width, fb_height, fb_pitch;
+unsigned int fb_width, fb_height, fb_pitch, fb_pixelsize;
 unsigned char *framebuf;
 static int vcanvas_initialized = 0;
 static int vcanvas_fg_color = 0;
@@ -91,6 +92,7 @@ void vcanvas_init(int width, int height)
     fb_height = mbox[6];
     fb_pitch = mbox[33];
     framebuf = (void*)((unsigned long)mbox[28]);
+    fb_pixelsize = 4;
   }
   else
   {
@@ -116,7 +118,7 @@ static void fill_background(psf_t *font, char *framebuf_off, int pitch)
 
 static unsigned int * fb_get_pixel_addr(int x, int y)
 {
-  return (unsigned int*)(framebuf + y * fb_pitch + x * sizeof(int));
+  return (unsigned int*)(framebuf + y * fb_pitch + x * fb_pixelsize);
 }
 
 static void vcanvas_draw_glyph(
@@ -283,7 +285,7 @@ void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, i
   int *p_pixel;
   for (_x = x; _x < xend; ++_x) {
     for (_y = y; _y < yend; ++_y) {
-      p_pixel = (int*)(((char*)framebuf) + _x * sizeof(rgba) + _y * fb_pitch);
+      p_pixel = (int*)(((char*)framebuf) + _x * fb_pixelsize + _y * fb_pitch);
       *p_pixel = rgba;
     }
   }
@@ -385,4 +387,258 @@ int vcanvas_get_fontsize(int *size_x, int *size_y)
   *size_x = font->width;
   *size_y = font->height;
   return 0;
+}
+
+typedef struct segment {
+  int offset;
+  unsigned size;
+} segment_t;
+
+static int clip_segment(segment_t *s0, segment_t *s1) {
+  /*
+   * x------------------x
+   * .       .          .
+   * .      (op)        .
+   * .       .          .
+   * .       x-----------------x
+   * .       .          .
+   * .       =          .
+   * .       .          .
+   * .       x----------x
+   * .       .          .
+   */
+  if (s0->offset + s0->size > s1->offset 
+   || s1->offset + s1->size < s0->offset)
+    return -1;
+
+  if (s0->offset > s1->offset) {
+    if (s0->offset + s0->size > s1->offset + s1->size)
+      s0->size = s1->offset + s1->size - s0->offset;
+    return 1;
+  }
+  if (s0->offset < s1->offset) {
+    s0->size -= (s1->offset - s0->offset);
+    s0->offset = s1->offset;
+    return 1;
+  }
+  
+  return 0;
+}
+
+typedef struct rect {
+  segment_t x;
+  segment_t y;
+} rect_t;
+
+/* r0       - rectangle to clip
+ * r1       - boundary rectangle 
+ * our_rect - rectangle, that is the result of applying 
+ *          - r1 boundary to r0 rect
+ * return value - '-1', rectangle is clipped away
+ *                ' 0', rectangle is not clipped
+ *                ' 1', rectangle is partially clipped
+ */
+// static int clip_rect(
+//     rect_t *r0, 
+//     rect_t *r1, 
+//     rect_t *out_i, 
+//     intersection_type *out_t
+//     )
+// {
+//   int partial_x, partial_y;
+//   rect_t tmp = *r0;
+//   partial_x = clip_segment(&tmp->x, &r1->x);
+//   if (partial_x < 0)
+//     return -1;
+// 
+//   partial_y = clip_segment(&tmp->y, &r1->y);
+//   if (partial_y < 0)
+//     return -1;
+// 
+//   *out_t = tmp;
+//   return (partial_x + partial_y) ? 1 : 0;
+// }
+
+typedef struct intersection_region {
+  rect_t r;
+  char exists;
+} intersection_region_t;
+
+typedef struct intersection_regions {
+  intersection_region_t rgs[9];
+} intersection_regions_t;
+
+#define RGN(x, y) (&(rs->rgs[y * 3 + x]))
+#define RCT(x, y) (&(rs->rgs[y * 3 + x].r))
+
+int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
+{ 
+  /*
+   * regions is 3 x 3 matrix of rects with additional fields like
+   * is this intersection exists
+   */
+
+  /*  
+   *  x-------x-------x-------x
+   *  |       |       |       |
+   *  | [0,0] | [0,1] | [0,2] |
+   *  |       |       |       |
+   *  x-------x-------x-------x
+   *  |       |       |       |
+   *  | [1,0] | [1,1] | [1,2] |
+   *  |       |       |       |
+   *  x-------x-------x-------x
+   *  |       |       |       |
+   *  | [2,0] | [2,1] | [2,2] |
+   *  |       |       |       |
+   *  x-------x-------x-------x
+   *
+   */
+  if (r0->x.offset + r0->x.size < r1->x.offset
+   || r1->x.offset + r1->x.size < r0->x.offset
+   || r0->y.offset + r0->y.size < r1->y.offset
+   || r1->y.offset + r1->y.size < r0->y.offset)
+    // no intersection
+    return 0;
+
+  memset(rs, 0, sizeof(*rs));
+
+  RGN(1, 1)->exists = 1;
+  *RCT(1, 1) = *r0;
+  RCT(1, 0)->x = RCT(1, 2)->x = r0->x;
+  RCT(0, 1)->y = RCT(2, 1)->y = r0->y;
+
+  // Check interection from the left size
+  if (r0->x.offset < r1->x.offset) {
+  /*  
+   *  x---x---x---x
+   *  | x |   |   |
+   *  x---x---x---x
+   *  | x | x |   |
+   *  x---x---x---x
+   *  | x |   |   |
+   *  x---x---x---x
+   */
+    RCT(1, 0)->x.offset = RCT(2, 0)->x.offset = RCT(0, 0)->x.offset = r1->x.offset;
+    RCT(1, 0)->x.size   = RCT(2, 0)->x.size   = RCT(0, 0)->x.size = r1->x.offset - r0->x.offset;
+    RGN(1, 0)->exists   = RGN(2, 0)->exists   = RGN(0, 0)->exists = 1;
+
+    RCT(1, 1)->x.offset += RCT(0, 0)->x.size;
+    RCT(1, 1)->x.size   -= RCT(0, 0)->x.size;
+  }
+
+  // Check interection from the right size
+  if (r0->x.offset + r0->x.size > r1->x.offset + r1->x.size) {
+  /*  
+   *  x---x---x---x
+   *  |   |   | x |
+   *  x---x---x---x
+   *  |   | x | x |
+   *  x---x---x---x
+   *  |   |   | x |
+   *  x---x---x---x
+   */
+    RCT(1, 2)->x.offset = RCT(2, 2)->x.offset = RCT(0, 2)->x.offset = r0->x.offset;
+    RCT(1, 2)->x.size   = RCT(2, 2)->x.size   = RCT(0, 2)->x.size   = r0->x.offset + r0->x.size - r0->x.offset - r0->x.size;
+    RGN(1, 2)->exists   = RGN(2, 2)->exists   = RGN(0, 2)->exists = 1;
+
+    RCT(1, 1)->x.size   -= RCT(0, 2)->x.size;
+  }
+
+  // Check interection from the top
+  if (r0->y.offset < r1->y.offset) {
+  /*  
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   | x |   |   | x | x |   |   |   | x | x |   | x | x | x |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   | x |   |   | x | x |   |   |   | x | x |   | x | x | x |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   |   |   |   | x | x |   |   |   |   | x |   | x |   | x |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   */
+    RCT(0, 1)->y.offset = RCT(0, 2)->y.offset = RCT(0, 0)->y.offset = r1->y.offset;
+    RCT(0, 1)->y.size   = RCT(0, 2)->y.size   = RCT(0, 0)->y.size = r1->y.offset - r0->y.offset;
+
+    RGN(0, 1)->exists = 1;
+
+    RCT(1, 1)->y.offset += RCT(0, 0)->y.size;
+    RCT(1, 1)->y.size   -= RCT(0, 0)->y.size;
+  }
+  else {
+    RGN(0, 0)->exists = RGN(0, 1)->exists = RGN(0, 2)->exists = 0;
+  }
+
+
+  // Check interection from the bottom
+  if (r0->y.offset + r0->y.size > r1->y.offset + r1->y.size) {
+  /*  
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   | x |   |   | x | x |   |   |   | x | x |   | x | x | x |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   *  |   | x |   |   | x | x |   |   |   | x | x |   | x | x | x |
+   *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
+   */
+    RCT(0, 2)->y.offset = RCT(1, 2)->y.offset = RCT(2, 2)->y.offset = r0->y.offset;
+    RCT(0, 2)->y.size   = RCT(1, 2)->y.size   = RCT(2, 2)->y.size   = r0->y.offset + r0->y.size - r1->y.offset - r1->y.size;
+    RCT(1, 1)->y.size  -= RCT(1, 2)->y.size;
+
+    RGN(1, 2)->exists   = 1;
+  }
+  else {
+    RGN(0, 2)->exists = RGN(1, 2)->exists = RGN(2, 2)->exists = 0;
+  }
+
+  return 1;
+}
+
+void viewport_copy_rect_unsafe(viewport_t *v, int x0, int y0, int size_x, int size_y, int x1, int y1)
+{
+  int i; 
+  char *src, *dst;
+
+  src = (char *)fb_get_pixel_addr(v->pos_x + x0, v->pos_y + y0);
+  dst = (char *)fb_get_pixel_addr(v->pos_x + x1, v->pos_y + y1);
+  
+  for (i = 0; i < size_y; i++) {
+    memcpy(dst, src, size_x * fb_pixelsize);
+    src += fb_pitch;
+    dst += fb_pitch;
+  }
+}
+
+void viewport_copy_rect(viewport_t *v, int x0, int y0, int size_x, int size_y, int x1, int y1)
+{
+  rect_t r0, r1;
+  unsigned int xi, yi;
+  intersection_region_t *ir;
+  intersection_regions_t regions;
+  intersection_regions_t *rs = &regions;
+
+  r0.x.offset = x0;
+  r0.x.size = size_x;
+  r0.y.offset = y0;
+  r0.y.size = size_y;
+  r1.x.offset = 0;
+  r1.x.size = v->size_x;
+  r1.y.offset = 0;
+  r1.y.size = v->size_y;
+
+  if (!get_intersection_regions(&r0, &r1, rs)) {
+    // r0 is outside viewport 
+    viewport_fill_rect(v, x1, y1, size_x, size_y, vcanvas_bg_color);
+    return;
+  }
+  for (yi = 0; yi < 3; yi ++) {
+    for (xi = 0; xi < 3; xi ++) {
+      if (xi == 1 && yi == 1)
+        continue;
+      ir = RGN(xi, yi);
+      if (ir->exists && ir->r.x.size && ir->r.y.size)
+        viewport_fill_rect(v, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1, ir->r.x.size, ir->r.y.size, vcanvas_bg_color); 
+    }
+  }
+  ir = RGN(1, 1);
+  viewport_copy_rect_unsafe(v, ir->r.x.offset, ir->r.y.offset, ir->r.x.size, ir->r.y.size, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1);
 }
