@@ -5,4 +5,5 @@ file kernel8.elf
 # b mmu_init
 # displ/8i $pc
 b textviewport_scrolldown
+b rectangle.c:89
 c 

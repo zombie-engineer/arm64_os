@@ -2,6 +2,7 @@
 #include <uart/uart.h>
 #include <string.h>
 #include <common.h>
+#include <console_char.h>
 
 CMDRUNNER_DECL_CMD(ls);
 CMDRUNNER_DECL_CMD(memdump);
@@ -51,7 +52,7 @@ static void cmdrunner_backspace(void)
   if (inputbuf_carret == inputbuf)
     return;
   *inputbuf_carret-- = 0;
-  putc(8);
+  putc(CONSOLE_CHAR_BACKSPACE);
 }
 
 void cmdrunner_init(void)
@@ -93,7 +94,7 @@ void cmdrunner_run_interactive_loop(void)
       cmdrunner_on_newline();
       cmdrunner_flush_inputbuf();
       puts(" >");
-    } else if (ch == 8) {
+    } else if (ch == CONSOLE_CHAR_BACKSPACE) {
       cmdrunner_backspace();
     } else {
       if (inputbuf_carret < inputbuf_end)
