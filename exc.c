@@ -13,6 +13,7 @@ void exc_handler(
   unsigned long spsr, 
   unsigned long far)
 {
+  char buf[64];
   int x = 40, y = 0; 
   // print out interruption type
   switch(type) {
@@ -40,23 +41,59 @@ void exc_handler(
   // decode data abort cause
   if (esr >> 26 == 0b100100 || esr >> 26 == 0b100101) {
     puts(", ");
-    switch((esr >> 2) & 0x3)
-    {
-      case 0: puts("Address size fault"); break;
-      case 1: puts("Translation fault"); break;
-      case 2: puts("Access flag fault"); break;
-      case 3: puts("Permission fault"); break;
+    int dfsc = (int)esr & 0x0000003f;
+    int print_level = 0;
+    switch(dfsc & 0x3c) {
+      case 0b000000: puts("Address size fault"); print_level = 1; break;
+      case 0b000100: puts("Translation fault");  print_level = 1; break;
+      case 0b001000: puts("Access flag fault");  print_level = 1; break;
+      case 0b001100: puts("Permission fault");   print_level = 1; break;
+      case 0b010000: puts("Synchronous External abort, not table walk"); break;
+      case 0b010001: puts("Synchronous Tag Check"); break;
+      case 0b010100: puts("Synchronous External abort, on table walk"); 
+        print_level = 1; 
+        break;
+      case 0b011000: puts("Synchronous parity or ECC error on memory access, not on table walk");
+        break;
+      case 0b011100: puts("Synchronous parity or ECC error on memory access, on table walk");
+        print_level = 1;
+        break;
+      default:
+        switch(dfsc) {
+          case 0b100001: puts("Alignment fault"); break;
+          case 0b110001: puts("Unsup atomic hardware update fault"); break;
+          case 0b110000: puts("TLB conflict abort"); break;
+          case 0b111101: puts("Section Domain Fault"); break;
+          case 0b111110: puts("Page Domain Fault"); break;
+          default: puts("Undefined Data abort code"); break;
+        }
     }
-    switch(esr & 0x3) {
-      case 0: puts(" at level 0 "); break;
-      case 1: puts(" at level 1 "); break;
-      case 2: puts(" at level 2 "); break;
-      case 3: puts(" at level 3 "); break;
+    if (print_level) {
+      switch(esr & 0x3) {
+        case 0: puts(" at level 0 "); break;
+        case 1: puts(" at level 1 "); break;
+        case 2: puts(" at level 2 "); break;
+        case 3: puts(" at level 3 "); break;
+      }
+    }
+    if (esr & 0b1000000) {
+      puts(", write op");
+    }
+    else {
+      puts(", read op");
+    }
+    if (esr & (1 << 24)) {
+      puts(", ISV valid");
+    }
+    if (esr & (1 << 15)) {
+      puts(", 64 bit");
+    }
+    else {
+      puts(", 32 bit");
     }
   }
 
   // dump registers
-  char buf[64];
   sprintf(buf, "esr: %08x", (int)esr);
   x = 40, y = 1;
   vcanvas_puts(&x, &y, buf);
