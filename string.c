@@ -18,6 +18,8 @@ int strncmp(const char *s1, const char *s2, size_t n)
     s2++;
     n--;
   }
+  if (!n)
+    return 0;
   return *s1 - *s2;
 }
 

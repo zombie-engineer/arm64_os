@@ -21,6 +21,7 @@ typedef struct text_viewport {
   int charpos_x;
   int charpos_y;
   int linenum;
+  int tabwidth;
 } textviewport_t;
 
 static textviewport_t tv;
@@ -37,8 +38,9 @@ int viewport_console_init()
   tv.text_wrapping = 1;
   tv.textbufend = tv.textbuf + VIEWPORT_TEXTBUF_LEN;
   tv.textbuflast = tv.textbuf;
+  tv.tabwidth = 4;
 
-  tv.viewport = vcanvas_make_viewport(20, 20, 768, 512);
+  tv.viewport = vcanvas_make_viewport(20, 20, 768, 256);
   vcanvas_get_fontsize(&tv.fontsize_x, &tv.fontsize_y);
   tv.maxchars_x = tv.viewport->size_x / tv.fontsize_x;
   tv.maxchars_y = tv.viewport->size_y / tv.fontsize_y;
@@ -120,7 +122,14 @@ void viewport_console_puts(const char *str)
 
 void viewport_console_putc(char c)
 {
+  int i;
   switch (c) {
+    case '\t':
+      *(tv.textbuflast++) = c;
+      *tv.textbuflast = 0;
+      for (i = 0; i < tv.tabwidth; ++i)
+        textviewport_print_char(&tv, ' ');
+      break;
     case '\n':
       *(tv.textbuflast++) = c;
       *tv.textbuflast = 0;

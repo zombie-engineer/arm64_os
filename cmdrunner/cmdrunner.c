@@ -22,11 +22,18 @@ static void cmdrunner_on_newline(void)
 {
   unsigned int i, maxarglen, cmplen, res;
   maxarglen = inputbuf_end - inputbuf;
+  cmplen = min(maxarglen, MAX_CMD_STRCMP_LEN);
+  const char *cmdend;
+  cmdend = inputbuf;
+  // first keyword is a COMMAND, find where it ends
+  while(cmdend < inputbuf_end && *cmdend && !isspace(*cmdend))
+    cmdend++;
+
+  // find COMMAND in the list of registered commands
   for (i = 0; i < num_commands; ++i) {
     command_t *cmd = &commands[i];
-    cmplen = min(maxarglen, MAX_CMD_STRCMP_LEN);
-    if (strncmp(cmd->name, inputbuf, cmplen) == 0) {
-      res = cmd->func(inputbuf_carret, inputbuf_end);
+    if (strncmp(cmd->name, inputbuf, cmdend - inputbuf) == 0) {
+      res = cmd->func(cmdend, inputbuf_end);
       if (res) {
         printf("Command completed with error code: %d\n", res);
       }
