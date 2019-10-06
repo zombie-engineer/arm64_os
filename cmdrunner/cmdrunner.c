@@ -28,6 +28,7 @@ static const char *cmdrunner_err_to_str(int err)
     CASE(CMD_ERR_NOT_IMPLEMENTED);
     CASE(CMD_ERR_UNKNOWN_SUBCMD);
     CASE(CMD_ERR_INVALID_ARGS);
+    CASE(CMD_ERR_EXECUTION_ERR);
     default: return "CMD_ERR_UNDEFINED";
   }
 #undef CASE
