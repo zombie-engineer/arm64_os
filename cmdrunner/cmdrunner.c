@@ -168,7 +168,6 @@ int string_tokens_from_string(const char *string_start, const char *string_end, 
 
     out->ts[i++].s = ptr;
     out->len++;
-    i++;
   }
   return 0;
 }

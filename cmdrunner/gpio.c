@@ -31,7 +31,7 @@ static int command_gpio_set(const string_token_t *args, int numargs)
     return CMD_ERR_INVALID_ARGS;
   }
 
-  value = (int)strtoll(args[0].s, &endptr, 0);
+  value = (int)strtoll(args[1].s, &endptr, 0);
   if (args[0].s == endptr) {
     puts("gpio set - invalid param for arg2 value\n");
     return CMD_ERR_INVALID_ARGS;
