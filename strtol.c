@@ -9,13 +9,14 @@ long long int strtoll(const char *str, char **endptr, int basis)
 {
   // ptr - for forward walk
   // bptr - for backward walk
-  const unsigned char *ptr, *bptr;
+  const unsigned char *ptr, *bptr, *eptr;
   unsigned char c;
   char has_negative_sign;
   long long int result;
   unsigned long long order;
 
-  ptr = str;
+  eptr = (const unsigned char *)str;
+  ptr = (const unsigned char *)str;
   result = 0;
   has_negative_sign = 0;
 
@@ -46,10 +47,11 @@ long long int strtoll(const char *str, char **endptr, int basis)
 
   // skip prefix
   if (basis == 16) {
-    if (ptr[0] == '0' && ptr[1] == 'x' || ptr[1] == 'X')
+    if (ptr[0] == '0' && (ptr[1] == 'x' || ptr[1] == 'X'))
       ptr += 2;
-    else
+    else {
       goto out;
+    }
   }
 
   switch(basis) {
@@ -57,9 +59,10 @@ long long int strtoll(const char *str, char **endptr, int basis)
       order = 0;
       // forward walk
       for(bptr = ptr; *bptr; bptr++) {
-        if (*bptr - '0' > 1)
+        if ((unsigned char)(*bptr - '0') > 1)
           break;
       }
+      eptr = bptr;
 
       // backward walk
       for(bptr--; bptr >= ptr; bptr--) {
@@ -72,9 +75,11 @@ long long int strtoll(const char *str, char **endptr, int basis)
       order = 1;
       // forward walk
       for(bptr = ptr; *bptr; bptr++) {
-        if (*bptr - '0' > 9)
+        if ((unsigned char)(*bptr - '0') > 9)
           break;
       }
+      eptr = bptr;
+
       // backward walk
       for(bptr--; bptr >= ptr; bptr--) {
         result += order * (*bptr - '0');
@@ -86,9 +91,12 @@ long long int strtoll(const char *str, char **endptr, int basis)
       // forward walk
       for(bptr = ptr; *bptr; bptr++) {
         c = *bptr;
-        if (c - '0' > 9 && (c - 'a' > 5) && (c - 'A' > 5))
+        if ((unsigned char)(c -'0') > 9 
+            && ((unsigned char)(c - 'a') > 5) 
+            && ((unsigned char)(c - 'A') > 5))
           break;
       }
+      eptr = bptr;
 
       // backward walk
       for(bptr--; bptr >= ptr; bptr--) {
@@ -112,7 +120,7 @@ long long int strtoll(const char *str, char **endptr, int basis)
   }
 out:
   if (endptr)
-    *endptr = (char*)ptr;
+    *endptr = (char*)eptr;
   if (has_negative_sign)
     result *= -1;
   return result;

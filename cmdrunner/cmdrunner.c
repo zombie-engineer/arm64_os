@@ -17,6 +17,17 @@ static char *inputbuf_carret;
 
 #define MAX_CMD_STRCMP_LEN 16
 
+static const char *cmdrunner_err_to_str(int err) 
+{
+#define CASE(a) case a: return #a
+  switch(err) {
+    CASE(CMD_ERR_NO_ERROR);
+    CASE(CMD_ERR_PARSE_ARG_ERROR);
+    CASE(CMD_ERR_NOT_IMPLEMENTED);
+    default: return "CMD_ERR_UNDEFINED";
+  }
+#undef CASE
+}
 
 static void cmdrunner_on_newline(void)
 {
@@ -35,7 +46,7 @@ static void cmdrunner_on_newline(void)
     if (strncmp(cmd->name, inputbuf, cmdend - inputbuf) == 0) {
       res = cmd->func(cmdend, inputbuf_end);
       if (res) {
-        printf("Command completed with error code: %d\n", res);
+        printf("Command completed with error code: %d (%s)\n", res, cmdrunner_err_to_str(res));
       }
       return;
     }
