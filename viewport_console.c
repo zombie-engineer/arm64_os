@@ -1,5 +1,6 @@
 #include <viewport_console.h>
 #include <vcanvas.h>
+#include <console_char.h>
 #include <common.h>
 
 #define VIEWPORT_TEXTBUF_LEN 4096
@@ -37,7 +38,7 @@ int viewport_console_init()
   tv.textbufend = tv.textbuf + VIEWPORT_TEXTBUF_LEN;
   tv.textbuflast = tv.textbuf;
 
-  tv.viewport = vcanvas_make_viewport(20, 20, 512, 256);
+  tv.viewport = vcanvas_make_viewport(20, 20, 768, 512);
   vcanvas_get_fontsize(&tv.fontsize_x, &tv.fontsize_y);
   tv.maxchars_x = tv.viewport->size_x / tv.fontsize_x;
   tv.maxchars_y = tv.viewport->size_y / tv.fontsize_y;
@@ -97,6 +98,18 @@ static void textviewport_newline(textviewport_t *tv)
     textviewport_scrolldown(tv, 1);
 }
 
+static void textviewport_backspace(textviewport_t *tv)
+{
+  if (tv->charpos_x) {
+    tv->charpos_x--;
+    viewport_fill_rect(tv->viewport, 
+      tv->charpos_x * tv->fontsize_x,
+      tv->charpos_y * tv->fontsize_y,
+      tv->fontsize_x,
+      tv->fontsize_y, tv->bg_color);
+  }
+}
+
 void viewport_console_puts(const char *str)
 {
   const char *ptr;
@@ -112,6 +125,10 @@ void viewport_console_putc(char c)
       *(tv.textbuflast++) = c;
       *tv.textbuflast = 0;
       textviewport_newline(&tv);
+      break;
+    case CONSOLE_CHAR_BACKSPACE:
+      *(tv.textbuflast--) = 0;
+      textviewport_backspace(&tv);
       break;
     default:
       *(tv.textbuflast++) = c;

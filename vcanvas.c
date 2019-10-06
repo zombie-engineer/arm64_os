@@ -213,7 +213,7 @@ void vcanvas_putc(int* x, int* y, char chr)
       *x += vcanvas_tabwidth;
       break;
     case CONSOLE_CHAR_BACKSPACE:
-    case CONSOLE_CHAR_DEL:
+    //case CONSOLE_CHAR_DEL:
       if (*x > 0)
         (*x)--;
       framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);

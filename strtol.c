@@ -1,0 +1,120 @@
+#include <stdlib.h>
+
+int isspace(int c) {
+  //return c == ' ' || c == '\t' || c == '\f' || c == '\n' || c == '\r' || c == '\v' ;
+  return c == ' ' || (c >= 0x9 && c <= 0xd);
+}
+
+long long int strtoll(const char *str, char **endptr, int basis)
+{
+  // ptr - for forward walk
+  // bptr - for backward walk
+  const unsigned char *ptr, *bptr;
+  unsigned char c;
+  char has_negative_sign;
+  long long int result;
+  unsigned long long order;
+
+  ptr = str;
+  result = 0;
+  has_negative_sign = 0;
+
+  // skip spaces
+  while(*ptr && isspace(*ptr))
+    ptr++;
+
+  // check sign
+  if (*ptr == '+')
+    ptr++;
+  if (*ptr == '-') {
+    has_negative_sign = 1;
+    ptr++;
+  }
+
+  // detect basis
+  if (basis == 0) {
+    if (ptr[0] == '0') {
+      if (ptr[1] == 'x' || ptr[1] == 'X')
+        basis = 16;
+      else {
+        basis = 2;
+      }
+    }
+    else
+      basis = 10;
+  }
+
+  // skip prefix
+  if (basis == 16) {
+    if (ptr[0] == '0' && ptr[1] == 'x' || ptr[1] == 'X')
+      ptr += 2;
+    else
+      goto out;
+  }
+
+  switch(basis) {
+    case 2:
+      order = 0;
+      // forward walk
+      for(bptr = ptr; *bptr; bptr++) {
+        if (*bptr - '0' > 1)
+          break;
+      }
+
+      // backward walk
+      for(bptr--; bptr >= ptr; bptr--) {
+        if (*bptr == '1')
+          result += 1 << order;
+        order++;
+      }
+      break;
+    case 10:
+      order = 1;
+      // forward walk
+      for(bptr = ptr; *bptr; bptr++) {
+        if (*bptr - '0' > 9)
+          break;
+      }
+      // backward walk
+      for(bptr--; bptr >= ptr; bptr--) {
+        result += order * (*bptr - '0');
+        order *= basis;
+      }
+      break;
+    case 16:
+      order = 1;
+      // forward walk
+      for(bptr = ptr; *bptr; bptr++) {
+        c = *bptr;
+        if (c - '0' > 9 && (c - 'a' > 5) && (c - 'A' > 5))
+          break;
+      }
+
+      // backward walk
+      for(bptr--; bptr >= ptr; bptr--) {
+        c = *bptr;
+        if (c >= 'a')
+          c -= ('a' - 'A');
+        if (c - '0' <= 9) {
+          result += order * (c - '0');
+          order *= basis;
+        }
+        else if (c - 'A' <= 6) {
+          result += order * (10 + c - 'A');
+          order *= basis;
+        }
+        else
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+out:
+  if (endptr)
+    *endptr = (char*)ptr;
+  if (has_negative_sign)
+    result *= -1;
+  return result;
+}
+
