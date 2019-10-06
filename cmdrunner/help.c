@@ -7,7 +7,7 @@ static int command_printer(command_t *cmd)
   return 0;
 }
 
-int command_help(const char *args_start, const char *args_end)
+int command_help(const string_tokens_t *args)
 {
   puts("Simple text command interpreter. Available commands: \n");
   cmdrunner_iterate_commands(command_printer);

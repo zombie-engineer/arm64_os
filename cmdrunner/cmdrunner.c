@@ -1,12 +1,14 @@
 #include <cmdrunner.h>
 #include <uart/uart.h>
 #include <string.h>
+#include <string_utils.h>
 #include <common.h>
 #include <console_char.h>
 
 CMDRUNNER_DECL_CMD(ls);
 CMDRUNNER_DECL_CMD(memdump);
 CMDRUNNER_DECL_CMD(help);
+CMDRUNNER_DECL_CMD(gpio);
 
 static command_t commands[COMMAND_MAX_COUNT];
 static unsigned int num_commands;
@@ -24,6 +26,8 @@ static const char *cmdrunner_err_to_str(int err)
     CASE(CMD_ERR_NO_ERROR);
     CASE(CMD_ERR_PARSE_ARG_ERROR);
     CASE(CMD_ERR_NOT_IMPLEMENTED);
+    CASE(CMD_ERR_UNKNOWN_SUBCMD);
+    CASE(CMD_ERR_INVALID_ARGS);
     default: return "CMD_ERR_UNDEFINED";
   }
 #undef CASE
@@ -31,20 +35,21 @@ static const char *cmdrunner_err_to_str(int err)
 
 static void cmdrunner_on_newline(void)
 {
-  unsigned int i, maxarglen, cmplen, res;
-  maxarglen = inputbuf_end - inputbuf;
-  cmplen = min(maxarglen, MAX_CMD_STRCMP_LEN);
-  const char *cmdend;
-  cmdend = inputbuf;
-  // first keyword is a COMMAND, find where it ends
-  while(cmdend < inputbuf_end && *cmdend && !isspace(*cmdend))
-    cmdend++;
+  unsigned int i, res;
+
+  string_token_t stokens[4];
+  string_tokens_t tokens;
+  tokens.ts = &stokens;
+  if (string_tokens_from_string(inputbuf, inputbuf_carret, ARRAY_SIZE(stokens), &tokens)) {
+    printf("Failed to parse command line to string tokens\n");
+    return;
+  }
 
   // find COMMAND in the list of registered commands
   for (i = 0; i < num_commands; ++i) {
     command_t *cmd = &commands[i];
-    if (strncmp(cmd->name, inputbuf, cmdend - inputbuf) == 0) {
-      res = cmd->func(cmdend, inputbuf_end);
+    if (string_token_eq(&tokens.ts[0], cmd->name)) {
+      res = cmd->func(&tokens);
       if (res) {
         printf("Command completed with error code: %d (%s)\n", res, cmdrunner_err_to_str(res));
       }
@@ -82,6 +87,7 @@ void cmdrunner_init(void)
   CMDRUNNER_ADD_CMD(ls);
   CMDRUNNER_ADD_CMD(memdump);
   CMDRUNNER_ADD_CMD(help);
+  CMDRUNNER_ADD_CMD(gpio);
 }
 
 int cmdrunner_add_cmd(
@@ -131,4 +137,43 @@ void cmdrunner_iterate_commands(iter_cmd_cb cb)
     if (cb(cmd))
       break;
   }
+}
+
+int string_tokens_from_string(const char *string_start, const char *string_end, int maxlen, string_tokens_t *out)
+{
+  int i;
+  const char *ptr;
+
+  ptr = string_start;
+
+  SKIP_WHITESPACES_BOUND(ptr, string_end);
+  if (!maxlen)
+    return -1;
+
+  out->ts[0].s = ptr;
+  out->len = i = 1;
+
+  while(1) {
+    SKIP_NONWHITESPACES_BOUND(ptr, string_end);
+    out->ts[i - 1].len = ptr - out->ts[i - 1].s;
+    if (ptr == string_end)
+      break;
+
+    if (i == maxlen)
+      break;
+
+    SKIP_WHITESPACES_BOUND(ptr, string_end);
+    if (ptr == string_end)
+      break;
+
+    out->ts[i++].s = ptr;
+    out->len++;
+    i++;
+  }
+  return 0;
+}
+
+int string_token_eq(const string_token_t *t, const char *str)
+{
+  return strncmp(t->s, str, t->len) == 0;
 }

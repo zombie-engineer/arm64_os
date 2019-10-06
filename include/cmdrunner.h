@@ -4,14 +4,34 @@
 
 #define CMD_ERR_NO_ERROR          0
 #define CMD_ERR_PARSE_ARG_ERROR   1
+#define CMD_ERR_UNKNOWN_SUBCMD    2
+#define CMD_ERR_INVALID_ARGS      3
 #define CMD_ERR_NOT_IMPLEMENTED 255
 
 #define COMMAND_MAX_COUNT 256
 #define CMDLINE_BUF_SIZE 1024
 
 
+typedef struct string_token {
+  const char *s;
+  int len;
+} string_token_t;
+
+typedef struct string_tokens {
+  string_token_t *ts;
+  int len;
+} string_tokens_t;
+
+int string_tokens_from_string(const char *string_start, const char *string_end, int maxlen, string_tokens_t *out);
+
+int string_token_eq(const string_token_t *t, const char *str);
+
+#define STRING_TOKENS_LOOP(t, var) \
+  string_token_t *var = t->ts; \
+  for(; var < &t->ts[t->len]; ++var)
+
 /* generic signature for every command */
-typedef int (*cmd_func)(const char*, const char*);
+typedef int (*cmd_func)(const string_tokens_t *);
 
 
 /* structure of a command */
@@ -40,7 +60,7 @@ int cmdrunner_add_cmd(
 
 
 #define CMDRUNNER_DECL_CMD(name) \
-  command_ ## name (const char*, const char*); \
+  int command_ ## name (const string_tokens_t *); \
   const char * get_command_name_ ## name ();\
   const char * get_command_description_ ## name ();\
   cmd_func     get_command_func_ ## name ();
@@ -65,3 +85,5 @@ void cmdrunner_iterate_commands(iter_cmd_cb cb);
 
 /* main interactive loop where user inputs commands */
 void cmdrunner_run_interactive_loop(void);
+
+

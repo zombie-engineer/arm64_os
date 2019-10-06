@@ -1,6 +1,6 @@
 #include <cmdrunner.h>
 
-int command_ls(const char *args_start, const char *args_end)
+int command_ls(const string_tokens_t *args)
 {
   return CMD_ERR_NOT_IMPLEMENTED;
 }

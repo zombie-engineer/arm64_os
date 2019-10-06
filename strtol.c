@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string_utils.h>
 
 int isspace(int c) {
   //return c == ' ' || c == '\t' || c == '\f' || c == '\n' || c == '\r' || c == '\v' ;
@@ -21,8 +22,7 @@ long long int strtoll(const char *str, char **endptr, int basis)
   has_negative_sign = 0;
 
   // skip spaces
-  while(*ptr && isspace(*ptr))
-    ptr++;
+  SKIP_WHITESPACES(ptr);
 
   // check sign
   if (*ptr == '+')

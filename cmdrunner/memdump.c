@@ -48,79 +48,58 @@ static void memdump_print_help()
   puts("\t-D - dump double-words\n");
 }
 
-int command_memdump(const char *args_start, const char *args_end)
+int command_memdump(const string_tokens_t *args)
 {
   int i, linesize;;
   // aptr - arguments pointer
   // ptr - memdump pointer
-  const char *aptr, *ptr;
-  char *endptr;
-  int print_help;
+  const char *ptr, *endptr;
   size_t bytescount;
   char nameless_args, element_size;
 
- 
   element_size = DUMPSIZE_BYTES;
-  print_help = 0;
   bytescount = 16;
   nameless_args = 0;
 
   // init and skip spaces
-  aptr = args_start;
-  for(; aptr < args_end && isspace(*aptr); aptr++);
-
-  for(; aptr < args_end; ) {
-    if (strncmp(aptr, "-h", min(2, args_end - aptr)) == 0) {
-      print_help = 1;
-      break;
+  //
+  STRING_TOKENS_LOOP(args, t) {
+    if (string_token_eq(t, "help")) {
+      memdump_print_help();
+      return CMD_ERR_NO_ERROR;
     }
-    if (strncmp(aptr, "-B", min(2, args_end - aptr)) == 0) {
+    if (string_token_eq(t, "-B")) {
       element_size = DUMPSIZE_BYTES;
-      aptr += 2;
       continue;
     }
-    if (strncmp(aptr, "-H", min(2, args_end - aptr)) == 0) {
+    if (string_token_eq(t, "-H")) {
       element_size = DUMPSIZE_HALFWORDS;
-      aptr += 2;
       continue;
     }
-    if (strncmp(aptr, "-W", min(2, args_end - aptr)) == 0) {
+    if (string_token_eq(t, "-W")) {
       element_size = DUMPSIZE_WORDS;
-      aptr += 2;
       continue;
     }
-    if (strncmp(aptr, "-D", min(2, args_end - aptr)) == 0) {
+    if (string_token_eq(t, "-D")) {
       element_size = DUMPSIZE_DOUBLEWORDS;
-      aptr += 2;
       continue;
     }
     if (nameless_args == 0) {
-      ptr = (char *)strtoll(aptr, &endptr, 0);
-      if (endptr > aptr) {
-        aptr = endptr;
+      ptr = (char *)strtoll(t->s, &endptr, 0);
+      if (endptr > t->s) {
         nameless_args++;
         continue;
       }
       return CMD_ERR_PARSE_ARG_ERROR;
     }
-    else if (nameless_args == 1) {
-      bytescount = (size_t)strtoll(aptr, &endptr, 0);
-      if (endptr > aptr) {
-        aptr = endptr;
+    if (nameless_args == 1) {
+      bytescount = (size_t)strtoll(t->s, &endptr, 0);
+      if (endptr > t->s) {
         nameless_args++;
         break;
       }
       return CMD_ERR_PARSE_ARG_ERROR;
     }
-    else {
-      return CMD_ERR_PARSE_ARG_ERROR;
-    }
-    aptr++;
-  }
-
-  if (print_help) {
-    memdump_print_help();
-    return CMD_ERR_NO_ERROR;
   }
 
   while(bytescount) {
@@ -134,6 +113,7 @@ int command_memdump(const char *args_start, const char *args_end)
       default: return CMD_ERR_PARSE_ARG_ERROR;
     }
     ptr += todump;
+    putc('\r');
     putc('\n');
   }
 

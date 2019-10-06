@@ -16,3 +16,5 @@ int isspace(int c);
 
 #define print_reg32_at(regname) printf(#regname " %08x\n",  *(reg32_t)regname)
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(*arr))
+
