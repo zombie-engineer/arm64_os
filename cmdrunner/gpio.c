@@ -28,7 +28,7 @@ typedef struct gpio_function {
 } gpio_function_t;
 
 typedef struct gpio_functions {
-  gpio_function_t f[5];
+  gpio_function_t f[6];
 } gpio_functions_t; 
 
 static int gpio_functions_set = 0;
