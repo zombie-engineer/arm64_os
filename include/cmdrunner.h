@@ -11,6 +11,7 @@
 
 #define COMMAND_MAX_COUNT 256
 #define CMDLINE_BUF_SIZE 1024
+#define MAX_HISTORY_LINES  8
 
 
 typedef struct string_token {
@@ -22,6 +23,8 @@ typedef struct string_tokens {
   string_token_t *ts;
   int len;
 } string_tokens_t;
+
+#define STRING_TOKEN_ARGN(arg, n) (arg->ts[n])
 
 int string_tokens_from_string(const char *string_start, const char *string_end, int maxlen, string_tokens_t *out);
 

@@ -216,8 +216,8 @@ void vcanvas_putc(int* x, int* y, char chr)
     //case CONSOLE_CHAR_DEL:
       if (*x > 0)
         (*x)--;
-      framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
-      fill_background(font, ((char*)framebuf) + framebuf_off, fb_pitch);
+      //framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
+      //fill_background(font, ((char*)framebuf) + framebuf_off, fb_pitch);
       break;
     default:
       vcanvas_draw_glyph(font, glyph, *x * font->width, *y * font->height, font->width, font->height, vcanvas_fg_color, vcanvas_bg_color);

@@ -130,7 +130,9 @@ void viewport_console_putc(char c)
       for (i = 0; i < tv.tabwidth; ++i)
         textviewport_print_char(&tv, ' ');
       break;
-    case '\n':
+    case CONSOLE_CHAR_CARRIAGE_RETURN:
+      break;
+    case CONSOLE_CHAR_LINEFEED:
       *(tv.textbuflast++) = c;
       *tv.textbuflast = 0;
       textviewport_newline(&tv);

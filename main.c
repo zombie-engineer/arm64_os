@@ -17,6 +17,7 @@
 #include <exception.h>
 #include <timer.h>
 #include <cmdrunner.h>
+#include <pwm.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -35,6 +36,10 @@ void print_mbox_props()
   char buf[6];
   val = mbox_get_firmware_rev();
   printf("firmware rev:    %08x\n", val);
+  //if (pwm_enable(0)) {
+  //  printf("pwm_enable failed\n");
+  //}
+  gpio_set_function(18, GPIO_FUNC_ALT_5);
   val = mbox_get_board_model();
   printf("board model:     %08x\n", val);
   val = mbox_get_board_rev();

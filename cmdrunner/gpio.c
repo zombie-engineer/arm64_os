@@ -1,22 +1,9 @@
 #include <cmdrunner.h>
+#include "argument.h"
 #include <stdlib.h>
 #include <gpio.h>
 #include <common.h>
 #include <string.h>
-
-
-#define ASSERT_NUMARGS_EQ(n) \
-  if (numargs != n) { \
-    printf("invalid number of args: expected %d, have: %d\n", n, numargs); \
-    return CMD_ERR_INVALID_ARGS; \
-  }
-
-#define GET_NUMERIC_PARAM(dst, typ, argnum, desc) \
-  dst = (typ)strtoll(args[argnum].s, &endptr, 0); \
-  if (args[argnum].s == endptr) { \
-    printf("failed to get numeric param '%s' from argument number %d\n", desc, argnum); \
-    return CMD_ERR_INVALID_ARGS; \
-  }
 
 
 #define GET_PIN_IDX() GET_NUMERIC_PARAM(pin_idx, int, 0, "pin_idx")
@@ -155,7 +142,7 @@ static int command_gpio_print_help()
   return CMD_ERR_NO_ERROR;
 }
 
-static int command_gpio_set_function(const string_token_t *args, int numargs)
+static int command_gpio_set_function(const string_tokens_t *args)
 {
   int pin_idx, i, status;
   char *endptr;
@@ -164,7 +151,7 @@ static int command_gpio_set_function(const string_token_t *args, int numargs)
   puts("gpio set-functions: ");
   ASSERT_NUMARGS_EQ(2);
   GET_PIN_IDX();
-  funcarg = &args[1];
+  funcarg = &args->ts[1];
 
   for (i = 0; i < gpio_aliases.len; ++i) {
     if (string_token_eq(funcarg, gpio_aliases.a[i].alias)) {
@@ -178,7 +165,7 @@ static int command_gpio_set_function(const string_token_t *args, int numargs)
   return CMD_ERR_NO_ERROR;
 }
 
-static int command_gpio_get_functions(const string_token_t *args, int numargs) 
+static int command_gpio_get_functions(const string_tokens_t *args) 
 {
   int pin_idx, i;
   char *endptr;
@@ -192,7 +179,7 @@ static int command_gpio_get_functions(const string_token_t *args, int numargs)
   return CMD_ERR_NO_ERROR;
 }
 
-static int command_gpio_set(const string_token_t *args, int numargs)
+static int command_gpio_set(const string_tokens_t *args)
 {
   int pin_idx, pin_value;
   char *endptr;
@@ -218,30 +205,28 @@ static int command_gpio_set(const string_token_t *args, int numargs)
 
 int command_gpio(const string_tokens_t *args)
 {
-  const string_token_t *subargs;
-  int subargslen;
+  string_tokens_t subargs;
+  string_token_t *subcmd_token;
   puts("gpio: \n");
   if (gpio_functions_set != 1) {
     command_gpio_init_functions();
     gpio_functions_set = 1;
   }
 
-  if (args->len <= 1)
-    return CMD_ERR_PARSE_ARG_ERROR;
+  ASSERT_NUMARGS_GE(2);
 
-  string_token_t *subcmd_token = &args->ts[1];
-  subargs = subcmd_token + 1;
-  subargslen = args->len - 2;
-
+  subcmd_token = &args->ts[1];
+  subargs.ts  = subcmd_token + 1;
+  subargs.len = args->len - 2;
 
   if (string_token_eq(subcmd_token, "help"))
     return command_gpio_print_help();
   if (string_token_eq(subcmd_token, "set"))
-    return command_gpio_set(subargs, subargslen);
+    return command_gpio_set(&subargs);
   if (string_token_eq(subcmd_token, "get-functions"))
-    return command_gpio_get_functions(subargs, subargslen);
+    return command_gpio_get_functions(&subargs);
   if (string_token_eq(subcmd_token, "set-function"))
-    return command_gpio_set_function(subargs, subargslen);
+    return command_gpio_set_function(&subargs);
 
   return CMD_ERR_UNKNOWN_SUBCMD;
 }
