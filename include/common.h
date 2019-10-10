@@ -2,6 +2,8 @@
 
 #define min(a, b) (a < b ? a : b)
 
+#define max(a, b) (a < b ? b : a)
+
 const char * printf(const char *fmt, ...);
 
 void puts(const char *str);
@@ -17,4 +19,6 @@ int isspace(int c);
 #define print_reg32_at(regname) printf(#regname " %08x\n",  *(reg32_t)regname)
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(*arr))
+
+#define DECL_ASSIGN_PTR(type, name, value) type *name = (type *)(value)
 

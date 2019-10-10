@@ -1,6 +1,7 @@
 #include <uart/pl011_uart.h>
 #include <gpio.h>
 #include <mbox/mbox.h>
+#include <types.h>
 
 
 #define UART0_BASE  (MMIO_BASE + 0x00201000)
@@ -35,19 +36,13 @@
 
 void pl011_uart_init(int baudrate, int unused)
 {
+  uint32_t hz;
+  hz = 4000000;
   *UART0_CR = 0; // turn off UART0
 
   /* set up clock for consistent divisor values */
-  mbox[0] = 9 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_SET_CLOCK_RATE;
-  mbox[3] = 12;
-  mbox[4] = 8;
-  mbox[5] = 2;       // UART clock
-  mbox[6] = 4000000; // 4Mhz
-  mbox[7] = 0;       // clear turbo
-  mbox[8] = MBOX_TAG_LAST;
-  mbox_call(MBOX_CH_PROP);
+
+  mbox_set_clock_rate(2, &hz, 0);
 
   /* map UART0 to GPIO pins */
   gpio_set_function(14, GPIO_FUNC_ALT_0);

@@ -1,6 +1,6 @@
 DIR=cmdrunner
 
-OBJS_CMDRUNNER := cmdrunner memdump ls help gpio
+OBJS_CMDRUNNER := cmdrunner memdump ls help gpio mbox
 
 OBJS_CMDRUNNER := $(addsuffix .o, $(addprefix $(DIR)/, $(OBJS_CMDRUNNER)))
 

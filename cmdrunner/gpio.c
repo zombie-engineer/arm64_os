@@ -139,6 +139,7 @@ static int command_gpio_print_help()
   puts("\tSets gpio pin with index GPIO to a value of VALUE\n");
   puts("gpio set-pullupdown GPIO VALUE\n");
   puts("\tSets pullup/down mode for gpio pin with index GPIO to a value of VALUE\n");
+  puts("gpio get-functions GPIO - list functions for a selected gpio pin\n");
   return CMD_ERR_NO_ERROR;
 }
 

@@ -14,6 +14,7 @@ CMDRUNNER_DECL_CMD(ww);
 CMDRUNNER_DECL_CMD(rw);
 CMDRUNNER_DECL_CMD(help);
 CMDRUNNER_DECL_CMD(gpio);
+CMDRUNNER_DECL_CMD(mbox);
 
 static command_t commands[COMMAND_MAX_COUNT];
 static unsigned int num_commands;
@@ -206,6 +207,7 @@ void cmdrunner_init(void)
   CMDRUNNER_ADD_CMD(rw);
   CMDRUNNER_ADD_CMD(help);
   CMDRUNNER_ADD_CMD(gpio);
+  CMDRUNNER_ADD_CMD(mbox);
 }
 
 int cmdrunner_add_cmd(
