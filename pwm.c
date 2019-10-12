@@ -1,66 +1,81 @@
 #include <pwm.h>
 #include <reg_access.h>
+#include <types.h>
+#include <memory.h>
 
-#define PWM_BASE (unsigned long)(0x3f020c000)
+#define PWM_BASE   (unsigned long)(MMIO_BASE + 0x0020c000)
 
-#define CM_PWMCTL (unsigned long)(0x3f2020a0)
-#define CM_PWMDIV (unsigned long)(0x3f2020a4)
 
-#define CM_PWMCTL_PASSWORD 0x5a000000
-#define CM_PWMCTL_ENABLE   0x00000010
-#define CM_PWMCTL_BUSY     0x00000080
+typedef struct {
+  char PWEN1 : 1; // 0
+  char MODE1 : 1; // 1
+  char RPTL1 : 1; // 2
+  char SBIT1 : 1; // 3
+  char POLA1 : 1; // 4
+  char USEF1 : 1; // 5
+  char CLRF1 : 1; // 6
+  char MSEN1 : 1; // 7
+  char PWEN2 : 1; // 8
+  char MODE2 : 1; // 9
+  char RPTL2 : 1; // 10
+  char SBIT2 : 1; // 11
+  char POLA2 : 1; // 12
+  char USEF2 : 1; // 13
+  char CLRF2 : 1; // 14
+  char MSEN2 : 1; // 15
+  uint32_t RESRV : 16;// 31:16
+} pwm_ctl_t;
 
-#define CM_PWMCTL_MASH_STAGE_1 (1<<9)
+typedef struct {
+  char FULL1 : 1; // 0  Fifo full
+  char EMPT1 : 1; // 1  Fifo empty
+  char WERR1 : 1; // 2  Fifo write err
+  char RERR1 : 1; // 3  Fifo read  err
+  char GAPO1 : 1; // 4  Channel 1 gap occured
+  char GAPO2 : 1; // 5  Channel 2 gap occured
+  char GAPO3 : 1; // 6  Channel 3 gap occured
+  char GAPO4 : 1; // 7  Channel 4 gap occured
+  char BERR  : 1; // 8  Bus error
+  char STA1  : 1; // 9  Channel 1 state
+  char STA2  : 1; // 10 Channel 2 state
+  char STA3  : 1; // 11 Channel 3 state
+  char STA4  : 1; // 12 Channel 4 state
+  uint32_t RESRV : 19;// 31:13
+} pwm_sta_t;
 
-#define CM_PWMCTL_SRC_GND     0
-#define CM_PWMCTL_SRC_OSC     1
-#define CM_PWMCTL_SRC_TSTDBG0 2
-#define CM_PWMCTL_SRC_TSTDBG1 3
-#define CM_PWMCTL_SRC_PLLA    4
-#define CM_PWMCTL_SRC_PLLC    5
-#define CM_PWMCTL_SRC_PLLD    6
-#define CM_PWMCTL_SRC_HDMI    7
 
-#define PWM_REG_CTL  (PWM_BASE + 0x00)
-#define PWM_REG_STA  (PWM_BASE + 0x04)
-#define PWM_REG_DMAC (PWM_BASE + 0x08)
-#define PWM_REG_RNG1 (PWM_BASE + 0x10)
-#define PWM_REG_DAT1 (PWM_BASE + 0x14)
-#define PWM_REG_FIF1 (PWM_BASE + 0x18)
-#define PWM_REG_RNG2 (PWM_BASE + 0x20)
-#define PWM_REG_DAT2 (PWM_BASE + 0x24)
+typedef struct {
+  union {
+    pwm_ctl_t fld;
+    uint32_t  val;
+  } CTL;
 
-#define PWM_REG_CTL_EN 1
-#define PWM_REG_CTL_MSEN1_MS  (1 << 7)
-#define PWM_REG_CTL_MSEN1_PWM (0 << 7)
+  union {
+    pwm_sta_t fld;
+    uint32_t  val;
+  } STA;
 
-int pwm_enable(int channel)
+  uint32_t DMAC;
+  uint32_t UND1;
+  uint32_t RNG1;
+  uint32_t DAT1;
+  uint32_t FIF1;
+  uint32_t UND2;
+  uint32_t RNG2;
+  uint32_t DAT2;
+} pwm_t;
+
+#define PWM_CONTROL ((volatile pwm_t*)PWM_BASE)
+
+int pwm_enable_pwm_mode(int channel, int mode, int data)
 {
-  int i;
-  // pwm off
-  *(reg32_t)PWM_REG_CTL = 0;
-  // enable flag off
-  *(reg32_t)CM_PWMCTL = ((*(reg32_t)CM_PWMCTL) & ~CM_PWMCTL_ENABLE) | CM_PWMCTL_PASSWORD;
+  PWM_CONTROL->CTL.fld.PWEN1 = 0;
+  PWM_CONTROL->CTL.fld.MSEN1 = mode;
+  PWM_CONTROL->CTL.fld.PWEN1 = 1;
+  return 0;
+}
 
-  // wait until not busy
-  i = 10000;
-  while(*(reg32_t)CM_PWMCTL & CM_PWMCTL_BUSY) {
-    if (--i == 0)
-      return -1;
-  }
-
-  // set divider
-  *(reg32_t)CM_PWMDIV = (5 << 12) | CM_PWMCTL_PASSWORD;
-  *(reg32_t)CM_PWMCTL = CM_PWMCTL_SRC_PLLD | CM_PWMCTL_MASH_STAGE_1 | CM_PWMCTL_ENABLE | CM_PWMCTL_PASSWORD;
-
-  // wait until not busy
-  i = 10000;
-  while(*(reg32_t)CM_PWMCTL & CM_PWMCTL_BUSY) {
-    if (--i == 0)
-      return -1;
-  }
-
-  *(reg32_t)PWM_REG_RNG1 = 100;
-  *(reg32_t)PWM_REG_DAT1 = 60;
-  *(reg32_t)PWM_REG_CTL  = PWM_REG_CTL_MSEN1_MS | PWM_REG_CTL_EN;
+int pwm_enable(int channel_id)
+{
+  return 0;
 }

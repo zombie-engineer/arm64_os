@@ -140,6 +140,7 @@ static int command_gpio_print_help()
   puts("gpio set-pullupdown GPIO VALUE\n");
   puts("\tSets pullup/down mode for gpio pin with index GPIO to a value of VALUE\n");
   puts("gpio get-functions GPIO - list functions for a selected gpio pin\n");
+  puts("gpio set-function  GPIO FUNCTION - set function for a selected gpio pin\n");
   return CMD_ERR_NO_ERROR;
 }
 
@@ -149,21 +150,22 @@ static int command_gpio_set_function(const string_tokens_t *args)
   char *endptr;
   const string_token_t *funcarg;
 
-  puts("gpio set-functions: ");
   ASSERT_NUMARGS_EQ(2);
   GET_PIN_IDX();
   funcarg = &args->ts[1];
 
   for (i = 0; i < gpio_aliases.len; ++i) {
     if (string_token_eq(funcarg, gpio_aliases.a[i].alias)) {
+      puts("gpio set-function: ");
       status = gpio_set_function(pin_idx, gpio_aliases.a[i].value);
       if (status) {
         printf("gpio_set_functions failed with error: %d\n", status);
         return CMD_ERR_EXECUTION_ERR;
       }
+      return CMD_ERR_NO_ERROR;
     }
   }
-  return CMD_ERR_NO_ERROR;
+  return CMD_ERR_INVALID_ARGS;
 }
 
 static int command_gpio_get_functions(const string_tokens_t *args) 

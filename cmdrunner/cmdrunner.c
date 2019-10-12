@@ -15,6 +15,8 @@ CMDRUNNER_DECL_CMD(rw);
 CMDRUNNER_DECL_CMD(help);
 CMDRUNNER_DECL_CMD(gpio);
 CMDRUNNER_DECL_CMD(mbox);
+CMDRUNNER_DECL_CMD(pwm);
+CMDRUNNER_DECL_CMD(clock);
 
 static command_t commands[COMMAND_MAX_COUNT];
 static unsigned int num_commands;
@@ -134,7 +136,7 @@ static void cmdrunner_on_newline(void)
 {
   unsigned int i, res;
 
-  string_token_t stokens[4];
+  string_token_t stokens[8];
   string_tokens_t tokens;
 
   cmdrunner_history_put();
@@ -208,6 +210,8 @@ void cmdrunner_init(void)
   CMDRUNNER_ADD_CMD(help);
   CMDRUNNER_ADD_CMD(gpio);
   CMDRUNNER_ADD_CMD(mbox);
+  CMDRUNNER_ADD_CMD(pwm);
+  CMDRUNNER_ADD_CMD(clock);
 }
 
 int cmdrunner_add_cmd(
@@ -229,7 +233,7 @@ void cmdrunner_run_interactive_loop(void)
 {
   char ch;
 
-  char escbuf[4];
+  char escbuf[8];
   char escbuflen;
 
   puts("\n >");
@@ -321,8 +325,10 @@ int string_tokens_from_string(const char *string_start, const char *string_end, 
     if (ptr == string_end)
       break;
 
-    if (i == maxlen)
-      break;
+    if (i == maxlen) {
+      puts("string_tokens_from_string: maxlen reached\n");
+      return -1;
+    }
 
     SKIP_WHITESPACES_BOUND(ptr, string_end);
     if (ptr == string_end)

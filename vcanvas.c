@@ -105,17 +105,17 @@ void vcanvas_init(int width, int height)
   num_viewports = 0;
 }
 
-static void fill_background(psf_t *font, char *framebuf_off, int pitch)
-{
-  int x, y;
-  unsigned int *pixel_addr;
-  for (y = 0; y < font->height; ++y) {
-    for (x = 0; x < font->width; ++x) {
-      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-      *pixel_addr = vcanvas_bg_color;
-    }
-  }
-}
+//static void fill_background(psf_t *font, char *framebuf_off, int pitch)
+//{
+//  int x, y;
+//  unsigned int *pixel_addr;
+//  for (y = 0; y < font->height; ++y) {
+//    for (x = 0; x < font->width; ++x) {
+//      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
+//      *pixel_addr = vcanvas_bg_color;
+//    }
+//  }
+//}
 
 static unsigned int * fb_get_pixel_addr(int x, int y)
 {

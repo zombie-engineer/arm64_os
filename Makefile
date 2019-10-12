@@ -49,3 +49,6 @@ rungdbq:
 
 gdb:
 	gdb-multiarch -x rungdb.gdb
+
+make serial:
+	minicom -b 115200 -D /dev/ttyUSB0

@@ -1,7 +1,7 @@
 #pragma once
+#include <memory.h>
 #include <reg_access.h>
 
-#define MMIO_BASE       0x3F000000
 #define GPIO_BASE       (unsigned long)(MMIO_BASE + 0x00200000)
 
 #define GPIO_REG_GPFSEL0   (GPIO_BASE + 0x00)
