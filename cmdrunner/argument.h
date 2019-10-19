@@ -18,3 +18,11 @@
     printf("failed to get numeric param '%s' from argument number %d\n", desc, argnum); \
     return CMD_ERR_INVALID_ARGS; \
   }
+
+#define DECL_ARGS_CTX()           \
+  string_tokens_t subargs;        \
+  string_token_t *subcmd_token;   \
+  subcmd_token = &args->ts[0];    \
+  subargs.ts  = subcmd_token + 1; \
+  subargs.len = args->len - 1     \
+

@@ -139,7 +139,7 @@ static void cmdrunner_on_newline(void)
   unsigned int i, res;
 
   string_token_t stokens[8];
-  string_tokens_t tokens;
+  string_tokens_t tokens, args;
 
   cmdrunner_history_put();
   putc(CONSOLE_CHAR_LINEFEED);
@@ -154,7 +154,9 @@ static void cmdrunner_on_newline(void)
   for (i = 0; i < num_commands; ++i) {
     command_t *cmd = &commands[i];
     if (string_token_eq(&tokens.ts[0], cmd->name)) {
-      res = cmd->func(&tokens);
+      args.ts = &tokens.ts[1];
+      args.len = tokens.len - 1;
+      res = cmd->func(&args);
       if (res) {
         printf("Command completed with error code: %d (%s)\n", res, cmdrunner_err_to_str(res));
       }

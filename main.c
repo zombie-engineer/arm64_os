@@ -225,7 +225,6 @@ void main()
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
   // shiftreg setup is for 8x8 led matrix 
-  shiftreg_setup();
   // mmu_init();
   print_current_ex_level();
   print_mbox_props();

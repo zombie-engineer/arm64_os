@@ -2,6 +2,7 @@
 #include <memory.h>
 #include <reg_access.h>
 #include <types.h>
+#include <common.h>
 
 #define SPI_BASE ((unsigned long long)MMIO_BASE + 0x00204000)
 
@@ -64,13 +65,13 @@ typedef struct {
 
 int spi_enable_dma()
 {
-  return SPI_ENA_ERR_UNIMPLEMENTED;
+  return SPI_ERR_UNIMPLEMENTED;
 }
 
 
 int spi_enable_int()
 {
-  return SPI_ENA_ERR_UNIMPLEMENTED;
+  return SPI_ERR_UNIMPLEMENTED;
 }
 
 
@@ -88,7 +89,7 @@ int spi_enable_poll()
     }
   }
 
-  return SPI_ENA_ERR_OK;
+  return SPI_ERR_OK;
 }
 
 
@@ -99,5 +100,15 @@ int spi_enable(int type)
     case SPI_TYPE_INT  : return spi_enable_int();
     case SPI_TYPE_DMA  : return spi_enable_dma();
   }
-  return SPI_ENA_ERR_INVALID;
+  return SPI_ERR_INVALID;
+}
+
+int spi0_get_dev() 
+{
+  return 0;
+}
+
+int spi1_get_dev() 
+{
+  return 0;
 }

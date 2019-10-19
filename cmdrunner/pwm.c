@@ -71,15 +71,8 @@ static int command_pwm_set(const string_tokens_t *args)
 
 int command_pwm(const string_tokens_t *args)
 {
-  string_tokens_t subargs;
-  string_token_t *subcmd_token;
-  puts("pwm: \n");
-
-  ASSERT_NUMARGS_GE(2);
-
-  subcmd_token = &args->ts[1];
-  subargs.ts  = subcmd_token + 1;
-  subargs.len = args->len - 2;
+  DECL_ARGS_CTX();
+  ASSERT_NUMARGS_GE(1);
 
   if (string_token_eq(subcmd_token, "help"))
     return command_pwm_print_help();

@@ -11,13 +11,23 @@ CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_
 all: clean kernel8.img
 
 include uart/Makefile
+include spi/Makefile
 include mbox/Makefile
 include arch/armv8/Makefile
 include cmdrunner/Makefile
 include drivers/max7219/Makefile
 
-OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8) $(OBJS_CMDRUNNER) $(OBJS_MAX7219)
-OBJS += font.o start.o
+
+LIBS = 
+LIBS += $(OBJS_UART) 
+LIBS += $(OBJS_MBOX) 
+LIBS += $(OBJS_ARMV8) 
+LIBS += $(OBJS_CMDRUNNER) 
+LIBS += $(OBJS_MAX7219)
+LIBS += $(OBJS_SPI)
+$(info LIBS = $(LIBS))
+
+OBJS += $(LIBS) font.o start.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld

@@ -1,4 +1,5 @@
 #pragma once
+#include <types.h>
 
 // SPI operation mode poll
 #define SPI_TYPE_POLL 0
@@ -10,12 +11,43 @@
 #define SPI_TYPE_DMA  2
 
 // spi_enable success
-#define SPI_ENA_ERR_OK             0
+#define SPI_ERR_OK               0
 
 // spi_enable error arguments invalid
-#define SPI_ENA_ERR_INVALID       -1
+#define SPI_ERR_INVALID         -1
 
 // spi_enable error not implemented
-#define SPI_ENA_ERR_UNIMPLEMENTED -2
+#define SPI_ERR_UNIMPLEMENTED   -2
+
+// spi not initialized
+#define SPI_ERR_NOT_INITIALIZED -3
+
+// spi0 controller
+#define SPI_TYPE_SPI0         0
+
+// spi1 controller
+#define SPI_TYPE_SPI1         1
+
+// emulated spi with manual bit banging of gpio pins.
+#define SPI_TYPE_SPI_EMULATED 2
+
+typedef struct spi_dev {
+  int (*push_bit)(uint8_t bit);
+  int (*ce0_set)();
+  int (*ce0_clear)();
+} spi_dev_t;
 
 int spi_enable(int type);
+
+int spi_emulated_init(
+  int sclk_pin, 
+  int mosi_pin, 
+  int miso_pin, 
+  int ce0_pin,
+  int ce1_pin);
+
+spi_dev_t *spi_emulated_get_dev();
+
+spi_dev_t *spi0_get_dev();
+
+spi_dev_t *spi1_get_dev();

@@ -3,6 +3,8 @@
 #include <types.h>
 #include <memory.h>
 #include <clock_manager.h>
+#include <common.h>
+#include <delays.h>
 
 #define PWM_BASE   (unsigned long)(MMIO_BASE + 0x0020c000)
 
