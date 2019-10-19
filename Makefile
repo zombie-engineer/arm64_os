@@ -14,8 +14,9 @@ include uart/Makefile
 include mbox/Makefile
 include arch/armv8/Makefile
 include cmdrunner/Makefile
+include drivers/max7219/Makefile
 
-OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8) $(OBJS_CMDRUNNER)
+OBJS += $(OBJS_UART) $(OBJS_MBOX) $(OBJS_ARMV8) $(OBJS_CMDRUNNER) $(OBJS_MAX7219)
 OBJS += font.o start.o
 
 CC      = $(CROSS_COMPILE)gcc

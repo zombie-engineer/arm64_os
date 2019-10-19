@@ -17,6 +17,7 @@
 #include <exception.h>
 #include <timer.h>
 #include <cmdrunner.h>
+#include <max7219.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -215,12 +216,6 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
-int do_ls(const char *arg_start, const char *args_end)
-{
-  printf("do_ls\n");
-  return 0;
-}
-
 void main()
 {
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
@@ -229,6 +224,8 @@ void main()
   
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
+  // shiftreg setup is for 8x8 led matrix 
+  shiftreg_setup();
   // mmu_init();
   print_current_ex_level();
   print_mbox_props();
@@ -243,8 +240,7 @@ void main()
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
 
-  gpio_set_function(21, GPIO_FUNC_OUT);
-
+  // gpio_set_function(21, GPIO_FUNC_OUT);
   print_cache_stats();
   print_mmu_stats();
 

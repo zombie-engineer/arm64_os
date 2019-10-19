@@ -3,7 +3,7 @@
 
 static int command_printer(command_t *cmd)
 {
-  printf("%s\n\t%s\n", cmd->name, cmd->description);
+  printf("%s: %s\n", cmd->name, cmd->description);
   return 0;
 }
 

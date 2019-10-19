@@ -1,7 +1,7 @@
 #include "argument.h"
 #include <cmdrunner.h>
 #include <stdlib.h>
-#include <pwm.h>
+#include <clock_manager.h>
 #include <common.h>
 #include <string.h>
 
@@ -29,7 +29,7 @@ static int command_clock_set(const string_tokens_t *args)
   uint32_t clock_src, mash, divi, divf;
   char *endptr;
 
-  ASSERT_NUMARGS_EQ(3);
+  ASSERT_NUMARGS_GE(3);
 
   if      (string_token_eq(&args->ts[0], "gp0"))
     clock_id = CM_CLK_ID_GP_0;
@@ -66,11 +66,15 @@ static int command_clock_set(const string_tokens_t *args)
   }
   
   GET_NUMERIC_PARAM(divi, uint32_t, 2, "divi");
+
   divf = 0;
+  if (args->len >= 4) {
+    GET_NUMERIC_PARAM(divf, uint32_t, 3, "divf");
+  }
   mash = 0;
 
   printf("setting clock id = %d, source = %d, divi = %d, divf = %d\n", clock_id, clock_src, divi, divf);
-  if (st = cm_set_clock(clock_id, clock_src, mash, divi, divf)) {
+  if ((st = cm_set_clock(clock_id, clock_src, mash, divi, divf))) {
     if (st == CM_SETCLK_ERR_INV)
       return CMD_ERR_INVALID_ARGS;
     if (st == CM_SETCLK_ERR_BUSY) {

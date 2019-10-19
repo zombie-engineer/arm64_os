@@ -137,8 +137,9 @@ static int command_gpio_print_help()
   puts("\tEnables gpio pin with index GPIO\n");
   puts("gpio set GPIO VALUE\n");
   puts("\tSets gpio pin with index GPIO to a value of VALUE\n");
-  puts("gpio set-pullupdown GPIO VALUE\n");
-  puts("\tSets pullup/down mode for gpio pin with index GPIO to a value of VALUE\n");
+  puts("gpio set-pullupdown GPIO VALUE - set pull-up/pull-down mode for pin.\n");
+  puts("\t                       GPIO  - pin index\n");
+  puts("\t                       VALUE - pullup, pulldown, no\n");
   puts("gpio get-functions GPIO - list functions for a selected gpio pin\n");
   puts("gpio set-function  GPIO FUNCTION - set function for a selected gpio pin\n");
   return CMD_ERR_NO_ERROR;
@@ -172,7 +173,6 @@ static int command_gpio_get_functions(const string_tokens_t *args)
 {
   int pin_idx, i;
   char *endptr;
-  puts("gpio get-functions: ");
   ASSERT_NUMARGS_EQ(1);
   GET_PIN_IDX();
   putc('\r');
@@ -187,7 +187,6 @@ static int command_gpio_set(const string_tokens_t *args)
   int pin_idx, pin_value;
   char *endptr;
 
-  puts("gpio set: ");
   ASSERT_NUMARGS_EQ(2);
   GET_PIN_IDX()
   GET_NUMERIC_PARAM(pin_value, int, 1, "pin_value");
@@ -203,6 +202,35 @@ static int command_gpio_set(const string_tokens_t *args)
     gpio_set_off(pin_idx);
 
   printf("success: pin%d is set to %d\n", pin_idx, pin_value);
+  return CMD_ERR_NO_ERROR;
+}
+
+static int command_gpio_set_pullupdown(const string_tokens_t *args)
+{
+  int pin_idx, pullup_val;
+  char *endptr;
+
+  ASSERT_NUMARGS_EQ(2);
+  GET_PIN_IDX();
+
+  if      (string_token_eq(&args->ts[1], "no"))
+    pullup_val = GPIO_PULLUPDOWN_NO_PULLUPDOWN;
+  else if (string_token_eq(&args->ts[1], "pulldown"))
+    pullup_val = GPIO_PULLUPDOWN_EN_PULLDOWN;
+  else if (string_token_eq(&args->ts[1], "pullup"))
+    pullup_val = GPIO_PULLUPDOWN_EN_PULLUP;
+  else {
+    puts("gpio set_pullupdown wrong value argument. Should be 'pullup', 'pulldown' or 'no'\n");
+    return CMD_ERR_INVALID_ARGS;
+  }
+
+  if (gpio_set_pullupdown(pin_idx, pullup_val)) {
+    puts("gpio_set_pullupdown failed\n");
+    return CMD_ERR_EXECUTION_ERR;
+  }
+    
+
+  printf("success: pin%d is set to %d\n", pin_idx, pullup_val);
   return CMD_ERR_NO_ERROR;
 }
 
@@ -230,6 +258,8 @@ int command_gpio(const string_tokens_t *args)
     return command_gpio_get_functions(&subargs);
   if (string_token_eq(subcmd_token, "set-function"))
     return command_gpio_set_function(&subargs);
+  if (string_token_eq(subcmd_token, "set-pullupdown"))
+    return command_gpio_set_pullupdown(&subargs);
 
   return CMD_ERR_UNKNOWN_SUBCMD;
 }

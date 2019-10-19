@@ -1,0 +1,3 @@
+OBJS_MAX7219 = drivers/max7219/max7219.o
+
+$(info OBJS_MAX7219 $(OBJS_MAX7219))

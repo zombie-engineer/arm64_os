@@ -16,13 +16,28 @@
 #define CM_CLK_ID_PWM         3
 
 
+/* 0 Hz */
 #define CM_SETCLK_SRC_GND     0
+
+/* 19.2 MHz */
 #define CM_SETCLK_SRC_OSC     1
+
+/* 0 Hz */
 #define CM_SETCLK_SRC_TSTDBG0 2
+
+/* 0 Hz */
 #define CM_SETCLK_SRC_TSTDBG1 3
+
+/* 0 Hz */
 #define CM_SETCLK_SRC_PLLA    4
+
+/* 1000 MHz */
 #define CM_SETCLK_SRC_PLLC    5
+
+/* 500 MHz */
 #define CM_SETCLK_SRC_PLLD    6
+
+/* 216 MHz */
 #define CM_SETCLK_SRC_HDMI    7
 
 
@@ -38,3 +53,4 @@
 
 
 int cm_set_clock(int clk_id, uint32_t clock_src, uint32_t mash, uint32_t divi, uint32_t divf);
+const char *set_clock_err_to_str(int);

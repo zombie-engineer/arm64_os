@@ -8,15 +8,17 @@
 #include <vcanvas.h>
 #include <exception.h>
 
-CMDRUNNER_DECL_CMD(ls);
-CMDRUNNER_DECL_CMD(memdump);
-CMDRUNNER_DECL_CMD(ww);
-CMDRUNNER_DECL_CMD(rw);
-CMDRUNNER_DECL_CMD(help);
-CMDRUNNER_DECL_CMD(gpio);
-CMDRUNNER_DECL_CMD(mbox);
-CMDRUNNER_DECL_CMD(pwm);
 CMDRUNNER_DECL_CMD(clock);
+CMDRUNNER_DECL_CMD(gpio);
+CMDRUNNER_DECL_CMD(help);
+CMDRUNNER_DECL_CMD(ls);
+CMDRUNNER_DECL_CMD(max7219);
+CMDRUNNER_DECL_CMD(mbox);
+CMDRUNNER_DECL_CMD(memdump);
+CMDRUNNER_DECL_CMD(pwm);
+CMDRUNNER_DECL_CMD(rw);
+CMDRUNNER_DECL_CMD(spi);
+CMDRUNNER_DECL_CMD(ww);
 
 static command_t commands[COMMAND_MAX_COUNT];
 static unsigned int num_commands;
@@ -203,15 +205,17 @@ void cmdrunner_init(void)
   cmdrunner_history_init();
   num_commands = 0;
 
-  CMDRUNNER_ADD_CMD(ls);
-  CMDRUNNER_ADD_CMD(memdump);
-  CMDRUNNER_ADD_CMD(ww);
-  CMDRUNNER_ADD_CMD(rw);
-  CMDRUNNER_ADD_CMD(help);
-  CMDRUNNER_ADD_CMD(gpio);
-  CMDRUNNER_ADD_CMD(mbox);
-  CMDRUNNER_ADD_CMD(pwm);
   CMDRUNNER_ADD_CMD(clock);
+  CMDRUNNER_ADD_CMD(gpio);
+  CMDRUNNER_ADD_CMD(help);
+  CMDRUNNER_ADD_CMD(ls);
+  CMDRUNNER_ADD_CMD(mbox);
+  CMDRUNNER_ADD_CMD(max7219);
+  CMDRUNNER_ADD_CMD(memdump);
+  CMDRUNNER_ADD_CMD(rw);
+  CMDRUNNER_ADD_CMD(pwm);
+  CMDRUNNER_ADD_CMD(spi);
+  CMDRUNNER_ADD_CMD(ww);
 }
 
 int cmdrunner_add_cmd(

@@ -1,6 +1,6 @@
 DIR=cmdrunner
 
-OBJS_CMDRUNNER := cmdrunner memdump ls help gpio mbox pwm clock
+OBJS_CMDRUNNER := cmdrunner memdump ls help gpio mbox pwm clock spi max7219
 
 OBJS_CMDRUNNER := $(addsuffix .o, $(addprefix $(DIR)/, $(OBJS_CMDRUNNER)))
 

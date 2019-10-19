@@ -2,6 +2,7 @@
 #include <reg_access.h>
 #include <types.h>
 #include <memory.h>
+#include <clock_manager.h>
 
 #define PWM_BASE   (unsigned long)(MMIO_BASE + 0x0020c000)
 
@@ -67,15 +68,42 @@ typedef struct {
 
 #define PWM_CONTROL ((volatile pwm_t*)PWM_BASE)
 
-int pwm_enable_pwm_mode(int channel, int mode, int data)
+int pwm_enable(int channel, int ms_mode)
 {
-  PWM_CONTROL->CTL.fld.PWEN1 = 0;
-  PWM_CONTROL->CTL.fld.MSEN1 = mode;
+  int st;
+  uint32_t divi, divf;
+
+  /* freq = 19.2 MHz = 19 200 000 */
+  divi = 192; 
+  /* freq = 19.2 MHz / 192 = 100 KHz = 19200000 / 192 = 100000 */
+  divf = 0;
+
+  st = cm_set_clock(CM_CLK_ID_PWM, CM_SETCLK_SRC_OSC, CM_SETCLK_MASH_OFF, divi, divf);
+  if (st) {
+    printf("pwm_enable error: %d (%s)\n", st, set_clock_err_to_str(st));
+    return -1;
+  }
+  
+  PWM_CONTROL->CTL.val = 0;
+  while(PWM_CONTROL->STA.val != 2 && PWM_CONTROL->STA.val != 0x202) {
+    printf("PWM disabled STA: %08x\n", PWM_CONTROL->STA.val);
+  }
+  PWM_CONTROL->CTL.fld.MSEN1 = ms_mode;
+  wait_msec(10);
   PWM_CONTROL->CTL.fld.PWEN1 = 1;
   return 0;
 }
 
-int pwm_enable(int channel_id)
+int pwm_set(int channel, int range, int data)
 {
+  /* freq = 10 000 Hz / range Hz */
+  if (channel == 0) {
+    PWM_CONTROL->RNG1 = range;
+    PWM_CONTROL->DAT1 = data;
+  }
+  else if (channel == 1) {
+    PWM_CONTROL->RNG2 = range;
+    PWM_CONTROL->DAT2 = data;
+  }
   return 0;
 }

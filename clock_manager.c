@@ -116,3 +116,13 @@ int cm_set_clock(int clock_id, uint32_t clock_src, uint32_t mash, uint32_t divi,
   CM_CTL_REG_ENABLE(ctl);
   return CM_SETCLK_ERR_OK;
 }
+
+const char *set_clock_err_to_str(int err)
+{
+  switch (err) {
+    case CM_SETCLK_ERR_OK   : return "CM_SETCLK_ERR_OK";
+    case CM_SETCLK_ERR_INV  : return "CM_SETCLK_ERR_INV";
+    case CM_SETCLK_ERR_BUSY : return "CM_SETCLK_ERR_BUSY";
+    default                 : return "UNKNOWN";
+  }
+}
