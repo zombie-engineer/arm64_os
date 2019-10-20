@@ -43,7 +43,7 @@ font.o: font.psf
 	$(LD) -r -b binary -o font.o font.psf
 
 kernel8.img: $(OBJS)
-	$(LD) -nostdlib -nostartfiles $(OBJS) -T link.ld -o kernel8.elf
+	$(LD) -nostdlib -nostartfiles $(OBJS) -T link.ld -o kernel8.elf -Map kernel8.map
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 clean:

@@ -32,12 +32,13 @@
 #define SPI_TYPE_SPI_EMULATED 2
 
 typedef struct spi_dev {
+  int (*xmit)(char* bytes, uint32_t len);
   int (*push_bit)(uint8_t bit);
   int (*ce0_set)();
   int (*ce0_clear)();
 } spi_dev_t;
 
-int spi_enable(int type);
+int spi0_init(int type);
 
 int spi_emulated_init(
   int sclk_pin, 
@@ -45,6 +46,9 @@ int spi_emulated_init(
   int miso_pin, 
   int ce0_pin,
   int ce1_pin);
+
+
+void spi_emulated_print_info();
 
 spi_dev_t *spi_emulated_get_dev();
 

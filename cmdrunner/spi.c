@@ -16,8 +16,6 @@ static int command_spi_print_help()
   puts("                            - correspongin SPI function.\n");
   puts("                            - ex: spi init emulated 3 4 10 15\n");
   puts("                            -     init spi emulated on gpio pins 3(SCLK),4(MOSI),10(MISO) 15(CE0) and 16(CE1)\n");
-  puts("spi enable CHANNEL MS_MODE - enables SPI with initial range/data\n");
-  puts("\t\t                       - MS_MODE - 0 for SPI, 1 for M/S mode\n");
   puts("spi set CHANNEL RANGE DATA    - sets SPI range/data\n");
   puts("\t\t                  CHANNEL - SPI0 or SPI1\n");
   puts("\t\t                  RANGE   - number of cycles in a single SPI loop\n");
@@ -28,6 +26,7 @@ static int command_spi_print_help()
 
 static int command_spi_info(const string_tokens_t *args)
 {
+  spi_emulated_print_info();
   return CMD_ERR_NO_ERROR;
 }
 
@@ -35,9 +34,9 @@ static int command_spi_info(const string_tokens_t *args)
 static int command_spi_init_spi0(const string_tokens_t *args)
 {
   int st;
-  st = spi_enable(SPI_TYPE_POLL);
+  st = spi0_init(SPI_TYPE_POLL);
   if (st) {
-    printf("command_pwd_enable error: spi_enable completed with error %d\n");
+    printf("command_pwd_enable error: spi0_init completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;
   }
   return CMD_ERR_NO_ERROR;

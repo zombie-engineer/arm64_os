@@ -104,13 +104,15 @@ int cm_set_clock(int clock_id, uint32_t clock_src, uint32_t mash, uint32_t divi,
   CM_CTL_REG_DISABLE(ctl);
 
   // busy flag should go down now.
-  if (st = cm_clk_wait_nobusy(ctl, 1000))
+  st = cm_clk_wait_nobusy(ctl, 1000);
+  if (st)
     return st;
 
   CM_CLK_REG_SET(ctl, clock_src, mash);
   CM_DIV_REG_SET(div, divi, divf);
 
-  if (st = cm_clk_wait_nobusy(ctl, 1000))
+  st = cm_clk_wait_nobusy(ctl, 1000);
+  if (st)
     return st;
 
   CM_CTL_REG_ENABLE(ctl);

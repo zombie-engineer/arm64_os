@@ -20,6 +20,14 @@ static int command_max7219_print_help()
   return CMD_ERR_NO_ERROR;
 }
 
+static int command_max7219_info()
+{
+  int st;
+  st = max7219_print_info();
+  if (st)
+    return CMD_ERR_EXECUTION_ERR;
+  return CMD_ERR_NO_ERROR;
+}
 
 static int command_max7219_init(const string_tokens_t *args)
 {
@@ -85,6 +93,8 @@ int command_max7219(const string_tokens_t *args)
 
   if (string_token_eq(subcmd_token, "help"))
     return command_max7219_print_help();
+  if (string_token_eq(subcmd_token, "info"))
+    return command_max7219_info();
   if (string_token_eq(subcmd_token, "init"))
     return command_max7219_init(&subargs);
   if (string_token_eq(subcmd_token, "set"))

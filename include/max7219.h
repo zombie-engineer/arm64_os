@@ -60,3 +60,6 @@ int max7219_set_digit(int digit_idx, uint8_t value);
 
 // Set raw value to address and data registers of the chip.
 int max7219_set_raw(uint16_t value);
+
+// Print some debug information
+int max7219_print_info();

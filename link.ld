@@ -2,16 +2,27 @@
 SECTIONS
 {
   . = 0x80000;
-  .text : { KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) }
-  .rodata : { *(.rodata .rodata.* .gnu.linkonce.r*) }
+
+  .text : 
+  { 
+    KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) 
+  }
+
+  .rodata : 
+  { 
+    *(.rodata .rodata.* .gnu.linkonce.r*) 
+  }
+
   . = ALIGN(4096);
   PROVIDE(_data = .);
   .data : {*(.data .data.* .gnu.linkonce.d*) }
-  .bss (NOLOAD) : {
+  .mybss (NOLOAD) : 
+  {
     . = ALIGN(16);
     __bss_start = .;
-    *(.bss, .bss.*)
     *(COMMON)
+    *(.bss)
+    *(.bss.*)
     __bss_end = .;
   }
   . = ALIGN(4096);

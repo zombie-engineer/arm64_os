@@ -57,12 +57,32 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
     gpio_set_off(spi_emulated.mosi_gpio_pin);
 
   gpio_set_on(spi_emulated.sclk_gpio_pin);
-  wait_msec(2000);
+  wait_msec(2000 * 10);
   gpio_set_off(spi_emulated.sclk_gpio_pin);
-  wait_msec(1000);
+  wait_msec(2000 * 10);
   return 0;
 }
 
+DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
+  int i, j, st;
+
+  if (spi_emulated_verbose_output)
+    printf("spi_emulated_xmit: %02x, %02x\n", bytes[0], bytes[1]);
+
+  for (j = 0; j < len; ++j) {
+    for (i = 0; i < 8; ++i) {
+      st = spi_emulated_push_bit((bytes[j] >> (7 - i)) & 1);
+      if (st) {
+        printf("spidev->push_bit error: %d\n", st);
+        return st;
+      }
+    }
+  }
+  spi_emulated_ce0_set();
+  wait_msec(40000);
+  spi_emulated_ce0_clear();
+  return 0;
+}
 
 
 int spi_emulated_init(
@@ -72,12 +92,19 @@ int spi_emulated_init(
   int ce0_pin,
   int ce1_pin)
 {
+  spi_emulated_verbose_output = 1;
+  if (spi_emulated_verbose_output) {
+    printf("spi_emulated_init: sclk: %d, mosi: %d, miso: %d, ce0: %d, ce1: %d\n",
+      sclk_pin, mosi_pin, miso_pin, ce0_pin, ce1_pin);
+  }
+
   gpio_set_function(sclk_pin, GPIO_FUNC_OUT);
   gpio_set_function(mosi_pin, GPIO_FUNC_OUT);
   gpio_set_function(miso_pin, GPIO_FUNC_IN);
   gpio_set_function(ce0_pin, GPIO_FUNC_OUT);
   gpio_set_function(ce1_pin, GPIO_FUNC_OUT);
 
+  spi_emulated.spidev.xmit     = spi_emulated_xmit;
   spi_emulated.spidev.push_bit = spi_emulated_push_bit;
   spi_emulated.spidev.ce0_set = spi_emulated_ce0_set;
   spi_emulated.spidev.ce0_clear = spi_emulated_ce0_clear;
@@ -88,7 +115,6 @@ int spi_emulated_init(
   spi_emulated.ce0_gpio_pin = ce0_pin;
   spi_emulated.ce1_gpio_pin = ce1_pin;
 
-  spi_emulated_verbose_output = 0;
   spi_emulated_initialized = 1;
   return SPI_ERR_OK;
 }
@@ -96,4 +122,11 @@ int spi_emulated_init(
 spi_dev_t *spi_emulated_get_dev()
 {
   return &spi_emulated.spidev;
+}
+
+void spi_emulated_print_info()
+{
+  puts("spi_emulated debug info:\n");
+  printf(" verbose_output: %d\n", spi_emulated_verbose_output);
+  printf(" initialized   : %d\n", spi_emulated_initialized);
 }
