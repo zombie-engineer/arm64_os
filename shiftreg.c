@@ -40,7 +40,7 @@ static int shiftreg_initialized = 0;
 
 #define CHECKED_CALL(fn, ...) if (fn(__VA_ARGS__)) return -1;
 
-shiftreg_t *shiftreg_init(int32_t ser, int32_t srclk, int32_t rclk, int32_t srclr, int32_t ce)
+shiftreg_t *shiftreg_init(int clk_wait, int32_t ser, int32_t srclk, int32_t rclk, int32_t srclr, int32_t ce)
 {
   if (ser == SHIFTREG_INIT_PIN_DISABLED || srclk == SHIFTREG_INIT_PIN_DISABLED || rclk == SHIFTREG_INIT_PIN_DISABLED) {
     puts("shiftreg_init: not possible to init shiftreg without ser, srclk and rclk pins set.\n");
@@ -58,21 +58,17 @@ shiftreg_t *shiftreg_init(int32_t ser, int32_t srclk, int32_t rclk, int32_t srcl
   // ser   = 16;
   // srclr = 12;
 
-  gpio_set_function(ser  , GPIO_FUNC_OUT); 
-  gpio_set_function(rclk , GPIO_FUNC_OUT); 
-  gpio_set_function(srclk, GPIO_FUNC_OUT); 
+  gpio_set_function(shiftreg.ser  , GPIO_FUNC_OUT); 
+  gpio_set_function(shiftreg.rclk , GPIO_FUNC_OUT); 
+  gpio_set_function(shiftreg.srclk, GPIO_FUNC_OUT); 
   // gpio_set_function(srclr, GPIO_FUNC_OUT); 
 
-  gpio_set_off (ser); 
-  gpio_set_off (rclk); 
-  gpio_set_off (srclk); 
+  gpio_set_off (shiftreg.ser); 
+  gpio_set_off (shiftreg.rclk); 
+  gpio_set_off (shiftreg.rclk); 
   // gpio_set_off (srclr); 
 
-  // gpio_set_pullupdown (ser  , GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  // gpio_set_pullupdown (rclk , GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  // gpio_set_pullupdown (srclk, GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  // gpio_set_pullupdown (srclr, GPIO_PULLUPDOWN_EN_PULLDOWN); 
-
+  shiftreg.delay_ms = clk_wait;
   shiftreg_initialized = 1;
   return &shiftreg;
 }

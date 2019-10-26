@@ -10,7 +10,8 @@ static shiftreg_t *sr = 0;
 
 static int command_shiftreg_print_help()
 {
-  puts("shiftreg init SER_PIN SRCLK_PIN RCLK_PIN\n");
+  puts("shiftreg init CLCK_WAIT SER_PIN SRCLK_PIN RCLK_PIN\n");
+  puts("              CLCK_WAIT - clock pulse interval\n");
   puts("shiftreg pushbit BIT    - push BIT 0 or 1\n");
   puts("shiftreg pushbyte BYTE  - push BYTE value MSR first\n");
   puts("shiftreg latch          - latch values from shift registers to output registers\n");
@@ -65,13 +66,14 @@ static int command_shiftreg_latch(const string_tokens_t *args)
 
 static int command_shiftreg_init(const string_tokens_t *args)
 {
-  int ser, srclk, rclk;
+  int clk_wait, ser, srclk, rclk;
   char *endptr;
-  ASSERT_NUMARGS_EQ(3);
-  GET_NUMERIC_PARAM(ser  , int, 0, "ser");
-  GET_NUMERIC_PARAM(srclk, int, 1, "srclk");
-  GET_NUMERIC_PARAM(rclk , int, 2, "rclk");
-  sr = shiftreg_init(ser, srclk, rclk, SHIFTREG_INIT_PIN_DISABLED, SHIFTREG_INIT_PIN_DISABLED);
+  ASSERT_NUMARGS_EQ(4);
+  GET_NUMERIC_PARAM(clk_wait, int, 0, "clk_wait");
+  GET_NUMERIC_PARAM(ser     , int, 1, "ser");
+  GET_NUMERIC_PARAM(srclk   , int, 2, "srclk");
+  GET_NUMERIC_PARAM(rclk    , int, 3, "rclk");
+  sr = shiftreg_init(clk_wait, ser, srclk, rclk, SHIFTREG_INIT_PIN_DISABLED, SHIFTREG_INIT_PIN_DISABLED);
   if (!sr) {
     printf("shiftreg_init failed\n");
     return CMD_ERR_EXECUTION_ERR;

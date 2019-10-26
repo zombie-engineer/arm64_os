@@ -12,7 +12,7 @@ typedef struct shiftreg {
   int delay_ms;
 } shiftreg_t;
 
-shiftreg_t *shiftreg_init(int32_t ser, int32_t srclk, int32_t rclk, int32_t srclr, int32_t ce);
+shiftreg_t *shiftreg_init(int clk_wait, int32_t ser, int32_t srclk, int32_t rclk, int32_t srclr, int32_t ce);
 
 int shiftreg_push_bit(shiftreg_t *sr, char bit);
 

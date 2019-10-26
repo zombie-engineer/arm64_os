@@ -1,40 +1,41 @@
 #include <led_display/f5161ah.h>
+#include <common.h>
 
 
 void shiftreg_work()
 {
-  while(1) {
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PULSE_RCLK(10000);
-
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PULSE_RCLK(10000);
-
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PULSE_RCLK(10000);
-    // PULSE_SRCLR();
-  }
+//  while(1) {
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PULSE_RCLK(10000);
+//
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(0, 10000);
+//    PULSE_RCLK(10000);
+//
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(0, 10000);
+//    PUSH_BIT(1, 10000);
+//    PUSH_BIT(1, 10000);
+//    PULSE_RCLK(10000);
+//    // PULSE_SRCLR();
+//  }
 
 }
 
@@ -71,19 +72,34 @@ static int dev_f5161ah_initialized = 0;
  *   E    D    GND     C    Dp
 */
 
-#define F5161AH_SEG_PIN_A    (1 << 0)
-#define F5161AH_SEG_PIN_B    (1 << 1)
+
+/* Physical pins numbering
+ *
+ * #define F5161AH_SEG_PIN_A    (1 << 0)
+ * #define F5161AH_SEG_PIN_B    (1 << 1)
+ * #define F5161AH_SEG_PIN_C    (1 << 2)
+ * #define F5161AH_SEG_PIN_D    (1 << 3)
+ * #define F5161AH_SEG_PIN_E    (1 << 4)
+ * #define F5161AH_SEG_PIN_F    (1 << 5)
+ * #define F5161AH_SEG_PIN_G    (1 << 6)
+ * #define F5161AH_SEG_PIN_DP   (1 << 7)
+*/
+
+#define F5161AH_SEG_PIN_A    (1 << 6)
+#define F5161AH_SEG_PIN_B    (1 << 7)
 #define F5161AH_SEG_PIN_C    (1 << 2)
-#define F5161AH_SEG_PIN_D    (1 << 3)
-#define F5161AH_SEG_PIN_E    (1 << 4)
+#define F5161AH_SEG_PIN_D    (1 << 1)
+#define F5161AH_SEG_PIN_E    (1 << 0)
 #define F5161AH_SEG_PIN_F    (1 << 5)
-#define F5161AH_SEG_PIN_DP   (1 << 6)
+#define F5161AH_SEG_PIN_G    (1 << 4)
+#define F5161AH_SEG_PIN_DP   (1 << 3)
 
 static uint8_t f5161ah_encode_char(uint8_t ch)
 {
   switch(ch) {
     case 0:
-      return F5161AH_SEG_PIN_A | F5161AH_SEG_PIN_B | F5161AH_SEG_PIN_C | F5161AH_SEG_PIN_D | F5161AH_SEG_PIN_E | F5161AH_SEG_PIN_F | F5161AH_SEG_PIN_G;
+      puts("0");
+      return F5161AH_SEG_PIN_A | F5161AH_SEG_PIN_B | F5161AH_SEG_PIN_C | F5161AH_SEG_PIN_D | F5161AH_SEG_PIN_E | F5161AH_SEG_PIN_F;
     case 1:
       return F5161AH_SEG_PIN_B | F5161AH_SEG_PIN_C;
     case 2:
@@ -104,16 +120,31 @@ static uint8_t f5161ah_encode_char(uint8_t ch)
       return F5161AH_SEG_PIN_A | F5161AH_SEG_PIN_F | F5161AH_SEG_PIN_B | F5161AH_SEG_PIN_G | F5161AH_SEG_PIN_C | F5161AH_SEG_PIN_D;
   }
   
+  return 0;
 }
+
 
 int f5161ah_init(shiftreg_t *sr)
 {
-  if (sr == NULL) {
+  int st;
+
+  if (sr == 0) {
     puts("f5161ah_init: can not init without shift register.\n");
     return -1;
   }
 
   dev_f5161ah.sr = sr;
+
+  if ((st = shiftreg_push_byte(dev_f5161ah.sr, 0))) {
+    printf("f5161ah_display_char: shiftreg_push_byte failed with error %d\n", st);
+    return -1;
+  }
+
+  if ((st = shiftreg_pulse_rclk(dev_f5161ah.sr))) {
+    printf("f5161ah_display_char: shiftreg_pulse_rclk failed with error %d\n", st);
+    return -1;
+  }
+
   dev_f5161ah_initialized = 1;
   return 0;
 }
@@ -128,15 +159,15 @@ int f5161ah_display_char(uint8_t ch, uint8_t dot)
     return -1;
   }
 
-  encoded_char = f5161ah_encode_char(ch) | (dot & F5161AH_SEG_PIN_DP);
+  encoded_char = f5161ah_encode_char(ch) | (dot ? F5161AH_SEG_PIN_DP : 0);
 
-  if (st = shiftreg_push_byte((char)encoded_char)) {
-    puts("f5161ah_display_char: shiftreg_push_byte failed with error %d\n", st);
+  if ((st = shiftreg_push_byte(dev_f5161ah.sr, (char)encoded_char))) {
+    printf("f5161ah_display_char: shiftreg_push_byte failed with error %d\n", st);
     return -1;
   }
 
-  if (st = shiftreg_pulse_rclk()) {
-    puts("f5161ah_display_char: shiftreg_pulse_rclk failed with error %d\n", st);
+  if ((st = shiftreg_pulse_rclk(dev_f5161ah.sr))) {
+    printf("f5161ah_display_char: shiftreg_pulse_rclk failed with error %d\n", st);
     return -1;
   }
   

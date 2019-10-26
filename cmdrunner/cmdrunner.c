@@ -9,6 +9,7 @@
 #include <exception.h>
 
 CMDRUNNER_DECL_CMD(clock);
+CMDRUNNER_DECL_CMD(f5161ah);
 CMDRUNNER_DECL_CMD(gpio);
 CMDRUNNER_DECL_CMD(help);
 CMDRUNNER_DECL_CMD(ls);
@@ -209,6 +210,7 @@ void cmdrunner_init(void)
   num_commands = 0;
 
   CMDRUNNER_ADD_CMD(clock);
+  CMDRUNNER_ADD_CMD(f5161ah);
   CMDRUNNER_ADD_CMD(gpio);
   CMDRUNNER_ADD_CMD(help);
   CMDRUNNER_ADD_CMD(ls);

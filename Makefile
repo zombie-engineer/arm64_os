@@ -16,6 +16,7 @@ include mbox/Makefile
 include arch/armv8/Makefile
 include cmdrunner/Makefile
 include drivers/max7219/Makefile
+include drivers/f5161ah/Makefile
 
 
 LIBS = 
