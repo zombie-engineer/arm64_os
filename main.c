@@ -216,12 +216,184 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
+ // void nokia_work()
+ // {
+ //   int clk, din, dc, ce, rst;
+ //   char value;
+ //   spi_dev_t *d;
+ //   int PD, V, H;
+ // 
+ //   spi_emulated_init(clk, din, 19, ce, 26);
+ //   d = spi_emulated_get_dev();
+ // 
+ //   gpio_set_function(dc, GPIO_FUNC_OUT);
+ //   gpio_set_function(rst, GPIO_FUNC_OUT);
+ //   gpio_set_off(rst);
+ //   wait_msec(30000);
+ //   gpio_set_on(rst);
+ //   wait_msec(30000);
+ // 
+ //   gpio_set_off(dc);
+ //   // set PD V H
+ //   PD = 0; // not shutdown mode
+ //   V = 0;  // horizontal addressing mode
+ //   H = 0;  // normal function set
+ //   value = 0b00100000 | (2 << PD) | (1 << V) | H;
+ //   d->xfer(&value, 1);
+ //   wait_msec(30000);
+ // 
+ //   // set display mode
+ //   value = 0b00001000;
+ //   d->xfer(&value, 1);
+ //   wait_msec(30000);
+ //   // set x-addr
+ //   value = 0x80;
+ //   d->xfer(&value, 1);
+ //   wait_msec(30000);
+ // 
+ //   // set y-addr
+ //   value = 0x40;
+ //   d->xfer(&value, 1);
+ //   wait_msec(30000);
+ // }
+
+
+void shiftreg_work()
+{
+  int ser, rclk, srclk, srclr;
+
+  srclk = 21;
+  rclk  = 20;
+  ser   = 16;
+  // srclr = 12;
+
+  gpio_set_function(ser  , GPIO_FUNC_OUT); 
+  gpio_set_function(rclk , GPIO_FUNC_OUT); 
+  gpio_set_function(srclk, GPIO_FUNC_OUT); 
+  // gpio_set_function(srclr, GPIO_FUNC_OUT); 
+
+  gpio_set_off (ser); 
+  gpio_set_off (rclk); 
+  gpio_set_off (srclk); 
+  // gpio_set_off (srclr); 
+
+  gpio_set_pullupdown (ser  , GPIO_PULLUPDOWN_EN_PULLDOWN); 
+  gpio_set_pullupdown (rclk , GPIO_PULLUPDOWN_EN_PULLDOWN); 
+  gpio_set_pullupdown (srclk, GPIO_PULLUPDOWN_EN_PULLDOWN); 
+  // gpio_set_pullupdown (srclr, GPIO_PULLUPDOWN_EN_PULLDOWN); 
+
+#define PULSE(time) \
+  gpio_set_on(srclk);    \
+  wait_msec(time);       \
+  gpio_set_off(srclk);   \
+  wait_msec(time)
+
+#define PULSE_RCLK(time) \
+    gpio_set_off(rclk);  \
+    wait_msec(time);     \
+    gpio_set_on(rclk);   \
+
+#define PULSE_SRCLR()     \
+    gpio_set_off(srclr);  \
+    wait_msec(80000);     \
+    gpio_set_on(srclr);   \
+    wait_msec(80000);     \
+    gpio_set_off(srclr);  \
+    wait_msec(80000);     \
+    gpio_set_on(srclr);   \
+ 
+#define PUSH_BIT(b, time) {\
+    if (b) gpio_set_on(ser); else gpio_set_off(ser); \
+    wait_msec(time);    \
+    PULSE(time); \
+  }
+
+  while(1) {
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PULSE_RCLK(10000);
+
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(0, 10000);
+    PULSE_RCLK(10000);
+
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(0, 10000);
+    PUSH_BIT(1, 10000);
+    PUSH_BIT(1, 10000);
+    PULSE_RCLK(10000);
+    // PULSE_SRCLR();
+  }
+}
+
+void spi_work() 
+{
+  int i, old_i;
+  int sclk, cs, mosi;
+
+  // spi_emulated_init(18, 14, 23, 15, 24);
+
+  sclk = 22;
+  cs   = 27;
+  mosi = 17;
+
+  sclk = 7;
+  mosi = 14;
+  cs   = 15;
+
+  spi_emulated_init(sclk, mosi, 18, cs, 24);
+  spi0_init(SPI_TYPE_SPI0);
+  // max7219_set_spi_dev(spi_emulated_get_dev());
+  max7219_set_spi_dev(spi0_get_dev());
+  max7219_set_raw(0xf01);
+  // max7219_set_test_mode_on();
+  wait_msec(300000);
+  max7219_set_raw(0xf00);
+  // max7219_set_raw(0xb07);
+  max7219_set_scan_limit(7);
+  wait_msec(300000);
+  max7219_set_shutdown_mode_off();
+  wait_msec(30000);
+
+  for (i = 0; i < 8; i++) {
+    max7219_set_raw(((i+1) << 8));
+    //max7219_set_digit(i, 0x00);
+  }
+
+  old_i = 0;
+  while(1) {
+    for (i = 0; i < 8; ++i) {
+      max7219_set_raw(((i+1) << 8) | 0xff);
+      max7219_set_raw((old_i+1) << 8);
+      old_i = i;
+      wait_msec(30000);
+    }
+  }
+}
+
 void main()
 {
+  shiftreg_work(); return;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
-  
+  // spi_work();
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
   // shiftreg setup is for 8x8 led matrix 

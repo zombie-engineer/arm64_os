@@ -46,43 +46,13 @@ int fn(__VA_ARGS__) \
 
 static int max7219_store(uint8_t addr, uint8_t data)
 {
-  int st;
   char bytes[2];
-  uint16_t value;
   if (max7219_verbose_output)
     printf("max7219_store : %02x %02x\n", addr, data);
 
   bytes[0] = addr;
   bytes[1] = data;
   return spidev->xmit(bytes, 2);
-
-  value = (addr << 8) | data;
-
-  int i;
-  for (i = 15; i >= 0; --i) {
-    
-    st = spidev->push_bit((value >> i) & 1);
-    if (st) {
-      printf("spidev->push_bit error: %d\n", st);
-      return st;
-    }
-  }
-
-  if (max7219_verbose_output)
-    puts("\n");
-
-  st = spidev->ce0_set();
-  if (st) {
-    printf("spidev->ce0_set error: %d\n", st);
-    return st;
-  }
-
-  st = spidev->ce0_clear();
-  if (st) {
-    printf("spidev->ce0_clear error: %d\n", st);
-    return st;
-  }
-  return 0;
 }
 
 int max7219_print_info()

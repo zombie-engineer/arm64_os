@@ -33,8 +33,9 @@ CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
-start.o: start.S
-	$(CC) $(CFLAGS) -c start.S -o start.o
+
+%.o: %.S
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

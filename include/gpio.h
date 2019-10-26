@@ -1,6 +1,7 @@
 #pragma once
 #include <memory.h>
 #include <reg_access.h>
+#include <types.h>
 
 #define GPIO_BASE       (unsigned long)(MMIO_BASE + 0x00200000)
 
@@ -60,29 +61,29 @@
 #define GPIO_PULLUPDOWN_EN_PULLDOWN   0b01
 #define GPIO_PULLUPDOWN_EN_PULLUP     0b10
 
-int gpio_is_set(int gpio_num);
+int gpio_is_set(uint32_t gpio_num);
 
-int gpio_set_function(int gpio_num, int func);
+int gpio_set_function(uint32_t gpio_num, int func);
 
-int gpio_set_on(int gpio_num);
+int gpio_set_on(uint32_t gpio_num);
 
-int gpio_set_off(int gpio_num);
+int gpio_set_off(uint32_t gpio_num);
 
-int gpio_set_detect_high(int gpio_num);
+int gpio_set_detect_high(uint32_t gpio_num);
 
-int gpio_set_detect_low(int gpio_num);
+int gpio_set_detect_low(uint32_t gpio_num);
 
-int gpio_set_detect_rising_edge(int gpio_num);
+int gpio_set_detect_rising_edge(uint32_t gpio_num);
 
-int gpio_set_detect_falling_edge(int gpio_num);
+int gpio_set_detect_falling_edge(uint32_t gpio_num);
 
-int gpio_set_detect_async_rising_edge(int gpio_num);
+int gpio_set_detect_async_rising_edge(uint32_t gpio_num);
 
-int gpio_set_detect_async_falling_edge(int gpio_num);
+int gpio_set_detect_async_falling_edge(uint32_t gpio_num);
 
-int gpio_set_gppudclk(int gpio_num);
+int gpio_set_gppudclk(uint32_t gpio_num);
 
-int gpio_set_pullupdown(int gpio_num, int pullupdown);
+int gpio_set_pullupdown(uint32_t gpio_num, int pullupdown);
 
 void gpio_dump_select_regs(const char* tag);
 

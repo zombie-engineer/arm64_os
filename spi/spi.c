@@ -152,8 +152,16 @@ static int spi0_ce0_clear()
 
 static int spi0_xmit(char* bytes, uint32_t len)
 {
-  puts("spi0_xmit started\n");
+  int x;
+  // puts("spi0_xmit started\n");
+  SPI_CS->CLEAR = 1;
   SPI_CS->TA = 1;
+  while(1) {
+    while(!SPI_CS->TXD);
+    SPI_FIFO->DATA = 0xffffffff;
+    while(SPI_CS->RXD) x = SPI_FIFO->DATA;
+  }
+
   while(len--) {
     while(!SPI_CS->TXD)
       puts("SPI_CS->TXD\n");
@@ -177,9 +185,6 @@ static int spi0_init_poll()
 {
   spi_init_gpio();
 
-  SPI_CS->CPOL = 0;
-  SPI_CS->CPHA = 0;
-  SPI_CS->TA = 1;
 
   printf("<%08x\n>", *(reg32_t)SPI_CS); 
   return SPI_ERR_OK;
@@ -188,6 +193,8 @@ static int spi0_init_poll()
 
 int spi0_init(int type)
 {
+  spi0_init_poll();
+  return;
   switch (type) {
     case SPI_TYPE_POLL : return spi0_init_poll();
     case SPI_TYPE_INT  : return spi0_init_int();

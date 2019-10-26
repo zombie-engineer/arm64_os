@@ -57,9 +57,9 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
     gpio_set_off(spi_emulated.mosi_gpio_pin);
 
   gpio_set_on(spi_emulated.sclk_gpio_pin);
-  wait_msec(2000 * 10);
+  wait_msec(10);
   gpio_set_off(spi_emulated.sclk_gpio_pin);
-  wait_msec(2000 * 10);
+  wait_msec(10);
   return 0;
 }
 
@@ -79,7 +79,7 @@ DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
     }
   }
   spi_emulated_ce0_set();
-  wait_msec(40000);
+  wait_msec(10);
   spi_emulated_ce0_clear();
   return 0;
 }
@@ -92,7 +92,7 @@ int spi_emulated_init(
   int ce0_pin,
   int ce1_pin)
 {
-  spi_emulated_verbose_output = 1;
+  // spi_emulated_verbose_output = 1;
   if (spi_emulated_verbose_output) {
     printf("spi_emulated_init: sclk: %d, mosi: %d, miso: %d, ce0: %d, ce1: %d\n",
       sclk_pin, mosi_pin, miso_pin, ce0_pin, ce1_pin);
@@ -100,9 +100,15 @@ int spi_emulated_init(
 
   gpio_set_function(sclk_pin, GPIO_FUNC_OUT);
   gpio_set_function(mosi_pin, GPIO_FUNC_OUT);
-  gpio_set_function(miso_pin, GPIO_FUNC_IN);
+  // gpio_set_function(miso_pin, GPIO_FUNC_IN);
   gpio_set_function(ce0_pin, GPIO_FUNC_OUT);
-  gpio_set_function(ce1_pin, GPIO_FUNC_OUT);
+  // gpio_set_function(ce1_pin, GPIO_FUNC_OUT);
+
+  gpio_set_off(sclk_pin);
+  gpio_set_off(mosi_pin);
+  // gpio_set_off(miso_pin, GPIO_FUNC_IN);
+  gpio_set_off(ce0_pin);
+  // gpio_set_off(ce1_pin);
 
   spi_emulated.spidev.xmit     = spi_emulated_xmit;
   spi_emulated.spidev.push_bit = spi_emulated_push_bit;
