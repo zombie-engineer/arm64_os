@@ -258,90 +258,6 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
  // }
 
 
-void shiftreg_work()
-{
-  int ser, rclk, srclk, srclr;
-
-  srclk = 21;
-  rclk  = 20;
-  ser   = 16;
-  // srclr = 12;
-
-  gpio_set_function(ser  , GPIO_FUNC_OUT); 
-  gpio_set_function(rclk , GPIO_FUNC_OUT); 
-  gpio_set_function(srclk, GPIO_FUNC_OUT); 
-  // gpio_set_function(srclr, GPIO_FUNC_OUT); 
-
-  gpio_set_off (ser); 
-  gpio_set_off (rclk); 
-  gpio_set_off (srclk); 
-  // gpio_set_off (srclr); 
-
-  gpio_set_pullupdown (ser  , GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  gpio_set_pullupdown (rclk , GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  gpio_set_pullupdown (srclk, GPIO_PULLUPDOWN_EN_PULLDOWN); 
-  // gpio_set_pullupdown (srclr, GPIO_PULLUPDOWN_EN_PULLDOWN); 
-
-#define PULSE(time) \
-  gpio_set_on(srclk);    \
-  wait_msec(time);       \
-  gpio_set_off(srclk);   \
-  wait_msec(time)
-
-#define PULSE_RCLK(time) \
-    gpio_set_off(rclk);  \
-    wait_msec(time);     \
-    gpio_set_on(rclk);   \
-
-#define PULSE_SRCLR()     \
-    gpio_set_off(srclr);  \
-    wait_msec(80000);     \
-    gpio_set_on(srclr);   \
-    wait_msec(80000);     \
-    gpio_set_off(srclr);  \
-    wait_msec(80000);     \
-    gpio_set_on(srclr);   \
- 
-#define PUSH_BIT(b, time) {\
-    if (b) gpio_set_on(ser); else gpio_set_off(ser); \
-    wait_msec(time);    \
-    PULSE(time); \
-  }
-
-  while(1) {
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PULSE_RCLK(10000);
-
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PULSE_RCLK(10000);
-
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(0, 10000);
-    PUSH_BIT(1, 10000);
-    PUSH_BIT(1, 10000);
-    PULSE_RCLK(10000);
-    // PULSE_SRCLR();
-  }
-}
-
 void spi_work() 
 {
   int i, old_i;
@@ -389,7 +305,7 @@ void spi_work()
 
 void main()
 {
-  shiftreg_work(); return;
+  // shiftreg_work(); return;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);

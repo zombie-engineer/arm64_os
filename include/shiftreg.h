@@ -1,10 +1,21 @@
 #pragma once
 #include <types.h>
 
-int shiftreg_init(uint32_t ser, uint32_t srclk, uint32_t rclk);
+#define SHIFTREG_INIT_PIN_DISABLED -1
 
-int shiftreg_push_bit(char bit);
+typedef struct shiftreg {
+  int32_t ser;
+  int32_t srclk;
+  int32_t rclk;
+  int32_t srclr;
+  int32_t ce; 
+  int delay_ms;
+} shiftreg_t;
 
-int shiftreg_push_byte(char byte);
+shiftreg_t *shiftreg_init(int32_t ser, int32_t srclk, int32_t rclk, int32_t srclr, int32_t ce);
 
-int shiftreg_pulse_rclk();
+int shiftreg_push_bit(shiftreg_t *sr, char bit);
+
+int shiftreg_push_byte(shiftreg_t *sr, char byte);
+
+int shiftreg_pulse_rclk(shiftreg_t *sr);

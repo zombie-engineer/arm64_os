@@ -6,6 +6,8 @@
 #include <shiftreg.h>
 
 
+static shiftreg_t *sr = 0;
+
 static int command_shiftreg_print_help()
 {
   puts("shiftreg init SER_PIN SRCLK_PIN RCLK_PIN\n");
@@ -23,7 +25,7 @@ static int command_shiftreg_pushbit(const string_tokens_t *args)
   char *endptr;
   ASSERT_NUMARGS_EQ(1);
   GET_NUMERIC_PARAM(bit_value, char, 0, "bit value");
-  st = shiftreg_push_bit(bit_value);
+  st = shiftreg_push_bit(sr, bit_value);
   if (st) {
     printf("shiftreg_push_bit failed with error %d\n", st);
     return CMD_ERR_EXECUTION_ERR;
@@ -39,7 +41,7 @@ static int command_shiftreg_pushbyte(const string_tokens_t *args)
   char *endptr;
   ASSERT_NUMARGS_EQ(1);
   GET_NUMERIC_PARAM(byte_value, char, 0, "byte value");
-  st = shiftreg_push_byte(byte_value);
+  st = shiftreg_push_byte(sr, byte_value);
   if (st) {
     printf("shiftreg_push_byte failed with error %d\n", st);
     return CMD_ERR_EXECUTION_ERR;
@@ -52,7 +54,7 @@ static int command_shiftreg_latch(const string_tokens_t *args)
 {
   int st;
   ASSERT_NUMARGS_EQ(0);
-  st = shiftreg_pulse_rclk();
+  st = shiftreg_pulse_rclk(sr);
   if (st) {
     printf("shiftreg_pulse_rclk failed with error %d\n", st);
     return CMD_ERR_EXECUTION_ERR;
@@ -63,15 +65,15 @@ static int command_shiftreg_latch(const string_tokens_t *args)
 
 static int command_shiftreg_init(const string_tokens_t *args)
 {
-  int st, ser, srclk, rclk;
+  int ser, srclk, rclk;
   char *endptr;
   ASSERT_NUMARGS_EQ(3);
   GET_NUMERIC_PARAM(ser  , int, 0, "ser");
   GET_NUMERIC_PARAM(srclk, int, 1, "srclk");
   GET_NUMERIC_PARAM(rclk , int, 2, "rclk");
-  st = shiftreg_init(ser, srclk, rclk);
-  if (st) {
-    printf("shiftreg_init failed with error %d\n", st);
+  sr = shiftreg_init(ser, srclk, rclk, SHIFTREG_INIT_PIN_DISABLED, SHIFTREG_INIT_PIN_DISABLED);
+  if (!sr) {
+    printf("shiftreg_init failed\n");
     return CMD_ERR_EXECUTION_ERR;
   }
   return CMD_ERR_NO_ERROR;

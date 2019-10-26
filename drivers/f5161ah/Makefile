@@ -1,0 +1,3 @@
+OBJS_F5161AH = drivers/f5161ah/f5161ah.o
+
+$(info OBJS_F5161AH $(OBJS_F5161AH))
