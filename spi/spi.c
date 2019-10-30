@@ -4,6 +4,7 @@
 #include <types.h>
 #include <common.h>
 #include <gpio.h>
+#include <delays.h>
 
 
 #define SPI_BASE ((unsigned long long)MMIO_BASE + 0x00204000)
@@ -44,20 +45,39 @@ typedef struct {
   char RES      : 6; // 31:26 Write as 0
 } __attribute__ ((packed)) spi_reg_cs_t;
 
-#define SPI_CS ((spi_reg_cs_t *)SPI_BASE)
+#define SPI_CS_CS       (3 << 0)
+#define SPI_CS_CPHA     (1 << 2)
+#define SPI_CS_CPOL     (1 << 3)
+#define SPI_CS_CLEAR    (3 << 4)
+#define SPI_CS_CSPOL    (1 << 6)
+#define SPI_CS_TA       (1 << 7)
+#define SPI_CS_DMAEN    (1 << 8)
+#define SPI_CS_INTD     (1 << 9)
+#define SPI_CS_INTR     (1 << 10)
+#define SPI_CS_ADCS     (1 << 11)
+#define SPI_CS_REN      (1 << 12)
+#define SPI_CS_LEN      (1 << 13)
+#define SPI_CS_DONE     (1 << 16)
+#define SPI_CS_RXD      (1 << 17)
+#define SPI_CS_TXD      (1 << 18)
+#define SPI_CS_RXR      (1 << 19)
+#define SPI_CS_RXF      (1 << 20)
+#define SPI_CS_CSPOL0   (1 << 21)
+#define SPI_CS_CSPOL1   (1 << 22)
+#define SPI_CS_CSPOL2   (1 << 23)
+#define SPI_CS_DMA_LEN  (1 << 24)
+#define SPI_CS_LEN_LONG (1 << 25)
 
-typedef struct {
-  uint32_t DATA; // data register
-} __attribute__ ((packed)) spi_reg_fifo_t;
+#define SPI_CS (*(reg32_t)SPI_BASE)
 
-#define SPI_FIFO ((spi_reg_fifo_t*)(SPI_BASE + 0x4))
+#define SPI_FIFO (*(reg32_t)(SPI_BASE + 0x4))
 
 typedef struct {
   uint32_t CDIV : 16; // clock divider
   uint32_t RES  : 16; // reserved
 } __attribute__ ((packed)) spi_reg_clk_t;
 
-#define SPI_CLK ((spi_reg_clk_t*)(SPI_BASE + 0x8))
+#define SPI_CLK (*(reg32_t)(SPI_BASE + 0x8))
 
 typedef struct {
   
@@ -124,6 +144,12 @@ static gpio_role_spi0_t *gpio_get_role_spi0()
 
 static int spi_init_gpio()
 {
+  gpio_set_function(11, GPIO_FUNC_ALT_0);
+  gpio_set_function(10, GPIO_FUNC_ALT_0);
+  gpio_set_function(9 , GPIO_FUNC_ALT_0);
+  gpio_set_function(8 , GPIO_FUNC_ALT_0);
+  gpio_set_function(7 , GPIO_FUNC_ALT_0);
+  return 0;
   int i;
   gpio_role_spi0_t *role;
   role = gpio_get_role_spi0();
@@ -152,24 +178,36 @@ static int spi0_ce0_clear()
 
 static int spi0_xmit(char* bytes, uint32_t len)
 {
-  int x;
-  // puts("spi0_xmit started\n");
-  SPI_CS->CLEAR = 1;
-  SPI_CS->TA = 1;
-  while(1) {
-    while(!SPI_CS->TXD);
-    SPI_FIFO->DATA = 0xffffffff;
-    while(SPI_CS->RXD) x = SPI_FIFO->DATA;
-  }
+  int rx_data;
+  spi_reg_cs_t reg;
 
-  while(len--) {
-    while(!SPI_CS->TXD)
-      puts("SPI_CS->TXD\n");
-    printf("spi0_xmit: transmitting: %02x\n", *bytes);
-    SPI_FIFO->DATA = *(bytes++);
+  puts("spi0_xmit started\n");
+
+  // SPI_CS |= SPI_CS_CLEAR;
+  SPI_CS |= SPI_CS_TA;
+  // SPI_CS |= SPI_CS_CSPOL;
+
+  int buf[] = { 0x0f000f00, 0x0f010f01, 0x00f00f0, 0x80f080f0, 0xffffffff, 0xf0f0f0f0, 0x0f0f0f0f, 0x0c010c01, 0x80308030};
+  len = sizeof(buf);
+  int i;
+  for (i = 0; i < sizeof(buf) / sizeof(buf[0]); ++i) {
+    while((SPI_CS & SPI_CS_TXD) == 0) {
+      printf("SPI_CS->TXD not yet, CS: 0x%08x, TXD: %d\n", SPI_CS, SPI_CS & SPI_CS_TXD);
+    }
+
+    while(SPI_CS & SPI_CS_RXD) {
+      rx_data = SPI_FIFO;
+      printf("RX data: 0x%08x\n", rx_data);
+    }
+
+    printf("spi0_xmit: transmitting: %08x\n", buf[i]); 
+    SPI_FIFO = buf[i];
+    while((SPI_CS & SPI_CS_DONE) == 0)
+      puts("SPI_CS->DONE not yet\n");
   } 
-  SPI_CS->TA = 0;
+  SPI_CS &= ~SPI_CS_TA;
   puts("spi0_xmit complete\n");
+  return 0;
 }
 
 static int spi0_init_dev()
@@ -179,14 +217,18 @@ static int spi0_init_dev()
   spi0_dev.spidev.ce0_set   = spi0_ce0_set;
   spi0_dev.spidev.ce0_clear = spi0_ce0_clear;
   spi0_dev_initialized = 1;
+  return 0;
 }
 
 static int spi0_init_poll()
 {
+  puts("spi0_init_poll\n");
   spi_init_gpio();
+  spi0_init_dev();
 
 
-  printf("<%08x\n>", *(reg32_t)SPI_CS); 
+  // printf("<%08x\n>", *(reg32_t)SPI_CS); 
+  puts("spi0_init_poll completed\n");
   return SPI_ERR_OK;
 }
 
@@ -194,7 +236,7 @@ static int spi0_init_poll()
 int spi0_init(int type)
 {
   spi0_init_poll();
-  return;
+  return 0;
   switch (type) {
     case SPI_TYPE_POLL : return spi0_init_poll();
     case SPI_TYPE_INT  : return spi0_init_int();

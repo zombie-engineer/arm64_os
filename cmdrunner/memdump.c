@@ -134,7 +134,7 @@ int command_ww(const string_tokens_t *args)
   if (string_token_eq(&args->ts[0], "help"))
     return command_ww_print_help();
 
-  ASSERT_NUMARGS_EQ(3);
+  ASSERT_NUMARGS_EQ(2);
 
   GET_NUMERIC_PARAM(address, unsigned long long, 0, "address to write");
   GET_NUMERIC_PARAM(value  , int               , 1, "value to write");

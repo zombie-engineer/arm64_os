@@ -262,21 +262,31 @@ void spi_work()
 {
   int i, old_i;
   int sclk, cs, mosi;
+  int emulated;
 
-  // spi_emulated_init(18, 14, 23, 15, 24);
+  emulated = 0;
 
-  sclk = 22;
-  cs   = 27;
-  mosi = 17;
+  if (emulated) {
+    sclk = 11;
+    cs   = 8;
+    mosi = 10;
+    spi_emulated_init(sclk, mosi, 18, cs, 24);
+    max7219_set_spi_dev(spi_emulated_get_dev());
+  } else {
+    puts("spi0 init\n");
+    spi0_init(SPI_TYPE_SPI0);
+    max7219_set_spi_dev(spi0_get_dev());
+    puts("spi0 init completed.\n");
+  }
 
-  sclk = 7;
-  mosi = 14;
-  cs   = 15;
-
-  spi_emulated_init(sclk, mosi, 18, cs, 24);
-  spi0_init(SPI_TYPE_SPI0);
-  // max7219_set_spi_dev(spi_emulated_get_dev());
-  max7219_set_spi_dev(spi0_get_dev());
+  while(1)
+  {
+    max7219_set_raw(0xf00);
+  }
+    // wait_msec(100000);
+    max7219_set_raw(0xf01);
+    // wait_msec(100000);
+  //}
   max7219_set_raw(0xf01);
   // max7219_set_test_mode_on();
   wait_msec(300000);
@@ -305,16 +315,18 @@ void spi_work()
 
 void main()
 {
-  // shiftreg_work(); return;
+  char c;
+  int i;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
-  // spi_work();
+  // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
-  // shiftreg setup is for 8x8 led matrix 
   // mmu_init();
+  // spi_work();
   print_current_ex_level();
+
   print_mbox_props();
   print_arm_features();
   disable_l1_caches();

@@ -53,7 +53,7 @@ clean:
 	rm kernel8.elf *.o > /dev/nell 2>/dev/null || true
 
 run:
-	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s
+	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s
 
 rungdb:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s -S
