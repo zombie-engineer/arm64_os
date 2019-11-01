@@ -157,7 +157,7 @@ static int command_gpio_set_function(const string_tokens_t *args)
 
   for (i = 0; i < gpio_aliases.len; ++i) {
     if (string_token_eq(funcarg, gpio_aliases.a[i].alias)) {
-      puts("gpio set-function: ");
+      printf("setting function %d to gpio pin %d\n\r", gpio_aliases.a[i].value, pin_idx);
       status = gpio_set_function(pin_idx, gpio_aliases.a[i].value);
       if (status) {
         printf("gpio_set_functions failed with error: %d\n", status);
@@ -178,7 +178,7 @@ static int command_gpio_get_functions(const string_tokens_t *args)
   putc('\r');
   putc('\n');
   for (i = 0; i < 6; ++i)
-    printf("\tgpio%d/alt%d: %s\n", pin_idx, i, GET_GPIOFN(pin_idx, i)->name);
+    printf("\tgpio%d/alt%d: %s\n\r", pin_idx, i, GET_GPIOFN(pin_idx, i)->name);
   return CMD_ERR_NO_ERROR;
 }
 

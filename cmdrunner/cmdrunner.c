@@ -293,7 +293,7 @@ void cmdrunner_run_interactive_loop(void)
     if (ch == CONSOLE_CHAR_LINEFEED) {
       cmdrunner_on_newline();
       cmdrunner_flush_inputbuf();
-      puts(" >");
+      puts("\n\r >");
     } else if (ch == CONSOLE_CHAR_BACKSPACE || ch == CONSOLE_CHAR_ASCII_BACKSPACE) {
       cmdrunner_backspace();
     } else {

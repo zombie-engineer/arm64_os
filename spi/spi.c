@@ -18,32 +18,35 @@ typedef struct {
 } spi_spi1_dev_t;
 
 typedef struct {
-  char CS       : 2; // 1:0 Chip Select (00, 01, 10 - chips 0, 1, 2. 11 -reserved)
-  char CPHA     : 1; // 2   Clock Phase
-  char CPOL     : 1; // 3   Clock Polarity
-  char CLEAR    : 2; // 5:4 CLEAR FIFO clear
-  char CSPOL    : 1; // 6   Chip Select Polarity
-  char TA       : 1; // 7   Transfer active
-  char DMAEN    : 1; // 8   DMAEN DMA Enable
-  char INTD     : 1; // 9   INTD Interrupt on Done
-  char INTR     : 1; // 10  INTR Interrupt on RXR
-  char ADCS     : 1; // 11  ADCS Auto Deassert Chip select
-  char REN      : 1; // 12  REN Read Enable
-  char LEN      : 1; // 13  LEN LoSSI enable
-  char LMONO    : 1; // 14  Unused
-  char TE_EN    : 1; // 15  Unused
-  char DONE     : 1; // 16  Done transfer Done
-  char RXD      : 1; // 17  RX FIFO contains Data
-  char TXD      : 1; // 18  TX FIFO can accept Data
-  char RXR      : 1; // 19  RX FIFO needs Reading (full)
-  char RXF      : 1; // 20  FX FIFO Full
-  char CSPOL0   : 1; // 21  Chip Select 0 Polarity
-  char CSPOL1   : 1; // 22  Chip Select 1 Polarity
-  char CSPOL2   : 1; // 23  Chip Select 2 Polarity
-  char DMA_LEN  : 1; // 24  Enable DMA mode in Lossi mode
-  char LEN_LONG : 1; // 25  Enable Long data word in Lossi mode if DMA_LEN set
-  char RES      : 6; // 31:26 Write as 0
-} __attribute__ ((packed)) spi_reg_cs_t;
+  spi_dev_t spidev;
+} spi_spi2_dev_t;
+
+// Description of SPI0 CS reg at SPI0_BASE + 0x00
+// 1:0 Chip Select (00, 01, 10 - chips 0, 1, 2. 11 -reserved)
+// 2   Clock Phase
+// 3   Clock Polarity
+// 5:4 CLEAR FIFO clear
+// 6   Chip Select Polarity
+// 7   Transfer active
+// 8   DMAEN DMA Enable
+// 9   INTD Interrupt on Done
+// 10  INTR Interrupt on RXR
+// 11  ADCS Auto Deassert Chip select
+// 12  REN Read Enable
+// 13  LEN LoSSI enable
+// 14  Unused
+// 15  Unused
+// 16  Done transfer Done
+// 17  RX FIFO contains Data
+// 18  TX FIFO can accept Data
+// 19  RX FIFO needs Reading (full)
+// 20  FX FIFO Full
+// 21  Chip Select 0 Polarity
+// 22  Chip Select 1 Polarity
+// 23  Chip Select 2 Polarity
+// 24  Enable DMA mode in Lossi mode
+// 25  Enable Long data word in Lossi mode if DMA_LEN set
+// 31:26 Write as 0
 
 #define SPI_CS_CS       (3 << 0)
 #define SPI_CS_CPHA     (1 << 2)
@@ -109,6 +112,8 @@ static int spi0_dev_initialized = 0;
 static spi_spi1_dev_t spi1_dev;
 static int spi1_dev_initialized = 0;
 
+static spi_spi2_dev_t spi2_dev;
+static int spi2_dev_initialized = 0;
 
 static int spi0_init_dma()
 {
@@ -120,7 +125,6 @@ static int spi0_init_int()
 {
   return SPI_ERR_UNIMPLEMENTED;
 }
-
 
 static gpio_role_spi0_t *gpio_get_role_spi0()
 {
@@ -144,12 +148,12 @@ static gpio_role_spi0_t *gpio_get_role_spi0()
 
 static int spi_init_gpio()
 {
-  gpio_set_function(11, GPIO_FUNC_ALT_0);
-  gpio_set_function(10, GPIO_FUNC_ALT_0);
-  gpio_set_function(9 , GPIO_FUNC_ALT_0);
-  gpio_set_function(8 , GPIO_FUNC_ALT_0);
-  gpio_set_function(7 , GPIO_FUNC_ALT_0);
-  return 0;
+//  gpio_set_function(11, GPIO_FUNC_ALT_0);
+//  gpio_set_function(10, GPIO_FUNC_ALT_0);
+//  gpio_set_function(9 , GPIO_FUNC_ALT_0);
+//  gpio_set_function(8 , GPIO_FUNC_ALT_0);
+//  gpio_set_function(7 , GPIO_FUNC_ALT_0);
+//  return 0;
   int i;
   gpio_role_spi0_t *role;
   role = gpio_get_role_spi0();
@@ -178,19 +182,16 @@ static int spi0_ce0_clear()
 
 static int spi0_xmit(char* bytes, uint32_t len)
 {
-  int rx_data;
-  spi_reg_cs_t reg;
+  int i, rx_data;
 
   puts("spi0_xmit started\n");
 
-  // SPI_CS |= SPI_CS_CLEAR;
-  SPI_CS |= SPI_CS_TA;
-  // SPI_CS |= SPI_CS_CSPOL;
+   
+  SPI_CS = SPI_CS_CLEAR;
+  SPI_CS = SPI_CS_TA;
+  printf("SPI0 CS: 0x%08x\n", SPI_CS);
 
-  int buf[] = { 0x0f000f00, 0x0f010f01, 0x00f00f0, 0x80f080f0, 0xffffffff, 0xf0f0f0f0, 0x0f0f0f0f, 0x0c010c01, 0x80308030};
-  len = sizeof(buf);
-  int i;
-  for (i = 0; i < sizeof(buf) / sizeof(buf[0]); ++i) {
+  for (i = 0; i < len; ++i) {
     while((SPI_CS & SPI_CS_TXD) == 0) {
       printf("SPI_CS->TXD not yet, CS: 0x%08x, TXD: %d\n", SPI_CS, SPI_CS & SPI_CS_TXD);
     }
@@ -200,12 +201,12 @@ static int spi0_xmit(char* bytes, uint32_t len)
       printf("RX data: 0x%08x\n", rx_data);
     }
 
-    printf("spi0_xmit: transmitting: %08x\n", buf[i]); 
-    SPI_FIFO = buf[i];
+    printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
+    SPI_FIFO = bytes[i];
     while((SPI_CS & SPI_CS_DONE) == 0)
       puts("SPI_CS->DONE not yet\n");
   } 
-  SPI_CS &= ~SPI_CS_TA;
+  SPI_CS = 0;
   puts("spi0_xmit complete\n");
   return 0;
 }
@@ -225,18 +226,14 @@ static int spi0_init_poll()
   puts("spi0_init_poll\n");
   spi_init_gpio();
   spi0_init_dev();
-
-
-  // printf("<%08x\n>", *(reg32_t)SPI_CS); 
-  puts("spi0_init_poll completed\n");
+  SPI_CS = SPI_CS_CLEAR;
+  printf("spi0_init_poll completed: SPI_CS: %08x\n>", SPI_CS); 
   return SPI_ERR_OK;
 }
 
 
 int spi0_init(int type)
 {
-  spi0_init_poll();
-  return 0;
   switch (type) {
     case SPI_TYPE_POLL : return spi0_init_poll();
     case SPI_TYPE_INT  : return spi0_init_int();
@@ -255,4 +252,9 @@ spi_dev_t *spi0_get_dev()
 spi_dev_t *spi1_get_dev() 
 {
   return spi1_dev_initialized ? &spi1_dev.spidev : 0;
+}
+
+spi_dev_t *spi2_get_dev() 
+{
+  return spi2_dev_initialized ? &spi2_dev.spidev : 0;
 }

@@ -55,3 +55,5 @@ spi_dev_t *spi_emulated_get_dev();
 spi_dev_t *spi0_get_dev();
 
 spi_dev_t *spi1_get_dev();
+
+spi_dev_t *spi2_get_dev();

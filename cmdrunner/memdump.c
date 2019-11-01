@@ -128,7 +128,6 @@ int command_ww(const string_tokens_t *args)
   unsigned long long address;
   int value;
 
-  puts("ww: ");
   ASSERT_NUMARGS_GE(1);
 
   if (string_token_eq(&args->ts[0], "help"))
@@ -139,6 +138,7 @@ int command_ww(const string_tokens_t *args)
   GET_NUMERIC_PARAM(address, unsigned long long, 0, "address to write");
   GET_NUMERIC_PARAM(value  , int               , 1, "value to write");
   *(int*)address = value;
+  printf("writing %08x to %p\n\r", value, address);
   return CMD_ERR_NO_ERROR;
 }
 
@@ -147,14 +147,13 @@ int command_rw(const string_tokens_t *args)
   char *endptr;
   unsigned long long address;
 
-  puts("rw: ");
   ASSERT_NUMARGS_GE(1);
 
   if (string_token_eq(&args->ts[0], "help"))
     return command_ww_print_help();
 
   GET_NUMERIC_PARAM(address, unsigned long long, 0, "address to read");
-  printf("%08x (%d)\n", *(int*)address, *(int*)address);
+  printf("%08x (%d)\n\r", *(int*)address, *(int*)address);
   return CMD_ERR_NO_ERROR;
 }
 

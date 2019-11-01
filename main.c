@@ -315,8 +315,6 @@ void spi_work()
 
 void main()
 {
-  char c;
-  int i;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
