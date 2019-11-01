@@ -56,7 +56,7 @@ run:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s
 
 rungdb:
-	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio -s -S
+	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s -S
 
 rungdbq:
 	./qemu.sh
