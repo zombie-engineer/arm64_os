@@ -45,9 +45,10 @@ int max7219_set_intensity(uint8_t value);
 int max7219_set_decode_mode(uint8_t value);
 
 
+#define MAX7219_SCAN_LIMIT_FULL 7
 // Scan limit.
 // Number of digits/lines that would be output during redraw phase.
-// Valid values from 0 to 8
+// Valid values from 0 to 7
 int max7219_set_scan_limit(uint8_t value);
 
 
@@ -60,6 +61,12 @@ int max7219_set_digit(int digit_idx, uint8_t value);
 
 // Set raw value to address and data registers of the chip.
 int max7219_set_raw(uint16_t value);
+
+int max7219_row_on(int row_index);
+int max7219_row_off(int row_index);
+
+int max7219_column_on(int column_index);
+int max7219_column_off(int column_index);
 
 // Print some debug information
 int max7219_print_info();

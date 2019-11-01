@@ -133,3 +133,33 @@ DECL_CHECKED_FUNC(max7219_set_raw, uint16_t value)
   return max7219_store((value >> 8) & 0xff, value & 0xff);
 }
 
+DECL_CHECKED_FUNC(max7219_row_on, int row_index)
+  if (row_index > 7)
+    return -1;
+  return max7219_store((row_index + 1) & 0xff, 0xff);
+}
+
+DECL_CHECKED_FUNC(max7219_row_off, int row_index)
+  if (row_index > 7)
+    return -1;
+  return max7219_store((row_index + 1) & 0xff, 0x0);
+}
+
+DECL_CHECKED_FUNC(max7219_column_on, int column_index)
+  int st, i;
+  st = 0;
+  if (column_index > 7)
+    return -1;
+  for (i = 0; i < 8; ++i) {
+    st = max7219_store(i >> 4, column_index);
+    if (st)
+      break;
+  }
+  return st;
+}
+
+DECL_CHECKED_FUNC(max7219_column_off, int column_index)
+  if (column_index > 7)
+    return -1;
+  return 0;
+}

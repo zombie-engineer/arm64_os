@@ -148,12 +148,6 @@ static gpio_role_spi0_t *gpio_get_role_spi0()
 
 static int spi_init_gpio()
 {
-//  gpio_set_function(11, GPIO_FUNC_ALT_0);
-//  gpio_set_function(10, GPIO_FUNC_ALT_0);
-//  gpio_set_function(9 , GPIO_FUNC_ALT_0);
-//  gpio_set_function(8 , GPIO_FUNC_ALT_0);
-//  gpio_set_function(7 , GPIO_FUNC_ALT_0);
-//  return 0;
   int i;
   gpio_role_spi0_t *role;
   role = gpio_get_role_spi0();
@@ -162,61 +156,40 @@ static int spi_init_gpio()
   return 0;
 }
 
-
-static int spi0_push_bit(uint8_t value)
-{
-  return 0;
-}
-
-
-static int spi0_ce0_set()
-{
-  return 0;
-}
-
-
-static int spi0_ce0_clear()
-{
-  return 0;
-}
-
 static int spi0_xmit(char* bytes, uint32_t len)
 {
   int i, rx_data;
 
-  puts("spi0_xmit started\n");
+  // puts("spi0_xmit started\n");
 
    
   SPI_CS = SPI_CS_CLEAR;
   SPI_CS = SPI_CS_TA;
-  printf("SPI0 CS: 0x%08x\n", SPI_CS);
+  // printf("SPI0 CS: 0x%08x\n", SPI_CS);
 
   for (i = 0; i < len; ++i) {
     while((SPI_CS & SPI_CS_TXD) == 0) {
-      printf("SPI_CS->TXD not yet, CS: 0x%08x, TXD: %d\n", SPI_CS, SPI_CS & SPI_CS_TXD);
+      // printf("SPI_CS->TXD not yet, CS: 0x%08x, TXD: %d\n", SPI_CS, SPI_CS & SPI_CS_TXD);
     }
 
     while(SPI_CS & SPI_CS_RXD) {
       rx_data = SPI_FIFO;
-      printf("RX data: 0x%08x\n", rx_data);
+      // printf("RX data: 0x%08x\n", rx_data);
     }
 
-    printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
+    // printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
     SPI_FIFO = bytes[i];
-    while((SPI_CS & SPI_CS_DONE) == 0)
-      puts("SPI_CS->DONE not yet\n");
+    while((SPI_CS & SPI_CS_DONE) == 0);
+    //  puts("SPI_CS->DONE not yet\n");
   } 
   SPI_CS = 0;
-  puts("spi0_xmit complete\n");
+  // puts("spi0_xmit complete\n");
   return 0;
 }
 
 static int spi0_init_dev()
 {
   spi0_dev.spidev.xmit      = spi0_xmit;
-  spi0_dev.spidev.push_bit  = spi0_push_bit;
-  spi0_dev.spidev.ce0_set   = spi0_ce0_set;
-  spi0_dev.spidev.ce0_clear = spi0_ce0_clear;
   spi0_dev_initialized = 1;
   return 0;
 }

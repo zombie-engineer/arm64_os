@@ -33,9 +33,6 @@
 
 typedef struct spi_dev {
   int (*xmit)(char* bytes, uint32_t len);
-  int (*push_bit)(uint8_t bit);
-  int (*ce0_set)();
-  int (*ce0_clear)();
 } spi_dev_t;
 
 int spi0_init(int type);

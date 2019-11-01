@@ -31,21 +31,36 @@ static int command_max7219_info()
 
 static int command_max7219_init(const string_tokens_t *args)
 {
+  int i;
   ASSERT_NUMARGS_EQ(1);
 
-  if      (string_token_eq(&args->ts[0], "spi0")) {
+  if      (string_token_eq(&args->ts[0], "spi0"))
     max7219_set_spi_dev(spi0_get_dev());
-    return CMD_ERR_NO_ERROR;
-  }
-  else if (string_token_eq(&args->ts[0], "spi1")) {
+  else if (string_token_eq(&args->ts[0], "spi1"))
     max7219_set_spi_dev(spi1_get_dev());
-    return CMD_ERR_NO_ERROR;
-  }
-  else if (string_token_eq(&args->ts[0], "spi-emulated")) {
+  else if (string_token_eq(&args->ts[0], "spi-emulated"))
     max7219_set_spi_dev(spi_emulated_get_dev());
-    return CMD_ERR_NO_ERROR;
+  else {
+    printf("unknown spi interface: %s\n", args->ts[0].s);
+    return CMD_ERR_INVALID_ARGS;
   }
-  return CMD_ERR_INVALID_ARGS;
+
+  max7219_set_test_mode_on();
+  wait_msec(100);
+  max7219_set_test_mode_off();
+  wait_msec(100);
+
+  for (i = 0; i < 8; ++i)
+    max7219_row_off(i);
+
+  max7219_set_shutdown_mode_off();
+  wait_msec(100);
+  max7219_set_scan_limit(MAX7219_SCAN_LIMIT_FULL);
+  wait_msec(100);
+  max7219_row_on(0);
+  wait_msec(10000);
+  max7219_row_off(0);
+  return CMD_ERR_NO_ERROR;
 }
 
 
@@ -78,7 +93,9 @@ static int command_max7219_lineloop(const string_tokens_t *args)
 
   for (i = 0; i < repeats; ++i) {
     for (b = 0; b < 8; ++b) {
-      max7219_set_raw(1 << (8 + line) | (1 << b));
+      max7219_row_on(b);
+      wait_msec(interval);
+      max7219_row_off(b);
       wait_msec(interval);
     }
   }

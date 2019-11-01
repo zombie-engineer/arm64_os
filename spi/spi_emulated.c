@@ -92,7 +92,6 @@ int spi_emulated_init(
   int ce0_pin,
   int ce1_pin)
 {
-  // spi_emulated_verbose_output = 1;
   if (spi_emulated_verbose_output) {
     printf("spi_emulated_init: sclk: %d, mosi: %d, miso: %d, ce0: %d, ce1: %d\n",
       sclk_pin, mosi_pin, miso_pin, ce0_pin, ce1_pin);
@@ -111,9 +110,6 @@ int spi_emulated_init(
   // gpio_set_off(ce1_pin);
 
   spi_emulated.spidev.xmit     = spi_emulated_xmit;
-  spi_emulated.spidev.push_bit = spi_emulated_push_bit;
-  spi_emulated.spidev.ce0_set = spi_emulated_ce0_set;
-  spi_emulated.spidev.ce0_clear = spi_emulated_ce0_clear;
 
   spi_emulated.sclk_gpio_pin = sclk_pin;
   spi_emulated.mosi_gpio_pin = mosi_pin;
