@@ -83,21 +83,9 @@ static int command_spi_send(const string_tokens_t *args)
   DECL_ARGS_CTX();
   ASSERT_NUMARGS_GE(2);
 
-  if (string_token_eq(subcmd_token, "spi0"))
-     spidev = spi0_get_dev();
-  else if (string_token_eq(subcmd_token, "spi1"))
-     spidev = spi1_get_dev();
-  else if (string_token_eq(subcmd_token, "spi2"))
-     spidev = spi2_get_dev();
-  else if (string_token_eq(subcmd_token, "emulated"))
-     spidev = spi_emulated_get_dev();
-  else {
-    printf("not a valid spi device %s\n", subcmd_token->s);
-    return CMD_ERR_INVALID_ARGS;
-  }
-
+  spidev = spi_get_dev(spi_type_from_string(subcmd_token->s, subcmd_token->len));
   if (!spidev) {
-    puts("spi device not initialized\n");
+    printf("not a valid spi device %s\n", subcmd_token->s);
     return CMD_ERR_INVALID_ARGS;
   }
 

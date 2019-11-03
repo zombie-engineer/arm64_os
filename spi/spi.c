@@ -117,13 +117,13 @@ static int spi2_dev_initialized = 0;
 
 static int spi0_init_dma()
 {
-  return SPI_ERR_UNIMPLEMENTED;
+  return ERR_NOT_IMPLEMENTED;
 }
 
 
 static int spi0_init_int()
 {
-  return SPI_ERR_UNIMPLEMENTED;
+  return ERR_NOT_IMPLEMENTED;
 }
 
 static gpio_role_spi0_t *gpio_get_role_spi0()
@@ -153,7 +153,20 @@ static int spi_init_gpio()
   role = gpio_get_role_spi0();
   for (i = 0; i < 5; ++i)
     gpio_set_function(role->pin[i].num, role->pin[i].fun);
-  return 0;
+  return ERR_OK;
+}
+
+static int spi0_xmit_byte(char data)
+{
+  int rx;
+  SPI_CS = SPI_CS_CLEAR;
+  SPI_CS = SPI_CS_TA;
+  while(!(SPI_CS & SPI_CS_TXD));
+  while(SPI_CS & SPI_CS_RXD) rx = SPI_FIFO;
+  SPI_FIFO = data;
+  while(!(SPI_CS & SPI_CS_DONE));
+  SPI_CS = 0;
+  return ERR_OK;
 }
 
 static int spi0_xmit(char* bytes, uint32_t len)
@@ -161,8 +174,6 @@ static int spi0_xmit(char* bytes, uint32_t len)
   int i, rx_data;
 
   // puts("spi0_xmit started\n");
-
-   
   SPI_CS = SPI_CS_CLEAR;
   SPI_CS = SPI_CS_TA;
   // printf("SPI0 CS: 0x%08x\n", SPI_CS);
@@ -184,14 +195,15 @@ static int spi0_xmit(char* bytes, uint32_t len)
   } 
   SPI_CS = 0;
   // puts("spi0_xmit complete\n");
-  return 0;
+  return ERR_OK;
 }
 
 static int spi0_init_dev()
 {
   spi0_dev.spidev.xmit      = spi0_xmit;
+  spi0_dev.spidev.xmit_byte = spi0_xmit_byte;
   spi0_dev_initialized = 1;
-  return 0;
+  return ERR_OK;
 }
 
 static int spi0_init_poll()
@@ -201,7 +213,7 @@ static int spi0_init_poll()
   spi0_init_dev();
   SPI_CS = SPI_CS_CLEAR;
   printf("spi0_init_poll completed: SPI_CS: %08x\n>", SPI_CS); 
-  return SPI_ERR_OK;
+  return ERR_OK;
 }
 
 
@@ -212,22 +224,50 @@ int spi0_init(int type)
     case SPI_TYPE_INT  : return spi0_init_int();
     case SPI_TYPE_DMA  : return spi0_init_dma();
   }
-  return SPI_ERR_INVALID;
+  return ERR_INVAL_ARG;
 }
 
 
-spi_dev_t *spi0_get_dev() 
+static spi_dev_t *spi0_get_dev() 
 {
   return spi0_dev_initialized ? &spi0_dev.spidev : 0;
 }
 
 
-spi_dev_t *spi1_get_dev() 
+static spi_dev_t *spi1_get_dev() 
 {
   return spi1_dev_initialized ? &spi1_dev.spidev : 0;
 }
 
-spi_dev_t *spi2_get_dev() 
+
+static spi_dev_t *spi2_get_dev() 
 {
   return spi2_dev_initialized ? &spi2_dev.spidev : 0;
+}
+
+
+spi_dev_t *spi_get_dev(int type)
+{
+  switch(type) {
+    case SPI_TYPE_SPI0:     return spi0_get_dev();
+    case SPI_TYPE_SPI1:     return spi1_get_dev();
+    case SPI_TYPE_SPI2:     return spi2_get_dev();
+    case SPI_TYPE_EMULATED: return spi_emulated_get_dev();
+  }
+
+  return 0;
+}
+
+
+int spi_type_from_string(const char *string, int len)
+{
+  if (!strncmp("spi0", string, len))
+    return SPI_TYPE_SPI0;
+  if (!strncmp("spi1", string, len))
+    return SPI_TYPE_SPI1;
+  if (!strncmp("spi2", string, len))
+    return SPI_TYPE_SPI2;
+  if (!strncmp("spi_emulated", string, len) || !strncmp("emulated", string, len))
+    return SPI_TYPE_EMULATED;
+  return SPI_TYPE_UNKNOWN;
 }

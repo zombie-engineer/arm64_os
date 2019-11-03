@@ -17,6 +17,7 @@ include arch/armv8/Makefile
 include cmdrunner/Makefile
 include drivers/max7219/Makefile
 include drivers/f5161ah/Makefile
+include drivers/nokia5110/Makefile
 
 
 LIBS = 
@@ -27,6 +28,7 @@ LIBS += $(OBJS_CMDRUNNER)
 LIBS += $(OBJS_MAX7219)
 LIBS += $(OBJS_F5161AH)
 LIBS += $(OBJS_SPI)
+LIBS += $(OBJS_NOKIA5110)
 $(info LIBS = $(LIBS))
 
 OBJS += $(LIBS) font.o start.o

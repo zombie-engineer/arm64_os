@@ -32,17 +32,20 @@ static int command_max7219_info()
 static int command_max7219_init(const string_tokens_t *args)
 {
   int i;
+  int err;
+  spi_dev_t *spidev;
   ASSERT_NUMARGS_EQ(1);
 
-  if      (string_token_eq(&args->ts[0], "spi0"))
-    max7219_set_spi_dev(spi0_get_dev());
-  else if (string_token_eq(&args->ts[0], "spi1"))
-    max7219_set_spi_dev(spi1_get_dev());
-  else if (string_token_eq(&args->ts[0], "spi-emulated"))
-    max7219_set_spi_dev(spi_emulated_get_dev());
-  else {
+  spidev = spi_get_dev(spi_type_from_string(args->ts[0].s, args->ts[0].len));
+  if (!spidev) {
     printf("unknown spi interface: %s\n", args->ts[0].s);
     return CMD_ERR_INVALID_ARGS;
+  }
+
+  err = max7219_set_spi_dev(spidev);
+  if (err) {
+    printf("max7219_set_spi_dev failed with error: %d\n", err);
+    return CMD_ERR_EXECUTION_ERR;
   }
 
   max7219_set_test_mode_on();

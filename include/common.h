@@ -1,4 +1,5 @@
 #pragma once
+#include <error.h>
 
 #define min(a, b) (a < b ? a : b)
 
@@ -21,4 +22,10 @@ int isspace(int c);
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(*arr))
 
 #define DECL_ASSIGN_PTR(type, name, value) type *name = (type *)(value)
+
+#define DECL_FUNC_CHECK_INIT(fn, cond, ...) \
+int fn(__VA_ARGS__) { \
+  if (!cond) return ERR_NOT_INIT;
+
+#define RET_IF_ERR(fn, ...) if ((err = fn(__VA_ARGS__))) return err;
 

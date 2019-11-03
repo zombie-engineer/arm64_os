@@ -28,11 +28,18 @@
 // spi1 controller
 #define SPI_TYPE_SPI1         1
 
+// spi2 controller
+#define SPI_TYPE_SPI2         2
+
 // emulated spi with manual bit banging of gpio pins.
-#define SPI_TYPE_SPI_EMULATED 2
+#define SPI_TYPE_EMULATED     3
+
+// for error signalling
+#define SPI_TYPE_UNKNOWN   0xff
 
 typedef struct spi_dev {
   int (*xmit)(char* bytes, uint32_t len);
+  int (*xmit_byte)(char data);
 } spi_dev_t;
 
 int spi0_init(int type);
@@ -49,8 +56,6 @@ void spi_emulated_print_info();
 
 spi_dev_t *spi_emulated_get_dev();
 
-spi_dev_t *spi0_get_dev();
+spi_dev_t *spi_get_dev(int type);
 
-spi_dev_t *spi1_get_dev();
-
-spi_dev_t *spi2_get_dev();
+int spi_type_from_string(const char *string, int len);

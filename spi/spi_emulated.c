@@ -63,6 +63,21 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
   return 0;
 }
 
+DECL_ASSERTED_FN(spi_emulated_xmit_byte, char data)
+  int i, err;
+
+  if (spi_emulated_verbose_output)
+    printf("spi_emulated_xmit_byte: 0x%02x\n", data);
+
+  for (i = 0; i < 8; ++i) {
+    RET_IF_ERR(spi_emulated_push_bit, (data >> (7 - i)) & 1);
+  }
+  spi_emulated_ce0_set();
+  wait_msec(10);
+  spi_emulated_ce0_clear();
+  return 0;
+}
+
 DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
   int i, j, st;
 
@@ -110,6 +125,7 @@ int spi_emulated_init(
   // gpio_set_off(ce1_pin);
 
   spi_emulated.spidev.xmit     = spi_emulated_xmit;
+  spi_emulated.spidev.xmit_byte= spi_emulated_xmit_byte;
 
   spi_emulated.sclk_gpio_pin = sclk_pin;
   spi_emulated.mosi_gpio_pin = mosi_pin;
@@ -121,10 +137,12 @@ int spi_emulated_init(
   return SPI_ERR_OK;
 }
 
+
 spi_dev_t *spi_emulated_get_dev()
 {
   return &spi_emulated.spidev;
 }
+
 
 void spi_emulated_print_info()
 {
