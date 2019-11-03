@@ -1,9 +1,8 @@
 #include <cmdrunner.h>
 #include <spi.h>
 #include "argument.h"
-#include <stdlib.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 #include <max7219.h>
 #include <delays.h>
 

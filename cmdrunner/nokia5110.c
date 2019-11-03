@@ -1,9 +1,9 @@
 #include <cmdrunner.h>
 #include <spi.h>
 #include "argument.h"
-#include <stdlib.h>
+#include <stringlib.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 #include <drivers/display/nokia5110.h>
 #include <delays.h>
 

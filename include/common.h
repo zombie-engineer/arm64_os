@@ -5,11 +5,17 @@
 
 #define max(a, b) (a < b ? b : a)
 
-const char * printf(const char *fmt, ...);
+#ifndef TEST_STRING
+#define printf _printf
+#define puts _puts
+#define putc _putc
+#endif
 
-void puts(const char *str);
+const char * _printf(const char *fmt, ...);
 
-void putc(char ch);
+void _puts(const char *str);
+
+void _putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
 

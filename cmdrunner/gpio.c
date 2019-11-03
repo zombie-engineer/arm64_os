@@ -1,9 +1,8 @@
 #include <cmdrunner.h>
 #include "argument.h"
-#include <stdlib.h>
 #include <gpio.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 
 
 #define GET_PIN_IDX() GET_NUMERIC_PARAM(pin_idx, int, 0, "pin_idx")

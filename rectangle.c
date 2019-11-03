@@ -1,5 +1,5 @@
 #include <rectangle.h>
-#include <string.h>
+#include <stringlib.h>
 
 
 /* r0       - rectangle to clip

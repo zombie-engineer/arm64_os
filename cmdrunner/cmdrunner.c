@@ -1,8 +1,6 @@
 #include <cmdrunner.h>
 #include <uart/uart.h>
-#include <string.h>
-#include <sprintf.h>
-#include <string_utils.h>
+#include <stringlib.h>
 #include <common.h>
 #include <console_char.h>
 #include <vcanvas.h>

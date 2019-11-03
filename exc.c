@@ -1,7 +1,8 @@
 #include <uart/uart.h>
+#include <stringlib.h>
 #include <vcanvas.h>
 #include <delays.h>
-#include <sprintf.h>
+
 
 #define puts(txt) \
   uart_puts(txt); vcanvas_puts(&x, &y, txt);

@@ -1,9 +1,8 @@
 #include "argument.h"
 #include <cmdrunner.h>
-#include <stdlib.h>
 #include <clock_manager.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 
 static int command_clock_print_help()
 {

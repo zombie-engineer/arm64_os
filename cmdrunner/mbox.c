@@ -1,9 +1,8 @@
 #include <cmdrunner.h>
 #include "argument.h"
-#include <stdlib.h>
+#include <stringlib.h>
 #include <mbox/mbox_props.h>
 #include <common.h>
-#include <string.h>
 
 static int command_mbox_print_help()
 {

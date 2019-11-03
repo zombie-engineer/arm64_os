@@ -3,6 +3,7 @@
 #include <reg_access.h>
 #include <types.h>
 #include <common.h>
+#include <stringlib.h>
 #include <gpio.h>
 #include <delays.h>
 

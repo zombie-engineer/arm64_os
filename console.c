@@ -1,6 +1,6 @@
 #include <console.h>
 #include <exception.h>
-#include <string.h>
+#include <stringlib.h>
 #include <uart/uart.h>
 #include <video_console.h>
 #include <viewport_console.h>

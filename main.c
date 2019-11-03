@@ -11,7 +11,6 @@
 #include <tags.h>
 #include <mmu.h>
 #include <common.h>
-#include <sprintf.h>
 #include <console.h>
 #include <interrupts.h>
 #include <exception.h>
@@ -216,102 +215,6 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
- // void nokia_work()
- // {
- //   int clk, din, dc, ce, rst;
- //   char value;
- //   spi_dev_t *d;
- //   int PD, V, H;
- // 
- //   spi_emulated_init(clk, din, 19, ce, 26);
- //   d = spi_emulated_get_dev();
- // 
- //   gpio_set_function(dc, GPIO_FUNC_OUT);
- //   gpio_set_function(rst, GPIO_FUNC_OUT);
- //   gpio_set_off(rst);
- //   wait_msec(30000);
- //   gpio_set_on(rst);
- //   wait_msec(30000);
- // 
- //   gpio_set_off(dc);
- //   // set PD V H
- //   PD = 0; // not shutdown mode
- //   V = 0;  // horizontal addressing mode
- //   H = 0;  // normal function set
- //   value = 0b00100000 | (2 << PD) | (1 << V) | H;
- //   d->xfer(&value, 1);
- //   wait_msec(30000);
- // 
- //   // set display mode
- //   value = 0b00001000;
- //   d->xfer(&value, 1);
- //   wait_msec(30000);
- //   // set x-addr
- //   value = 0x80;
- //   d->xfer(&value, 1);
- //   wait_msec(30000);
- // 
- //   // set y-addr
- //   value = 0x40;
- //   d->xfer(&value, 1);
- //   wait_msec(30000);
- // }
-
-
-void spi_work() 
-{
-  int i, old_i;
-  int sclk, cs, mosi;
-  int emulated;
-
-  emulated = 0;
-
-  if (emulated) {
-    sclk = 11;
-    cs   = 8;
-    mosi = 10;
-    spi_emulated_init(sclk, mosi, 18, cs, 24);
-    max7219_set_spi_dev(spi_emulated_get_dev());
-  } else {
-    puts("spi0 init\n");
-    spi0_init(SPI_TYPE_SPI0);
-    max7219_set_spi_dev(spi0_get_dev());
-    puts("spi0 init completed.\n");
-  }
-
-  while(1)
-  {
-    max7219_set_raw(0xf00);
-  }
-    // wait_msec(100000);
-    max7219_set_raw(0xf01);
-    // wait_msec(100000);
-  //}
-  max7219_set_raw(0xf01);
-  // max7219_set_test_mode_on();
-  wait_msec(300000);
-  max7219_set_raw(0xf00);
-  // max7219_set_raw(0xb07);
-  max7219_set_scan_limit(7);
-  wait_msec(300000);
-  max7219_set_shutdown_mode_off();
-  wait_msec(30000);
-
-  for (i = 0; i < 8; i++) {
-    max7219_set_raw(((i+1) << 8));
-    //max7219_set_digit(i, 0x00);
-  }
-
-  old_i = 0;
-  while(1) {
-    for (i = 0; i < 8; ++i) {
-      max7219_set_raw(((i+1) << 8) | 0xff);
-      max7219_set_raw((old_i+1) << 8);
-      old_i = i;
-      wait_msec(30000);
-    }
-  }
-}
 
 void main()
 {
@@ -321,8 +224,18 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
+  printf("hello, %lld, %llu, %llx, %ld, %lu, %lx, %d, %u, %x\n",
+    0xffffffffffffffffll,
+    0xffffffffffffffffllu,
+    0xffffffffffffffffll,
+    0xffffffffl,
+    0xfffffffflu,
+    0xffffffffl);
+  printf("%lld\n", 0x7fffffffffffffff);
+  printf("%lld\n", 0xfffffffffffffffe);
+  printf("%lld\n", 0x8000000000000000LL);
+  printf("%lld\n", 0x8000000000000000LL + 1);
   // mmu_init();
-  // spi_work();
   print_current_ex_level();
 
   print_mbox_props();

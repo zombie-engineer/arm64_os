@@ -6,7 +6,7 @@
 #include "homer.h"
 #include <exception.h>
 #include <rectangle.h>
-#include <string.h>
+#include <stringlib.h>
 
 #define MAX_VIEWPORTS 16
 

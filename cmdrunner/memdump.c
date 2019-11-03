@@ -1,7 +1,7 @@
 #include <cmdrunner.h>
 #include "argument.h"
 #include <common.h>
-#include <stdlib.h>
+#include <stringlib.h>
 #include <types.h>
 
 #define DUMPSIZE_BYTES       1

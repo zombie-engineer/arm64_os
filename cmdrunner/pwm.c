@@ -1,9 +1,9 @@
 #include <cmdrunner.h>
 #include "argument.h"
-#include <stdlib.h>
+#include <stringlib.h>
 #include <pwm.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 
 static int command_pwm_print_help()
 {

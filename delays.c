@@ -2,6 +2,7 @@
 #include <gpio.h>
 #include <types.h>
 #include <arch/armv8/armv8.h>
+#include <common.h>
 
 
 #define SYSTMR_LO ((volatile unsigned int*)(MMIO_BASE + 0x00003004))

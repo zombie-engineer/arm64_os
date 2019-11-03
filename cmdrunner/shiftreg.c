@@ -1,8 +1,7 @@
 #include <cmdrunner.h>
 #include "argument.h"
-#include <stdlib.h>
 #include <common.h>
-#include <string.h>
+#include <stringlib.h>
 #include <shiftreg.h>
 
 

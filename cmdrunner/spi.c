@@ -1,9 +1,9 @@
 #include <cmdrunner.h>
 #include "argument.h"
-#include <stdlib.h>
+#include <stringlib.h>
 #include <spi.h>
 #include <common.h>
-#include <string.h>
+
 
 static int command_spi_print_help()
 {
