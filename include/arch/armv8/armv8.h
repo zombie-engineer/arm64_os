@@ -1,4 +1,5 @@
 #pragma once
+#include <types.h>
 
 void enable_irq(void);
 void disable_irq(void);
@@ -38,3 +39,9 @@ void arm_set_tcr_el1(unsigned long );
 
 void arm_mmu_init(void);
 void arm_mmu_enable(void);
+
+// Returns system clock frequency in Hz
+uint32_t get_system_timer_freq(void);
+
+// Returns system clock counter value
+uint64_t get_system_timer(void);
