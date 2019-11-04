@@ -1,6 +1,8 @@
 #include <rectangle.h>
-#include <stdlib.h>
+#include <stringlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define ASSERT_VALUE_EQ(v1, v2, desc) \
   if ((v1) != (v2)) { printf("assertion! values not equal for '%s': %lld != %lld\n", desc, (long long)v1, (long long)v2); exit(1); }
@@ -47,7 +49,7 @@ void fill_rect(rect_t *r, int x, int y, unsigned int sx, unsigned int sy)
   r->y.size = sy;
 }
 
-void test_rectangle_cases()
+void run_cases_rectangle()
 {
   rect_t r0;
   rect_t r1;
@@ -118,12 +120,12 @@ void test_rectangle_cases()
 
 void test_strtoll_single(const char *str, int base, long long int expected)
 {
-  const char *endptr;
+  char *endptr;
   long long int result;
   result = strtoll(str, &endptr, base);
   ASSERT_VALUE_EQ(result, expected, "strtoll");
 }
-void test_strtol_case()
+void run_cases_strtol()
 {
   test_strtoll_single("-0x1"         , 0, -0x1);
   test_strtoll_single("  -0x1"       , 0, -0x1);
@@ -143,8 +145,45 @@ void test_strtol_case()
   test_strtoll_single("0xf3579abcdef", 16, 0xf3579abcdefLL);
 }
 
+void test_sprintf(const char *fmt, ...)
+{
+  int status;
+  char buf1[256];
+  char buf2[256];
+  __builtin_va_list args;
+  __builtin_va_start(args, fmt);
+  _vsprintf(buf1, fmt, args);
+  __builtin_va_start(args, fmt);
+  vsprintf(buf2, fmt, args);
+  if (strcmp(buf1, buf2)) {
+    printf("assertion! strings not equal: expected: '%s', got '%s'\n", buf1, buf2);
+    exit(1);
+  }
+  printf("success: '%s'\n", buf1);
+}
+
+void run_cases_sprintf()
+{
+  test_sprintf("%d", 0);
+  test_sprintf("%d", 1234);
+  test_sprintf("%d", -1234);
+  test_sprintf("%d", 0x7fffffff);
+  test_sprintf("%d", 0x80000000);
+
+  test_sprintf("%x", 1234);
+  test_sprintf("%x", -1234);
+  test_sprintf("%x", 0x7fffffff);
+  test_sprintf("%x", 0x80000000);
+
+  test_sprintf("%lld", 1234);
+  test_sprintf("%lld", -1234);
+  test_sprintf("%lld", 0x7fffffff);
+  test_sprintf("%lld", 0x80000000);
+}
+
 int main() 
 {
-  test_rectangle_cases();
-  test_strtol_case();
+  run_cases_rectangle();
+  run_cases_strtol();
+  run_cases_sprintf();
 }

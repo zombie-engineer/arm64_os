@@ -82,7 +82,7 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
     // no intersection
     return 0;
 
-  memset(rs, 0, sizeof(*rs));
+  _memset(rs, 0, sizeof(*rs));
   RGN(1, 1)->exists = 1;
   RCT(1, 1)->x = r0->x;
   RCT(1, 1)->y = r0->y;
