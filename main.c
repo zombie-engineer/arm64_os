@@ -224,13 +224,16 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
-  printf("0x0: %x\n", 0x0);
-  printf("0xf: %x\n", 0xf);
-  printf("0x7f: %x\n", 0x7f);
+  printf("016d 10: %016d\n", 10);
+  printf("-%4.3d\n", 1);
+  printf("-%4.3x\n", 1);
+  printf("0xf: %08x\n", 0xf);
+  printf("0x7f: %8x\n", 0x7f);
   printf("0x3ff: %x\n", 0x3ff);
   printf("0x1fff: %x\n", 0x1fff);
   printf("0xef0f0: %x\n", 0xef0f0);
   printf("0xefffff: %x\n", 0xefffff);
+  printf("016d -10: %016d\n", -10);
 
   printf("sizoef(long) = %ld\n", sizeof(long));
   printf("printf_test:\nlld: %lld,\nllu: %llu,\nllx: %llx,\nld: %ld,\nlu: %lu,\nlx: %lx,\nd: %d, u: %u, x: %x\n",

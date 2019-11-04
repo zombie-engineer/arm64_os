@@ -40,7 +40,10 @@ unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
 {
   unsigned long long arg, divider;
   char type;
-  int d;
+  int wordlen;
+  int padding_size;
+  int padding;
+  int space_padding;
   int maxbits;
   int leading_zeroes;
   int nibble;
@@ -48,7 +51,7 @@ unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
   int is_neg_sign;
   int base;
   int flags_left_align;
-  int flags_show_sign;
+  int flags_plus;
   int flags_space;
   int flags_zero;
   int width;
@@ -93,9 +96,9 @@ unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
       fmt++;
     }
 
-    flags_show_sign = 0;
+    flags_plus = 0;
     if (*fmt == '+') {
-      flags_show_sign = 1;
+      flags_plus = 1;
       fmt++;
     }
 
@@ -198,9 +201,12 @@ _sprintf_char:
 _sprintf_ptr:
     base = 16;
     *dst++ = '0'; *dst++ = 'x';
+    width = 16;
     type = 'x';
 _sprintf_number:
     is_neg_sign = 0;
+    padding_size = 0;
+    padding = 0;
     if (type == 'x' || type == 'X') {
       if (size == SIZE_ll) {
         leading_zeroes = __builtin_clzll(arg);
@@ -220,7 +226,28 @@ _sprintf_number:
         *dst++ = '<';
         *dst++ = '>';
       }
-      rightmost_nibble = max((maxbits - leading_zeroes) / 4 - 1, 0);
+
+      // padding
+      rightmost_nibble = (maxbits - leading_zeroes) / 4;
+
+      padding = max(max(width, precision) - (rightmost_nibble + 1), 0);
+
+      space_padding = padding;
+      if (precision != -1) {
+        precision = max(precision - (rightmost_nibble + 1), 0);
+        space_padding = padding - precision;
+      }
+      else if (flags_zero)
+        space_padding = 0;
+
+      while(space_padding--) {
+        *dst++ = ' ';
+        padding--;
+      }
+
+      while(padding--)
+        *dst++ = '0';
+
       for (;rightmost_nibble >= 0; rightmost_nibble--) {
         nibble = (int)((LLU(arg) >> (rightmost_nibble * 4)) & 0xf);
         *dst++ = to_char_16(nibble, /* uppercase */ type < 'a');
@@ -250,11 +277,34 @@ _sprintf_number:
         arg = (unsigned int)(arg * -1);
       }
 
-      while(divider != MAX_DIV_LLD && DIV_LLD(arg, divider * 10))
+      wordlen = 1;
+      while(divider != MAX_DIV_LLD && DIV_LLD(arg, divider * 10)) {
         divider *= 10;
+        wordlen++;
+      }
+
+      if (is_neg_sign || flags_plus || flags_space)
+        wordlen++;
+
+      padding = max(width - wordlen, 0);
+      space_padding = max(padding - max(max(precision, 0) - wordlen, 0), 0);
+      if (flags_zero && precision == -1)
+        space_padding = 0;
+
+      while(space_padding-- > 0) {
+        *dst++ = ' ';
+        padding--;
+      }
 
       if (is_neg_sign)
         *dst++ = '-';
+      else if (flags_plus)
+        *dst++ = '+';
+      else if (flags_space)
+        *dst++ = ' ';
+
+      while(padding-- > 0)
+        *dst++ = '0';
 
       while(divider) {
         *dst++ = to_char_8_10(DIV_LLD(arg, divider), base);
@@ -268,8 +318,34 @@ _sprintf_number:
       else if (size == SIZE_no)
         arg &= 0xffffffff;
 
-      while(divider != MAX_DIV_LLU && DIV_LLU(arg, divider * 10))
+      wordlen = 1;
+      while(divider != MAX_DIV_LLU && DIV_LLU(arg, divider * 10)) {
         divider *= 10;
+        wordlen++;
+      }
+
+      if (flags_plus || flags_space)
+        wordlen++;
+
+      padding = max(width - wordlen, 0);
+      space_padding = max(padding - max(max(precision, 0) - wordlen, 0), 0);
+      if (flags_zero && precision == -1)
+        space_padding = 0;
+
+      while(space_padding-- > 0) {
+        *dst++ = ' ';
+        padding--;
+      }
+
+      if (is_neg_sign)
+        *dst++ = '-';
+      else if (flags_plus)
+        *dst++ = '+';
+      else if (flags_space)
+        *dst++ = ' ';
+
+      while(padding-- > 0)
+        *dst++ = '0';
 
       while(divider) {
         *dst++ = to_char_8_10(DIV_LLU(arg, divider), base);
