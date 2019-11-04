@@ -29,7 +29,7 @@ static nokia5110_dev_t *nokia5110_dev = 0;
 
 #define SPI_SEND_BYTE(data)  RET_IF_ERR(nokia5110_dev->spi->xmit_byte, data)
 
-#define SEND_CMD(cmd)        SET_CMD(); SPI_SEND_BYTE((cmd))
+#define SEND_CMD(cmd)        SET_CMD(); wait_msec(100); SPI_SEND_BYTE((cmd)); wait_msec(100)
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(&data, len)
 
@@ -53,8 +53,8 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   if (!spidev)
     return ERR_INVAL_ARG;
 
-  RET_IF_ERR(gpio_set_function, dc_pin, GPIO_FUNC_OUT);
   RET_IF_ERR(gpio_set_function, rst_pin, GPIO_FUNC_OUT);
+  RET_IF_ERR(gpio_set_function, dc_pin, GPIO_FUNC_OUT);
 
   nokia5110_device.spi = spidev;
   nokia5110_device.dc = dc_pin;
@@ -65,14 +65,36 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   RET_IF_ERR(gpio_set_off, nokia5110_device.dc);
   RET_IF_ERR(nokia5110_reset);
 
-
   SEND_CMD(0x21);
-  return ERR_OK;
+  wait_msec(500);
   SEND_CMD(0xb9);
+  wait_msec(500);
   SEND_CMD(0x04);
+  wait_msec(500);
   SEND_CMD(0x14);
+  wait_msec(500);
   SEND_CMD(0x20);
+  wait_msec(500);
   SEND_CMD(0x0c);
+
+  int i;
+  char data1, data2;
+  data1 = 0xf0;
+  data2 = 0x0f;
+  while(1) {
+  for (i = 0; i < 100; ++i) {
+    SEND_DATA(data1, 1);
+    SEND_DATA(data2, 1);
+    wait_msec(1);
+  }
+  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+  for (i = 0; i < 100; ++i) {
+    SEND_DATA(data2, 1);
+    SEND_DATA(data1, 1);
+    wait_msec(1);
+  }
+  }
+
   // RET_IF_ERR(nokia5110_set_function, function_flags);
   // RET_IF_ERR(nokia5110_set_display_mode, display_mode);
   
@@ -121,6 +143,7 @@ CHECKED_FUNC(nokia5110_reset)
   puts("R\r\n");
   wait_msec(1000);
   RET_IF_ERR(gpio_set_on, nokia5110_dev->rst);
+  wait_msec(500);
   return ERR_OK;
 }
 

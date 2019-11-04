@@ -21,6 +21,46 @@
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
 
+#ifdef CHECK_PRINTF
+void check_printf()
+{
+  printf("016d 10: %016d\n", 10);
+  printf("-%4.3d\n", 1);
+  printf("-%4.3x\n", 1);
+  printf("0xf: %08x\n", 0xf);
+  printf("0x7f: %8x\n", 0x7f);
+  printf("0x3ff: %x\n", 0x3ff);
+  printf("0x1fff: %x\n", 0x1fff);
+  printf("0xef0f0: %x\n", 0xef0f0);
+  printf("0xefffff: %x\n", 0xefffff);
+  printf("016d -10: %016d\n", -10);
+
+  printf("sizoef(long) = %ld\n", sizeof(long));
+  printf("printf_test:\nlld: %lld,\nllu: %llu,\nllx: %llx,\nld: %ld,\nlu: %lu,\nlx: %lx,\nd: %d, u: %u, x: %x\n",
+    0xffffffffffffffffll,
+    0xffffffff66666666llu,
+    0xffffffff55555555ll,
+
+    0xffffffffl,
+    0xffff3333lu,
+    0xffff2222,
+
+    (unsigned int)0xffffffff,
+    (unsigned int)0xffffffff,
+    (unsigned int)0xffffffff);
+
+  printf("lld 0x7fffffffffffffff = %lld\n", 0x7fffffffffffffff);
+  printf("lld 0xfffffffffffffffe = %lld\n", 0xfffffffffffffffe);
+  printf("ld  0x7fffffffffffffff = %ld\n", 0x7fffffffffffffff);
+  printf("ld  0xfffffffffffffffe = %ld\n", 0xfffffffffffffffe);
+  printf("d   0x7fffffffffffffff = %d\n", 0x7fffffffffffffff);
+  printf("d   0xfffffffffffffffe = %d\n", 0xfffffffffffffffe);
+
+  printf("lld 0x8000000000000000 = %lld\n", 0x8000000000000000ll);
+  printf("ld  0x80000000         = %ld\n" , 0x80000000l);
+  printf("ld  0x80000000         = %d\n", 0x80000000);
+}
+#endif
 void print_current_ex_level()
 {
   unsigned long el;
@@ -224,41 +264,6 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
-  printf("016d 10: %016d\n", 10);
-  printf("-%4.3d\n", 1);
-  printf("-%4.3x\n", 1);
-  printf("0xf: %08x\n", 0xf);
-  printf("0x7f: %8x\n", 0x7f);
-  printf("0x3ff: %x\n", 0x3ff);
-  printf("0x1fff: %x\n", 0x1fff);
-  printf("0xef0f0: %x\n", 0xef0f0);
-  printf("0xefffff: %x\n", 0xefffff);
-  printf("016d -10: %016d\n", -10);
-
-  printf("sizoef(long) = %ld\n", sizeof(long));
-  printf("printf_test:\nlld: %lld,\nllu: %llu,\nllx: %llx,\nld: %ld,\nlu: %lu,\nlx: %lx,\nd: %d, u: %u, x: %x\n",
-    0xffffffffffffffffll,
-    0xffffffff66666666llu,
-    0xffffffff55555555ll,
-
-    0xffffffffl,
-    0xffff3333lu,
-    0xffff2222,
-
-    (unsigned int)0xffffffff,
-    (unsigned int)0xffffffff,
-    (unsigned int)0xffffffff);
-
-  printf("lld 0x7fffffffffffffff = %lld\n", 0x7fffffffffffffff);
-  printf("lld 0xfffffffffffffffe = %lld\n", 0xfffffffffffffffe);
-  printf("ld  0x7fffffffffffffff = %ld\n", 0x7fffffffffffffff);
-  printf("ld  0xfffffffffffffffe = %ld\n", 0xfffffffffffffffe);
-  printf("d   0x7fffffffffffffff = %d\n", 0x7fffffffffffffff);
-  printf("d   0xfffffffffffffffe = %d\n", 0xfffffffffffffffe);
-
-  printf("lld 0x8000000000000000 = %lld\n", 0x8000000000000000ll);
-  printf("ld  0x80000000         = %ld\n" , 0x80000000l);
-  printf("ld  0x80000000         = %d\n", 0x80000000);
   // mmu_init();
   print_current_ex_level();
 
