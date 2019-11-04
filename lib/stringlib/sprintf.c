@@ -1,6 +1,7 @@
 #include <stringlib.h>
 #include <limits.h>
 #include <common.h>
+#include <compiler.h>
 
 #define MAX_NEG_LLD         0x8000000000000000
 #define MAX_NEG_LLD_STR     "-9223372036854775808"
@@ -36,12 +37,11 @@ char to_char_8_10(int i, int base) {
   return i + '0';
 }
 
-unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
+unsigned int optimized _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
 {
   unsigned long long arg, divider;
   char type;
   int wordlen;
-  int padding_size;
   int padding;
   int space_padding;
   int maxbits;
@@ -57,18 +57,9 @@ unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
   int width;
   int precision;
   int size;
-  int len, sign, i;
-  int num_spaces;
-  int fieldlen;
   const char *s_src;
 
-  char *p;
   char *orig;
-  // tmpstr is able to hold longest 64 bit number, which happens to be 
-  // '18446744073709551615' - for unsigned long long
-  // '-9223372036854775808' - for signed long long
-  // '0xffffffffffffffff..' - in hexform it's 2 symbols shorter
-  char tmpstr[21];
   orig = dst;
 
   while(*fmt) {
@@ -205,7 +196,6 @@ _sprintf_ptr:
     type = 'x';
 _sprintf_number:
     is_neg_sign = 0;
-    padding_size = 0;
     padding = 0;
     if (type == 'x' || type == 'X') {
       if (size == SIZE_ll) {
@@ -228,8 +218,7 @@ _sprintf_number:
       }
 
       // padding
-      rightmost_nibble = (maxbits - leading_zeroes) / 4;
-
+      rightmost_nibble = (maxbits - leading_zeroes - 1) / 4;
       padding = max(max(width, precision) - (rightmost_nibble + 1), 0);
 
       space_padding = padding;
@@ -240,13 +229,12 @@ _sprintf_number:
       else if (flags_zero)
         space_padding = 0;
 
-      while(space_padding--) {
-        *dst++ = ' ';
-        padding--;
-      }
+      memset(dst, ' ', space_padding);
+      dst += space_padding;
+      padding -= space_padding;
 
-      while(padding--)
-        *dst++ = '0';
+      memset(dst, '0', padding);
+      dst += padding;
 
       for (;rightmost_nibble >= 0; rightmost_nibble--) {
         nibble = (int)((LLU(arg) >> (rightmost_nibble * 4)) & 0xf);
@@ -259,7 +247,7 @@ _sprintf_number:
     divider = 1;
     if (type == 'd') {
       if (size == SIZE_ll && (long long)arg == MAX_NEG_LLD) {
-        arg = MAX_NEG_LLD_STR;
+        arg = LLU(MAX_NEG_LLD_STR);
         goto _sprintf_string;
       }
 
@@ -291,10 +279,9 @@ _sprintf_number:
       if (flags_zero && precision == -1)
         space_padding = 0;
 
-      while(space_padding-- > 0) {
-        *dst++ = ' ';
-        padding--;
-      }
+      memset(dst, ' ', space_padding);
+      dst += space_padding;
+      padding -= space_padding;
 
       if (is_neg_sign)
         *dst++ = '-';
@@ -303,8 +290,8 @@ _sprintf_number:
       else if (flags_space)
         *dst++ = ' ';
 
-      while(padding-- > 0)
-        *dst++ = '0';
+      memset(dst, '0', padding);
+      dst += padding;
 
       while(divider) {
         *dst++ = to_char_8_10(DIV_LLD(arg, divider), base);
@@ -332,10 +319,9 @@ _sprintf_number:
       if (flags_zero && precision == -1)
         space_padding = 0;
 
-      while(space_padding-- > 0) {
-        *dst++ = ' ';
-        padding--;
-      }
+      memset(dst, ' ', space_padding);
+      dst += space_padding;
+      padding -= space_padding;
 
       if (is_neg_sign)
         *dst++ = '-';
@@ -344,8 +330,8 @@ _sprintf_number:
       else if (flags_space)
         *dst++ = ' ';
 
-      while(padding-- > 0)
-        *dst++ = '0';
+      memset(dst, '0', padding);
+      dst += padding;
 
       while(divider) {
         *dst++ = to_char_8_10(DIV_LLU(arg, divider), base);

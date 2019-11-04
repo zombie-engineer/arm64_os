@@ -1,8 +1,6 @@
-#include "gpio.h"
-#include "common.h"
-
-
-#define optimized __attribute__((optimize("O3")))
+#include <gpio.h>
+#include <common.h>
+#include <compiler.h>
 
 
 #define GPIO_CHECK_GPIO_NUM(gpio_num) \
