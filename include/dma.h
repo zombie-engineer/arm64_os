@@ -53,9 +53,6 @@ void dma_channel_setup(int channel, void *src, void *dst, int len);
 
 #define DMA_TRANSFER_WIDTH_32BIT  0
 #define DMA_TRANSFER_WIDTH_128BIT 1
-int dma_set_transfer_width(int channel, int width);
-
-int dma_set_control_block(int channel, dma_cb_t *cb);
 
 int dma_set_active(int channel);
 
@@ -63,11 +60,12 @@ typedef struct {
   uint32_t channel;
   uint32_t src;
   uint32_t src_inc;
+  uint32_t src_dreq;
   uint32_t dst;
   uint32_t dst_inc;
+  uint32_t dst_dreq;
   uint32_t len;
   uint32_t width_bits;
-  uint32_t dreq;
 } dma_ch_opts_t;
 
 int dma_setup(dma_ch_opts_t *o);

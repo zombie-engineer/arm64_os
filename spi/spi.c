@@ -84,6 +84,8 @@ typedef struct {
 
 #define SPI_CLK ((reg32_t)(SPI_BASE + 0x8))
 
+#define SPI_DLEN ((reg32_t)(SPI_BASE + 0xc))
+
 typedef struct {
   
 } __attribute__ ((packed)) spi_reg_dlen_t;
@@ -159,45 +161,66 @@ static int spi_init_gpio()
 }
 
 
-static int spi0_xmit_dma(uint32_t to_tx, uint32_t from_rx, uint32_t len)
+static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
 {
   int cs;
 
   cs = *SPI_CS;
+  cs |= SPI_CS_CLEAR;
   cs |= SPI_CS_DMAEN;
   cs |= SPI_CS_ADCS;
   *SPI_CS = cs;
 
-  dma_set_transfer_width(0, DMA_TRANSFER_WIDTH_32BIT);
-  dma_set_transfer_width(1, DMA_TRANSFER_WIDTH_32BIT);
+  ((uint32_t*)data)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS;
 
-  ((uint32_t*)to_tx)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR;
+  uint32_t recv_data[2];
+  uint32_t send_data[8];
+  send_data[0] = 12 << 16 | (SPI_CS_TA | SPI_CS_DMAEN | SPI_CS_ADCS);
+  send_data[1] = 0x11111111;
+  send_data[2] = 0x22222222;
+  send_data[3] = 0x44444444;
+  send_data[4] = 0x88888888;
+  send_data[5] = 0x11111111;
+  send_data[6] = 0x22222222;
+  send_data[7] = 0x44444444;
+  send_data[8] = 0x88888888;
 
   dma_ch_opts_t o = { 0 };
 
-  o->channel    = 0;
-  o->src        = to_tx;
-  o->src_inc    = 1;
-  o->dst        = SPI_FIFO;
-  o->dst_inc    = 0;
-  o->len        = len;
-  o->width_bits = DMA_TRANSFER_WIDTH_32BIT;
-  o->dreq       = DMA_DREQ_SPI_TX;
+  *SPI_DLEN = 4 * 200;
+
+  o.channel    = 0;
+  o.src        = ((uint32_t)&send_data[1]) | 0xc0000000;
+  o.src_inc    = 4 * 8;
+  o.src_dreq   = 0;
+  o.dst        = (((uint32_t)SPI_FIFO) & 0x00ffffff) + 0x7e000000;
+  o.dst_inc    = 0;
+  o.dst_dreq   = DMA_DREQ_SPI_TX;
+  o.len        = 8;
+  o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
   dma_setup(&o);
 
-  o->channel    = 1;
-  o->src        = SPI_FIFO;
-  o->src_inc    = 0;
-  o->dst        = from_rx;
-  o->dst_inc    = 1;
-  o->len        = len;
-  o->width_bits = DMA_TRANSFER_WIDTH_32BIT;
-  o->dreq       = DMA_DREQ_SPI_RX;
+  o.channel    = 1;
+  o.src        = (((uint32_t)SPI_FIFO) & 0x00ffffff) + 0x7e000000;
+  o.src_inc    = 0;
+  o.src_dreq   = DMA_DREQ_SPI_RX;
+  o.dst        = (uint32_t)&recv_data[0] | 0xc0000000;
+  o.dst_inc    = 0;
+  o.dst_dreq   = 0;
+  o.len        = 4 * 8;
+  o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
   dma_setup(&o);
 
-  dma_set_active(0);
+  *SPI_CS = cs | SPI_CS_TA;
+  printf("before recv_data: %08x\n", recv_data[0]);
   dma_print_debug_info(0);
+  dma_print_debug_info(1);
+  dma_set_active(0);
   dma_set_active(1);
+
+
+  printf("after recv_data: %08x\n", recv_data[0]);
+  dma_print_debug_info(0);
   dma_print_debug_info(1);
   return ERR_OK;
 }

@@ -132,8 +132,7 @@ static int command_spi_dmasend(const string_tokens_t *args)
   GET_NUMERIC_PARAM(srclen,   int, 2, "source len");
 
   printf("spi0->xmit_dma %d bytes from %p.\n", srclen, src);
-
-  st = spidev->xmit_dma(src, srclen, 0, 0);
+  st = spidev->xmit_dma(src, 0, srclen);
   if (st) {
     printf("command_pwd_enable error: spidev xmit completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;

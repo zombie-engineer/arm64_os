@@ -3,6 +3,7 @@
 #include <error.h>
 #include <common.h>
 #include <reg_access.h>
+#include <delays.h>
 
 
 #define DMA_BASE (unsigned long long)(MMIO_BASE + 0x00007000)
@@ -98,32 +99,61 @@ int dma_set_active(int channel)
   int reg;
   reg = *DMA_CS(channel);
   reg |= DMA_CS_ACTIVE;
+  reg |= DMA_CS_WAIT_FOR_OUTSTANDING_WRITES;
   *DMA_CS(channel) = reg;
   return ERR_OK;
 }
 
-int dma_setup(dma_ch_opts_t *o) {
-  uint32_t dma_enable;
+static void cache_clean_and_inval(uint64_t address, uint64_t length)
+{
+  length += 64;
+  while(1) {
+    asm volatile ("dc civac, %0" : : "r" (address) : "memory");
+    if (length < 64)
+      break;
+    address += 64;
+    length -= 64;
+  }
+  asm volatile ("dsb sy" ::: "memory");
+}
 
+int dma_setup(dma_ch_opts_t *o) 
+{
+  int dma_enable;
   dma_enable = *DMA_ENABLE;
   dma_enable |= (1 << o->channel);
   *DMA_ENABLE = dma_enable;
 
+  printf("*DMA_ENABLE = %08x\n", *DMA_ENABLE);
+
+  wait_msec(1);
+  *DMA_CS(o->channel) = (*(DMA_CS(o->channel))) | DMA_CS_RESET;
+  while(*DMA_CS(o->channel) & DMA_CS_RESET) printf("DMA_CS: %08x, waiting reset..\n", *DMA_CS(o->channel));
+
+  printf("*DMA_CS#%d = %08x\n", o->channel, *DMA_CS(o->channel));
+
+  wait_msec(1);
+
+
   dma_cb_t *cb = &dma_channels[o->channel];
   printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", o->dst, o->src, cb);
 
-  cb->ti              = DMA_TI_PERMAP(o->dreq)
-                        | (o->src_inc ? DMA_TI_SRC_INC : 0)
-                        | (o->dst_inc ? DMA_TI_DEST_INC : 0);
+  cb->ti              = DMA_TI_PERMAP(o->src_dreq | o->dst_dreq)
+                        | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
+                        | (o->src_dreq ? DMA_TI_SRC_DREQ  : 0)
+                        | (o->dst_inc  ? DMA_TI_DEST_INC  : 0)
+                        | (o->dst_dreq ? DMA_TI_DEST_DREQ : 0)
+                        | DMA_TI_WAIT_RESP;
   cb->src_addr        = o->src;
   cb->dst_addr        = o->dst;
   cb->transfer_length = o->len;
   cb->stride          = 0;
-  cb->dma_cb_next     = 0;
+  cb->dma_cb_next     = (uint32_t)cb | 0xc0000000;
   cb->res0            = 0;
   cb->res1            = 0;
 
   dma_set_control_block(o->channel, cb);
+  cache_clean_and_inval(o->src, o->len);
 
   return ERR_OK;
 }
@@ -147,5 +177,5 @@ void dma_print_debug_info(int channel)
   printf("DMA_DEST_AD#%d    %08x\n", channel, dest_ad);
   printf("DMA_TXFR_LEN#%d   %08x\n", channel, txfr_len);
   printf("DMA_DEBUG#%d      %08x\n", channel, debug);
-  printf("DMA_ENABLE#%d     %08x\n", channel, enable);
+  printf("DMA_ENABLE%c      %08x\n", ' ', enable);
 }
