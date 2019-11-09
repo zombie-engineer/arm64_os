@@ -53,9 +53,6 @@ kernel8.img: $(OBJS)
 	$(LD) -nostdlib -nostartfiles $(OBJS) -T link.ld -o kernel8.elf -Map kernel8.map
 	$(OBJCOPY) -O binary kernel8.elf $@
 
-clean:
-	rm kernel8.elf *.o > /dev/nell 2>/dev/null || true
-
 run:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s
 
@@ -68,5 +65,9 @@ rungdbq:
 gdb:
 	gdb-multiarch -x rungdb.gdb
 
-make serial:
+serial:
 	minicom -b 115200 -D /dev/ttyUSB0
+
+.PHONY: clean
+clean:
+	find -name '*.o' -exec rm -v {} \;
