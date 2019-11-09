@@ -6,6 +6,7 @@
 #include <stringlib.h>
 #include <gpio.h>
 #include <delays.h>
+#include <dma.h>
 
 
 #define SPI_BASE ((unsigned long long)MMIO_BASE + 0x00204000)
@@ -72,16 +73,16 @@ typedef struct {
 #define SPI_CS_DMA_LEN  (1 << 24)
 #define SPI_CS_LEN_LONG (1 << 25)
 
-#define SPI_CS (*(reg32_t)SPI_BASE)
+#define SPI_CS ((reg32_t)SPI_BASE)
 
-#define SPI_FIFO (*(reg32_t)(SPI_BASE + 0x4))
+#define SPI_FIFO ((reg32_t)(SPI_BASE + 0x4))
 
 typedef struct {
   uint32_t CDIV : 16; // clock divider
   uint32_t RES  : 16; // reserved
 } __attribute__ ((packed)) spi_reg_clk_t;
 
-#define SPI_CLK (*(reg32_t)(SPI_BASE + 0x8))
+#define SPI_CLK ((reg32_t)(SPI_BASE + 0x8))
 
 typedef struct {
   
@@ -157,16 +158,42 @@ static int spi_init_gpio()
   return ERR_OK;
 }
 
+
+static int spi0_xmit_dma(uint32_t to_tx, uint32_t from_rx, uint32_t len)
+{
+  int cs;
+
+  cs = *SPI_CS;
+  cs |= SPI_CS_DMAEN;
+  cs |= SPI_CS_ADCS;
+  *SPI_CS = cs;
+
+  dma_set_transfer_width(0, DMA_TRANSFER_WIDTH_32BIT);
+  dma_set_transfer_width(1, DMA_TRANSFER_WIDTH_32BIT);
+
+  ((uint32_t*)to_tx)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS;
+  dma_setup(0, SPI_FIFO, to_tx, len, DMA_DREQ_SPI_TX);
+  dma_setup(1, from_rx, SPI_FIFO, len, DMA_DREQ_SPI_RX);
+
+  dma_set_active(0);
+  dma_print_debug_info(0);
+  dma_set_active(1);
+  dma_print_debug_info(1);
+  return ERR_OK;
+}
+
+
 static int spi0_xmit_byte(char data)
 {
   int rx;
-  SPI_CS = SPI_CS_CLEAR;
-  SPI_CS = SPI_CS_TA;
-  while(!(SPI_CS & SPI_CS_TXD));
-  while(SPI_CS & SPI_CS_RXD) rx = SPI_FIFO;
-  SPI_FIFO = data;
-  while(!(SPI_CS & SPI_CS_DONE));
-  SPI_CS = 0;
+  *SPI_CS = SPI_CS_CLEAR;
+  *SPI_CS = SPI_CS_TA;
+  while(!(*SPI_CS & SPI_CS_TXD));
+  while(*SPI_CS & SPI_CS_RXD) rx = *SPI_FIFO;
+  if (rx);
+  *SPI_FIFO = data;
+  while(!(*SPI_CS & SPI_CS_DONE));
+  *SPI_CS = 0;
   return ERR_OK;
 }
 
@@ -175,26 +202,27 @@ static int spi0_xmit(char* bytes, uint32_t len)
   int i, rx_data;
 
   // puts("spi0_xmit started\n");
-  SPI_CS = SPI_CS_CLEAR;
-  SPI_CS = SPI_CS_TA;
+  *SPI_CS = SPI_CS_CLEAR;
+  *SPI_CS = SPI_CS_TA;
   // printf("SPI0 CS: 0x%08x\n", SPI_CS);
 
   for (i = 0; i < len; ++i) {
-    while((SPI_CS & SPI_CS_TXD) == 0) {
+    while((*SPI_CS & SPI_CS_TXD) == 0) {
       // printf("SPI_CS->TXD not yet, CS: 0x%08x, TXD: %d\n", SPI_CS, SPI_CS & SPI_CS_TXD);
     }
 
-    while(SPI_CS & SPI_CS_RXD) {
-      rx_data = SPI_FIFO;
+    while(*SPI_CS & SPI_CS_RXD) {
+      rx_data = *SPI_FIFO;
+      if (rx_data);
       // printf("RX data: 0x%08x\n", rx_data);
     }
 
     // printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
-    SPI_FIFO = bytes[i];
-    while((SPI_CS & SPI_CS_DONE) == 0);
+    *SPI_FIFO = bytes[i];
+    while((*SPI_CS & SPI_CS_DONE) == 0);
     //  puts("SPI_CS->DONE not yet\n");
   } 
-  SPI_CS = 0;
+  *SPI_CS = 0;
   // puts("spi0_xmit complete\n");
   return ERR_OK;
 }
@@ -203,6 +231,7 @@ static int spi0_init_dev()
 {
   spi0_dev.spidev.xmit      = spi0_xmit;
   spi0_dev.spidev.xmit_byte = spi0_xmit_byte;
+  spi0_dev.spidev.xmit_dma  = spi0_xmit_dma;
   spi0_dev_initialized = 1;
   return ERR_OK;
 }
@@ -212,8 +241,9 @@ static int spi0_init_poll()
   puts("spi0_init_poll\n");
   spi_init_gpio();
   spi0_init_dev();
-  SPI_CS = SPI_CS_CLEAR;
-  printf("spi0_init_poll completed: SPI_CS: %08x\n>", SPI_CS); 
+  *SPI_CLK = 256;
+  *SPI_CS = SPI_CS_CLEAR;
+  printf("spi0_init_poll completed: SPI_CS: %08x\n>", *SPI_CS); 
   return ERR_OK;
 }
 

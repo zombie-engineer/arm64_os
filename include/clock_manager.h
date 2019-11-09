@@ -53,4 +53,5 @@
 
 
 int cm_set_clock(int clk_id, uint32_t clock_src, uint32_t mash, uint32_t divi, uint32_t divf);
+int cm_get_clock(int clk_id);
 const char *set_clock_err_to_str(int);

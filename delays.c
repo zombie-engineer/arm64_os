@@ -15,32 +15,31 @@ void wait_cycles(unsigned int n)
     while(n--);
 }
 
-
-void wait_msec(unsigned int n)
+void wait_usec(unsigned int n)
 {
   register uint64_t now, counter, counter_target;
   register uint32_t counter_freq, counter_freq_milli_sec, wait_counts;
 
-  // get Hz (counts per second) 19200000
-  counter_freq = get_system_timer_freq();
-  counter_freq_milli_sec = counter_freq / 1000;
-  wait_counts = counter_freq_milli_sec * n;
-
   counter = get_system_timer();
+  counter_freq = get_system_timer_freq();
+  wait_counts = (counter_freq / 1000000) * n;
 
   counter_target = counter + wait_counts;
-  /*printf("wait_msec: %d now: %lx (%ld), freq: %d, wait_til: %lx (%ld)\n", n, 
-      counter, counter,
-      counter_freq, 
-      counter_target, counter_target
-      );
-  */
-  while(1) {
-    now = get_system_timer();
-    if (now >= counter_target)
-      break;
-    // printf("waiting: now: %ld\n", now);
-  }
+  while(get_system_timer() < counter_target);
+}
+
+void wait_msec(unsigned int n)
+{
+  // get Hz (counts per second) 19200000
+  register uint64_t now, counter, counter_target;
+  register uint32_t counter_freq, counter_freq_milli_sec, wait_counts;
+
+  counter = get_system_timer();
+  counter_freq = get_system_timer_freq();
+  wait_counts = (counter_freq / 1000) * n;
+
+  counter_target = counter + wait_counts;
+  while(get_system_timer() < counter_target);
 }
 
 

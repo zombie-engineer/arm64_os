@@ -25,6 +25,9 @@ static int command_spi_print_help()
   puts("spi send SPI_TYPE BYTE1 [BYTE2] - send 1 or 2 bytes over selected spi interface\n");
   puts("                      SPI_TYPE  - spi0, spi1, spi2, emulated\n");
   puts("                      BYTEx     - byte values BYTE1 should be, BYTE2 optional\n");
+  puts("spi dmasend SPI_TYPE BYTE1 [BYTE2] - send 1 or 2 bytes over selected spi interface\n");
+  puts("                      SPI_TYPE  - spi0, spi1, spi2, emulated\n");
+  puts("                      BYTEx     - byte values BYTE1 should be, BYTE2 optional\n");
   puts("\t\tinfo   - prints info about SPI registers\n");
   return CMD_ERR_NO_ERROR;
 }
@@ -108,6 +111,38 @@ static int command_spi_send(const string_tokens_t *args)
 }
 
 
+static int command_spi_dmasend(const string_tokens_t *args)
+{
+  int st;
+  spi_dev_t *spidev;
+  char *endptr;
+  void *src;
+  int srclen;
+
+  DECL_ARGS_CTX();
+  ASSERT_NUMARGS_EQ(3);
+
+  spidev = spi_get_dev(spi_type_from_string(subcmd_token->s, subcmd_token->len));
+  if (!spidev) {
+    printf("not a valid spi device %s\n", subcmd_token->s);
+    return CMD_ERR_INVALID_ARGS;
+  }
+
+  GET_NUMERIC_PARAM(src,   void *, 1, "source addr");
+  GET_NUMERIC_PARAM(srclen,   int, 2, "source len");
+
+  printf("spi0->xmit_dma %d bytes from %p.\n", srclen, src);
+
+  st = spidev->xmit_dma(src, srclen, 0, 0);
+  if (st) {
+    printf("command_pwd_enable error: spidev xmit completed with error %d\n");
+    return CMD_ERR_EXECUTION_ERR;
+  }
+
+  return CMD_ERR_NO_ERROR;
+}
+
+
 static int command_spi_init(const string_tokens_t *args)
 {
   DECL_ARGS_CTX();
@@ -136,6 +171,8 @@ int command_spi(const string_tokens_t *args)
     return command_spi_init(&subargs);
   if (string_token_eq(subcmd_token, "send"))
     return command_spi_send(&subargs);
+  if (string_token_eq(subcmd_token, "dmasend"))
+    return command_spi_dmasend(&subargs);
   if (string_token_eq(subcmd_token, "info"))
     return command_spi_info(&subargs);
 

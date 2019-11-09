@@ -19,6 +19,8 @@ static int command_clock_print_help()
 static int command_clock_info(const string_tokens_t *args)
 {
   puts("clock info:\n");
+  ASSERT_NUMARGS_EQ(1);
+
   return CMD_ERR_NO_ERROR;
 }
 

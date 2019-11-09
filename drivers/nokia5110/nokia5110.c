@@ -18,6 +18,10 @@ static nokia5110_dev_t nokia5110_device;
 
 static nokia5110_dev_t *nokia5110_dev = 0;
 
+static char frame_1[504];
+static char frame_2[504];
+static char frame_3[504];
+static char dma_rx_buf[504];
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -27,11 +31,15 @@ static nokia5110_dev_t *nokia5110_dev = 0;
 
 #define SPI_SEND(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit, data, len)
 
+#define SPI_SEND_DMA(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit_dma, dma_rx_buf, data, len)
+
 #define SPI_SEND_BYTE(data)  RET_IF_ERR(nokia5110_dev->spi->xmit_byte, data)
 
-#define SEND_CMD(cmd)        SET_CMD(); wait_msec(100); SPI_SEND_BYTE((cmd)); wait_msec(100)
+#define SEND_CMD(cmd)        SET_CMD(); SPI_SEND_BYTE((cmd));
 
-#define SEND_DATA(data, len) SET_DATA(); SPI_SEND(&data, len)
+#define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
+
+#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len)
 
 
 #define NOKIA5110_INSTRUCTION_SET_NORMAL 0
@@ -66,33 +74,33 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   RET_IF_ERR(nokia5110_reset);
 
   SEND_CMD(0x21);
-  wait_msec(500);
   SEND_CMD(0xb9);
-  wait_msec(500);
   SEND_CMD(0x04);
-  wait_msec(500);
   SEND_CMD(0x14);
-  wait_msec(500);
   SEND_CMD(0x20);
-  wait_msec(500);
   SEND_CMD(0x0c);
 
-  int i;
-  char data1, data2;
-  data1 = 0xf0;
-  data2 = 0x0f;
-  while(1) {
-  for (i = 0; i < 100; ++i) {
-    SEND_DATA(data1, 1);
-    SEND_DATA(data2, 1);
-    wait_msec(1);
-  }
+  int x, y;
+
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  for (i = 0; i < 100; ++i) {
-    SEND_DATA(data2, 1);
-    SEND_DATA(data1, 1);
-    wait_msec(1);
+  for (x = 0; x < 84; ++x) {
+    for (y = 0; y < 6; ++y) {
+      frame_1[y * 84 + x] = 0xf0;
+      frame_2[y * 84 + x] = 0xff;
+      frame_3[y * 84 + x] = 0x0f;
+    }
   }
+
+  printf("frame_1 at %08x\n", frame_1);
+  SEND_DATA_DMA((uint32_t)frame_1, 504);
+  while(1);
+  while(1) {
+    SEND_DATA_DMA((uint32_t)frame_1, 504);
+    wait_msec(50);
+    SEND_DATA_DMA((uint32_t)frame_2, 504);
+    wait_msec(50);
+    SEND_DATA_DMA((uint32_t)frame_3, 504);
+    wait_msec(50);
   }
 
   // RET_IF_ERR(nokia5110_set_function, function_flags);
@@ -141,9 +149,8 @@ CHECKED_FUNC(nokia5110_reset)
   int err;
   RET_IF_ERR(gpio_set_off, nokia5110_dev->rst);
   puts("R\r\n");
-  wait_msec(1000);
+  wait_usec(1000);
   RET_IF_ERR(gpio_set_on, nokia5110_dev->rst);
-  wait_msec(500);
   return ERR_OK;
 }
 
@@ -172,7 +179,7 @@ CHECKED_FUNC(nokia5110_draw_dot, int x, int y)
   char dot_pixel;
   RET_IF_ERR(nokia5110_set_cursor, x, y / 8);
   dot_pixel = 1 << (y % 8);
-  SEND_DATA(dot_pixel, 1);
+  SEND_DATA(&dot_pixel, 1);
   return ERR_OK;
 }
 

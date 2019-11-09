@@ -3,6 +3,7 @@
 #include <types.h>
 #include <common.h>
 #include <delays.h>
+#include <error.h>
 
 
 typedef struct spi_emulated_dev {
@@ -37,14 +38,14 @@ DECL_ASSERTED_FN(spi_emulated_ce0_set)
   ASSERT_INITIALIZED();
   gpio_set_on(spi_emulated.ce0_gpio_pin);
   wait_msec(100);
-  return 0;
+  return ERR_OK;
 }
 
 
 DECL_ASSERTED_FN(spi_emulated_ce0_clear)
   gpio_set_off(spi_emulated.ce0_gpio_pin);
   wait_msec(100);
-  return 0;
+  return ERR_OK;
 }
 
 DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
@@ -60,8 +61,14 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
   wait_msec(10);
   gpio_set_off(spi_emulated.sclk_gpio_pin);
   wait_msec(10);
-  return 0;
+  return ERR_OK;
 }
+
+
+DECL_ASSERTED_FN(spi_emulated_xmit_dma, uint32_t dst, uint32_t src, int len)
+  return ERR_OK;
+}
+
 
 DECL_ASSERTED_FN(spi_emulated_xmit_byte, char data)
   int i, err;
@@ -75,7 +82,7 @@ DECL_ASSERTED_FN(spi_emulated_xmit_byte, char data)
   spi_emulated_ce0_set();
   wait_msec(10);
   spi_emulated_ce0_clear();
-  return 0;
+  return ERR_OK;
 }
 
 DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
@@ -96,7 +103,7 @@ DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
   spi_emulated_ce0_set();
   wait_msec(10);
   spi_emulated_ce0_clear();
-  return 0;
+  return ERR_OK;
 }
 
 
