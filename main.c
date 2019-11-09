@@ -111,7 +111,7 @@ void print_mbox_props()
     if (mbox_get_clock_rate(i, &clock_rate))
       printf("failed to get clock rate for clock_id %d\n", i);
     else
-      printf("clock %d rate: %08x\n", i, clock_rate);
+      printf("clock %d rate: %08x (%d KHz)\n", i, clock_rate, clock_rate / 1000);
   }
 }
 
