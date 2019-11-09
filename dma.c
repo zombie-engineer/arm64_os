@@ -56,7 +56,7 @@
 
 
 #define DMA_STRIDE_D_STRIDE(x) ((x & 0xffff) << 16)
-#define DMA_STRIDE_D_STRIDE(x) ((x & 0xffff) <<  0)
+#define DMA_STRIDE_S_STRIDE(x) ((x & 0xffff) <<  0)
 
 
 #define DMA_DEBUG_READ_LAST_NOT_SET_ERROR (1 <<  0)
@@ -87,19 +87,9 @@ int dma_set_transfer_width(int channel, int width)
   return ERR_OK;
 }
 
-void dma_transfer(void *dst, void *src, size_t n)
-{
-  dma_cb_t *cb = &dma_channels[0];
-  cb->ti  = 0;
-  cb->src_addr = src;
-  cb->dst_addr = dst;
-  cb->stride = 0;
-  cb->dma_cb_next = 0;
-}
-
 int dma_set_control_block(int channel, dma_cb_t *cb)
 {
-  *DMA_CONBLK_AD(channel) = cb;
+  *DMA_CONBLK_AD(channel) = (uint32_t)(uint64_t)cb;
   return ERR_OK;
 }
 
@@ -112,26 +102,28 @@ int dma_set_active(int channel)
   return ERR_OK;
 }
 
-int dma_setup(int channel, uint32_t dst, uint32_t src, int len, int dreq) {
+int dma_setup(dma_ch_opts_t *o) {
   uint32_t dma_enable;
 
   dma_enable = *DMA_ENABLE;
-  dma_enable |= (1 << channel);
+  dma_enable |= (1 << o->channel);
   *DMA_ENABLE = dma_enable;
 
-  dma_cb_t *cb = &dma_channels[channel];
-  printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", dst, src, cb);
+  dma_cb_t *cb = &dma_channels[o->channel];
+  printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", o->dst, o->src, cb);
 
-  cb->ti              = DMA_TI_PERMAP(dreq);
-  cb->src_addr        = (uint32_t)src;
-  cb->dst_addr        = (uint32_t)dst;
-  cb->transfer_length = len;
+  cb->ti              = DMA_TI_PERMAP(o->dreq)
+                        | (o->src_inc ? DMA_TI_SRC_INC : 0)
+                        | (o->dst_inc ? DMA_TI_DEST_INC : 0);
+  cb->src_addr        = o->src;
+  cb->dst_addr        = o->dst;
+  cb->transfer_length = o->len;
   cb->stride          = 0;
   cb->dma_cb_next     = 0;
   cb->res0            = 0;
   cb->res1            = 0;
 
-  dma_set_control_block(channel, cb);
+  dma_set_control_block(o->channel, cb);
 
   return ERR_OK;
 }

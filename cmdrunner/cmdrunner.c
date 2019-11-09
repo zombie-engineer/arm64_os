@@ -245,7 +245,6 @@ void cmdrunner_run_interactive_loop(void)
 {
   char ch;
 
-  char escbuf[8];
   char escbuflen;
 
   puts("\n >");

@@ -1,5 +1,6 @@
 #include <gpio.h>
 #include <mmu.h>
+#include <mbox/mbox_props.h>
 #include <uart/uart.h>
 #include <common.h>
 #include <types.h>
@@ -176,7 +177,6 @@ void mmu_init_table()
   int vcmem_base = 0, vcmem_size = 0;
   int block_size = (1<<21);
   int nblocks = 0;
-  uint64_t t;
   if (mbox_get_vc_memory(&vcmem_base, &vcmem_size)) {
     printf("failed to get arm memory\n");
     return;

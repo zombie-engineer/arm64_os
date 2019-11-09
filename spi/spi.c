@@ -171,9 +171,29 @@ static int spi0_xmit_dma(uint32_t to_tx, uint32_t from_rx, uint32_t len)
   dma_set_transfer_width(0, DMA_TRANSFER_WIDTH_32BIT);
   dma_set_transfer_width(1, DMA_TRANSFER_WIDTH_32BIT);
 
-  ((uint32_t*)to_tx)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS;
-  dma_setup(0, SPI_FIFO, to_tx, len, DMA_DREQ_SPI_TX);
-  dma_setup(1, from_rx, SPI_FIFO, len, DMA_DREQ_SPI_RX);
+  ((uint32_t*)to_tx)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR;
+
+  dma_ch_opts_t o = { 0 };
+
+  o->channel    = 0;
+  o->src        = to_tx;
+  o->src_inc    = 1;
+  o->dst        = SPI_FIFO;
+  o->dst_inc    = 0;
+  o->len        = len;
+  o->width_bits = DMA_TRANSFER_WIDTH_32BIT;
+  o->dreq       = DMA_DREQ_SPI_TX;
+  dma_setup(&o);
+
+  o->channel    = 1;
+  o->src        = SPI_FIFO;
+  o->src_inc    = 0;
+  o->dst        = from_rx;
+  o->dst_inc    = 1;
+  o->len        = len;
+  o->width_bits = DMA_TRANSFER_WIDTH_32BIT;
+  o->dreq       = DMA_DREQ_SPI_RX;
+  dma_setup(&o);
 
   dma_set_active(0);
   dma_print_debug_info(0);

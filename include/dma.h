@@ -16,7 +16,7 @@
 #define DMA_DREQ_UART_TX       12
 #define DMA_DREQ_SD_HOST       13
 #define DMA_DREQ_UART_RX       14
-#define DMA_DREQ_DSI           15
+#define DMA_DREQ_DSI_B         15
 #define DMA_DREQ_SLIMBUS_MCTX  16
 #define DMA_DREQ_HDMI          17
 #define DMA_DREQ_SLIMBUS_MCRX  18
@@ -49,7 +49,6 @@ typedef struct {
   uint32_t res1;
 } dma_cb_t;
 
-void dma_transfer(void *dst, void *src, size_t n);
 void dma_channel_setup(int channel, void *src, void *dst, int len);
 
 #define DMA_TRANSFER_WIDTH_32BIT  0
@@ -60,6 +59,17 @@ int dma_set_control_block(int channel, dma_cb_t *cb);
 
 int dma_set_active(int channel);
 
-int dma_setup(int channel, uint32_t dst, uint32_t src, int len, int dreq);
+typedef struct {
+  uint32_t channel;
+  uint32_t src;
+  uint32_t src_inc;
+  uint32_t dst;
+  uint32_t dst_inc;
+  uint32_t len;
+  uint32_t width_bits;
+  uint32_t dreq;
+} dma_ch_opts_t;
+
+int dma_setup(dma_ch_opts_t *o);
 
 void dma_print_debug_info(int channel);
