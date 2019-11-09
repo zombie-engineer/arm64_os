@@ -8,7 +8,7 @@ OPTIMIZATION_FLAGS = -g
 CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 
-all: clean kernel8.img
+all: kernel8.img
 
 include uart/Makefile
 include spi/Makefile
@@ -71,3 +71,4 @@ serial:
 .PHONY: clean
 clean:
 	find -name '*.o' -exec rm -v {} \;
+
