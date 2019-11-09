@@ -106,6 +106,11 @@ typedef struct {
   } pin[5];
 } gpio_role_spi0_t;
 
+
+#define DMA_CHANNEL_SPI_TX 0
+
+#define DMA_CHANNEL_SPI_RX 1
+
 static gpio_role_spi0_t gpio_spi0_role;
 
 static int gpio_roles_initialized = 0;
@@ -118,17 +123,6 @@ static int spi1_dev_initialized = 0;
 
 static spi_spi2_dev_t spi2_dev;
 static int spi2_dev_initialized = 0;
-
-static int spi0_init_dma()
-{
-  return ERR_NOT_IMPLEMENTED;
-}
-
-
-static int spi0_init_int()
-{
-  return ERR_NOT_IMPLEMENTED;
-}
 
 static gpio_role_spi0_t *gpio_get_role_spi0()
 {
@@ -149,7 +143,6 @@ static gpio_role_spi0_t *gpio_get_role_spi0()
   return &gpio_spi0_role;
 }
 
-
 static int spi_init_gpio()
 {
   int i;
@@ -160,16 +153,24 @@ static int spi_init_gpio()
   return ERR_OK;
 }
 
+static int spi0_init_dma()
+{
+  int err;
+  RET_IF_ERR(dma_reset, DMA_CHANNEL_SPI_TX);
+  RET_IF_ERR(dma_reset, DMA_CHANNEL_SPI_RX);
+  RET_IF_ERR(dma_enable, DMA_CHANNEL_SPI_TX);
+  RET_IF_ERR(dma_enable, DMA_CHANNEL_SPI_RX);
+  return ERR_OK;
+}
+
+static void spi0_set_dma_mode()
+{
+  *SPI_CS |= (SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS);
+}
 
 static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
 {
-  int cs;
-
-  cs = *SPI_CS;
-  cs |= SPI_CS_CLEAR;
-  cs |= SPI_CS_DMAEN;
-  cs |= SPI_CS_ADCS;
-  *SPI_CS = cs;
+  spi0_set_dma_mode();
 
   ((uint32_t*)data)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS;
 
@@ -189,7 +190,7 @@ static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
 
   *SPI_DLEN = 4 * 200;
 
-  o.channel    = 0;
+  o.channel    = DMA_CHANNEL_SPI_TX;
   o.src        = ((uint32_t)&send_data[1]) | 0xc0000000;
   o.src_inc    = 4 * 8;
   o.src_dreq   = 0;
@@ -200,7 +201,7 @@ static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
   o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
   dma_setup(&o);
 
-  o.channel    = 1;
+  o.channel    = DMA_CHANNEL_SPI_RX;
   o.src        = (((uint32_t)SPI_FIFO) & 0x00ffffff) + 0x7e000000;
   o.src_inc    = 0;
   o.src_dreq   = DMA_DREQ_SPI_RX;
@@ -211,17 +212,17 @@ static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
   o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
   dma_setup(&o);
 
-  *SPI_CS = cs | SPI_CS_TA;
+  *SPI_CS |= SPI_CS_TA;
   printf("before recv_data: %08x\n", recv_data[0]);
-  dma_print_debug_info(0);
-  dma_print_debug_info(1);
-  dma_set_active(0);
-  dma_set_active(1);
+  dma_print_debug_info(DMA_CHANNEL_SPI_TX);
+  dma_print_debug_info(DMA_CHANNEL_SPI_RX);
+  dma_set_active(DMA_CHANNEL_SPI_TX);
+  dma_set_active(DMA_CHANNEL_SPI_RX);
 
 
   printf("after recv_data: %08x\n", recv_data[0]);
-  dma_print_debug_info(0);
-  dma_print_debug_info(1);
+  dma_print_debug_info(DMA_CHANNEL_SPI_TX);
+  dma_print_debug_info(DMA_CHANNEL_SPI_RX);
   return ERR_OK;
 }
 
@@ -279,26 +280,16 @@ static int spi0_init_dev()
   return ERR_OK;
 }
 
-static int spi0_init_poll()
+int spi0_init()
 {
-  puts("spi0_init_poll\n");
-  spi_init_gpio();
-  spi0_init_dev();
+  int err;
+  RET_IF_ERR(spi_init_gpio);
+  RET_IF_ERR(spi0_init_dev);
   *SPI_CLK = 256;
   *SPI_CS = SPI_CS_CLEAR;
   printf("spi0_init_poll completed: SPI_CS: %08x\n>", *SPI_CS); 
+  RET_IF_ERR(spi0_init_dma);
   return ERR_OK;
-}
-
-
-int spi0_init(int type)
-{
-  switch (type) {
-    case SPI_TYPE_POLL : return spi0_init_poll();
-    case SPI_TYPE_INT  : return spi0_init_int();
-    case SPI_TYPE_DMA  : return spi0_init_dma();
-  }
-  return ERR_INVAL_ARG;
 }
 
 

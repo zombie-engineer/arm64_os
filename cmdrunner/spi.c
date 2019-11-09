@@ -42,7 +42,7 @@ static int command_spi_info(const string_tokens_t *args)
 static int command_spi_init_spi0(const string_tokens_t *args)
 {
   int st;
-  st = spi0_init(SPI_TYPE_POLL);
+  st = spi0_init();
   if (st) {
     printf("command_pwd_enable error: spi0_init completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;

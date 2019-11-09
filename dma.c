@@ -104,39 +104,51 @@ int dma_set_active(int channel)
   return ERR_OK;
 }
 
-static void cache_clean_and_inval(uint64_t address, uint64_t length)
+//static void cache_clean_and_inval(uint64_t address, uint64_t length)
+//{
+//  length += 64;
+//  while(1) {
+//    asm volatile ("dc civac, %0" : : "r" (address) : "memory");
+//    if (length < 64)
+//      break;
+//    address += 64;
+//    length -= 64;
+//  }
+//  asm volatile ("dsb sy" ::: "memory");
+//}
+
+int dma_enable(int channel)
 {
-  length += 64;
-  while(1) {
-    asm volatile ("dc civac, %0" : : "r" (address) : "memory");
-    if (length < 64)
-      break;
-    address += 64;
-    length -= 64;
-  }
-  asm volatile ("dsb sy" ::: "memory");
+  *DMA_ENABLE |= (1 << channel);
+  return ERR_OK;
+}
+
+int dma_reset(int channel)
+{
+  *DMA_CS(channel) |= DMA_CS_RESET;
+  return ERR_OK;
 }
 
 int dma_setup(dma_ch_opts_t *o) 
 {
-  int dma_enable;
-  dma_enable = *DMA_ENABLE;
-  dma_enable |= (1 << o->channel);
-  *DMA_ENABLE = dma_enable;
+//  int dma_enable;
+//  dma_enable = *DMA_ENABLE;
+//  dma_enable |= (1 << o->channel);
+//  *DMA_ENABLE = dma_enable;
+//
+//  printf("*DMA_ENABLE = %08x\n", *DMA_ENABLE);
 
-  printf("*DMA_ENABLE = %08x\n", *DMA_ENABLE);
+  // wait_msec(1);
+  // *DMA_CS(o->channel) = (*(DMA_CS(o->channel))) | DMA_CS_RESET;
+  // while(*DMA_CS(o->channel) & DMA_CS_RESET) printf("DMA_CS: %08x, waiting reset..\n", *DMA_CS(o->channel));
 
-  wait_msec(1);
-  *DMA_CS(o->channel) = (*(DMA_CS(o->channel))) | DMA_CS_RESET;
-  while(*DMA_CS(o->channel) & DMA_CS_RESET) printf("DMA_CS: %08x, waiting reset..\n", *DMA_CS(o->channel));
-
-  printf("*DMA_CS#%d = %08x\n", o->channel, *DMA_CS(o->channel));
+  // printf("*DMA_CS#%d = %08x\n", o->channel, *DMA_CS(o->channel));
 
   wait_msec(1);
 
 
   dma_cb_t *cb = &dma_channels[o->channel];
-  printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", o->dst, o->src, cb);
+  // printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", o->dst, o->src, cb);
 
   cb->ti              = DMA_TI_PERMAP(o->src_dreq | o->dst_dreq)
                         | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
@@ -153,7 +165,7 @@ int dma_setup(dma_ch_opts_t *o)
   cb->res1            = 0;
 
   dma_set_control_block(o->channel, cb);
-  cache_clean_and_inval(o->src, o->len);
+  // cache_clean_and_inval(o->src, o->len);
 
   return ERR_OK;
 }

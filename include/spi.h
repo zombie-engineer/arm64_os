@@ -43,7 +43,7 @@ typedef struct spi_dev {
   int (*xmit_dma)(uint32_t to_tx, uint32_t from_rx, uint32_t len);
 } spi_dev_t;
 
-int spi0_init(int type);
+int spi0_init();
 
 int spi_emulated_init(
   int sclk_pin, 
