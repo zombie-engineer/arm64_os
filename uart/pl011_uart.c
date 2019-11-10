@@ -4,7 +4,7 @@
 #include <types.h>
 
 
-#define UART0_BASE  (MMIO_BASE + 0x00201000)
+#define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
 #define UART0_DR    ((reg32_t)(UART0_BASE + 0x00))
 #define UART0_FR    ((reg32_t)(UART0_BASE + 0x18))
 #define UART0_IBRD  ((reg32_t)(UART0_BASE + 0x24))

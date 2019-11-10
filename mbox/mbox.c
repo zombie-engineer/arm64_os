@@ -3,7 +3,7 @@
 
 volatile unsigned int __attribute__ ((aligned(16))) mbox[36];
 
-#define VIDEOCORE_MBOX (MMIO_BASE + 0xb880)
+#define VIDEOCORE_MBOX (PERIPHERAL_BASE_PHY + 0xb880)
 #define MBOX_READ   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x00))
 #define MBOX_POLL   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x10))
 #define MBOX_SENDER ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x14))

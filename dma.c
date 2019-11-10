@@ -6,7 +6,7 @@
 #include <delays.h>
 
 
-#define DMA_BASE (unsigned long long)(MMIO_BASE + 0x00007000)
+#define DMA_BASE (unsigned long long)(PERIPHERAL_BASE_PHY + 0x00007000)
 #define DMA_CH_BASE(channel) (DMA_BASE + channel * 0x100)
 #define DMA_CS(channel) (reg32_t)(DMA_CH_BASE(channel) + 0x00)
 #define DMA_CONBLK_AD(channel) (reg32_t)(DMA_CH_BASE(channel) + 0x04)
@@ -131,42 +131,24 @@ int dma_reset(int channel)
 
 int dma_setup(dma_ch_opts_t *o) 
 {
-//  int dma_enable;
-//  dma_enable = *DMA_ENABLE;
-//  dma_enable |= (1 << o->channel);
-//  *DMA_ENABLE = dma_enable;
-//
-//  printf("*DMA_ENABLE = %08x\n", *DMA_ENABLE);
-
-  // wait_msec(1);
-  // *DMA_CS(o->channel) = (*(DMA_CS(o->channel))) | DMA_CS_RESET;
-  // while(*DMA_CS(o->channel) & DMA_CS_RESET) printf("DMA_CS: %08x, waiting reset..\n", *DMA_CS(o->channel));
-
-  // printf("*DMA_CS#%d = %08x\n", o->channel, *DMA_CS(o->channel));
-
-  wait_msec(1);
-
-
   dma_cb_t *cb = &dma_channels[o->channel];
-  // printf("dma_setup: dst: %08x, src: %08x, cb: %08x\n", o->dst, o->src, cb);
 
-  cb->ti              = DMA_TI_PERMAP(o->src_dreq | o->dst_dreq)
-                        | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
-                        | (o->src_dreq ? DMA_TI_SRC_DREQ  : 0)
-                        | (o->dst_inc  ? DMA_TI_DEST_INC  : 0)
-                        | (o->dst_dreq ? DMA_TI_DEST_DREQ : 0)
-                        | DMA_TI_WAIT_RESP;
+  cb->ti = DMA_TI_PERMAP(o->src_dreq | o->dst_dreq)
+         | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
+         | (o->src_dreq != DMA_DREQ_NONE ? DMA_TI_SRC_DREQ : 0)
+         | (o->dst_inc  ? DMA_TI_DEST_INC  : 0)
+         | (o->dst_dreq != DMA_DREQ_NONE ? DMA_TI_DEST_DREQ : 0)
+         | DMA_TI_WAIT_RESP;
+
   cb->src_addr        = o->src;
   cb->dst_addr        = o->dst;
   cb->transfer_length = o->len;
   cb->stride          = 0;
-  cb->dma_cb_next     = (uint32_t)cb | 0xc0000000;
+  cb->dma_cb_next     = NARROW_PTR(cb) | RAM_BASE_BUS_UNCACHED;
   cb->res0            = 0;
   cb->res1            = 0;
 
   dma_set_control_block(o->channel, cb);
-  // cache_clean_and_inval(o->src, o->len);
-
   return ERR_OK;
 }
 
@@ -190,4 +172,22 @@ void dma_print_debug_info(int channel)
   printf("DMA_TXFR_LEN#%d   %08x\n", channel, txfr_len);
   printf("DMA_DEBUG#%d      %08x\n", channel, debug);
   printf("DMA_ENABLE%c      %08x\n", ' ', enable);
+}
+
+int dma_transfer_is_done(int channel)
+{
+  printf("DMA_CS#%d         %08x\n", channel, *DMA_CS(channel));
+  return (*DMA_CS(channel) & DMA_CS_END) || (*DMA_CS(channel) & DMA_CS_INT);
+}
+
+int dma_clear_transfer(int channel)
+{
+  int dma_cs;
+  dma_cs = *DMA_CS(channel);
+  if (dma_cs & DMA_CS_END)
+    dma_cs |= DMA_CS_END;
+  if (dma_cs & DMA_CS_INT)
+    dma_cs |= DMA_CS_INT;
+  *DMA_CS(channel) = dma_cs;
+  return ERR_OK;
 }

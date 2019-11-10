@@ -9,7 +9,7 @@
 #include <dma.h>
 
 
-#define SPI_BASE ((unsigned long long)MMIO_BASE + 0x00204000)
+#define SPI_BASE ((unsigned long long)PERIPHERAL_BASE_PHY + 0x00204000)
 
 typedef struct {
   spi_dev_t spidev;
@@ -168,61 +168,73 @@ static void spi0_set_dma_mode()
   *SPI_CS |= (SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS);
 }
 
-static int spi0_xmit_dma(uint32_t data, uint32_t backdata, uint32_t len)
+static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
 {
+  uint32_t stub_in, stub_out;
+  dma_ch_opts_t o;
+
+  if (data_out == 0 && data_in == 0) {
+    puts("spi0_xmit_dma: in and out data buffers are both zero\n");
+    return ERR_INVAL_ARG;
+  }
+
   spi0_set_dma_mode();
+  stub_out = 0;
 
-  ((uint32_t*)data)[0] = (len << 16) | SPI_CS_TA | SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS;
+  memset(&o, 0, sizeof(o));
 
-  uint32_t recv_data[2];
-  uint32_t send_data[8];
-  send_data[0] = 12 << 16 | (SPI_CS_TA | SPI_CS_DMAEN | SPI_CS_ADCS);
-  send_data[1] = 0x11111111;
-  send_data[2] = 0x22222222;
-  send_data[3] = 0x44444444;
-  send_data[4] = 0x88888888;
-  send_data[5] = 0x11111111;
-  send_data[6] = 0x22222222;
-  send_data[7] = 0x44444444;
-  send_data[8] = 0x88888888;
+  *SPI_DLEN = len;
 
-  dma_ch_opts_t o = { 0 };
-
-  *SPI_DLEN = 4 * 200;
+  o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
+  o.len        = len;
 
   o.channel    = DMA_CHANNEL_SPI_TX;
-  o.src        = ((uint32_t)&send_data[1]) | 0xc0000000;
-  o.src_inc    = 4 * 8;
-  o.src_dreq   = 0;
-  o.dst        = (((uint32_t)SPI_FIFO) & 0x00ffffff) + 0x7e000000;
+  o.src_dreq   = DMA_DREQ_NONE;
+  o.dst        = NARROW_PTR(PERIPHERAL_PHY_TO_BUS(SPI_FIFO));
   o.dst_inc    = 0;
   o.dst_dreq   = DMA_DREQ_SPI_TX;
-  o.len        = 8;
-  o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
+
+  if (data_out) {
+    o.src        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(data_out));
+    o.src_inc    = 1;
+  } else {
+    o.src        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(&stub_out));
+    o.src_inc    = 0;
+  }
+
   dma_setup(&o);
 
   o.channel    = DMA_CHANNEL_SPI_RX;
-  o.src        = (((uint32_t)SPI_FIFO) & 0x00ffffff) + 0x7e000000;
+  o.src        = NARROW_PTR(PERIPHERAL_PHY_TO_BUS(SPI_FIFO));
   o.src_inc    = 0;
   o.src_dreq   = DMA_DREQ_SPI_RX;
-  o.dst        = (uint32_t)&recv_data[0] | 0xc0000000;
-  o.dst_inc    = 0;
-  o.dst_dreq   = 0;
-  o.len        = 4 * 8;
-  o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
+  o.dst_dreq   = DMA_DREQ_NONE;
+
+  if (data_in) {
+    o.dst        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(data_in));
+    o.dst_inc    = 1;
+  } else {
+    o.dst        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(&stub_in));
+    o.dst_inc    = 0;
+  }
+
   dma_setup(&o);
 
   *SPI_CS |= SPI_CS_TA;
-  printf("before recv_data: %08x\n", recv_data[0]);
   dma_print_debug_info(DMA_CHANNEL_SPI_TX);
   dma_print_debug_info(DMA_CHANNEL_SPI_RX);
   dma_set_active(DMA_CHANNEL_SPI_TX);
   dma_set_active(DMA_CHANNEL_SPI_RX);
-
-
-  printf("after recv_data: %08x\n", recv_data[0]);
+  puts("-\n");
   dma_print_debug_info(DMA_CHANNEL_SPI_TX);
   dma_print_debug_info(DMA_CHANNEL_SPI_RX);
+
+  while(dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
+  while(dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
+  dma_clear_transfer(DMA_CHANNEL_SPI_TX);
+  dma_clear_transfer(DMA_CHANNEL_SPI_RX);
+
+  // *SPI_CS = 0;
   return ERR_OK;
 }
 

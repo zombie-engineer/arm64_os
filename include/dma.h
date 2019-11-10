@@ -1,7 +1,7 @@
 #pragma once
 #include <types.h>
 
-#define DMA_DREQ_1              0
+#define DMA_DREQ_NONE           0
 #define DMA_DREQ_DSI            1
 #define DMA_DREQ_PCM_TX         2
 #define DMA_DREQ_PCM_RX         3
@@ -73,3 +73,7 @@ typedef struct {
 int dma_setup(dma_ch_opts_t *o);
 
 void dma_print_debug_info(int channel);
+
+int dma_transfer_is_done(int channel);
+
+int dma_clear_transfer(int channel);

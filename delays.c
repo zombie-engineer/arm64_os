@@ -5,8 +5,8 @@
 #include <common.h>
 
 
-#define SYSTMR_LO ((volatile unsigned int*)(MMIO_BASE + 0x00003004))
-#define SYSTMR_HI ((volatile unsigned int*)(MMIO_BASE + 0x00003008))
+#define SYSTMR_LO ((volatile unsigned int*)(PERIPHERAL_BASE_PHY + 0x00003004))
+#define SYSTMR_HI ((volatile unsigned int*)(PERIPHERAL_BASE_PHY + 0x00003008))
 
 
 void wait_cycles(unsigned int n)

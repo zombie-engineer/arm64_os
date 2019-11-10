@@ -1,3 +1,15 @@
 #pragma once
 
-#define MMIO_BASE       0x3F000000
+#define RAM_BASE_PHY          0x00000000
+#define RAM_BASE_BUS_UNCACHED 0xc0000000
+#define RAM_BASE_BUS_CACHED   0x40000000
+
+#define RAM_PHY_TO_BUS_UNCACHED(x) ((((uint64_t)x) & ~RAM_BASE_BUS_UNCACHED) | RAM_BASE_BUS_UNCACHED) 
+
+#define PERIPHERAL_BASE_PHY   0x3f000000
+#define PERIPHERAL_BASE_BUS   0x7f000000
+
+#define PERIPHERAL_PHY_TO_BUS(x) ((((uint64_t)x) & ~PERIPHERAL_BASE_BUS) | PERIPHERAL_BASE_BUS) 
+
+#define NARROW_PTR(x) ((uint32_t)((uint64_t)(x)))
+

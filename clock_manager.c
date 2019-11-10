@@ -2,15 +2,15 @@
 #include <reg_access.h>
 #include <memory.h>
 
-#define CM_GP0CTL  (reg32_t)(MMIO_BASE + 0x00101070)
-#define CM_GP1CTL  (reg32_t)(MMIO_BASE + 0x00101078)
-#define CM_GP2CTL  (reg32_t)(MMIO_BASE + 0x00101080)
-#define CM_PWMCTL  (reg32_t)(MMIO_BASE + 0x001010a0)
+#define CM_GP0CTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101070)
+#define CM_GP1CTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101078)
+#define CM_GP2CTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101080)
+#define CM_PWMCTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x001010a0)
 
-#define CM_GP0DIV  (reg32_t)(MMIO_BASE + 0x00101074)
-#define CM_GP1DIV  (reg32_t)(MMIO_BASE + 0x0010107c)
-#define CM_GP2DIV  (reg32_t)(MMIO_BASE + 0x00101084)
-#define CM_PWMDIV  (reg32_t)(MMIO_BASE + 0x001010a4)
+#define CM_GP0DIV  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101074)
+#define CM_GP1DIV  (reg32_t)(PERIPHERAL_BASE_PHY + 0x0010107c)
+#define CM_GP2DIV  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101084)
+#define CM_PWMDIV  (reg32_t)(PERIPHERAL_BASE_PHY + 0x001010a4)
 
 
 // Any value that is written into registers 

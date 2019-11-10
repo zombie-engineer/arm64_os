@@ -2,7 +2,7 @@
 #include "reg_access.h"
 #include "gpio.h"
 
-#define INTERRUPT_CONTROLLER_BASE (MMIO_BASE + 0xb200)
+#define INTERRUPT_CONTROLLER_BASE (PERIPHERAL_BASE_PHY + 0xb200)
 
 typedef struct {
   unsigned timer                 : 1;
@@ -34,7 +34,7 @@ typedef struct {
   unsigned disable_base_irqs;
 } __attribute__((packed)) irq_controller_t;
 
-#define DECL_INTERRUPT_CONTROLLER(v) DECL_PERIPH_BASE(irq_controller_t, v, MMIO_BASE + 0xb200)
+#define DECL_INTERRUPT_CONTROLLER(v) DECL_PERIPH_BASE(irq_controller_t, v, PERIPHERAL_BASE_PHY + 0xb200)
 
 #define INT_CTRL_BASE 0x3f00b200
 #define INT_CTRL_IRQ_BASIC_PENDING      *(volatile unsigned int*)(INT_CTRL_BASE + 0x00)

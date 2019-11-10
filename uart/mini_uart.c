@@ -2,7 +2,7 @@
 #include <gpio.h>
 
 
-#define AUX_BASE        (MMIO_BASE + 0x00215000)
+#define AUX_BASE        (PERIPHERAL_BASE_PHY + 0x00215000)
 
 
 /* Auxilary mini UART registers */

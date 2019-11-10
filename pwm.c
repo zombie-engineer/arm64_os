@@ -6,7 +6,7 @@
 #include <common.h>
 #include <delays.h>
 
-#define PWM_BASE   (unsigned long)(MMIO_BASE + 0x0020c000)
+#define PWM_BASE   (unsigned long)(PERIPHERAL_BASE_PHY + 0x0020c000)
 
 
 typedef struct {

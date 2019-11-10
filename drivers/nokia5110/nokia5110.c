@@ -22,7 +22,6 @@ static nokia5110_dev_t *nokia5110_dev = 0;
 static char frame_1[504];
 static char frame_2[504];
 static char frame_3[504];
-static char dma_rx_buf[504];
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -32,7 +31,7 @@ static char dma_rx_buf[504];
 
 #define SPI_SEND(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit, data, len)
 
-#define SPI_SEND_DMA(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit_dma, (uint32_t)(uint64_t)data, (uint32_t)(uint64_t)dma_rx_buf, len)
+#define SPI_SEND_DMA(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit_dma, data, 0, len)
 
 #define SPI_SEND_BYTE(data)  RET_IF_ERR(nokia5110_dev->spi->xmit_byte, data)
 
@@ -93,12 +92,12 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   }
 
   printf("frame_1 at %08x\n", frame_1);
-  // memset(frame_1, 0xff, sizeof(frame_1));
+  memset(frame_1, 0xff, sizeof(frame_1));
   // memset(frame_2, 0xf0, sizeof(frame_2));
   printf("frame_1: %08x, frame_2: %08x\n", frame_1, frame_2);
   // SEND_DATA(frame_1, 504);
   // wait_msec(1000);
-  SEND_DATA_DMA(frame_3, 504);
+  SEND_DATA_DMA(frame_1, 504);
 //  while(1) {
 //    SEND_DATA_DMA((uint32_t)frame_1, 504);
 //    wait_msec(50);

@@ -3,7 +3,7 @@
 #include <reg_access.h>
 #include <types.h>
 
-#define GPIO_BASE       (unsigned long)(MMIO_BASE + 0x00200000)
+#define GPIO_BASE       (uint64_t)(PERIPHERAL_BASE_PHY + 0x200000)
 
 #define GPIO_REG_GPFSEL0   (GPIO_BASE + 0x00)
 #define GPIO_REG_GPFSEL1   (GPIO_BASE + 0x04)

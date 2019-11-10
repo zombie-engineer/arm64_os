@@ -1,8 +1,10 @@
 #pragma once
-#include "reg_access.h"
-#include "gpio.h"
+#include <memory.h>
+#include <types.h>
+#include <reg_access.h>
+#include <gpio.h>
 
-#define ARM_TIMER_BASE                     0x3f00b400
+#define ARM_TIMER_BASE                     (uint64_t)(PERIPHERAL_BASE_PHY + 0xb400)
 // ARM_TIMER_BASE is proved to be exactly 0x3f00b400
 #define ARM_TIMER_LOAD_REG                 *(volatile int*)(ARM_TIMER_BASE)
 #define ARM_TIMER_VALUE_REG                *(volatile int*)(ARM_TIMER_BASE + 4)

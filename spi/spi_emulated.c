@@ -65,7 +65,7 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
 }
 
 
-DECL_ASSERTED_FN(spi_emulated_xmit_dma, uint32_t dst, uint32_t src, int len)
+DECL_ASSERTED_FN(spi_emulated_xmit_dma, void *data_out, void *data_in, uint32_t len)
   return ERR_OK;
 }
 
@@ -131,8 +131,9 @@ int spi_emulated_init(
   gpio_set_off(ce0_pin);
   // gpio_set_off(ce1_pin);
 
-  spi_emulated.spidev.xmit     = spi_emulated_xmit;
-  spi_emulated.spidev.xmit_byte= spi_emulated_xmit_byte;
+  spi_emulated.spidev.xmit      = spi_emulated_xmit;
+  spi_emulated.spidev.xmit_byte = spi_emulated_xmit_byte;
+  spi_emulated.spidev.xmit_dma  = spi_emulated_xmit_dma;
 
   spi_emulated.sclk_gpio_pin = sclk_pin;
   spi_emulated.mosi_gpio_pin = mosi_pin;
