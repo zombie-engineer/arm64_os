@@ -62,9 +62,11 @@ typedef struct {
   uint32_t channel;
   uint32_t src;
   uint32_t src_inc;
+  uint32_t src_ign;
   uint32_t src_dreq;
   uint32_t dst;
   uint32_t dst_inc;
+  uint32_t dst_ign;
   uint32_t dst_dreq;
   uint32_t len;
   uint32_t width_bits;
@@ -76,4 +78,8 @@ void dma_print_debug_info(int channel);
 
 int dma_transfer_is_done(int channel);
 
+int dma_transfer_error(int channel);
+
 int dma_clear_transfer(int channel);
+
+int dma_clear_end_flag(int channel);

@@ -163,12 +163,8 @@ static int spi0_init_dma()
   return ERR_OK;
 }
 
-static void spi0_set_dma_mode()
-{
-  *SPI_CS |= (SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS);
-}
 
-static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
+static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
 {
   uint32_t stub_in, stub_out;
 
@@ -177,16 +173,13 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
     return ERR_INVAL_ARG;
   }
 
-  spi0_set_dma_mode();
+  *SPI_CS |= (SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS);
   stub_out = 0;
 
   dma_ch_opts_t o = { 0 };
 
-  *SPI_DLEN = len;
-
   o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
   o.dst        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
-  o.len        = len;
 
   o.channel    = DMA_CHANNEL_SPI_TX;
   o.src_dreq   = DMA_DREQ_NONE;
@@ -194,8 +187,10 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
   o.dst_dreq   = DMA_DREQ_SPI_TX;
 
   if (data_out) {
+    ((uint32_t*)data_out)[0] = bytelen << 16 | SPI_CS_TA;
     o.src        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(data_out));
     o.src_inc    = 1;
+    o.len        = bytelen + 4;
   } else {
     o.src        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(&stub_out));
     o.src_inc    = 0;
@@ -207,6 +202,7 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
   o.channel    = DMA_CHANNEL_SPI_RX;
   o.src        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
   o.src_inc    = 0;
+  o.len        = bytelen;
   o.src_dreq   = DMA_DREQ_SPI_RX;
   o.dst_dreq   = DMA_DREQ_NONE;
 
@@ -220,14 +216,14 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
 
   dma_setup(&o);
 
-  *SPI_CS |= SPI_CS_TA;
-  dma_print_debug_info(DMA_CHANNEL_SPI_TX);
-  dma_print_debug_info(DMA_CHANNEL_SPI_RX);
+  // *SPI_CS |= SPI_CS_TA;
+  // dma_print_debug_info(DMA_CHANNEL_SPI_TX);
+  // dma_print_debug_info(DMA_CHANNEL_SPI_RX);
   dma_set_active(DMA_CHANNEL_SPI_TX);
   dma_set_active(DMA_CHANNEL_SPI_RX);
-  puts("-\n");
-  dma_print_debug_info(DMA_CHANNEL_SPI_TX);
-  dma_print_debug_info(DMA_CHANNEL_SPI_RX);
+  // puts("-\n");
+  // dma_print_debug_info(DMA_CHANNEL_SPI_TX);
+  // dma_print_debug_info(DMA_CHANNEL_SPI_RX);
 
   while(!dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
   while(!dma_transfer_is_done(DMA_CHANNEL_SPI_RX));

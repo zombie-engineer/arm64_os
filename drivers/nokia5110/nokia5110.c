@@ -39,7 +39,7 @@ static char frame_3[504];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
-#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len)
+#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len); SET_CMD()
 
 
 #define NOKIA5110_INSTRUCTION_SET_NORMAL 0
@@ -81,22 +81,50 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   SEND_CMD(0x0c);
 
   int x, y;
+  char *ptr;
+  ptr = frame_1;
 
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  for (x = 0; x < 84; ++x) {
-    for (y = 0; y < 6; ++y) {
-      frame_1[y * 84 + x] = 0xf0;
-      frame_2[y * 84 + x] = 0xff;
-      frame_3[y * 84 + x] = 0x0f;
-    }
-  }
 
   printf("frame_1 at %08x\n", frame_1);
+  memset(frame_1, 0x0f, 504);
+  *ptr++ = 0b11111111;
+  *ptr++ = 0b11111111;
+  *ptr++ = 0b11111111;
+  *ptr++ = 0b11111111;
+
+  *ptr++ = 0b10000000;
+  *ptr++ = 0b01000000;
+  *ptr++ = 0b00100000;
+  *ptr++ = 0b00010000;
+  *ptr++ = 0b00001000;
+  *ptr++ = 0b00000100;
+  *ptr++ = 0b00000010;
+  *ptr++ = 0b00000001;
+
+
+  memset(frame_2, 0x0f, 504);
+  memset(frame_2, 0xff, 4);
   printf("frame_1: %08x, frame_2: %08x\n", frame_1, frame_2);
+
   while(1) {
-    SEND_DATA_DMA(frame_1, 504);
-    SEND_DATA_DMA(frame_2, 504);
+    SEND_DATA_DMA(frame_1, 8);
+    wait_msec(200);
   }
+  int i, j;
+  for (j = 0; j < 2; ++j) {
+    // RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+    for (i = 0; i < 5; ++i) {
+      if (j % 2) {
+        SEND_DATA_DMA(frame_1, 8);
+      } else {
+        SEND_DATA_DMA(frame_2, 4);
+      }
+      wait_msec(10);
+    }
+    wait_msec(10);
+  }
+  puts("nokia5110 init is complete\n");
 //  while(1) {
 //    SEND_DATA_DMA((uint32_t)frame_1, 504);
 //    wait_msec(50);
