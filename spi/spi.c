@@ -171,7 +171,6 @@ static void spi0_set_dma_mode()
 static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
 {
   uint32_t stub_in, stub_out;
-  dma_ch_opts_t o;
 
   if (data_out == 0 && data_in == 0) {
     puts("spi0_xmit_dma: in and out data buffers are both zero\n");
@@ -181,16 +180,16 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
   spi0_set_dma_mode();
   stub_out = 0;
 
-  memset(&o, 0, sizeof(o));
+  dma_ch_opts_t o = { 0 };
 
   *SPI_DLEN = len;
 
   o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
+  o.dst        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
   o.len        = len;
 
   o.channel    = DMA_CHANNEL_SPI_TX;
   o.src_dreq   = DMA_DREQ_NONE;
-  o.dst        = NARROW_PTR(PERIPHERAL_PHY_TO_BUS(SPI_FIFO));
   o.dst_inc    = 0;
   o.dst_dreq   = DMA_DREQ_SPI_TX;
 
@@ -202,10 +201,11 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
     o.src_inc    = 0;
   }
 
+
   dma_setup(&o);
 
   o.channel    = DMA_CHANNEL_SPI_RX;
-  o.src        = NARROW_PTR(PERIPHERAL_PHY_TO_BUS(SPI_FIFO));
+  o.src        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
   o.src_inc    = 0;
   o.src_dreq   = DMA_DREQ_SPI_RX;
   o.dst_dreq   = DMA_DREQ_NONE;
@@ -229,12 +229,12 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t len)
   dma_print_debug_info(DMA_CHANNEL_SPI_TX);
   dma_print_debug_info(DMA_CHANNEL_SPI_RX);
 
-  while(dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
-  while(dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
+  while(!dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
+  while(!dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
   dma_clear_transfer(DMA_CHANNEL_SPI_TX);
   dma_clear_transfer(DMA_CHANNEL_SPI_RX);
 
-  // *SPI_CS = 0;
+  *SPI_CS = 0;
   return ERR_OK;
 }
 
