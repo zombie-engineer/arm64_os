@@ -17,6 +17,7 @@
 #include <timer.h>
 #include <cmdrunner.h>
 #include <max7219.h>
+#include <drivers/display/nokia5110.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -255,6 +256,14 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
+void nokia5110_test()
+{
+  spi_dev_t *spidev;
+  spi0_init();
+  spidev = spi_get_dev(SPI_TYPE_SPI0);
+  nokia5110_init(spidev, 23, 18, 1, 1);
+  while(1);
+}
 
 void main()
 {
@@ -264,6 +273,7 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
+  nokia5110_test();
   // mmu_init();
   print_current_ex_level();
 
