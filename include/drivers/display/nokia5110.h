@@ -65,3 +65,7 @@ int nokia5110_draw_rect(int x, int y, int sx, int sy);
 
 // Prints debug information about the display
 void nokia5110_print_info();
+
+int nokia5110_run_test_loop_1(int interations, int wait_interval);
+
+int nokia5110_run_test_loop_2(int interations, int wait_interval);

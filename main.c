@@ -262,7 +262,8 @@ void nokia5110_test()
   spi0_init();
   spidev = spi_get_dev(SPI_TYPE_SPI0);
   nokia5110_init(spidev, 23, 18, 1, 1);
-  while(1);
+  nokia5110_run_test_loop_1(40, 200);
+  nokia5110_run_test_loop_2(40, 200);
 }
 
 void main()
