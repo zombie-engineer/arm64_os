@@ -91,7 +91,7 @@ int dma_set_transfer_width(int channel, int width)
 
 int dma_set_control_block(int channel, dma_cb_t *cb)
 {
-  *DMA_CONBLK_AD(channel) = (uint32_t)(uint64_t)cb;
+  *DMA_CONBLK_AD(channel) = RAM_PHY_TO_BUS_UNCACHED(cb);
   return ERR_OK;
 }
 

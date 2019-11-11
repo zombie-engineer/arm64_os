@@ -167,7 +167,13 @@ static int spi0_init_dma()
 static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
 {
   uint32_t stub_in, stub_out;
+  // printf("spi0_xmit_dma: data_out: %08x\n", data_out);
+  dma_reset(DMA_CHANNEL_SPI_TX);
+  dma_reset(DMA_CHANNEL_SPI_RX);
+  dma_enable(DMA_CHANNEL_SPI_TX);
+  dma_enable(DMA_CHANNEL_SPI_RX);
 
+  __sync_synchronize();
   if (data_out == 0 && data_in == 0) {
     puts("spi0_xmit_dma: in and out data buffers are both zero\n");
     return ERR_INVAL_ARG;
@@ -188,7 +194,7 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
 
   if (data_out) {
     ((uint32_t*)data_out)[0] = bytelen << 16 | SPI_CS_TA;
-    o.src        = NARROW_PTR(RAM_PHY_TO_BUS_UNCACHED(data_out));
+    o.src        = RAM_PHY_TO_BUS_UNCACHED(data_out);
     o.src_inc    = 1;
     o.len        = bytelen + 4;
   } else {
@@ -215,22 +221,17 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
   }
 
   dma_setup(&o);
+  __sync_synchronize();
 
-  // *SPI_CS |= SPI_CS_TA;
-  // dma_print_debug_info(DMA_CHANNEL_SPI_TX);
-  // dma_print_debug_info(DMA_CHANNEL_SPI_RX);
   dma_set_active(DMA_CHANNEL_SPI_TX);
   dma_set_active(DMA_CHANNEL_SPI_RX);
-  // puts("-\n");
-  // dma_print_debug_info(DMA_CHANNEL_SPI_TX);
-  // dma_print_debug_info(DMA_CHANNEL_SPI_RX);
 
   while(!dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
   while(!dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
   dma_clear_transfer(DMA_CHANNEL_SPI_TX);
   dma_clear_transfer(DMA_CHANNEL_SPI_RX);
 
-  *SPI_CS = 0;
+  // *SPI_CS = 0;
   return ERR_OK;
 }
 

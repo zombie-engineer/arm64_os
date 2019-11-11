@@ -19,9 +19,10 @@ static nokia5110_dev_t nokia5110_device;
 
 static nokia5110_dev_t *nokia5110_dev = 0;
 
-static char frame_1[504];
-static char frame_2[504];
-static char frame_3[504];
+static char frame_1[504 + 4];
+static char frame_2[504 + 4];
+static char frame_3[504 + 4];
+static char frame_4[504 + 4];
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -39,7 +40,7 @@ static char frame_3[504];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
-#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len); SET_CMD()
+#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len)
 
 
 #define NOKIA5110_INSTRUCTION_SET_NORMAL 0
@@ -80,38 +81,88 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   SEND_CMD(0x20);
   SEND_CMD(0x0c);
 
-  int x, y;
-  char *ptr;
-  ptr = frame_1;
-
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-
   printf("frame_1 at %08x\n", frame_1);
-  memset(frame_1, 0x0f, 504);
-  *ptr++ = 0b11111111;
-  *ptr++ = 0b11111111;
-  *ptr++ = 0b11111111;
-  *ptr++ = 0b11111111;
-
-  *ptr++ = 0b10000000;
-  *ptr++ = 0b01000000;
-  *ptr++ = 0b00100000;
-  *ptr++ = 0b00010000;
-  *ptr++ = 0b00001000;
-  *ptr++ = 0b00000100;
-  *ptr++ = 0b00000010;
-  *ptr++ = 0b00000001;
-
-
-  memset(frame_2, 0x0f, 504);
-  memset(frame_2, 0xff, 4);
   printf("frame_1: %08x, frame_2: %08x\n", frame_1, frame_2);
 
+  int i, j;
+  int x, y;
+  char *ptr;
+  memset(frame_1, 0xff, 4);
+  memset(frame_2, 0xff, 4);
+  memset(frame_3, 0xff, 4);
+  memset(frame_4, 0xff, 4);
+
+  ptr = frame_1 + 4;
+  for (i = 0; i < 504 / 8; ++i) {
+    *ptr++ = 0b10000000;
+    *ptr++ = 0b01000000;
+    *ptr++ = 0b00100000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00001000;
+    *ptr++ = 0b00000100;
+    *ptr++ = 0b00000010;
+    *ptr++ = 0b00000001;
+  }
+
+  ptr = frame_2 + 4;
+  for (i = 0; i < 504 / 8; ++i) {
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00010000;
+  }
+
+  ptr = frame_3 + 4;
+  for (i = 0; i < 504 / 8; ++i) {
+    *ptr++ = 0b00000001;
+    *ptr++ = 0b00000010;
+    *ptr++ = 0b00000100;
+    *ptr++ = 0b00001000;
+    *ptr++ = 0b00010000;
+    *ptr++ = 0b00100000;
+    *ptr++ = 0b01000000;
+    *ptr++ = 0b10000000;
+  }
+
+  ptr = frame_4 + 4;
+  for (i = 0; i < 504 / 8; ++i) {
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b11111111;
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b00000000;
+    *ptr++ = 0b00000000;
+  }
+
   while(1) {
+    SEND_DATA_DMA(frame_1, 504);
+    wait_msec(1000);
+    SEND_DATA_DMA(frame_2, 504);
+    wait_msec(1000);
+    SEND_DATA_DMA(frame_3, 504);
+    wait_msec(1000);
+    SEND_DATA_DMA(frame_4, 504);
+    wait_msec(1000);
+  }
+
+  while(1);
+  for (i = 0; i < 504 / 8 / 8; ++i) { 
     SEND_DATA_DMA(frame_1, 8);
     wait_msec(200);
   }
-  int i, j;
+  for (i = 0; i < 504 / 8 / 8; ++i) { 
+    puts("sending\n");
+    SEND_DATA_DMA(frame_2, 8);
+    wait_msec(200);
+  }
+  return;
   for (j = 0; j < 2; ++j) {
     // RET_IF_ERR(nokia5110_set_cursor, 0, 0);
     for (i = 0; i < 5; ++i) {
