@@ -33,7 +33,7 @@ LIBS += $(OBJS_NOKIA5110)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font.o start.o
+OBJS += $(LIBS) font.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
