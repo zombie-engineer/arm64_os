@@ -262,8 +262,18 @@ void nokia5110_test()
   spi0_init();
   spidev = spi_get_dev(SPI_TYPE_SPI0);
   nokia5110_init(spidev, 23, 18, 1, 1);
-  nokia5110_run_test_loop_1(40, 200);
-  nokia5110_run_test_loop_2(40, 200);
+  // nokia5110_run_test_loop_1(5, 200);
+  nokia5110_run_test_loop_3(30, 10);
+  while(1);
+  nokia5110_run_test_loop_1(8, 100);
+  nokia5110_run_test_loop_1(8, 50);
+  nokia5110_run_test_loop_1(8, 30);
+  nokia5110_run_test_loop_1(8, 15);
+  nokia5110_run_test_loop_2(10, 50);
+  nokia5110_run_test_loop_2(10, 40);
+  nokia5110_run_test_loop_2(10, 30);
+  nokia5110_run_test_loop_2(20, 20);
+  nokia5110_run_test_loop_2(30, 10);
 }
 
 void main()

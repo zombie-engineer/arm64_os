@@ -33,7 +33,7 @@ LIBS += $(OBJS_NOKIA5110)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font.o
+OBJS += $(LIBS) font.o to_raspi.nokia5110.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
@@ -48,6 +48,10 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 
 font.o: font.psf
 	$(LD) -r -b binary -o font.o font.psf
+
+.PHONY: to_raspi.nokia5110.o
+to_raspi.nokia5110.o: 
+	$(LD) -r -b binary to_raspi.nokia5110 -o $@
 
 kernel8.img: $(OBJS)
 	$(LD) -nostdlib -nostartfiles $(OBJS) -T link.ld -o kernel8.elf -Map kernel8.map

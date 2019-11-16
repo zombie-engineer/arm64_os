@@ -29,6 +29,9 @@ SECTIONS
   _end = .;
 
   /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
+
+  . = ALIGN(4096);
+  __bin_start = .;
 }
 __bss_size = (__bss_end - __bss_start)>>3;
 /* https://github.com/bztsrc/raspi3-tutorial/blob/master/02_multicorec/link.ld */

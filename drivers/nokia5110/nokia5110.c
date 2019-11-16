@@ -21,11 +21,15 @@
 #define NOKIA_5110_DISPLAY_CONTROL_ALL_SEG_ON NOKIA_5110_DISPLAY_CONTROL(0, 1)
 #define NOKIA_5110_DISPLAY_CONTROL_INVERTED   NOKIA_5110_DISPLAY_CONTROL(1, 1)
 
+// Temperature control 0 - 3 0 is more contrast, 3 - is less contrast
 #define NOKIA_5110_TEMP_CONTROL(value) (0b00000100 | (value & 3))
 #define NOKIA_5110_BIAS_SYSTEM(value)  (0b00010000 | (value & 7))
 #define NOKIA_5110_SET_VOP(value)      (0b10000000 | (value & 0x7f))
 
 #define DISPLAY_MODE_MAX 3
+
+extern const char _binary_to_raspi_nokia5110_start;
+extern const char _binary_to_raspi_nokia5110_end;
 
 typedef struct nokia5110_dev {
   spi_dev_t *spi;
@@ -185,7 +189,27 @@ int nokia5110_run_test_loop_2(int iterations, int wait_interval)
     wait_msec(wait_interval);
   }
 
-  return 0;
+  return ERR_OK;
+}
+
+int nokia5110_run_test_loop_3(int iterations, int wait_interval)
+{
+  int err, i, numframes;
+  const char *video_0;
+  uint64_t bufsize;
+  wait_msec(5000);
+
+  video_0 = &_binary_to_raspi_nokia5110_start;
+  bufsize = (uint64_t)(&_binary_to_raspi_nokia5110_end) - (uint64_t)&_binary_to_raspi_nokia5110_start;
+  numframes = bufsize / 508;
+  printf("showing video_0 from address: %08x, num frames: %d\n", &_binary_to_raspi_nokia5110_start, numframes);
+  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+  for (i = 0; i < numframes; ++i) {
+    RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+    SEND_DATA_DMA(video_0 + (504 + 4) * i, 504);
+    wait_msec(20);
+  }
+  return ERR_OK;
 }
 
 int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int function_flags, int display_mode)
