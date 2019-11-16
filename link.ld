@@ -8,6 +8,8 @@ SECTIONS
     KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) 
   }
 
+  . = ALIGN(8);
+  __arm_initial_reg_value_address_hcr_el2 = .;
   .rodata : 
   { 
     *(.rodata .rodata.* .gnu.linkonce.r*) 

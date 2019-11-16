@@ -27,81 +27,164 @@
 _start:
   // Start in EL2/SP_EL2, exceptions masked, non-MMU
   // read cpu id, stop slave cores
+
+  // Store arm_init_regvalue
+  mrs   x1, hcr_el2
+  ldr   x2, =__arm_initial_reg_value_address_hcr_el2
+  str   x1, [x2]
+
   mrs   x1, mpidr_el1
-  and   x1, x1, #3        // get CPU core number
-  cbz   x1, 2f            // jump if core number is 0
+  // get CPU core number
+  and   x1, x1, #3        
+  // jump if core number is 0
+  cbnz   x1, _cpu_wait_for_event
   // cpu id > 0, stop
-1: 
-  wfe
-  b 1b
+
+
 2: // cpu id == 0
   
   // set stack 
   ldr   x1, =_start
 
   // set up EL1
+  // Get current exception level
   mrs   x0, CurrentEl
-  and   x0, x0, #0xc // clear reserved bits
-  cmp   x0, #0xc
-  bne 5f
+  // bits [3:2] are exception level
+
+  // 0b00 - EL0, 0b01 - EL1, 0b10 - EL2, 0b11 - EL3
+  and   x0, x0, #(3 << 2)  
+  cmp   x0, #(3 << 2)
+  // check if EL3
+  bne   _check_el1
   mov   sp, x1
 
-5: 
-  cmp   x0, #4
-  beq   5f
+
+// ******************************************************************************
+// Check if we are in EL1 execution state and set it if not
+// ******************************************************************************
+.local _check_el1
+_check_el1: 
+  // check if EL1
+  cmp   x0, #(1 << 2)
+  beq   _in_el1
+  // on not EL3 and not EL1
+  // Set EL1 stack to _start
   msr   sp_el1, x1
+
+  // ***************************************************************** // 
   // enable CNTP for EL1
-  mrs   x0, cnthctl_el2
-  orr   x0, x0, #3
-  msr   cnthctl_el2, x0   // Hypervisor Configuration Register Enables second stage translation for execution in Non-secure EL1 and EL0.
+  // mrs   x0, cnthctl_el2
+  // orr   x0, x0, #3
+  // msr   cnthctl_el2, x0   // Hypervisor Configuration Register Enables second stage translation for execution in Non-secure EL1 and EL0.
+  // ***************************************************************** // 
+
   msr   cntvoff_el2, xzr  // 
+
   bl    _disable_coproc_traps
+
   // enable AArch64 in EL1
+
+
+  // HCR_EL2.RW bit - Execution state for EL1 is AArch64,
+  //                - Execution state for EL0 is taken from PSTATE.nRW when at EL0
   mov   x0, #(1 << 31)    // AArch64
-  orr   x0, x0, #(1 << 1) // SWIO hardwired on Pi3 Set/Way Invalidation Override 
+
+  // HCW_EL2.SWIO   - 1 
+  // SWIO hardwired on Pi3 Set/Way Invalidation Override 
+  orr   x0, x0, #(1 << 1) 
   msr   hcr_el2, x0
-  mrs   x0, hcr_el2
+
+  // ***************************************************************** // 
+  // mrs   x0, hcr_el2
+  // ***************************************************************** // 
+
+
   // Setup SCTLR access x2 = 0x30d00800
+  // SCTLR.EOS    = 1 Exeption exit is context synchronizing
+  // SCTLR.TSCTX  = 1 Trap EL0 access to SCTXNUM_EL0 reg when EL0 in AArch64
+  // SCTLR.EIS    = 1 Exception entry is synchronizing
+  // SCTLR.SPAN   = 1 PSTATE.PAN is unchanged on taking an exception to EL1
+  //                  (Set Privelidged Access Never = false)
+  // SCTLR.TLSMD  = 1 All EL0 A32/T32 accesses to stage 1 marged as 
+  //                  Device-nGRE/Device-nGnRE/Device-nGnRnE are not trapped
+  // SCTLR.LSMAOE = 1 Load multiple/Store multiple Atomicity and Ordering Enable
+
   mov   x2, #0x0800
   movk  x2, #0x30d0, lsl #16
   msr   sctlr_el1, x2
-  // setup exception handlers
+
+
+  // Setup exception handlers
   ldr   x2, =_vectors
   msr   vbar_el1, x2
-  // change execution level to EL1
+
+
+
+  // Change execution level to EL1
+
+  // Set SPSR_EL2 to simulate exception context to which to return
+  // SPSR_EL2.M = EL1 (0b0100) - exception came from EL1
+  // SPSR_EL2.F = 1 - FIQ interrupts will be masked upon returning to EL1
+  // SPSR_EL2.I = 1 - IRQ interrupts will be masked upon returning to EL1
+  // SPSR_EL2.A = 1 - SError interrupts will be masked upon returning to EL1
+  // SPSR_EL2.D = 1 - Debug interrupts will be masked upon returning to EL1
   mov   x2, #0x3c4
-  // [9:8] [7:6] [3] -> bits D, A, I, F, M 0b0100
   msr   spsr_el2, x2
-  adr   x2, 5f
+
+  // Set ELR_EL2 to point to _in_el1 from where it proceeds execution
+  adr   x2, _in_el1
   msr   elr_el2, x2
+  // Jump out of exception
   eret
-5:
+
+
+
+// ******************************************************************************
+// In EL1
+// ******************************************************************************
+.local _in_el1
+_in_el1:
+  // Set stack
   mov   sp, x1
 
   // clear bss
   ldr   x1, =__bss_start 
   ldr   w2, =__bss_size
-3:
-  cbz   w2, 4f
+1:
+  cbz   w2, 2f
   str   xzr, [x1], #8
   sub   w2, w2, #1
-  cbnz  w2, 3b
-4:
+  cbnz  w2, 1b
+
+
+2:
+  // Jump to main
   bl    main
-  b     1b
-  
-.globl timer_irq_init
-timer_irq_init:
-  mov   w1, #0
-  str   w1, [x0, #4]
-  ldr   x0, =0x3b00b400
-  ldr   w1, =0xa00
-  str   w1, [x0]
-  ldr   w1, [x0, #4]
-  mov   w2, #0xa2
-  orr   w1, w1, w2
-  str   w1, [x0, #4]
-  ret
+  // After main returns halt 
+  b     _cpu_wait_for_event
+
+// ******************************************************************************
+
+.local _cpu_wait_for_event
+_cpu_wait_for_event: 
+  wfe
+  b _cpu_wait_for_event
+
+
+
+
+//.globl timer_irq_init
+//timer_irq_init:
+//  mov   w1, #0
+//  str   w1, [x0, #4]
+//  ldr   x0, =0x3b00b400
+//  ldr   w1, =0xa00
+//  str   w1, [x0]
+//  ldr   w1, [x0, #4]
+//  mov   w2, #0xa2
+//  orr   w1, w1, w2
+//  str   w1, [x0, #4]
+//  ret
 
 .macro vector_entry symbol
   .align 7
@@ -137,13 +220,24 @@ vector_entry __interrupt_l_spx_serror
 
   
 _disable_coproc_traps:
-  // [9:0] -> RES1
-  // [10]  => 0 to disable FPU trap
+  // Trap SVE , dont trap SIMD/Floating point instructions
+
+  // bits [7:0] -> RES1
+  // bit  8     -> TZ, Trap SVE (Scalable Vector Extension) instructions
+  //               at EL0, EL1 and EL2
+  // bit  9     -> RES1
+  // bit 10     -> TFP, Trap access to SVE FPCR, FPSR, FPEXC32_EL2 (SIMD/FP)
+  //               Set to 0 means dont trap
   // [13:12] -> RES1
   // => 0x33ff
   mov   x0, #0x33ff
   msr   cptr_el2, x0
+
+  // Disable access to coproc == 0b1111 encoding space in AArch32
   msr   hstr_el2, xzr
+
+  // Do not trap accesses to SVE, SIMD or Floating point registers
+  // to EL1
   mov   x0, #(3 << 20)
   msr   cpacr_el1, x0
   ret

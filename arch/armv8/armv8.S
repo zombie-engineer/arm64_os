@@ -7,6 +7,22 @@
 
 #define DAIF_IRQ_BIT    (1 << 1)
 
+// CurrentEL - Current Exception Level
+// bits [63:4] - RES0
+// bits [3:2]  - EL, Current exception level
+//             - 0b00 EL0
+//             - 0b01 EL1
+//             - 0b10 EL2
+//             - 0b11 EL3
+
+.macro GET_CURRENT_EXCEPTION_LEVEL dreg 
+  // dreg - destination register
+  mrs \dreg, CurrentEl
+  // clear reserved bits
+  and \dreg, \dreg, #0xc 
+.endm
+
+
 .section ".text"
 
 FUNC(enable_irq):

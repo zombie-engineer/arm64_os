@@ -62,11 +62,18 @@ void check_printf()
   printf("ld  0x80000000         = %d\n", 0x80000000);
 }
 #endif
+
+extern char __arm_initial_reg_value_address_hcr_el2;
+
 void print_current_ex_level()
 {
   unsigned long el;
   asm volatile("mrs %0, CurrentEL; lsr %0, %0, #2" : "=r"(el));
   printf("Executing at EL%d\n", el);
+  printf("HCR_EL2: %016lx (stored at %016lx)\n", 
+    *(uint64_t*)(&__arm_initial_reg_value_address_hcr_el2), 
+    &__arm_initial_reg_value_address_hcr_el2
+  );
 }
 
 void print_mbox_props()
@@ -284,7 +291,7 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
-  nokia5110_test();
+  // nokia5110_test();
   // mmu_init();
   print_current_ex_level();
 
