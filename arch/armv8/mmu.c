@@ -144,6 +144,8 @@ void enable_mmu_tables(uint64_t ttbr0, uint64_t ttbr1)
 }
 
 
+extern void _armv8_mmu_init();
+
 // ?? why alignment is 16384
 static uint64_t __attribute__((aligned(16384))) 
 mmu_table_l1[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
@@ -153,6 +155,7 @@ mmu_table_l2[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
 
 void mmu_init()
 {
+  _armv8_mmu_init();
   _Static_assert(sizeof(tcr_el1_t)              == 8, "size not 8"); 
   _Static_assert(sizeof(sctlr_el1_t)            == 8, "size not 8");
   _Static_assert(sizeof(vmsav8_64_block_dsc_t)  == 8, "size not 8");

@@ -54,7 +54,7 @@ to_raspi.nokia5110.o:
 	$(LD) -r -b binary to_raspi.nokia5110 -o $@
 
 kernel8.img: $(OBJS)
-	$(LD) -nostdlib -nostartfiles $(OBJS) -T link.ld -o kernel8.elf -Map kernel8.map
+	$(LD) -nostdlib -nostartfiles $(OBJS) -T arch/armv8/link.ld -o kernel8.elf -Map kernel8.map
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 run:

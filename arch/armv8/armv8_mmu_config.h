@@ -1,0 +1,22 @@
+
+#define VA_BITS 48
+#define PTE_IDX_BITS 9
+
+#define PTE_INDICES_COUNT      (1 << PTE_IDX_BITS)
+#define PTE_COUNT_LVL0         (PTE_INDICES_COUNT)
+#define PTE_COUNT_LVL1         (PTR_COUNT_LVL0 * PTE_INDICES_COUNT)
+#define PTE_COUNT_LVL2         (PTR_COUNT_LVL1 * PTE_INDICES_COUNT)
+#define PTE_SIZE               8
+
+#define ARMV8_MAX_PA_BITS              48
+#define ARMV8_PAGE_BITS_4K             12
+
+#define ARMV8_PTE_LOWATTR_BIT_WIDTH_4K 10
+#define ARMV8_PTE_LOWATTR_BIT_POS_4K   2
+
+#define ARMV8_PTE_OA_BIT_WIDTH_4K      36 
+#define ARMV8_PTE_OA_BIT_POS_4K        12
+
+#define ARMV8_PTE_UPATTR_BIT_WIDTH_4K 13
+#define ARMV8_PTE_UPATTR_BIT_POS_4K   51
+
