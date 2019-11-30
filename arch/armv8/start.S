@@ -189,6 +189,7 @@ _cpu_wait_for_event:
 .macro vector_entry symbol
   .align 7
   .globl \symbol
+\symbol:
   mov   x0, #0
   mrs   x1, esr_el1
   mrs   x2, elr_el1

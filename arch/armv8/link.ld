@@ -2,23 +2,6 @@
 SECTIONS
 {
   . = 0x80000;
-  .text.init_mmu :
-  {
-    KEEP(*(.text.init_mmu))
-  }
-
-  . = ALIGN(16 * 1024);
-  __mmu_ttbr0 = .;
-  __mmu_ttbr0_lvl_0 = .;
-  . += 8 * 1;
-  __mmu_ttbr0_lvl_1 = .;
-  . += 8 * 1 * 512;
-  __mmu_ttbr0_lvl_2 = .;
-  . += 8 * 1 * 512 * 512;
-  
-  . = ALIGN(16 * 1024);
-  __mmu_ttbr1 = .;
-
   .text : 
   { 
     KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) 

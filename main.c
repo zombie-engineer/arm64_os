@@ -291,8 +291,8 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
+  mmu_init();
   // nokia5110_test();
-  // mmu_init();
   print_current_ex_level();
 
   print_mbox_props();

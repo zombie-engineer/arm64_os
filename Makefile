@@ -63,6 +63,9 @@ run:
 rungdb:
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s -S
 
+rungdb2:
+	gdb -ex 'b get_phys_addr_lpae' --args qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s -S
+
 rungdbq:
 	./qemu.sh
 

@@ -92,29 +92,54 @@ _armv8_mmu_map_pte_l0:
   // y = (x + 35); z = 16
   // For PAMax = 48 TnSZ = 16, x = 28-16=12; y = 37; z = 16
   // pte_l0 = TTBR0[47:12]:IA[47:39]:0b000
+  ret
+  stp x5, x6 , [sp, #-16]!
+  stp x7, x8 , [sp, #-16]!
+  stp x9, x10, [sp, #-16]!
+  pages_per_pte_l1 .req x4
+  mov   pages_per_pte_l1, #1
+  mov    pages_per_pte_l1,  pages_per_pte_l1, lsl #(9 * 3)
 1:
   bl   _armv8_mmu_map_pte_l1  
   bne  1b
+
+  ldp x9, x10, [sp], #16
+  ldp x7, x8, [sp], #16
+  ldp x5, x6, [sp], #16
+
+  .unreq pages_per_pte_l1
   ret
 
 
-.globl _armv8_mmu_init
-_armv8_mmu_init:
-  mov   x0, #0
-  adrp  x0, __mmu_ttbr0_lvl_0
-  mov   x1, #PTE_COUNT_LVL0
-  add   x1, x0, x1, lsl 3
-  adrp  x2, __mmu_ttbr0_lvl_1
-  bl    _armv8_mmu_map_pte_l0
-  ret
+// Map pages 
+//.globl _armv8_mmu_init
+//_armv8_mmu_init:
+//  stp x5, x6 , [sp, #-16]!
+//  stp x7, x8 , [sp, #-16]!
+//  stp x9, x10, [sp, #-16]!
+//
+//  pt_l0_addr       .req x4
+//  max_pages        .req x5
+//  pages_per_pte_l0 .req x6
+//
+//  mov pt_l0_addr, x0
+//  mov max_pages , x1
+//  mov   pages_per_pte_l0, #1
+//  mov   pages_per_pte_l0, pages_per_pte_l0, lsl #(9 * 4)
+//1:
+//  mov   x0, pt0_addr
+//  mov   x0, pages_per_pte_l0
+//  bl    _armv8_mmu_map_pte_l0
+//  subs  max_pages, max_pages, pages_per_pte_l0
+//  add   pt0_addr, pt0_addr, #8
+//  bgt   1b
+//
+//  .unreq pt_l0_addr
+//  .unreq max_pages
+//
+//  ldp x9, x10, [sp], #16
+//  ldp x7, x8, [sp], #16
+//  ldp x5, x6, [sp], #16
+//  ret
   
-1:
-  str   x2, [x0], #8
-  cmp   x0, x1
-  bne 1b
-
-  
-  
-   
-
 

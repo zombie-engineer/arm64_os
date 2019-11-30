@@ -577,3 +577,24 @@ FUNC(arm_mmu_init):
   .set ADDR, ADDR+2 
   .endr
 
+FUNC(__enable_mmu):
+  msr   ttbr0_el1, x0
+  msr   ttbr1_el1, x1
+
+  mrs   x2, tcr_el1
+  // Set T0SZ to 16
+  orr   x2, x2, #0b1000
+  // Set HA bit
+  orr   x2, x2, #(1<<39)
+  msr   tcr_el1, x2
+  isb
+  
+  mrs   x0, sctlr_el1
+  // mov   x1, x0
+  orr   x0, x0, #1
+  bic   x0, x0, #(1<<19)
+  msr   sctlr_el1, x0
+  // msr   sctlr_el1, x1
+  
+  isb
+  ret
