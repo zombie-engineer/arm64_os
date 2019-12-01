@@ -75,6 +75,9 @@
 #define TABLE_ENTRY_TYPE_BLOCK 1
 #define TABLE_ENTRY_TYPE_TABLE 3
 
+#define MEM_ATTR_IDX_NORMAL    0
+#define MEM_ATTR_IDX_DEV_NGNRE 1
+
   // MAP a range of 32 megabytes
   // map range 32Mb
   // 32Mb = 32 * 1024 * 1024 = 8 * 4 * 1024 * 1024 = 8 * 1024 * 4096 
@@ -104,24 +107,24 @@
 #define MMU_PT_ALIGNMENT 4096
 #define ALIGN_UP(v, to) ((((v) + (to) - 1) / to) * to)
 
-#define PTE_OUT_ADDR(out_addr) BITWIDTH64(out_addr & (0xffffffffffff - 0xfff))
+#define PTE_OUT_ADDR(phys_page_idx) BITWIDTH64(BITS_AT_POS(phys_page_idx, 12, 0xffffffffff))
 #define PTE_LO_ATTR(lo_attr)   BITS_AT_POS(lo_attr,  2,  0x3ff)
 #define PTE_UP_ATTR(up_attr)   BITS_AT_POS(up_attr, 51, 0x1fff)
 
-#define MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr) (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(out_addr) | PTE_LO_ATTR(lo_attr) | 0b11)
+#define MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr) (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(phys_page_idx) | PTE_LO_ATTR(lo_attr) | 0b11)
 
-#define MAKE_PAGE_PTE(up_attr, out_addr, lo_attr) MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr)
+#define MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr) MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr)
 
 #define MAKE_PAGE_PTE_LO_ATTR(attr_idx, ns, ap, sh, af, ng) \
   BITS_AT_POS(attr_idx, 0, 0b111) | BIT_AT_POS(ns, 3) | BITS_AT_POS(ap, 4, 0b11) \
   | BITS_AT_POS(sh, 6, 0b11) | BIT_AT_POS(af, 8) | BIT_AT_POS(ng, 9) 
 
-#define MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
+#define MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page) \
   BIT_AT_POS(ns_table, 63) | BITS_AT_POS(ap_table, 61, 0b11) | BIT_AT_POS(xn_table, 60) | BIT_AT_POS(pxn_table, 59) | \
-  PTE_OUT_ADDR(next_lvl_table_addr) | 0b11
+  PTE_OUT_ADDR(next_lvl_table_page) | 0b11
   
-#define MAKE_TABLE_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
-  MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr)
+#define MAKE_TABLE_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page) \
+  MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page)
 
 
 #define SET_MEMATTR(desc, mem_attr_idx) \
@@ -135,6 +138,20 @@ typedef struct mmu_caps {
   int max_pa_bits;
 } mmu_caps_t;
 
+// Single range of physical pages, grouped by
+// same memory attributes
+typedef struct pt_mem_range {
+  // Index of a first physical page in range
+  uint64_t pa_start_page;
+  // Index of a first virtual page in range
+  uint64_t va_start_page;
+  // Number of pages in range
+  uint64_t num_pages;
+  // Index of memory attribute in MAIR register
+  int mem_attr_idx;
+} pt_mem_range_t;
+
+
 // Page table configuration
 typedef struct pt_config {
   uint64_t base_address;
@@ -142,66 +159,65 @@ typedef struct pt_config {
   int page_size;
   // Number of entries (ptes) in a single page table
   int num_entries_per_pt;
+  // [pstart - pa_end] is the range of physical addresses,
+  // covered by this page table
+  uint64_t pa_start;
+  uint64_t pa_end;
+  
+  // Memory ranges to map
+  int num_ranges;
+  pt_mem_range_t mem_ranges[64];
 } pt_config_t;
 
 
-void map_page_ptes(mmu_pte_t *l3_pt, int l3_pte_count, uint64_t start_page_pa)
+void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pages, int mem_attr_idx)
 {
   int i;
-  uint64_t pa;
-  uint64_t pte;
-  mmu_pte_t *ppte = l3_pt;
   uint64_t lo_attr, up_attr;
-  lo_attr = up_attr = 0;
 
+  up_attr = 0;
   lo_attr = MAKE_PAGE_PTE_LO_ATTR(
-    0 /* attr_idx */, 
+    mem_attr_idx,
     1 /* ns */, 
     0 /* ap */, 
     0 /* sh */, 
     1 /* af */, 
     0 /* ng */);
 
-  pa = start_page_pa;
-  for (i = 0; i < l3_pte_count; ++i) {
-    pte = MAKE_PAGE_PTE(up_attr, pa, lo_attr);
-    *(ppte++) = pte;
-    pa += 4096;
+  for (i = 0; i < num_pages; ++i) {
+    *(page_pte++) = MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr);
+    phys_page_idx++;
   }
-}
-
-uint64_t *get_l3_pte_for_va(uint64_t* l3_pt, uint64_t *l3_pt_end, uint64_t va)
-{
-  return l3_pt + va / MMU_PAGE_GRANULE;
 }
 
 void map_table_ptes(mmu_pte_t *pt, int pte_count, mmu_pte_t *next_level_pte, pt_config_t *pt_config)
 {
   int i;
-  mmu_pte_t *next_level_pt_addr;
   uint64_t ns, ap, xn, pxn;
+  uint64_t next_level_pt_page = (uint64_t)next_level_pte / pt_config->page_size;
   ns = ap = xn = pxn = 0;
 
-  next_level_pt_addr = next_level_pte;
   for (i = 0; i < pte_count; ++i) {
-    pt[i] = MAKE_TABLE_PTE(ns, ap, xn, pxn, next_level_pt_addr);
-    next_level_pt_addr += pt_config->num_entries_per_pt;
+    pt[i] = MAKE_TABLE_PTE(ns, ap, xn, pxn, next_level_pt_page);
+    next_level_pt_page++;
   }
 }
 
-void map_linear_range(uint64_t start_pa, uint64_t linear_size, uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_config)
+void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_config)
 {
+  int i;
   int l3_pte_count;
   int l2_pte_count;
   int l1_pte_count;
   int l0_pte_count;
+  pt_mem_range_t *range;
 
   mmu_pte_t *l3_pt;
   mmu_pte_t *l2_pt;
   mmu_pte_t *l1_pt;
   mmu_pte_t *l0_pt;
 
-  l3_pte_count = max(linear_size  / pt_config->page_size, 1);
+  l3_pte_count = max((pt_config->pa_end - pt_config->pa_start) / pt_config->page_size, 1);
   l2_pte_count = max(l3_pte_count / pt_config->num_entries_per_pt, 1);
   l1_pte_count = max(l2_pte_count / pt_config->num_entries_per_pt, 1);
   l0_pte_count = max(l1_pte_count / pt_config->num_entries_per_pt, 1);
@@ -219,26 +235,10 @@ void map_linear_range(uint64_t start_pa, uint64_t linear_size, uint64_t start_va
   map_table_ptes(l1_pt, l1_pte_count, l2_pt, pt_config);
 
   // Map level 3 page table entries to actual pages
-  map_page_ptes(l3_pt, l3_pte_count, start_pa);
-
-//  l3_pte_devmem_start = get_l3_pte_for_va(l3_pt_start, l3_pt_start + l3_pte_count, 0x3f000000);
-//  l3_pte_devmem_end   = get_l3_pte_for_va(l3_pt_start, l3_pt_start + l3_pte_count, 0x40000000);
-//
-//  uint64_t mair0;
-//  asm volatile(
-//      "mrs   x0, mair_el1\r\n"
-//      "mov   x1, 0b00000100\r\n"
-//      "orr   x0, x0, x1\r\n"
-//      "msr   mair_el1, x0\r\n"
-//      );
-//
-//  //mair0 = MAIR_SetAttr_Cacheable(0) | MAIR_SetAttr_Dev_nGnRE(1) | MAIR_SetAttr_NonCacheable(2) | MAIR_SetAttr_NonCacheable(2);
-//  // char mair_attr1 = MAIR_dd_nGnRE;
-//
-//  // asm volatile("msr mair_el1, %0"  :: "r"(mair_reg));
-//  for (l3_pte_devmem = l3_pte_devmem_start; l3_pte_devmem != l3_pte_devmem_end; l3_pte_devmem) {
-//    *l3_pte_devmem = SET_MEMATTR(*l3_pte_devmem, 1);
-//  }
+  for (i = 0; i < pt_config->num_ranges; ++i) {
+    range = &pt_config->mem_ranges[i];
+    map_page_ptes(l3_pt + range->va_start_page, range->pa_start_page, range->num_pages, range->mem_attr_idx);
+  }
 }
 
 void enable_mmu_tables(uint64_t ttbr0, uint64_t ttbr1)
@@ -324,48 +324,31 @@ void enable_mmu_tables(uint64_t ttbr0, uint64_t ttbr1)
 
 void mmu_init()
 {
-  uint64_t pa_start, pa_range, va_start;
+  uint64_t va_start;
   mmu_caps_t mmu_caps;
   pt_config_t pt_config;
 
   pt_config.base_address = 0x900000;
   pt_config.page_size = MMU_PAGE_GRANULE;
   pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
+  // Cover from 0 to 1GB of physical address space
+  pt_config.pa_start = 0;
+  pt_config.pa_end = 1 * 1024 * 1024 * 1024; 
+
+  pt_config.mem_ranges[0].pa_start_page = 0;
+  pt_config.mem_ranges[0].va_start_page = 0;
+  pt_config.mem_ranges[0].num_pages     = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[0].mem_attr_idx  = MEM_ATTR_IDX_NORMAL;
+
+  pt_config.mem_ranges[1].pa_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[1].va_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[1].num_pages     = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[1].mem_attr_idx  = MEM_ATTR_IDX_DEV_NGNRE;
+  pt_config.num_ranges = 2;
 
   // Number of entries (ptes) in a single page table
   mmu_caps.max_pa_bits = mem_model_max_pa_bits();
-  pa_start = 0;
   va_start = 0;
-  pa_range = 1024 * 1024 * 1024;
-  map_linear_range(pa_start, pa_range, va_start, &mmu_caps, &pt_config);
+  map_linear_range(va_start, &mmu_caps, &pt_config);
   armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
 }
-
-//void mmu_init_table()
-//{
-//  uint64_t val = 0;
-//  vmsav8_64_block_dsc_t* t1 = (vmsav8_64_block_dsc_t*)&val;
-//  t1->SH = 1;
-//  t1->NS = 1;
-//  t1->AF = 1;
-//  t1->PXNTable = 1;
-//  t1->XNTable = 1;
-//
-//  mmu_table_l1[0] = (0x8000000000000000) | val | TABLE_ENTRY_TYPE_BLOCK;
-//  return;
-//
-//  int vcmem_base = 0, vcmem_size = 0;
-//  int block_size = (1<<21);
-//  int nblocks = 0;
-//  if (mbox_get_vc_memory(&vcmem_base, &vcmem_size)) {
-//    printf("failed to get arm memory\n");
-//    return;
-//  } else {
-//    nblocks  = vcmem_size / block_size;
-//    printf("vc memory base:  %08x,\n size: %08x,\n block_size: %08x,\n nblocks: %d\n",
-//      vcmem_base,
-//      vcmem_size,
-//      block_size, 
-//      nblocks);
-//  }
-//}
