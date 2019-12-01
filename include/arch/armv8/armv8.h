@@ -38,7 +38,7 @@ void arm_set_ttbr1_el1(unsigned long);
 void arm_set_tcr_el1(unsigned long );
 
 void arm_mmu_init(void);
-void arm_mmu_enable(void);
+void armv8_enable_mmu(long long ttbr0, long long ttbr1);
 
 // Returns system clock frequency in Hz
 uint32_t get_system_timer_freq(void);

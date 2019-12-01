@@ -1,9 +1,11 @@
 #include <gpio.h>
+#include <bits_api.h>
 #include <mmu.h>
 #include <mbox/mbox_props.h>
 #include <uart/uart.h>
 #include <common.h>
 #include <types.h>
+#include <arch/armv8/armv8.h>
 #include "armv8_tcr.h"
 #include "armv8_sctlr.h"
 #include "mmu_memattr.h"
@@ -102,225 +104,268 @@
 #define MMU_PT_ALIGNMENT 4096
 #define ALIGN_UP(v, to) ((((v) + (to) - 1) / to) * to)
 
-#define LONGLONG(x) ((uint64_t)x)
-
-#define BITS_AT_POS(bits, pos, mask) ((LONGLONG(bits) & mask) << pos)
-#define BIT_AT_POS(bit, pos) BITS_AT_POS(bit, pos, 1)
-
-#define PTE_OUT_ADDR(out_addr) LONGLONG(out_addr & (0xffffffffffff - 0xfff))
+#define PTE_OUT_ADDR(out_addr) BITWIDTH64(out_addr & (0xffffffffffff - 0xfff))
 #define PTE_LO_ATTR(lo_attr)   BITS_AT_POS(lo_attr,  2,  0x3ff)
 #define PTE_UP_ATTR(up_attr)   BITS_AT_POS(up_attr, 51, 0x1fff)
 
-#define MAKE_Lx_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
+#define MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr) (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(out_addr) | PTE_LO_ATTR(lo_attr) | 0b11)
+
+#define MAKE_PAGE_PTE(up_attr, out_addr, lo_attr) MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr)
+
+#define MAKE_PAGE_PTE_LO_ATTR(attr_idx, ns, ap, sh, af, ng) \
+  BITS_AT_POS(attr_idx, 0, 0b111) | BIT_AT_POS(ns, 3) | BITS_AT_POS(ap, 4, 0b11) \
+  | BITS_AT_POS(sh, 6, 0b11) | BIT_AT_POS(af, 8) | BIT_AT_POS(ng, 9) 
+
+#define MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
   BIT_AT_POS(ns_table, 63) | BITS_AT_POS(ap_table, 61, 0b11) | BIT_AT_POS(xn_table, 60) | BIT_AT_POS(pxn_table, 59) | \
   PTE_OUT_ADDR(next_lvl_table_addr) | 0b11
   
-#define MAKE_L3_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr) (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(out_addr) | PTE_LO_ATTR(lo_attr) | 0b11)
+#define MAKE_TABLE_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
+  MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr)
 
-  
 
-#define MAKE_L3_PTE(up_attr, out_addr, lo_attr) MAKE_L3_PTE_VALID_PAGE_4KB(up_attr, out_addr, lo_attr)
+#define SET_MEMATTR(desc, mem_attr_idx) \
+  ((desc) & BITS_AT_POS(mem_attr_idx, 2, 0b11))
 
-#define MAKE_Lx_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr) \
-  MAKE_Lx_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_addr)
 
-#define MAKE_L3_PTE_LO_ATTR(attr_idx, ns, ap, sh, af, ng) \
-  BITS_AT_POS(attr_idx, 0, 0b111) | BIT_AT_POS(ns, 3) | BITS_AT_POS(ap, 4, 0b11) \
-  | BITS_AT_POS(sh, 6, 0b11) | BIT_AT_POS(af, 8) | BIT_AT_POS(ng, 9) 
-void map_l3_pt(uint64_t* l3_pt_start, int l3_pte_count, uint64_t start_page_pa)
+typedef uint64_t mmu_pte_t;
+
+// MMU capabilities
+typedef struct mmu_caps {
+  int max_pa_bits;
+} mmu_caps_t;
+
+// Page table configuration
+typedef struct pt_config {
+  uint64_t base_address;
+  // Size of a signle mapped page (page granule size)
+  int page_size;
+  // Number of entries (ptes) in a single page table
+  int num_entries_per_pt;
+} pt_config_t;
+
+
+void map_page_ptes(mmu_pte_t *l3_pt, int l3_pte_count, uint64_t start_page_pa)
 {
   int i;
   uint64_t pa;
   uint64_t pte;
-  uint64_t *ppte = l3_pt_start;
+  mmu_pte_t *ppte = l3_pt;
   uint64_t lo_attr, up_attr;
   lo_attr = up_attr = 0;
 
-  lo_attr = MAKE_L3_PTE_LO_ATTR(
+  lo_attr = MAKE_PAGE_PTE_LO_ATTR(
     0 /* attr_idx */, 
     1 /* ns */, 
     0 /* ap */, 
     0 /* sh */, 
-    0, //1 /* af */, 
+    1 /* af */, 
     0 /* ng */);
 
   pa = start_page_pa;
   for (i = 0; i < l3_pte_count; ++i) {
-    pte = MAKE_L3_PTE(up_attr, pa, lo_attr);
+    pte = MAKE_PAGE_PTE(up_attr, pa, lo_attr);
     *(ppte++) = pte;
     pa += 4096;
   }
 }
 
-void map_l0l1l2_pt(uint64_t pt_start, int pte_count, uint64_t start_pte)
+uint64_t *get_l3_pte_for_va(uint64_t* l3_pt, uint64_t *l3_pt_end, uint64_t va)
+{
+  return l3_pt + va / MMU_PAGE_GRANULE;
+}
+
+void map_table_ptes(mmu_pte_t *pt, int pte_count, mmu_pte_t *next_level_pte, pt_config_t *pt_config)
 {
   int i;
-  uint64_t *ppte = pt_start;
-  uint64_t next_lvl_table_addr;
-  uint64_t pte;
+  mmu_pte_t *next_level_pt_addr;
   uint64_t ns, ap, xn, pxn;
   ns = ap = xn = pxn = 0;
 
-  next_lvl_table_addr = start_pte;
+  next_level_pt_addr = next_level_pte;
   for (i = 0; i < pte_count; ++i) {
-    pte = MAKE_Lx_PTE(ns, ap, xn, pxn, next_lvl_table_addr);
-    *(ppte++) = pte;
-    next_lvl_table_addr += MMU_PTES_PER_LEVEL * sizeof(pte);
+    pt[i] = MAKE_TABLE_PTE(ns, ap, xn, pxn, next_level_pt_addr);
+    next_level_pt_addr += pt_config->num_entries_per_pt;
   }
 }
 
-void mmu_map_linear_range(uint64_t l0_pt_start, uint64_t start_pa, uint64_t linear_size, uint64_t start_va)
+void map_linear_range(uint64_t start_pa, uint64_t linear_size, uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_config)
 {
-  uint64_t l3_pte_count, l2_pte_count, l1_pte_count, l0_pte_count;
-  uint64_t l3_pt_start, l2_pt_start, l1_pt_start;
+  int l3_pte_count;
+  int l2_pte_count;
+  int l1_pte_count;
+  int l0_pte_count;
 
-  l3_pte_count = max(linear_size   / MMU_PAGE_GRANULE  , 1);
-  l2_pte_count = max(l3_pte_count  / MMU_PTES_PER_LEVEL, 1);
-  l1_pte_count = max(l2_pte_count  / MMU_PTES_PER_LEVEL, 1);
-  l0_pte_count = max(l1_pte_count  / MMU_PTES_PER_LEVEL, 1);
-  l1_pt_start = ALIGN_UP(l0_pt_start + l0_pte_count, MMU_PT_ALIGNMENT);
-  l2_pt_start = ALIGN_UP(l1_pt_start + l1_pte_count, MMU_PT_ALIGNMENT);
-  l3_pt_start = ALIGN_UP(l2_pt_start + l2_pte_count, MMU_PT_ALIGNMENT);
-  map_l3_pt    (l3_pt_start, l3_pte_count, start_pa);
-  map_l0l1l2_pt(l2_pt_start, l2_pte_count, l3_pt_start);
-  map_l0l1l2_pt(l1_pt_start, l1_pte_count, l2_pt_start);
-  map_l0l1l2_pt(l0_pt_start, l0_pte_count, l1_pt_start);
+  mmu_pte_t *l3_pt;
+  mmu_pte_t *l2_pt;
+  mmu_pte_t *l1_pt;
+  mmu_pte_t *l0_pt;
+
+  l3_pte_count = max(linear_size  / pt_config->page_size, 1);
+  l2_pte_count = max(l3_pte_count / pt_config->num_entries_per_pt, 1);
+  l1_pte_count = max(l2_pte_count / pt_config->num_entries_per_pt, 1);
+  l0_pte_count = max(l1_pte_count / pt_config->num_entries_per_pt, 1);
+
+  l0_pt = (mmu_pte_t *)(pt_config->base_address);
+  l1_pt = l0_pt + max(l0_pte_count, pt_config->num_entries_per_pt);
+  l2_pt = l1_pt + max(l1_pte_count, pt_config->num_entries_per_pt);
+  l3_pt = l2_pt + max(l2_pte_count, pt_config->num_entries_per_pt);
+
+  // Map level 0 page table entries to level 1 page tables 
+  map_table_ptes(l0_pt, l0_pte_count, l1_pt, pt_config);
+  // Map level 1 page table entries to level 2 page tables 
+  map_table_ptes(l2_pt, l2_pte_count, l3_pt, pt_config);
+  // Map level 2 page table entries to level 3 page tables 
+  map_table_ptes(l1_pt, l1_pte_count, l2_pt, pt_config);
+
+  // Map level 3 page table entries to actual pages
+  map_page_ptes(l3_pt, l3_pte_count, start_pa);
+
+//  l3_pte_devmem_start = get_l3_pte_for_va(l3_pt_start, l3_pt_start + l3_pte_count, 0x3f000000);
+//  l3_pte_devmem_end   = get_l3_pte_for_va(l3_pt_start, l3_pt_start + l3_pte_count, 0x40000000);
+//
+//  uint64_t mair0;
+//  asm volatile(
+//      "mrs   x0, mair_el1\r\n"
+//      "mov   x1, 0b00000100\r\n"
+//      "orr   x0, x0, x1\r\n"
+//      "msr   mair_el1, x0\r\n"
+//      );
+//
+//  //mair0 = MAIR_SetAttr_Cacheable(0) | MAIR_SetAttr_Dev_nGnRE(1) | MAIR_SetAttr_NonCacheable(2) | MAIR_SetAttr_NonCacheable(2);
+//  // char mair_attr1 = MAIR_dd_nGnRE;
+//
+//  // asm volatile("msr mair_el1, %0"  :: "r"(mair_reg));
+//  for (l3_pte_devmem = l3_pte_devmem_start; l3_pte_devmem != l3_pte_devmem_end; l3_pte_devmem) {
+//    *l3_pte_devmem = SET_MEMATTR(*l3_pte_devmem, 1);
+//  }
 }
 
 void enable_mmu_tables(uint64_t ttbr0, uint64_t ttbr1)
 {
-  uint64_t sctlr_el1_val = 0;
-  uint64_t mair_reg = 0;
-  uint64_t tcr_el1_val = 0;
-  char mair_attr0 = MAIR_normal(MAIR_NormReadonly(1), MAIR_NormReadonly(0)); // MAIR_dd_nGnRnE;
-  char mair_attr1 = MAIR_dd_nGnRE;
-  char mair_attr2 = MAIR_dd_GRE;
-  char mair_attr3 = MAIR_normal(MAIR_Norm_NonCacheable(1), MAIR_Norm_NonCacheable(0));
-  char mair_attr4 = MAIR_normal(MAIR_Norm(1), MAIR_Norm(0));
-
-  mair_reg |= ((uint64_t)mair_attr0) << (8 * 0);
-  mair_reg |= ((uint64_t)mair_attr1) << (8 * 1);
-  mair_reg |= ((uint64_t)mair_attr2) << (8 * 2);
-  mair_reg |= ((uint64_t)mair_attr3) << (8 * 3);
-  mair_reg |= ((uint64_t)mair_attr4) << (8 * 4);
-  
-  asm volatile("dsb sy");
-  asm volatile("msr mair_el1, %0"  :: "r"(mair_reg));
-  asm volatile("msr ttbr0_el1, %0" :: "r"(ttbr0));
-  asm volatile("msr ttbr1_el1, %0" :: "r"(ttbr1));
-  asm volatile("isb");
-
-  // Set translate control register
-  // for both ttbr0_el1, ttbr1_el1:
-  // - enable table walk
-  // - set page granule 4kb
-  // - set region size 512Gb
-  // - set region caching Normal Mem, Write-Back Read-Allocate Write-Allocate Cacheable
-  tcr_el1_t *tcr = (tcr_el1_t*)&tcr_el1_val;
-  tcr->IPS   = TCR_IPS_32_BITS;
-  tcr->TG1   = TCR_TG_4K;
-  tcr->SH1   = TCR_SH_INNER_SHAREABLE;
-  tcr->ORGN1 = TCR_RGN_WbRaWaC;
-  tcr->IRGN1 = TCR_RGN_WbRaWaC;
-  tcr->EPD1  = TCR_EPD_WALK_ENABLED;
-  tcr->T1SZ  = 25; // 0x19 - Region size is (2 ** (64 - 25) -> 2 ** 39 
-                  // = 0x8 000 000 000 = 512G
-  tcr->TG0   = TCR_TG_4K;
-  tcr->SH0   = TCR_SH_INNER_SHAREABLE;
-  tcr->ORGN0 = TCR_RGN_WbRaWaC;
-  tcr->IRGN0 = TCR_RGN_WbRaWaC;
-  tcr->EPD0  = TCR_EPD_WALK_ENABLED;
-  tcr->T0SZ  = 25; // 0x19 Region Size is 512G
-  asm volatile("msr tcr_el1, %0" :: "r"(tcr_el1_val));
-
-  // Set system control register
-  sctlr_el1_t *sctlr = (sctlr_el1_t*)&sctlr_el1_val;
-  sctlr->I   = 1; // instruction cache enable
-  sctlr->SA0 = 1; // stack align check enable
-  sctlr->SA  = 1; // stack align check enable
-  sctlr->C   = 1; // data cache enable
-  sctlr->A   = 1; // alignment check enable
-  sctlr->M   = 1; // mmu enable
-  // 0xC00800
- 
-  sctlr_el1_val |= 0x30d00800;
-  asm volatile("mov x0, #0; at S1E1R, x0");
-
-  asm volatile("msr sctlr_el1, %0; isb" :: "r"(sctlr_el1_val));
-
-  sctlr->M   = 0; // mmu enable
-
-  asm volatile(
-    "msr sctlr_el1, %0;"
-    "isb"
-      :: "r"(sctlr_el1_val));
+  //uint64_t sctlr_el1_val = 0;
+  //uint64_t mair_reg = 0;
+  //uint64_t tcr_el1_val = 0;
+//  char mair_attr0 = MAIR_normal(MAIR_NormReadonly(1), MAIR_NormReadonly(0));
+//  char mair_attr1 = MAIR_dd_nGnRE;
+//  char mair_attr2 = MAIR_dd_GRE;
+//  char mair_attr3 = MAIR_normal(MAIR_Norm_NonCacheable(1), MAIR_Norm_NonCacheable(0));
+//  char mair_attr4 = MAIR_normal(MAIR_Norm(1), MAIR_Norm(0));
+//
+//  mair_reg |= ((uint64_t)mair_attr0) << (8 * 0);
+//  mair_reg |= ((uint64_t)mair_attr1) << (8 * 1);
+//  mair_reg |= ((uint64_t)mair_attr2) << (8 * 2);
+//  mair_reg |= ((uint64_t)mair_attr3) << (8 * 3);
+//  mair_reg |= ((uint64_t)mair_attr4) << (8 * 4);
+//  
+//  asm volatile("dsb sy");
+//  asm volatile("msr mair_el1, %0"  :: "r"(mair_reg));
+//  asm volatile("msr ttbr0_el1, %0" :: "r"(ttbr0));
+//  asm volatile("msr ttbr1_el1, %0" :: "r"(ttbr1));
+//  asm volatile("isb");
+//
+//  // Set translate control register
+//  // for both ttbr0_el1, ttbr1_el1:
+//  // - enable table walk
+//  // - set page granule 4kb
+//  // - set region size 512Gb
+//  // - set region caching Normal Mem, Write-Back Read-Allocate Write-Allocate Cacheable
+//  tcr_el1_t *tcr = (tcr_el1_t*)&tcr_el1_val;
+//  tcr->IPS   = TCR_IPS_32_BITS;
+//  tcr->TG1   = TCR_TG_4K;
+//  tcr->SH1   = TCR_SH_INNER_SHAREABLE;
+//  tcr->ORGN1 = TCR_RGN_WbRaWaC;
+//  tcr->IRGN1 = TCR_RGN_WbRaWaC;
+//  tcr->EPD1  = TCR_EPD_WALK_ENABLED;
+//  tcr->T1SZ  = 25; // 0x19 - Region size is (2 ** (64 - 25) -> 2 ** 39 
+//                  // = 0x8 000 000 000 = 512G
+//  tcr->TG0   = TCR_TG_4K;
+//  tcr->SH0   = TCR_SH_INNER_SHAREABLE;
+//  tcr->ORGN0 = TCR_RGN_WbRaWaC;
+//  tcr->IRGN0 = TCR_RGN_WbRaWaC;
+//  tcr->EPD0  = TCR_EPD_WALK_ENABLED;
+//  tcr->T0SZ  = 25; // 0x19 Region Size is 512G
+//  asm volatile("msr tcr_el1, %0" :: "r"(tcr_el1_val));
+//
+//  // Set system control register
+//  sctlr_el1_t *sctlr = (sctlr_el1_t*)&sctlr_el1_val;
+//  sctlr->I   = 1; // instruction cache enable
+//  sctlr->SA0 = 1; // stack align check enable
+//  sctlr->SA  = 1; // stack align check enable
+//  sctlr->C   = 1; // data cache enable
+//  sctlr->A   = 1; // alignment check enable
+//  sctlr->M   = 1; // mmu enable
+//  // 0xC00800
+// 
+//  sctlr_el1_val |= 0x30d00800;
+//  asm volatile("mov x0, #0; at S1E1R, x0");
+//
+//  asm volatile("msr sctlr_el1, %0; isb" :: "r"(sctlr_el1_val));
+//
+//  sctlr->M   = 0; // mmu enable
+//
+//  asm volatile(
+//    "msr sctlr_el1, %0;"
+//    "isb"
+//      :: "r"(sctlr_el1_val));
 }
 
-
-extern void _armv8_mmu_init(void *pt_l0, uint64_t max_pages);
 
 // ?? why alignment is 16384
-static uint64_t __attribute__((aligned(16384))) 
-mmu_table_l1[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
-
-static uint64_t __attribute__((aligned(16384))) 
-mmu_table_l2[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
-
-void mmu_set_ttbr0(uint64_t ttbr0_table)
-{
-}
+//static uint64_t __attribute__((aligned(16384))) 
+//mmu_table_l1[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
+//
+//static uint64_t __attribute__((aligned(16384))) 
+//mmu_table_l2[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
+//
+//void mmu_set_ttbr0(uint64_t ttbr0_table)
+//{
+//}
 
 void mmu_init()
 {
-  int max_pa_bits;
-  uint64_t pt_l0;
   uint64_t pa_start, pa_range, va_start;
-  uint64_t max_pages;
-  pt_l0 = 0x900000;
+  mmu_caps_t mmu_caps;
+  pt_config_t pt_config;
+
+  pt_config.base_address = 0x900000;
+  pt_config.page_size = MMU_PAGE_GRANULE;
+  pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
+
+  // Number of entries (ptes) in a single page table
+  mmu_caps.max_pa_bits = mem_model_max_pa_bits();
   pa_start = 0;
   va_start = 0;
   pa_range = 1024 * 1024 * 1024;
-  max_pa_bits = mem_model_max_pa_bits();
-  mmu_map_linear_range(pt_l0, pa_start, pa_range, va_start);
-  __enable_mmu(pt_l0, pt_l0);
-  //mmu_set_ttbr0(pt_l0);
-  return;
-
-
-  _armv8_mmu_init(pt_l0, max_pages);
-  _Static_assert(sizeof(tcr_el1_t)              == 8, "size not 8"); 
-  _Static_assert(sizeof(sctlr_el1_t)            == 8, "size not 8");
-  _Static_assert(sizeof(vmsav8_64_block_dsc_t)  == 8, "size not 8");
-  
-  mmu_init_table();
-  enable_mmu_tables((uint64_t)&mmu_table_l1[0], (uint64_t)&mmu_table_l2[0]);
+  map_linear_range(pa_start, pa_range, va_start, &mmu_caps, &pt_config);
+  armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
 }
 
-void mmu_init_table()
-{
-  uint64_t val = 0;
-  vmsav8_64_block_dsc_t* t1 = (vmsav8_64_block_dsc_t*)&val;
-  t1->SH = 1;
-  t1->NS = 1;
-  t1->AF = 1;
-  t1->PXNTable = 1;
-  t1->XNTable = 1;
-
-  mmu_table_l1[0] = (0x8000000000000000) | val | TABLE_ENTRY_TYPE_BLOCK;
-  return;
-
-  int vcmem_base = 0, vcmem_size = 0;
-  int block_size = (1<<21);
-  int nblocks = 0;
-  if (mbox_get_vc_memory(&vcmem_base, &vcmem_size)) {
-    printf("failed to get arm memory\n");
-    return;
-  } else {
-    nblocks  = vcmem_size / block_size;
-    printf("vc memory base:  %08x,\n size: %08x,\n block_size: %08x,\n nblocks: %d\n",
-      vcmem_base,
-      vcmem_size,
-      block_size, 
-      nblocks);
-  }
-}
+//void mmu_init_table()
+//{
+//  uint64_t val = 0;
+//  vmsav8_64_block_dsc_t* t1 = (vmsav8_64_block_dsc_t*)&val;
+//  t1->SH = 1;
+//  t1->NS = 1;
+//  t1->AF = 1;
+//  t1->PXNTable = 1;
+//  t1->XNTable = 1;
+//
+//  mmu_table_l1[0] = (0x8000000000000000) | val | TABLE_ENTRY_TYPE_BLOCK;
+//  return;
+//
+//  int vcmem_base = 0, vcmem_size = 0;
+//  int block_size = (1<<21);
+//  int nblocks = 0;
+//  if (mbox_get_vc_memory(&vcmem_base, &vcmem_size)) {
+//    printf("failed to get arm memory\n");
+//    return;
+//  } else {
+//    nblocks  = vcmem_size / block_size;
+//    printf("vc memory base:  %08x,\n size: %08x,\n block_size: %08x,\n nblocks: %d\n",
+//      vcmem_base,
+//      vcmem_size,
+//      block_size, 
+//      nblocks);
+//  }
+//}

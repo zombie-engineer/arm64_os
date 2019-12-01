@@ -577,7 +577,7 @@ FUNC(arm_mmu_init):
   .set ADDR, ADDR+2 
   .endr
 
-FUNC(__enable_mmu):
+FUNC(armv8_enable_mmu):
   msr   ttbr0_el1, x0
   msr   ttbr1_el1, x1
 
