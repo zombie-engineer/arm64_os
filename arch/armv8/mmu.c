@@ -141,7 +141,7 @@ void map_l3_pt(uint64_t* l3_pt_start, int l3_pte_count, uint64_t start_page_pa)
     1 /* ns */, 
     0 /* ap */, 
     0 /* sh */, 
-    1 /* af */, 
+    0, //1 /* af */, 
     0 /* ng */);
 
   pa = start_page_pa;
@@ -169,12 +169,12 @@ void map_l0l1l2_pt(uint64_t pt_start, int pte_count, uint64_t start_pte)
   }
 }
 
-void map_linear(uint64_t l0_pt_start, uint64_t start_pa, uint64_t linear_size, uint64_t start_va)
+void mmu_map_linear_range(uint64_t l0_pt_start, uint64_t start_pa, uint64_t linear_size, uint64_t start_va)
 {
   uint64_t l3_pte_count, l2_pte_count, l1_pte_count, l0_pte_count;
   uint64_t l3_pt_start, l2_pt_start, l1_pt_start;
 
-  l3_pte_count = max(linear_size / MMU_PAGE_GRANULE  , 1);
+  l3_pte_count = max(linear_size   / MMU_PAGE_GRANULE  , 1);
   l2_pte_count = max(l3_pte_count  / MMU_PTES_PER_LEVEL, 1);
   l1_pte_count = max(l2_pte_count  / MMU_PTES_PER_LEVEL, 1);
   l0_pte_count = max(l1_pte_count  / MMU_PTES_PER_LEVEL, 1);
@@ -272,6 +272,7 @@ void mmu_set_ttbr0(uint64_t ttbr0_table)
 
 void mmu_init()
 {
+  int max_pa_bits;
   uint64_t pt_l0;
   uint64_t pa_start, pa_range, va_start;
   uint64_t max_pages;
@@ -279,7 +280,8 @@ void mmu_init()
   pa_start = 0;
   va_start = 0;
   pa_range = 1024 * 1024 * 1024;
-  map_linear(pt_l0, pa_start, pa_range, va_start);
+  max_pa_bits = mem_model_max_pa_bits();
+  mmu_map_linear_range(pt_l0, pa_start, pa_range, va_start);
   __enable_mmu(pt_l0, pt_l0);
   //mmu_set_ttbr0(pt_l0);
   return;

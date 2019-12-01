@@ -143,3 +143,22 @@ _armv8_mmu_map_pte_l0:
 //  ret
   
 
+// Chapter D5.2.8
+// Table D5-25. Translation table entry addresses when using 4KB
+// translation granule.
+
+l0_pte_idx:
+  // BaseAddr[39:x]:IA[y:39]:0b000; x = 12; y = 47
+  // BaseAddr[39:12]:IA[47:39]:0b000
+
+l1_pte_idx:
+  // BaseAddr[39:x]:IA[y:30]:0b000; x = 12; y = 38
+  // BaseAddr[39:12]:IA[38:30]:0b000
+
+l2_pte_idx:
+  // BaseAddr[39:x]:IA[y:21]:0b000; x = 12; y = 29
+  // BaseAddr[39:12]:IA[29:21]:0b000
+
+l3_pte_idx:
+  // BaseAddr[39:x]:IA[y:12]:0b000; x = 12; y = 20
+  // BaseAddr[39:12]:IA[20:12]:0b000

@@ -285,19 +285,27 @@ void nokia5110_test()
 
 void main()
 {
+  int i;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
+  mmu_init();
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
-  mmu_init();
   // nokia5110_test();
   print_current_ex_level();
 
   print_mbox_props();
   print_arm_features();
-  disable_l1_caches();
+  print_cache_stats();
+  i = 0;
+  while(1) {
+    printf("%d", i++);
+    wait_msec(1000);
+  }
+
+  // disable_l1_caches();
 
   rand_init();
 
@@ -308,7 +316,6 @@ void main()
   tags_print_cmdline();
 
   // gpio_set_function(21, GPIO_FUNC_OUT);
-  print_cache_stats();
   print_mmu_stats();
 
   // hexdump_addr(0x100);
