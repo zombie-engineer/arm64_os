@@ -75,8 +75,8 @@
 #define TABLE_ENTRY_TYPE_BLOCK 1
 #define TABLE_ENTRY_TYPE_TABLE 3
 
-#define MEM_ATTR_IDX_NORMAL    0
-#define MEM_ATTR_IDX_DEV_NGNRE 1
+#define MEMATTR_IDX_NORMAL    0
+#define MEMATTR_IDX_DEV_NGNRE 1
 
   // MAP a range of 32 megabytes
   // map range 32Mb
@@ -241,86 +241,22 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
   }
 }
 
-void enable_mmu_tables(uint64_t ttbr0, uint64_t ttbr1)
+void armv8_set_mem_attribute(int attr_idx, char attribute)
 {
-  //uint64_t sctlr_el1_val = 0;
-  //uint64_t mair_reg = 0;
-  //uint64_t tcr_el1_val = 0;
-//  char mair_attr0 = MAIR_normal(MAIR_NormReadonly(1), MAIR_NormReadonly(0));
-//  char mair_attr1 = MAIR_dd_nGnRE;
-//  char mair_attr2 = MAIR_dd_GRE;
-//  char mair_attr3 = MAIR_normal(MAIR_Norm_NonCacheable(1), MAIR_Norm_NonCacheable(0));
-//  char mair_attr4 = MAIR_normal(MAIR_Norm(1), MAIR_Norm(0));
-//
-//  mair_reg |= ((uint64_t)mair_attr0) << (8 * 0);
-//  mair_reg |= ((uint64_t)mair_attr1) << (8 * 1);
-//  mair_reg |= ((uint64_t)mair_attr2) << (8 * 2);
-//  mair_reg |= ((uint64_t)mair_attr3) << (8 * 3);
-//  mair_reg |= ((uint64_t)mair_attr4) << (8 * 4);
-//  
-//  asm volatile("dsb sy");
-//  asm volatile("msr mair_el1, %0"  :: "r"(mair_reg));
-//  asm volatile("msr ttbr0_el1, %0" :: "r"(ttbr0));
-//  asm volatile("msr ttbr1_el1, %0" :: "r"(ttbr1));
-//  asm volatile("isb");
-//
-//  // Set translate control register
-//  // for both ttbr0_el1, ttbr1_el1:
-//  // - enable table walk
-//  // - set page granule 4kb
-//  // - set region size 512Gb
-//  // - set region caching Normal Mem, Write-Back Read-Allocate Write-Allocate Cacheable
-//  tcr_el1_t *tcr = (tcr_el1_t*)&tcr_el1_val;
-//  tcr->IPS   = TCR_IPS_32_BITS;
-//  tcr->TG1   = TCR_TG_4K;
-//  tcr->SH1   = TCR_SH_INNER_SHAREABLE;
-//  tcr->ORGN1 = TCR_RGN_WbRaWaC;
-//  tcr->IRGN1 = TCR_RGN_WbRaWaC;
-//  tcr->EPD1  = TCR_EPD_WALK_ENABLED;
-//  tcr->T1SZ  = 25; // 0x19 - Region size is (2 ** (64 - 25) -> 2 ** 39 
-//                  // = 0x8 000 000 000 = 512G
-//  tcr->TG0   = TCR_TG_4K;
-//  tcr->SH0   = TCR_SH_INNER_SHAREABLE;
-//  tcr->ORGN0 = TCR_RGN_WbRaWaC;
-//  tcr->IRGN0 = TCR_RGN_WbRaWaC;
-//  tcr->EPD0  = TCR_EPD_WALK_ENABLED;
-//  tcr->T0SZ  = 25; // 0x19 Region Size is 512G
-//  asm volatile("msr tcr_el1, %0" :: "r"(tcr_el1_val));
-//
-//  // Set system control register
-//  sctlr_el1_t *sctlr = (sctlr_el1_t*)&sctlr_el1_val;
-//  sctlr->I   = 1; // instruction cache enable
-//  sctlr->SA0 = 1; // stack align check enable
-//  sctlr->SA  = 1; // stack align check enable
-//  sctlr->C   = 1; // data cache enable
-//  sctlr->A   = 1; // alignment check enable
-//  sctlr->M   = 1; // mmu enable
-//  // 0xC00800
-// 
-//  sctlr_el1_val |= 0x30d00800;
-//  asm volatile("mov x0, #0; at S1E1R, x0");
-//
-//  asm volatile("msr sctlr_el1, %0; isb" :: "r"(sctlr_el1_val));
-//
-//  sctlr->M   = 0; // mmu enable
-//
-//  asm volatile(
-//    "msr sctlr_el1, %0;"
-//    "isb"
-//      :: "r"(sctlr_el1_val));
+  asm volatile (
+    "lsl   %0, %0, 3\n"
+    "lsl   %1, %1, %0\n"
+
+    "mov   x2, #0xff\n"
+    "lsl   x2, x2, %0\n"
+
+    "mrs   x0, mair_el1\n"
+    "bic   x0, x0, x2\n"
+    "orr   x0, x0, x1\n"
+
+    "msr   mair_el1, x1\n" :: "r" (attr_idx), "r" (attribute)
+  );
 }
-
-
-// ?? why alignment is 16384
-//static uint64_t __attribute__((aligned(16384))) 
-//mmu_table_l1[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
-//
-//static uint64_t __attribute__((aligned(16384))) 
-//mmu_table_l2[MAX_TABLE_ENTRIES_FOR_4K_GRANULE] = { 0 };
-//
-//void mmu_set_ttbr0(uint64_t ttbr0_table)
-//{
-//}
 
 void mmu_init()
 {
@@ -338,13 +274,15 @@ void mmu_init()
   pt_config.mem_ranges[0].pa_start_page = 0;
   pt_config.mem_ranges[0].va_start_page = 0;
   pt_config.mem_ranges[0].num_pages     = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[0].mem_attr_idx  = MEM_ATTR_IDX_NORMAL;
+  pt_config.mem_ranges[0].mem_attr_idx  = MEMATTR_IDX_NORMAL;
 
   pt_config.mem_ranges[1].pa_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].va_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].num_pages     = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[1].mem_attr_idx  = MEM_ATTR_IDX_DEV_NGNRE;
+  pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
   pt_config.num_ranges = 2;
+
+  armv8_set_mem_attribute(MEMATTR_IDX_DEV_NGNRE, MEMATTR_DEVICE_NGNRE);
 
   // Number of entries (ptes) in a single page table
   mmu_caps.max_pa_bits = mem_model_max_pa_bits();
