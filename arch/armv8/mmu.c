@@ -126,11 +126,6 @@
 #define MAKE_TABLE_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page) \
   MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page)
 
-
-#define SET_MEMATTR(desc, mem_attr_idx) \
-  ((desc) & BITS_AT_POS(mem_attr_idx, 2, 0b11))
-
-
 typedef uint64_t mmu_pte_t;
 
 // MMU capabilities
@@ -295,7 +290,11 @@ void mmu_init()
   pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
   pt_config.num_ranges = 2;
 
-  // armv8_set_mem_attribute(MEMATTR_IDX_NORMAL, 0b01000100);
+  armv8_set_mem_attribute(MEMATTR_IDX_NORMAL,   
+    MAKE_MEMATTR_NORMAL(
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA), 
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA)));
+
   armv8_set_mem_attribute(MEMATTR_IDX_DEV_NGNRE, MEMATTR_DEVICE_NGNRE);
 
   // Number of entries (ptes) in a single page table

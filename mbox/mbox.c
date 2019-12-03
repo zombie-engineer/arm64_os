@@ -57,14 +57,14 @@ int mbox_call(unsigned char ch)
   // wait until we can write to mailbox
   while(read_reg(MBOX_STATUS) & MBOX_FULL);
 
-  flush_dcache_range(mbox_addr, mbox_addr);
+  // flush_dcache_range(mbox_addr, mbox_addr);
   // write address of out message
   write_reg(MBOX_WRITE, regval);
 
   while(1) {
     while (read_reg(MBOX_STATUS) & MBOX_EMPTY);
     if (read_reg(MBOX_READ) == regval) {
-      flush_dcache_range(mbox_addr, mbox_addr);
+      // flush_dcache_range(mbox_addr, mbox_addr);
       return mbox[1] == MBOX_RESPONSE;
     }
   }
