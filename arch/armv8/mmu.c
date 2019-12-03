@@ -244,7 +244,7 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
 void armv8_set_mem_attribute(int attr_idx, char attribute)
 {
   asm volatile (
-    "lsl   %0, %0, 3\n"
+    "lsl   %0, %0, #3\n"
     "lsl   %1, %1, %0\n"
 
     "mov   x2, #0xff\n"
@@ -256,6 +256,19 @@ void armv8_set_mem_attribute(int attr_idx, char attribute)
 
     "msr   mair_el1, x1\n" :: "r" (attr_idx), "r" (attribute)
   );
+}
+
+char armv8_get_mem_attribute(int attr_idx)
+{
+  char attribute;
+  asm volatile (
+    "lsl   %1, %1, #3\n"
+    "mrs   x1, mair_el1\n"
+    "lsr   x1, x1, %1\n"
+    "and   x1, x1, #0xff\n"
+    "mov   %0, x1\n" :"=r"(attribute) : "r"(attr_idx)
+  );
+  return attribute;
 }
 
 void mmu_init()
@@ -282,6 +295,7 @@ void mmu_init()
   pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
   pt_config.num_ranges = 2;
 
+  // armv8_set_mem_attribute(MEMATTR_IDX_NORMAL, 0b01000100);
   armv8_set_mem_attribute(MEMATTR_IDX_DEV_NGNRE, MEMATTR_DEVICE_NGNRE);
 
   // Number of entries (ptes) in a single page table

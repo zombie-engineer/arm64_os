@@ -93,7 +93,7 @@ void print_mbox_props()
   if (mbox_get_mac_addr(&buf[0], &buf[7]))
     printf("failed to get MAC addr\n");
   else
-    printf("mac address:     %x:%x:%x:%x:%x:%x\n", 
+    printf("mac address:     %02x:%02x:%02x:%02x:%02x:%02x\n", 
       (int)(buf[0]),
       (int)(buf[1]),
       (int)(buf[2]),
@@ -231,6 +231,14 @@ void print_mmu_stats()
     arm_get_tcr_el1());
 }
 
+void print_mmu_features()
+{
+  char memattrs[8];
+  memattrs[0] = armv8_get_mem_attribute(0);
+  memattrs[1] = armv8_get_mem_attribute(1);
+  printf("mmu: mem_attr_0: %02x, mem_attr_1: %02x\n", memattrs[0], memattrs[1]);
+}
+
 void print_arm_features()
 {
   unsigned long el;
@@ -297,13 +305,8 @@ void main()
   print_current_ex_level();
 
   print_mbox_props();
-  print_arm_features();
+  print_mmu_features();
   print_cache_stats();
-  i = 0;
-  while(1) {
-    printf("%d", i++);
-    wait_msec(1000);
-  }
 
   // disable_l1_caches();
 

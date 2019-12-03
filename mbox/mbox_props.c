@@ -94,19 +94,15 @@ int mbox_get_firmware_rev()
   return -1;
 }
 
+DECL_MBOX_REQ_2T(get_mac_addr, mac_address_1, mac_address_2);
+DECL_MBOX_RSP_2T(get_mac_addr, mac_address_1, mac_address_2);
+DECL_MBOX_1TAG_MSG_T(get_mac_addr);
+
 int mbox_get_mac_addr(char *mac_start, char *mac_end)
 {
   int i;
-  mbox[0] = 8 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_MAC_ADDR;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = 0;
-  mbox[6] = 0;
-  mbox[7] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
-  {
+  DECL_MBOX_MSG(get_mac_addr, MBOX_TAG_GET_MAC_ADDR);
+  if (mbox_call(MBOX_CH_PROP)) {
     for (i = 0; i < 6; ++i)
     {
       if (mac_start + i >= mac_end)
@@ -117,6 +113,30 @@ int mbox_get_mac_addr(char *mac_start, char *mac_end)
   }
   return -1;
 }
+//
+//int mbox_get_mac_addr(char *mac_start, char *mac_end)
+//{
+//  int i;
+//  mbox[0] = 8 * 4;
+//  mbox[1] = MBOX_REQUEST;
+//  mbox[2] = MBOX_TAG_GET_MAC_ADDR;
+//  mbox[3] = 8;
+//  mbox[4] = 8;
+//  mbox[5] = 0;
+//  mbox[6] = 0;
+//  mbox[7] = MBOX_TAG_LAST;
+//  if (mbox_call(MBOX_CH_PROP))
+//  {
+//    for (i = 0; i < 6; ++i)
+//    {
+//      if (mac_start + i >= mac_end)
+//        break;
+//      mac_start[i] = ((char*)(&mbox[5]))[i];
+//    }
+//    return 0;
+//  }
+//  return -1;
+//}
 
 int mbox_get_board_model()
 {

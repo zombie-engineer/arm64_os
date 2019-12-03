@@ -42,6 +42,8 @@ void armv8_enable_mmu(long long ttbr0, long long ttbr1);
 
 void armv8_set_mem_attribute(int attr_idx, char attribute);
 
+char armv8_get_mem_attribute(int attr_idx);
+
 // Returns system clock frequency in Hz
 uint32_t get_system_timer_freq(void);
 

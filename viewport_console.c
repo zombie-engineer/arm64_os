@@ -40,7 +40,7 @@ int viewport_console_init()
   tv.textbuflast = tv.textbuf;
   tv.tabwidth = 4;
 
-  tv.viewport = vcanvas_make_viewport(20, 20, 768, 256);
+  tv.viewport = vcanvas_make_viewport(20, 20, 768, 512);
   vcanvas_get_fontsize(&tv.fontsize_x, &tv.fontsize_y);
   tv.maxchars_x = tv.viewport->size_x / tv.fontsize_x;
   tv.maxchars_y = tv.viewport->size_y / tv.fontsize_y;

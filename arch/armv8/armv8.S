@@ -593,6 +593,8 @@ FUNC(armv8_enable_mmu):
   // mov   x1, x0
   orr   x0, x0, #1
   bic   x0, x0, #(1<<19)
+  // Cacheability control
+  // bic   x0, x0, #(1<<2)
   msr   sctlr_el1, x0
   // msr   sctlr_el1, x1
   
