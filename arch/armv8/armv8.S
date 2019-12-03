@@ -458,25 +458,6 @@ FUNC(arm_set_tcr_el1):
     // NFD1,  bit[54]   Non-fault translation table disable for stage 1 TTBR1_EL1
 
 
-    // D13.2.84 MAIR_EL1, Memory Attribute Indirection Register (EL1)
-    // Provides the memory attribute encodings corresponding to the possible AttrIndx values in a
-    // Long-descriptor format translation table entry for stage 1 translations at EL1.
-    // Attr<n>, bits [8n+7:8n], for n = 0 to 7
-    //    0b0000dd00 Device memory. 
-    //    0b0000ddxx (xx != 00) unpredictable
-    //    0booooiiii (oooo != 0000 and iiii != 0000) Normal memory 
-    //    0b11110000 Tagged Normal Memory.
-    //    0bxxxx0000 (xxxx != 0000 and xxxx != 1111) unpredictable
-    //    dd: 0b00 Device-nGnRnE memory
-    //        0b01 Device-nGnRE memory
-    //        0b10 Device-nGRE memory
-    //        0b11 Device-GRE memory
-    //    oooo: 0b0000
-    //          0b00RW, RW not 0b00 Normal mem, Outer Write-throught Transient
-    //          0b0100              Normal mem, Outer Non-cacheable
-    //          0b01RW, RW not 0b00 Normal mem, Outer Write-Back Transient
-    //          0b11RW              Normal mem, Outer Write-Back Non-transient
-    //    iiii: 0b0000
 
     // Search "Table D5-33 Stage 1 access permissions for instruction execution for a translation regime that applies to EL0 and a
     // higher Exception level"
@@ -487,95 +468,6 @@ FUNC(arm_set_tcr_el1):
   mov   w7, #(1<<21)
   str   w7, [x6]
 .endm
-
-FUNC(arm_mmu_enable):
-  mrs   x0, s3_1_c15_c2_1 // Read CPUECTLR_EL1 register
-  orr   x0, x0, #(1 << 6) // SMPEN bit enable data coherency with other cores in the cluster.
-  msr   s3_1_c15_c2_1, x0
-
-  // Enable caches and the MMU.
-  mrs   x0, SCTLR_EL1
-  orr   x0, x0, #(1 << 2)  // C bit (data cache)
-  orr   x0, x0, #(1 << 12) // I bit (instruction cache)
-  orr   x0, x0, #1         // M bit (MMU)
-  bic   x0, x0, #(3 << 19) // UWXN, WXN
-  msr   SCTLR_EL1, x0
-  // dsb   sy // Full system DMB operation
-  ret
-
-.macro ORR_BIT Rd, Rtmp, V, Mask, Pos
-  mov   \Rtmp,  #\V
-  and   \Rtmp, \Rtmp, \Mask
-  orr   \Rd, \Rd, \Rtmp, lsl #\Pos
-.endm
-
-.macro SET_LOWER_ATTRS Rd, Rtmp, AttrIdx, NS, AP, SH, AF, nG
-  bic   \Rd, \Rd, #0x3ff
-  ORR_BIT \Rd, \Rtmp, \AttrIdx, 3, 2
-  ORR_BIT \Rd, \Rtmp, \NS, 1, 5
-  ORR_BIT \Rd, \Rtmp, \AP, 3, 6
-  ORR_BIT \Rd, \Rtmp, \SH, 3, 8
-  ORR_BIT \Rd, \Rtmp, \AF, 1, 10
-  ORR_BIT \Rd, \Rtmp, \nG, 1, 11
-.endm
-
-FUNC(arm_mmu_init):
-  ldr   x1, =0x3520     // [5:0]   = 32 region size is pow(2, 64 - 32) = pow(2,32) = 4GB
-                        // [9:8]   = 1 Normal Inner cacheable
-                        // [11:10] = 1 Normal Outer cacheable
-                        // [12:13] = 3 Inner-shareable
-  msr   TCR_EL1, x1
-  ldr   x1, =0xff440400 // Attr0 - Device-nGnRnE, Attr1 Device, Attr2 - Normal Non-Cacheeable
-  msr   MAIR_EL1, x1    // Attr2 - Normal Non-Cacheeable
-  adr   x0, ttb0_base   // 4kb-aligned address
-  add   x0, x0, #1      // 
-  msr   TTBR0_EL1, x0
-  bic   x0, x0, #1
-
-  // Set up translation table entries in memory with looped store
-  // instructions
-  // Set level 1 translation table
-  // The first entry points to level2_pagetable
-  ldr   x1, =level2_pagetable // 4kb aligned
-  ldr   x2, =0x00000000fffff000
-  and   x2, x1, x2            // NSTable=0 APTable=0 XNTable=0 PXNTable=0
-  orr   x2, x2, #3
-  str   x2, [x0]              // Long Format Table Descriptor
-  
-  // Set level 2 translation table
-  ldr   x0, =level2_pagetable // Base address of level2_pagetable.
-  ldr   x2, =0x0000074d       // Executale Inner and Outer Shareable.
-  bic   x2, x2, #(3<<6)       // R/W at all ELs secure memory.
-                              // AttrIdx=011 Normal Cacheable.
-  str   x2, [x0]              // Long Format Block Descriptor
-  ret   
-
-  // Put a 64-bit value with little endianness.
-  .macro PUT_64B high, low
-    .word \low
-    .word \high
-  .endm
-
-  // Create an entry pointing to next-level table
-  .macro TABLE_ENTRY PA, ATTR
-    PUT_64B \ATTR, (\PA) + 0x3
-  .endm
-
-  .macro BLOCK_2MB PHYS_ADDR, ATTR_HI, ATTR_LO
-    PUT_64B \ATTR_HI, (\PHYS_ADDR & 0xffe00000)| \ATTR_LO | 0x1
-  .endm
-
-  .align 12      // 12 for 4kb granule
-  ttb0_base:
-  TABLE_ENTRY level2_pagetable, 0
-
-  .align 12      // 12 for 4kb granule
-  level2_pagetable:
-  .set ADDR, 0x000
-  .rept 0x200
-  BLOCK_2MB (ADDR << 20), 0, 0x74c
-  .set ADDR, ADDR+2 
-  .endr
 
 FUNC(armv8_enable_mmu):
   msr   ttbr0_el1, x0
