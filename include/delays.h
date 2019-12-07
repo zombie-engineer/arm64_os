@@ -1,14 +1,12 @@
 #pragma once
+#include <types.h>
 
-void wait_cycles(unsigned int n);
+void wait_cycles(uint32_t n);
 
 /* wait n microseconds */
-void wait_usec(unsigned int n);
+void wait_usec(uint32_t n);
 
 /* wait n milliseconds */
-void wait_msec(unsigned int n);
+void wait_msec(uint32_t n);
 
-unsigned long long get_system_timer();
-void wait_msec_st(unsigned int n);
-
-void set_timer(unsigned int ms);
+uint64_t get_system_timer();
