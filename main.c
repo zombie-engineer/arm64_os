@@ -18,6 +18,7 @@
 #include <cmdrunner.h>
 #include <max7219.h>
 #include <drivers/display/nokia5110.h>
+#include <system_timer.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -123,43 +124,24 @@ void print_mbox_props()
   }
 }
 
-int lit = 0;
-
-void c_irq_handler(void)
+void* my_timer_callback(void* arg)
 {
-  gpio_set_on(21);
-  // if (lit) lit = 0; else lit = 1;
-//  set_activity_led(lit);
-// clear_timer_irq();
+  printf("this is my timer_callback\n");
+  return 0;
 }
 
 void wait_timer()
 {
-  gpio_set_function(21, GPIO_FUNC_OUT);
-  enable_irq();
+  puts("wait 2 sec\n");
+  wait_msec(2000);
+  bcm2835_arm_timer_set(1000000, my_timer_callback, 0);
   interrupt_ctrl_enable_timer_irq();
-  if (is_irq_enabled())
-    printf("irq enabled\n");
-  arm_timer_set(500000, c_irq_handler);
-  while(1)
-  {
-    interrupt_ctrl_dump_regs("after set\n");
-    print_reg32_at(GPIO_REG_GPEDS0);
-    wait_cycles(0x1800000);
-    print_reg32_at(GPIO_REG_GPEDS0);
-    print_reg32(ARM_TIMER_VALUE_REG);
-    print_reg32(ARM_TIMER_RAW_IRQ_REG);
-    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
-    printf(">>\n");
-    gpio_set_on(21);
-    wait_cycles(0x1800000);
-    print_reg32(ARM_TIMER_VALUE_REG);
-    print_reg32(ARM_TIMER_RAW_IRQ_REG);
-    print_reg32(ARM_TIMER_MASKED_IRQ_REG);
-    printf(">>\n");
-    gpio_set_off(21);
-    if (ARM_TIMER_RAW_IRQ_REG)
-      ARM_TIMER_IRQ_CLEAR_ACK_REG = 1;
+  enable_irq();
+  // interrupt_ctrl_dump_regs("after");
+  // asm volatile("svc #0");
+  while(1) {
+    wait_msec(100000);
+    // interrupt_ctrl_dump_regs("during");
   }
 }
 
@@ -177,7 +159,7 @@ void wait_gpio()
   while(1) {
     // f: 1111 b: 1011
     wait_cycles(0x300000);
-    print_reg32(INT_CTRL_IRQ_PENDING_2);
+    // print_reg32(INT_CTRL_IRQ_PENDING_2);
     print_reg32_at(GPIO_REG_GPLEV0);
     print_reg32_at(GPIO_REG_GPEDS0);
   }
@@ -298,11 +280,12 @@ void main()
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
-  mmu_init();
+  // mmu_init();
   uart_init(115200, BCM2825_SYSTEM_CLOCK);
   init_consoles();
   // nokia5110_test();
   print_current_ex_level();
+  wait_timer();
 
   print_mbox_props();
   print_mmu_features();
@@ -320,6 +303,7 @@ void main()
 
   // gpio_set_function(21, GPIO_FUNC_OUT);
   print_mmu_stats();
+  // run_task();
 
   // hexdump_addr(0x100);
   // 0x0000000000001122
@@ -330,7 +314,6 @@ void main()
   // TGran16  0: 16KB granule not supported
   // TGran64  0: 64KB granule is supported
   // TGran4   0: 4KB granule is supported
-  // wait_timer();
 
   // vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
   // vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
@@ -347,15 +330,4 @@ void main()
   } else {
     uart_puts("Unable to query serial!\n");
   }
-
-  uart_puts("waiting 20000 cycles\n");
-  uart_puts("wait complete.\n");
-
-  uart_puts("waiting 200000 cycles\n");
-  wait_msec(2000);
-  uart_puts("wait complete.\n");
-
-  uart_puts("waiting 200000 cycles\n");
-  wait_msec_st(40000);
-  uart_puts("wait complete.\n");
 }

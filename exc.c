@@ -7,7 +7,9 @@
 #define puts(txt) \
   uart_puts(txt); vcanvas_puts(&x, &y, txt);
 
-void exc_handler(
+extern void timer_irq_callback();
+
+void irq_handle_generic(
   unsigned long type, 
   unsigned long esr, 
   unsigned long elr, 
@@ -19,25 +21,25 @@ void exc_handler(
   // print out interruption type
   switch(type) {
     case 0: puts("Synchronous"); break;
-    case 1: puts("IRQ"); break;
-    case 2: puts("FIQ"); break;
-    case 3: puts("SError"); break;
+    case 1: puts("IRQ");         break;
+    case 2: puts("FIQ");         break;
+    case 3: puts("SError");      break;
   }
   puts(": ");
   // decode exception type (some, not all. See ARM DDI0487B_b chapter D10.2.28)
   switch(esr >> 26) {
-    case 0b000000: puts("Unknown"); break;
-    case 0b000001: puts("Trapped WFI/WFE"); break;
-    case 0b001110: puts("Illegal execution"); break;
-    case 0b010101: puts("System call"); break;
+    case 0b000000: puts("Unknown");                     break;
+    case 0b000001: puts("Trapped WFI/WFE");             break;
+    case 0b001110: puts("Illegal execution");           break;
+    case 0b010101: puts("System call");                 break;
     case 0b100000: puts("Instruction abort, lower EL"); break;
-    case 0b100001: puts("Instruction abort, same EL"); break;
+    case 0b100001: puts("Instruction abort, same EL");  break;
     case 0b100010: puts("Instruction alignment fault"); break;
-    case 0b100100: puts("Data abort, lower EL"); break;
-    case 0b100101: puts("Data abort, same EL"); break;
-    case 0b100110: puts("Stack alignment fault"); break;
-    case 0b101100: puts("Floating point"); break;
-    default: puts("Unknown"); break;
+    case 0b100100: puts("Data abort, lower EL");        break;
+    case 0b100101: puts("Data abort, same EL");         break;
+    case 0b100110: puts("Stack alignment fault");       break;
+    case 0b101100: puts("Floating point");              break;
+    default:       puts("Unknown2"); timer_irq_callback();                   break;
   }
   // decode data abort cause
   if (esr >> 26 == 0b100100 || esr >> 26 == 0b100101) {
@@ -107,6 +109,7 @@ void exc_handler(
   sprintf(buf, "far: %08x", (int)far);
   x = 40, y = 4;
   vcanvas_puts(&x, &y, buf);
+  // wait_msec(100000);
   return;
 
   uart_hex(esr>>32);
@@ -124,3 +127,8 @@ void exc_handler(
   // no return from exception for now
   while(1);
 }
+
+// esr 61b3fd9e
+// elr 00086320
+// spsr 20000344
+// far 8bf8dc72
