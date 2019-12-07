@@ -186,7 +186,7 @@ _cpu_wait_for_event:
 //  str   w1, [x0, #4]
 //  ret
 
-.macro vector_entry symbol
+.macro __vector_entry symbol handler
   .align 7
   .globl \symbol
 \symbol:
@@ -195,9 +195,14 @@ _cpu_wait_for_event:
   mrs   x2, elr_el1
   mrs   x3, spsr_el1
   mrs   x4, far_el1
-  b exc_handler
+  bl    \handler
+  eret
 .endm
-  
+
+.macro vector_entry symbol
+  __vector_entry \symbol irq_handle_generic
+.endm
+
 
 // important, code has to be properly aligned
 .align 11
