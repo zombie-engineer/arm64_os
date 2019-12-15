@@ -1,8 +1,11 @@
 #include <timer.h>
 #include <reg_access.h>
 #include <mbox/mbox.h>
+#include <mbox/mbox_props.h>
 #include <common.h>
+#include <interrupts.h>
 #include <exception.h>
+#include <error.h>
 
 #define SEC_TO_USEC(x) (x * 1000 * 1000)
 
@@ -22,6 +25,14 @@
 #define ARM_TIMER_CONTROL_REG_ENABLE      (1 << 7)
 #define ARM_TIMER_CONTROL_REG_ENABLE_FREE (1 << 9)
 
+typedef struct {
+  timer_callback_t cb;
+  void *cb_arg;
+  int is_oneshot;
+} bcm2835_timer_t;
+
+static bcm2835_timer_t bcm2835_arm_timer;
+
 typedef enum {
   Clkdiv1      = 0b00,
   Clkdiv16     = 0b01,
@@ -37,6 +48,15 @@ static void bcm2835_arm_timer_enable_freerunning()
   write_reg(ARM_TIMER_CONTROL_REG, control_reg);
 }
 
+static inline 
+void bcm2835_arm_timer_disable()
+{
+  uint32_t control_reg; 
+  control_reg = read_reg(ARM_TIMER_CONTROL_REG);
+  control_reg &= ~ARM_TIMER_CONTROL_REG_ENABLE;
+  write_reg(ARM_TIMER_CONTROL_REG, control_reg);
+}
+ 
 static void bcm2835_arm_timer_disable_freerunning()
 {
   uint32_t control_reg; 
@@ -45,9 +65,14 @@ static void bcm2835_arm_timer_disable_freerunning()
   write_reg(ARM_TIMER_CONTROL_REG, control_reg);
 }
 
-void bcm2835_arm_timer_init()
+int bcm2835_arm_timer_init()
 {
+  bcm2835_arm_timer.cb = 0;
+  bcm2835_arm_timer.cb_arg = 0;
+  bcm2835_arm_timer.is_oneshot = 0;
+  bcm2835_arm_timer_disable();
   bcm2835_arm_timer_disable_freerunning();
+  return ERR_OK;
 }
 
 void bcm2835_arm_timer_dump_regs(const char* tag)
@@ -65,49 +90,75 @@ void bcm2835_arm_timer_dump_regs(const char* tag)
   printf("---------\n");
 }
 
-static timer_callback timer_cb = 0;
-static void * timer_cb_arg     = 0;
-
 void timer_irq_callback()
 {
-  // bcm2835_arm_timer_dump_regs("timer_irq_callback");
   if (read_reg(ARM_TIMER_RAW_IRQ_REG))
     write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 1);
-  if (timer_cb)
-    timer_cb(timer_cb_arg);
+  if (bcm2835_arm_timer.is_oneshot)
+    bcm2835_arm_timer_disable();
+  if (bcm2835_arm_timer.cb)
+    bcm2835_arm_timer.cb(bcm2835_arm_timer.cb_arg);
 }
 
-void bcm2835_arm_timer_set(uint32_t usec, timer_callback cb, void *cb_arg)
+static uint32_t get_core_clock_rate()
 {
-  uint32_t core_clock_rate, arm_clock_rate;
-  uint32_t control_reg; 
-  uint32_t predivider_clock;
+  uint32_t result;
   // clock rate - is HZ : number of clocks per sec
-  if (mbox_get_clock_rate(MBOX_CLOCK_ID_CORE, &core_clock_rate))
+  if (mbox_get_clock_rate(MBOX_CLOCK_ID_CORE, &result))
      generate_exception();
   // 250 000 000 Hz
-  bcm2835_arm_timer_dump_regs("timer_irq_callback");
 
-  predivider_clock = read_reg(ARM_TIMER_PRE_DIVIDER_REG) & 0x3ff;
-  if (mbox_get_clock_rate(MBOX_CLOCK_ID_ARM, &arm_clock_rate))
-     generate_exception();
-  // 600 000 000 Hz
-  //
-  // 300 microseconds = 1 / 300 of a second = 0.3333 = (600 000 000 / 1000 0000) * 300
-
-  // printf("core_clock_rate: %d, arm_clock_rate: %d\n", core_clock_rate, arm_clock_rate);
-  // return;
-  timer_cb = cb;
-  timer_cb_arg = cb_arg;
-
-  control_reg = read_reg(ARM_TIMER_CONTROL_REG);
-  // write_reg(ARM_TIMER_LOAD_REG, microsec * (core_clock_rate / MICROSECONDS_PER_SECOND));
-  write_reg(ARM_TIMER_LOAD_REG, core_clock_rate / (predivider_clock + 1) / SEC_TO_USEC(1) * usec);
-
-  control_reg &= ~ARM_TIMER_CONTROL_REG_ENABLE;
-  write_reg(ARM_TIMER_CONTROL_REG, control_reg);
-  control_reg = ARM_TIMER_CONTROL_REG_WIDTH | ARM_TIMER_CONTROL_REG_ENABLE_IRQ | ARM_TIMER_CONTROL_REG_ENABLE;
-  write_reg(ARM_TIMER_CONTROL_REG, control_reg);
-
-  write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 0xffffffff);
+  // if (mbox_get_clock_rate(MBOX_CLOCK_ID_ARM, &arm_clock_rate))
+  //   generate_exception();
+  // // 600 000 000 Hz
+  return result;
 }
+
+static inline
+int bcm2835_arm_timer_set_and_enable(uint32_t load_reg_value)
+{
+  // set counter 
+  write_reg(ARM_TIMER_LOAD_REG, load_reg_value);
+  write_reg(ARM_TIMER_CONTROL_REG, ARM_TIMER_CONTROL_REG_WIDTH | ARM_TIMER_CONTROL_REG_ENABLE_IRQ | ARM_TIMER_CONTROL_REG_ENABLE);
+
+  // clear interrupt ack
+  write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 0xffffffff);
+
+  // unmask basic interrupt in interrupt controller
+  interrupt_ctrl_enable_timer_irq();
+  return ERR_OK;
+}
+
+#define GET_COUNTER_VALUE(clock_rate, predivider_clock, usec) \
+  (clock_rate / (predivider_clock + 1) / SEC_TO_USEC(1) * usec)
+
+int bcm2835_arm_timer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_arg)
+{
+  uint32_t core_clock_rate, predivider_clock;
+
+  bcm2835_arm_timer_disable();
+
+  core_clock_rate = get_core_clock_rate();
+  predivider_clock = read_reg(ARM_TIMER_PRE_DIVIDER_REG) & 0x3ff;
+
+  bcm2835_arm_timer.cb = cb;
+  bcm2835_arm_timer.cb_arg = cb_arg;
+  bcm2835_arm_timer.is_oneshot = 0;
+  return bcm2835_arm_timer_set_and_enable(GET_COUNTER_VALUE(core_clock_rate, predivider_clock, usec));
+}
+
+int bcm2835_arm_timer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg)
+{
+  uint32_t core_clock_rate, predivider_clock;
+
+  bcm2835_arm_timer_disable();
+
+  core_clock_rate = get_core_clock_rate();
+  predivider_clock = read_reg(ARM_TIMER_PRE_DIVIDER_REG) & 0x3ff;
+
+  bcm2835_arm_timer.cb = cb;
+  bcm2835_arm_timer.cb_arg = cb_arg;
+  bcm2835_arm_timer.is_oneshot = 0;
+  return bcm2835_arm_timer_set_and_enable(GET_COUNTER_VALUE(core_clock_rate, predivider_clock, usec));
+}
+

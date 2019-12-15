@@ -4,13 +4,14 @@
 #include <reg_access.h>
 #include <gpio.h>
 
-void bcm2835_arm_timer_init();
+// Generic callback triggered at timer event
+typedef void*(*timer_callback_t)(void*);
 
-void bcm2835_arm_timer_dump_regs(const char* tag);
+int systimer_init();
 
-typedef void*(*timer_callback)(void*);
+int systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_arg);
+
+int systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg);
 
 void timer_irq_callback();
-
-void bcm2835_arm_timer_set(uint32_t usec, timer_callback cb, void *cb_arg);
 

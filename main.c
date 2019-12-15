@@ -124,21 +124,40 @@ void print_mbox_props()
   }
 }
 
-void* my_timer_callback(void* arg)
+void* my_timer_callback_periodic(void* arg)
 {
-  printf("this is my timer_callback\n");
+  putc('1');
   return 0;
+}
+
+void* my_timer_callback_oneshot(void* arg)
+{
+  putc('2');
+  systimer_set_periodic(1000 * 1000 / 2, my_timer_callback_periodic, 0);
+  return 0;
+}
+
+void irq_callback()
+{
+  puts("IRQ CALLBACK\n");
 }
 
 void wait_timer()
 {
-  puts("wait 2 sec\n");
-  wait_msec(2000);
-  bcm2835_arm_timer_set(1000000, my_timer_callback, 0);
-  interrupt_ctrl_enable_timer_irq();
+//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x10) = 0xffffffff; 
+//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x14) = 0xffffffff; 
+//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x18) = 0xffffffff; 
+//  puts("wait 2 sec\n");
+  // wait_msec(2000);
+  // systimer_set_oneshot(10 * 1000 * 1000, my_timer_callback_oneshot, 0);
+  set_irq_cb(irq_callback);
   enable_irq();
-  // interrupt_ctrl_dump_regs("after");
+
+  system_timer_set(1000 * 1000 * 1);
   // asm volatile("svc #0");
+
+  // system_timer_set(1000);
+  // interrupt_ctrl_dump_regs("after");
   while(1) {
     wait_msec(100000);
     // interrupt_ctrl_dump_regs("during");
@@ -261,7 +280,6 @@ void nokia5110_test()
   nokia5110_init(spidev, 23, 18, 1, 1);
   // nokia5110_run_test_loop_1(5, 200);
   nokia5110_run_test_loop_3(30, 10);
-  while(1);
   nokia5110_run_test_loop_1(8, 100);
   nokia5110_run_test_loop_1(8, 50);
   nokia5110_run_test_loop_1(8, 30);
@@ -280,14 +298,15 @@ void main()
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
-  // mmu_init();
-  uart_init(115200, BCM2825_SYSTEM_CLOCK);
+  mmu_init();
+  uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
+  systimer_init();
+  wait_timer();
   // nokia5110_test();
   print_current_ex_level();
-  wait_timer();
-
   print_mbox_props();
+
   print_mmu_features();
   print_cache_stats();
 

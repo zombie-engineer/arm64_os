@@ -14,8 +14,9 @@
 void system_timer_set(uint32_t msec)
 {
   uint32_t clo;
+  interrupt_ctrl_enable_sys_timer_irq();
   clo = read_reg(SYSTEM_TIMER_CLO);
   write_reg(SYSTEM_TIMER_C1, clo + msec);
   write_reg(SYSTEM_TIMER_C3, clo + msec);
-  interrupt_ctrl_enable_sys_timer_irq();
+  write_reg(SYSTEM_TIMER_CS, 1);
 }

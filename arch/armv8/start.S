@@ -186,11 +186,11 @@ _cpu_wait_for_event:
 //  str   w1, [x0, #4]
 //  ret
 
-.macro __vector_entry symbol handler
+.macro __vector_entry symbol handler type
   .align 7
   .globl \symbol
 \symbol:
-  mov   x0, #0
+  mov   x0, #\type
   mrs   x1, esr_el1
   mrs   x2, elr_el1
   mrs   x3, spsr_el1
@@ -199,30 +199,33 @@ _cpu_wait_for_event:
   eret
 .endm
 
-.macro vector_entry symbol
-  __vector_entry \symbol irq_handle_generic
+.macro vector_entry symbol type
+  __vector_entry \symbol irq_handle_generic \type
 .endm
 
 
 // important, code has to be properly aligned
 .align 11
 _vectors:
-vector_entry __interrupt_sp0_synchronous
-vector_entry __interrupt_sp0_irq
-vector_entry __interrupt_sp0_fiq
-vector_entry __interrupt_sp0_serror
-vector_entry __interrupt_spx_synchronous
-vector_entry __interrupt_spx_irq
-vector_entry __interrupt_spx_fiq
-vector_entry __interrupt_spx_serror
-vector_entry __interrupt_l_sp0_synchronous
-vector_entry __interrupt_l_sp0_irq
-vector_entry __interrupt_l_sp0_fiq
-vector_entry __interrupt_l_sp0_serror
-vector_entry __interrupt_l_spx_synchronous
-vector_entry __interrupt_l_spx_irq
-vector_entry __interrupt_l_spx_fiq
-vector_entry __interrupt_l_spx_serror
+vector_entry __interrupt_sp0_synchronous   0
+vector_entry __interrupt_sp0_irq           1
+vector_entry __interrupt_sp0_fiq           2
+vector_entry __interrupt_sp0_serror        3
+
+vector_entry __interrupt_spx_synchronous   0
+vector_entry __interrupt_spx_irq           1
+vector_entry __interrupt_spx_fiq           2
+vector_entry __interrupt_spx_serror        3
+
+vector_entry __interrupt_l_sp0_synchronous 0
+vector_entry __interrupt_l_sp0_irq         1
+vector_entry __interrupt_l_sp0_fiq         2
+vector_entry __interrupt_l_sp0_serror      3
+
+vector_entry __interrupt_l_spx_synchronous 0
+vector_entry __interrupt_l_spx_irq         1
+vector_entry __interrupt_l_spx_fiq         2
+vector_entry __interrupt_l_spx_serror      3
 
   
 _disable_coproc_traps:

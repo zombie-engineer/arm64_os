@@ -7,6 +7,7 @@ OPTIMIZATION_FLAGS = -g
 
 CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 all: kernel8.img
 
@@ -18,6 +19,7 @@ include cmdrunner/Makefile
 include drivers/max7219/Makefile
 include drivers/f5161ah/Makefile
 include drivers/nokia5110/Makefile
+include board/bcm2835/Makefile
 include lib/stringlib/Makefile
 
 
@@ -30,6 +32,7 @@ LIBS += $(OBJS_MAX7219)
 LIBS += $(OBJS_F5161AH)
 LIBS += $(OBJS_SPI)
 LIBS += $(OBJS_NOKIA5110)
+LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
@@ -58,13 +61,19 @@ kernel8.img: $(OBJS)
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 run:
-	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s
+	$(QEMU) -M raspi3 -kernel kernel8.img -serial stdio -nographic -s 
 
 rungdb:
-	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s -S
+	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S
 
 rungdb2:
-	gdb -ex 'b get_phys_addr_lpae' --args qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial stdio -s -S
+	gdb \
+		-ex 'b bcm2835_ic_write'\
+		-ex 'b bcm2835_timer_tick_common'\
+		-ex 'b bcm2835_peripherals_init'\
+	 	-ex 'b bcm2835_peripherals_realize'\
+	 	-ex 'b bcm2835_systmr_update_compare'\
+	 	--args $(QEMU) -M raspi3 -kernel kernel8.img -s -nographic -S
 
 rungdbq:
 	./qemu.sh
