@@ -8,4 +8,4 @@ void set_fiq_cb(irq_cb_t cb);
 
 void generate_exception();
 
-void irq_handle_generic();
+void __handle_interrupt();

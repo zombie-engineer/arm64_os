@@ -74,7 +74,7 @@ const char *get_exception_class_string(uint8_t exception_class)
   }
 }
 
-void irq_handle_synchronous(unsigned long esr, int *x, int *y)
+void __handle_interrupt_synchronous(unsigned long esr, int *x, int *y)
 {
   uint8_t exception_class;
   int el_num;
@@ -142,7 +142,11 @@ void irq_handle_synchronous(unsigned long esr, int *x, int *y)
   }
 }
 
-void irq_handle_generic(
+void __handle_interrupt_serror()
+{
+}
+
+void __handle_interrupt(
   unsigned long type, 
   unsigned long esr, 
   unsigned long elr, 
@@ -168,7 +172,10 @@ void irq_handle_generic(
         fiq_cb();
       break;
     case INTERRUPT_TYPE_SYNCHRONOUS:
-      irq_handle_synchronous(esr, x, y);
+      __handle_interrupt_synchronous(esr, x, y);
+      break;
+    case INTERRUPT_TYPE_SERROR:
+      __handle_interrupt_serror();
       break;
   } 
 

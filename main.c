@@ -149,14 +149,12 @@ void wait_timer()
 //  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x18) = 0xffffffff; 
 //  puts("wait 2 sec\n");
   // wait_msec(2000);
-  // systimer_set_oneshot(10 * 1000 * 1000, my_timer_callback_oneshot, 0);
+  systimer_set_oneshot(10 * 1000 * 1000, my_timer_callback_oneshot, 0);
   set_irq_cb(irq_callback);
   enable_irq();
 
-  system_timer_set(1000 * 1000 * 1);
   // asm volatile("svc #0");
 
-  // system_timer_set(1000);
   // interrupt_ctrl_dump_regs("after");
   while(1) {
     wait_msec(100000);

@@ -33,13 +33,6 @@ typedef struct {
 
 static bcm2835_timer_t bcm2835_arm_timer;
 
-typedef enum {
-  Clkdiv1      = 0b00,
-  Clkdiv16     = 0b01,
-  Clkdiv256    = 0b10,
-  Clkdiv_undef = 0b11,
-} TIMER_PRESCALE;
-
 static void bcm2835_arm_timer_enable_freerunning()
 {
   uint32_t control_reg; 

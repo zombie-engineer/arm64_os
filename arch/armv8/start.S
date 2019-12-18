@@ -200,7 +200,7 @@ _cpu_wait_for_event:
 .endm
 
 .macro vector_entry symbol type
-  __vector_entry \symbol irq_handle_generic \type
+  __vector_entry \symbol __handle_interrupt \type
 .endm
 
 
