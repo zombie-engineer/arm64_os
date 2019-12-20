@@ -18,7 +18,6 @@
 #include <cmdrunner.h>
 #include <max7219.h>
 #include <drivers/display/nokia5110.h>
-#include <system_timer.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -144,14 +143,13 @@ void irq_callback()
 
 void wait_timer()
 {
-//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x10) = 0xffffffff; 
-//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x14) = 0xffffffff; 
-//  *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x18) = 0xffffffff; 
-//  puts("wait 2 sec\n");
+  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x10) = 0xffffffff; 
+  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x14) = 0xffffffff; 
+  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x18) = 0xffffffff; 
+ // puts("wait 2 sec\n");
   // wait_msec(2000);
-  systimer_set_oneshot(10 * 1000 * 1000, my_timer_callback_oneshot, 0);
-  set_irq_cb(irq_callback);
   enable_irq();
+  systimer_set_oneshot(20 * 1000 * 1000, my_timer_callback_oneshot, 0);
 
   // asm volatile("svc #0");
 

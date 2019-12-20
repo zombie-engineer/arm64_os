@@ -24,7 +24,9 @@
 #define BASIC_IRQ_ACCESS_ERR_TYPE_0 (1 << 6)
 #define BASIC_IRQ_ACCESS_ERR_TYPE_1 (1 << 7)
 
+#define GPU_1_SYSTIMER_0 (1 << 0)
 #define GPU_1_SYSTIMER_1 (1 << 1)
+#define GPU_1_SYSTIMER_2 (1 << 2)
 #define GPU_1_SYSTIMER_3 (1 << 3)
 #define GPU_1_USB        (1 << 9)
 #define GPU_1_AUX        (1 << 29)
@@ -48,10 +50,12 @@ void interrupt_ctrl_dump_regs(const char* tag)
 
 void interrupt_ctrl_enable_systimer_1(void)
 {
+  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_0);
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
+  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_2);
 }
 
-void interrupt_ctrl_enable_systimer_2(void)
+void interrupt_ctrl_enable_systimer_3(void)
 {
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_3);
 }

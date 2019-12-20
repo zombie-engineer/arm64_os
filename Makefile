@@ -61,7 +61,7 @@ kernel8.img: $(OBJS)
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 run:
-	$(QEMU) -M raspi3 -kernel kernel8.img -serial stdio -nographic -s 
+	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s 
 
 rungdb:
 	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S

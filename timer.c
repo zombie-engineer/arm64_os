@@ -2,8 +2,10 @@
 #include <error.h>
 #include <config.h>
 
-#ifdef CONFIG_SYSTEM_TIMER_BCM2835_ARM_TIMER
+#if defined CONFIG_SYSTEM_TIMER_BCM2835_ARM_TIMER
 #include <board/bcm2835/bcm2835_arm_timer.h>
+#elif defined CONFIG_SYSTEM_TIMER_BCM2835_SYSTEM_TIMER
+#include <board/bcm2835/bcm2835_systimer.h>
 #else
 #error System timer not selected
 #endif
@@ -19,11 +21,17 @@ int systimer_init()
 {
   int status;
   status = ERR_FATAL;
-#ifdef CONFIG_SYSTEM_TIMER_BCM2835_ARM_TIMER
+#if defined CONFIG_SYSTEM_TIMER_BCM2835_ARM_TIMER
   status = bcm2835_arm_timer_init();
   if (status == ERR_OK) {
     systimer.set_periodic = bcm2835_arm_timer_set_periodic;
     systimer.set_oneshot = bcm2835_arm_timer_set_oneshot;
+  }
+#elif defined CONFIG_SYSTEM_TIMER_BCM2835_SYSTEM_TIMER
+  status = bcm2835_systimer_init();
+  if (status == ERR_OK) {
+    systimer.set_periodic = bcm2835_systimer_set_periodic;
+    systimer.set_oneshot = bcm2835_systimer_set_oneshot;
   }
 #endif
   return status;
