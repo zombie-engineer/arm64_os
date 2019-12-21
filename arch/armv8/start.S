@@ -170,32 +170,51 @@ _cpu_wait_for_event:
   wfe
   b _cpu_wait_for_event
 
-
-
-
-//.globl timer_irq_init
-//timer_irq_init:
-//  mov   w1, #0
-//  str   w1, [x0, #4]
-//  ldr   x0, =0x3b00b400
-//  ldr   w1, =0xa00
-//  str   w1, [x0]
-//  ldr   w1, [x0, #4]
-//  mov   w2, #0xa2
-//  orr   w1, w1, w2
-//  str   w1, [x0, #4]
-//  ret
-
 .macro __vector_entry symbol handler type
   .align 7
   .globl \symbol
 \symbol:
+  stp   x0, x1, [sp, #-16]!
+  stp   x2, x3, [sp, #-16]!
+  stp   x4, x5, [sp, #-16]!
+  stp   x6, x7, [sp, #-16]!
+  stp   x8, x9, [sp, #-16]!
+  stp   x10, x11, [sp, #-16]!
+  stp   x12, x13, [sp, #-16]!
+  stp   x14, x15, [sp, #-16]!
+  stp   x16, x17, [sp, #-16]!
+  stp   x18, x19, [sp, #-16]!
+  stp   x20, x21, [sp, #-16]!
+  stp   x22, x23, [sp, #-16]!
+  stp   x24, x25, [sp, #-16]!
+  stp   x26, x27, [sp, #-16]!
+  stp   x28, x29, [sp, #-16]!
+//  stp   x30, x31, [sp, #-16]!
+
   mov   x0, #\type
   mrs   x1, esr_el1
   mrs   x2, elr_el1
   mrs   x3, spsr_el1
   mrs   x4, far_el1
   bl    \handler
+
+//  ldp   x30, x31, [sp], #16
+  ldp   x28, x29, [sp], #16
+  ldp   x26, x27, [sp], #16
+  ldp   x24, x25, [sp], #16
+  ldp   x22, x23, [sp], #16
+  ldp   x20, x21, [sp], #16
+  ldp   x18, x19, [sp], #16
+  ldp   x16, x17, [sp], #16
+  ldp   x14, x15, [sp], #16
+  ldp   x12, x13, [sp], #16
+  ldp   x10, x11, [sp], #16
+  ldp   x8, x9, [sp], #16
+  ldp   x6, x7, [sp], #16
+  ldp   x4, x5, [sp], #16
+  ldp   x2, x3, [sp], #16
+  ldp   x0, x1, [sp], #16
+
   eret
 .endm
 
