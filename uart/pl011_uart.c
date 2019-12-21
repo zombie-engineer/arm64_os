@@ -1,5 +1,6 @@
 #include <uart/pl011_uart.h>
 #include <gpio.h>
+#include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <types.h>
 

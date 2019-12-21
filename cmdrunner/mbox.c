@@ -1,6 +1,7 @@
 #include <cmdrunner.h>
 #include "argument.h"
 #include <stringlib.h>
+#include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <common.h>
 
