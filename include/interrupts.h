@@ -43,7 +43,7 @@ void interrupt_ctrl_enable_gpio_irq(int gpio_num);
 
 void interrupt_ctrl_enable_systimer_1(void);
 
-void interrupt_ctrl_enable_systimer_2(void);
+void interrupt_ctrl_enable_systimer_3(void);
 
 void interrupt_ctrl_disable_systimer_1(void);
 

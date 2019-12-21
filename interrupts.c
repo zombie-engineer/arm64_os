@@ -50,9 +50,7 @@ void interrupt_ctrl_dump_regs(const char* tag)
 
 void interrupt_ctrl_enable_systimer_1(void)
 {
-  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_0);
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
-  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_2);
 }
 
 void interrupt_ctrl_enable_systimer_3(void)

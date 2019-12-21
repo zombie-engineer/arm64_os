@@ -158,6 +158,7 @@ void __handle_interrupt(
   int cy = 0;
   int *x = &cx;
   int *y = &cy; 
+  return;
 
   puts("interrupt: type: ");
   puts(get_interrupt_type_string(type));

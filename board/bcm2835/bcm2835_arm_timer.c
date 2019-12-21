@@ -7,8 +7,6 @@
 #include <exception.h>
 #include <error.h>
 
-#define SEC_TO_USEC(x) (x * 1000 * 1000)
-
 #define ARM_TIMER_BASE                     (uint64_t)(PERIPHERAL_BASE_PHY + 0xb400)
 #define ARM_TIMER_LOAD_REG                 (reg32_t)(ARM_TIMER_BASE)
 #define ARM_TIMER_VALUE_REG                (reg32_t)(ARM_TIMER_BASE + 4)

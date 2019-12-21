@@ -125,14 +125,14 @@ void print_mbox_props()
 
 void* my_timer_callback_periodic(void* arg)
 {
-  putc('1');
+  puts("periodic tick\n");
   return 0;
 }
 
 void* my_timer_callback_oneshot(void* arg)
 {
-  putc('2');
-  systimer_set_periodic(1000 * 1000 / 2, my_timer_callback_periodic, 0);
+  puts("oneshot tick\n");
+  systimer_set_periodic(SEC_TO_USEC(1), my_timer_callback_periodic, 0);
   return 0;
 }
 
@@ -143,20 +143,17 @@ void irq_callback()
 
 void wait_timer()
 {
-  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x10) = 0xffffffff; 
-  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x14) = 0xffffffff; 
-  // *(volatile int*)(PERIPHERAL_BASE_PHY  + 0xb200 + 0x18) = 0xffffffff; 
- // puts("wait 2 sec\n");
-  // wait_msec(2000);
   enable_irq();
-  systimer_set_oneshot(20 * 1000 * 1000, my_timer_callback_oneshot, 0);
+
+  puts("setting timer for 1 sec\n");
+  systimer_set_oneshot(10, my_timer_callback_oneshot, 0);
 
   // asm volatile("svc #0");
 
   // interrupt_ctrl_dump_regs("after");
   while(1) {
-    wait_msec(100000);
-    // interrupt_ctrl_dump_regs("during");
+    wait_msec(10000);
+   // interrupt_ctrl_dump_regs("during");
   }
 }
 
@@ -294,7 +291,7 @@ void main()
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
-  mmu_init();
+  // mmu_init();
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
   systimer_init();

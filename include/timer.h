@@ -3,6 +3,7 @@
 #include <types.h>
 #include <reg_access.h>
 #include <gpio.h>
+#include <time.h>
 
 // Generic callback triggered at timer event
 typedef void*(*timer_callback_t)(void*);

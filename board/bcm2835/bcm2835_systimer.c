@@ -29,7 +29,6 @@ static int bcm2835_systimer_set(uint32_t usec)
   uint32_t clo;
   clo = read_reg(SYSTEM_TIMER_CLO);
   write_reg(SYSTEM_TIMER_C1, clo + usec);
-  write_reg(SYSTEM_TIMER_C3, clo + usec);
   write_reg(SYSTEM_TIMER_CS, 1);
   interrupt_ctrl_enable_systimer_1();
   return ERR_OK;
