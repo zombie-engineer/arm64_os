@@ -1,3 +1,4 @@
+GDB := 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
 INCLUDES = include
@@ -61,25 +62,29 @@ kernel8.img: $(OBJS)
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 run:
-	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s 
+	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s
 
 rungdb:
 	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S
 
+
+#		-ex 'b bcm2835_ic_write'\
+#		-ex 'b bcm2835_timer_tick_common'\
+#		-ex 'b bcm2835_peripherals_init'\
+#	 	-ex 'b bcm2835_peripherals_realize'\
+#		-ex 'b el_from_spsr' \
+#		-ex 'b helper_exception_return' 
+#
 rungdb2:
-	gdb \
-		-ex 'b bcm2835_ic_write'\
-		-ex 'b bcm2835_timer_tick_common'\
-		-ex 'b bcm2835_peripherals_init'\
-	 	-ex 'b bcm2835_peripherals_realize'\
-	 	-ex 'b bcm2835_systmr_update_compare'\
-	 	--args $(QEMU) -M raspi3 -kernel kernel8.img -s -nographic -S
+	gdb -x qemu.gdb\
+	 	--args $(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S
 
 rungdbq:
 	./qemu.sh
 
+#	gdb-multiarch -x rungdb.gdb
 gdb:
-	gdb-multiarch -x rungdb.gdb
+	/home/zombie/binutils-gdb/gdb/gdb -x rungdb.gdb
 
 serial:
 	minicom -b 115200 -D /dev/ttyUSB0
