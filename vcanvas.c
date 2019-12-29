@@ -31,7 +31,7 @@ typedef struct {
   unsigned int height;
   unsigned int width;
   unsigned char glyphs;
-} __attribute__ ((packed)) psf_t;
+} packed psf_t;
 
 extern volatile unsigned char _binary_font_psf_start;
 
@@ -198,6 +198,7 @@ void vcanvas_putc(int* x, int* y, char chr)
   int framebuf_off;
   psf_t *font = (psf_t*)&_binary_font_psf_start;
   glyph = font_get_glyph(font, chr);
+
   // calculate offset on screen
   framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
   
