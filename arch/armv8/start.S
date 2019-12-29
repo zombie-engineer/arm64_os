@@ -144,6 +144,8 @@ _check_el1:
 // ******************************************************************************
 .local _in_el1
 _in_el1:
+  mov   x2, #1
+  msr   SPSel, x2
   // Set stack
   mov   sp, x1
 
@@ -170,52 +172,113 @@ _cpu_wait_for_event:
   wfe
   b _cpu_wait_for_event
 
+// 8 byte aligned cpu context
+.align 3
+.globl __aarch64_cpu_ctx
+__aarch64_cpu_ctx:
+.rept 31
+.quad 0x6666666666666666
+.endr
+
+.align 3
+.globl __exception_info
+__exception_info:
+.rept 7
+.quad 0x6666666666666666
+.endr
+
+
+.local __store_cpu_ctx
+__store_cpu_ctx:
+  // of all general purpose registers
+  // x0 - x29 are uncorrupted and
+  // link register x30 is in [sp]
+  str   x30, [sp, #-8]
+  ldr   x30, =__aarch64_cpu_ctx
+
+  stp   x0 , x1 , [x30], #16
+  stp   x2 , x3 , [x30], #16
+  stp   x4 , x5 , [x30], #16
+  stp   x6 , x7 , [x30], #16
+  stp   x8 , x9 , [x30], #16
+  stp   x10, x11, [x30], #16
+  stp   x12, x13, [x30], #16
+  stp   x14, x15, [x30], #16
+  stp   x16, x17, [x30], #16
+  stp   x18, x19, [x30], #16
+  stp   x20, x21, [x30], #16
+  stp   x22, x23, [x30], #16
+  stp   x24, x25, [x30], #16
+  stp   x26, x27, [x30], #16
+  stp   x28, x29, [x30], #16
+
+  // store original link register (x30)
+  // of the caller function
+  ldr   x29, [sp] 
+  str   x29, [x30]
+
+  // restore this function's link register (x30)
+  // to return
+  ldr   x30, [sp, #-8]
+  ret
+
+.local __eret_to_cpu_ctx
+__eret_to_cpu_ctx:
+  ldr   x30 , =__aarch64_cpu_ctx
+  ldp   x0 , x1 , [x30], #16
+  ldp   x2 , x3 , [x30], #16
+  ldp   x4 , x5 , [x30], #16
+  ldp   x6 , x7 , [x30], #16
+  ldp   x8 , x9 , [x30], #16
+  ldp   x10, x11, [x30], #16
+  ldp   x12, x13, [x30], #16
+  ldp   x14, x15, [x30], #16
+  ldp   x16, x17, [x30], #16
+  ldp   x18, x19, [x30], #16
+  ldp   x20, x21, [x30], #16
+  ldp   x22, x23, [x30], #16
+  ldp   x24, x25, [x30], #16
+  ldp   x26, x27, [x30], #16
+  ldp   x28, x29, [x30], #16
+  ldr   x30, [x30]
+  eret
+
+
+.local __prep_exception_info
+__prep_exception_info:
+  // x0 - exception type
+  // x1 - top of stack at exception enter
+  mov   x8, x1
+  ldr   x5, =__exception_info
+  ldr   x6, =__aarch64_cpu_ctx
+  mov   x7, x5
+  mrs   x1, esr_el1
+  mrs   x2, spsr_el1
+  mrs   x3, elr_el1
+  mrs   x4, far_el1
+  stp   x1, x2, [x5], #16
+  stp   x3, x4, [x5], #16
+  stp   x0, x6, [x5], #16
+  str   x8, [x5]
+  mov   x0, x7
+  ret
+
+
 .macro __vector_entry symbol handler type
   .align 7
   .globl \symbol
 \symbol:
-  stp   x0, x1, [sp, #-16]!
-  stp   x2, x3, [sp, #-16]!
-  stp   x4, x5, [sp, #-16]!
-  stp   x6, x7, [sp, #-16]!
-  stp   x8, x9, [sp, #-16]!
-  stp   x10, x11, [sp, #-16]!
-  stp   x12, x13, [sp, #-16]!
-  stp   x14, x15, [sp, #-16]!
-  stp   x16, x17, [sp, #-16]!
-  stp   x18, x19, [sp, #-16]!
-  stp   x20, x21, [sp, #-16]!
-  stp   x22, x23, [sp, #-16]!
-  stp   x24, x25, [sp, #-16]!
-  stp   x26, x27, [sp, #-16]!
-  stp   x28, x29, [sp, #-16]!
-//  stp   x30, x31, [sp, #-16]!
-
+# Entry can only occupy 0x80 bytes
+  # x30 is lr (link register)
+  # it should be saved in a correct order
+  str   x30, [sp, #-8]!
+  bl    __store_cpu_ctx
+  add   sp, sp, 8
   mov   x0, #\type
-  mrs   x1, esr_el1
-  mrs   x2, elr_el1
-  mrs   x3, spsr_el1
-  mrs   x4, far_el1
+  mov   x1, sp
+  bl    __prep_exception_info  
   bl    \handler
-
-//  ldp   x30, x31, [sp], #16
-  ldp   x28, x29, [sp], #16
-  ldp   x26, x27, [sp], #16
-  ldp   x24, x25, [sp], #16
-  ldp   x22, x23, [sp], #16
-  ldp   x20, x21, [sp], #16
-  ldp   x18, x19, [sp], #16
-  ldp   x16, x17, [sp], #16
-  ldp   x14, x15, [sp], #16
-  ldp   x12, x13, [sp], #16
-  ldp   x10, x11, [sp], #16
-  ldp   x8, x9, [sp], #16
-  ldp   x6, x7, [sp], #16
-  ldp   x4, x5, [sp], #16
-  ldp   x2, x3, [sp], #16
-  ldp   x0, x1, [sp], #16
-
-  eret
+  b     __eret_to_cpu_ctx
 .endm
 
 .macro vector_entry symbol type
@@ -224,27 +287,29 @@ _cpu_wait_for_event:
 
 
 // important, code has to be properly aligned
+// VBAR_EL1
 .align 11
 _vectors:
-vector_entry __interrupt_sp0_synchronous   0
-vector_entry __interrupt_sp0_irq           1
-vector_entry __interrupt_sp0_fiq           2
-vector_entry __interrupt_sp0_serror        3
+// 
+vector_entry __interrupt_cur_el_sp0_synchronous   0
+vector_entry __interrupt_cur_el_sp0_irq           1
+vector_entry __interrupt_cur_el_sp0_fiq           2
+vector_entry __interrupt_cur_el_sp0_serror        3
 
-vector_entry __interrupt_spx_synchronous   0
-vector_entry __interrupt_spx_irq           1
-vector_entry __interrupt_spx_fiq           2
-vector_entry __interrupt_spx_serror        3
+vector_entry __interrupt_cur_el_spx_synchronous   0
+vector_entry __interrupt_cur_el_spx_irq           1
+vector_entry __interrupt_cur_el_spx_fiq           2
+vector_entry __interrupt_cur_el_spx_serror        3
 
-vector_entry __interrupt_l_sp0_synchronous 0
-vector_entry __interrupt_l_sp0_irq         1
-vector_entry __interrupt_l_sp0_fiq         2
-vector_entry __interrupt_l_sp0_serror      3
+vector_entry __interrupt_low_el_sp0_synchronous 0
+vector_entry __interrupt_low_el_sp0_irq         1
+vector_entry __interrupt_low_el_sp0_fiq         2
+vector_entry __interrupt_low_el_sp0_serror      3
 
-vector_entry __interrupt_l_spx_synchronous 0
-vector_entry __interrupt_l_spx_irq         1
-vector_entry __interrupt_l_spx_fiq         2
-vector_entry __interrupt_l_spx_serror      3
+vector_entry __interrupt_low_el_spx_synchronous 0
+vector_entry __interrupt_low_el_spx_irq         1
+vector_entry __interrupt_low_el_spx_fiq         2
+vector_entry __interrupt_low_el_spx_serror      3
 
   
 _disable_coproc_traps:
