@@ -2,6 +2,6 @@
 *.elf
 *.img
 *.swp
-.map
+*.map
 test/test
 sdcard
