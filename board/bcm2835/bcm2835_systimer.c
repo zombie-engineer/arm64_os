@@ -3,6 +3,7 @@
 #include <interrupts.h>
 #include <exception.h>
 #include <stringlib.h>
+#include <common.h>
 
 #include <reg_access.h>
 #include <error.h>
@@ -23,6 +24,11 @@ typedef struct bcm2835_systimer {
 } bcm2835_systimer_t;
 
 static bcm2835_systimer_t bcm2835_systimer_info_1;
+
+static void bcm2835_systimer_clear_irq_1()
+{
+  write_reg(SYSTEM_TIMER_CS, (1<<1));
+}
 
 static int bcm2835_systimer_set(uint32_t usec)
 {
@@ -54,13 +60,16 @@ static void bcm2835_systimer_run_cb_1()
 
 static int bcm2835_systimer_cb_periodic_timer_1()
 {
-  bcm2835_systimer_set(bcm2835_systimer_info_1.period);
+  // bcm2835_systimer_set(bcm2835_systimer_info_1.period);
+  bcm2835_systimer_clear_irq_1();
   bcm2835_systimer_run_cb_1();
   return ERR_OK;
 }
 
 static int bcm2835_systimer_cb_oneshot_timer_1()
 {
+  // puts("bcm2835_systimer_cb_oneshot_timer_1\n");
+  bcm2835_systimer_clear_irq_1();
   interrupt_ctrl_disable_systimer_1();
   bcm2835_systimer_run_cb_1();
   return ERR_OK;
