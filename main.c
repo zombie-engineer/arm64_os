@@ -11,6 +11,7 @@
 #include <tags.h>
 #include <mmu.h>
 #include <common.h>
+#include <stringlib.h>
 #include <console.h>
 #include <interrupts.h>
 #include <exception.h>
@@ -131,29 +132,33 @@ void* my_timer_callback_periodic(void* arg)
 
 void* my_timer_callback_oneshot(void* arg)
 {
-  puts("oneshot tick\n");
-  systimer_set_periodic(SEC_TO_USEC(1), my_timer_callback_periodic, 0);
+  puts("oneshot");
+  systimer_set_oneshot(MSEC_TO_USEC(80), my_timer_callback_oneshot, 0);
   return 0;
-}
-
-void irq_callback()
-{
-  puts("IRQ CALLBACK\n");
 }
 
 void wait_timer()
 {
-  enable_irq();
-
+  int i;
   puts("setting timer for 1 sec\n");
-  systimer_set_oneshot(10, my_timer_callback_oneshot, 0);
+  enable_irq();
+  systimer_set_oneshot(SEC_TO_USEC(4), my_timer_callback_oneshot, 0);
+
+  for (i = 0; i < 0xffffffff; ++i) {
+    if (i > 0xfffffff1)
+      i = 0;
+    if (i % 20000 == 0)
+      putc('.');
+  }
+
 
   // asm volatile("svc #0");
 
   // interrupt_ctrl_dump_regs("after");
   while(1) {
-    wait_msec(10000);
-   // interrupt_ctrl_dump_regs("during");
+    wait_msec(1000);
+    printf("systimer_reg: %08x\n", *(volatile int*)(PERIPHERAL_BASE_PHY + 0x3000 + 0x04));
+    // interrupt_ctrl_dump_regs("during");
   }
 }
 
@@ -286,14 +291,22 @@ void nokia5110_test()
 
 void main()
 {
-  int i;
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
-  // mmu_init();
+  mmu_init();
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
+  // puts("1\n");
+  // asm volatile("svc #0");
+  // puts("2\n");
+  // asm volatile("svc #1");
+  // puts("3\n");
+  // asm volatile("svc #2");
+  // puts("4\n");
+  char buf[16];
+  snprintf(buf, 16, "my: %016x\n", 234);
   systimer_init();
   wait_timer();
   // nokia5110_test();

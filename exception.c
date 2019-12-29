@@ -3,21 +3,47 @@
 #include <stringlib.h>
 #include <vcanvas.h>
 #include <delays.h>
+#include <cpu.h>
 
 #define INTERRUPT_TYPE_SYNCHRONOUS 0
 #define INTERRUPT_TYPE_IRQ         1
 #define INTERRUPT_TYPE_FIQ         2
 #define INTERRUPT_TYPE_SERROR      3
 
-#define puts(txt) \
-  uart_puts(txt); vcanvas_puts(x, y, txt);
 
-#define putc(c) \
-  uart_putc(c); vcanvas_putc(x, y, c);
+static void *p_cpu_ctx;
+static char cpu_ctx_buf[2048];
+
+typedef struct printer {
+  int x;
+  int y;
+} printer_t;
+
+static printer_t printer;
+
+void printer_puts(printer_t *p, const char *str, int x, int y)
+{
+  uart_puts(str);
+  vcanvas_puts(&x, &y, str);
+}
+
+void printer_putc(printer_t *p, char c, int x, int y)
+{
+  uart_putc(c);
+  vcanvas_putc(&x, &y, c);
+}
+
+#define puts(str, x, y) printer_puts(&printer, str, x, y)
+#define putc(c, x, y) printer_putc(&printer, c, x, y)
 
 void generate_exception()
 {
   *(volatile long int*)(0xffffffffffffffff) = 1;
+}
+
+void kernel_panic(const char *msg)
+{
+  generate_exception();
 }
 
 irq_cb_t irq_cb = 0;
@@ -32,6 +58,47 @@ void set_fiq_cb(irq_cb_t cb)
 {
   fiq_cb = cb;
 }
+
+static inline void exception_panic(const char *msg)
+{
+  puts("exception_panic: ", 0, 0);
+  puts(msg, 0, 1);
+  while(1);
+}
+
+static void dump_stack(uint64_t *stack, int depth, int x, int y)
+{
+  char buf[64];
+  int i;
+
+  sprintf(buf, "stack at: %016x", stack);
+  puts(buf, x, y++);
+
+  for (i = 0; i < depth; ++i) {
+     sprintf(buf, "%08x: %016x", stack + i, *(stack + i));
+     puts(buf, x, y++);
+  }
+}
+
+static void dump_exception_ctx(exception_info_t *e, int x, int y)
+{
+  int stop;
+  char *p1, *p2;
+  p1 = cpu_ctx_buf;
+  p2 = p1;
+  stop = 0;
+  cpu_dump_ctx(cpu_ctx_buf, sizeof(cpu_ctx_buf), p_cpu_ctx);
+  while(!stop) {
+    while(*p2 && *p2 != '\n') p2++;
+    if (*p2 == 0)
+      stop = 1;
+
+    *(p2++) = 0;
+    puts(p1, x, y++);
+    p1 = p2;
+  }
+}
+
 
 const char *get_interrupt_type_string(int interrupt_type) {
   switch(interrupt_type) {
@@ -74,123 +141,143 @@ const char *get_exception_class_string(uint8_t exception_class)
   }
 }
 
-void __handle_interrupt_synchronous(unsigned long esr, int *x, int *y)
+static void __handle_data_abort(exception_info_t *e)
 {
-  uint8_t exception_class;
+  int dfsc;
   int el_num;
+  int print_level;
 
-  exception_class = (esr >> 26) & 0xff; 
-  el_num = esr & 0x3;
-  puts("exception class: ");
-  puts(get_exception_class_string(exception_class));
-  putc('\n');
+  el_num = e->esr & 0x3;
+  dfsc = (int)e->esr & 0x0000003f;
+  print_level = 0;
 
-  // decode data abort cause
-  if (exception_class == EXC_CLASS_DATA_ABRT_LO_EL 
-      || exception_class == EXC_CLASS_DATA_ABRT_EQ_EL) {
-    puts(", ");
-    int dfsc = (int)esr & 0x0000003f;
-    int print_level = 0;
-    switch(dfsc & 0x3c) {
-      case 0b000000: puts("Address size fault"); print_level = 1; break;
-      case 0b000100: puts("Translation fault");  print_level = 1; break;
-      case 0b001000: puts("Access flag fault");  print_level = 1; break;
-      case 0b001100: puts("Permission fault");   print_level = 1; break;
-      case 0b010000: puts("Synchronous External abort, not table walk"); break;
-      case 0b010001: puts("Synchronous Tag Check"); break;
-      case 0b010100: puts("Synchronous External abort, on table walk"); 
+  switch(dfsc & 0x3c) {
+      case 0b000000: puts("Address size fault", 0, 1); print_level = 1; break;
+      case 0b000100: puts("Translation fault", 0, 1);  print_level = 1; break;
+      case 0b001000: puts("Access flag fault", 0, 1);  print_level = 1; break;
+      case 0b001100: puts("Permission fault", 0, 1);   print_level = 1; break;
+      case 0b010000: puts("Synchronous External abort, not table walk", 0, 1); break;
+      case 0b010001: puts("Synchronous Tag Check", 0, 1); break;
+      case 0b010100: puts("Synchronous External abort, on table walk", 0, 1); 
         print_level = 1; 
         break;
-      case 0b011000: puts("Synchronous parity or ECC error on memory access, not on table walk");
+      case 0b011000: puts("Synchronous parity or ECC error on memory access, not on table walk", 0, 1);
         break;
-      case 0b011100: puts("Synchronous parity or ECC error on memory access, on table walk");
+      case 0b011100: puts("Synchronous parity or ECC error on memory access, on table walk", 0, 1);
         print_level = 1;
         break;
       default:
         switch(dfsc) {
-          case 0b100001: puts("Alignment fault"); break;
-          case 0b110001: puts("Unsup atomic hardware update fault"); break;
-          case 0b110000: puts("TLB conflict abort"); break;
-          case 0b111101: puts("Section Domain Fault"); break;
-          case 0b111110: puts("Page Domain Fault"); break;
-          default: puts("Undefined Data abort code"); break;
+          case 0b100001: puts("Alignment fault", 0, 1); break;
+          case 0b110001: puts("Unsup atomic hardware update fault", 0, 1); break;
+          case 0b110000: puts("TLB conflict abort", 0, 1); break;
+          case 0b111101: puts("Section Domain Fault", 0, 1); break;
+          case 0b111110: puts("Page Domain Fault", 0, 1); break;
+          default: puts("Undefined Data abort code", 0, 1); break;
         }
     }
-    if (print_level) {
-      switch(el_num) {
-        case 0: puts(" at level 0 "); break;
-        case 1: puts(" at level 1 "); break;
-        case 2: puts(" at level 2 "); break;
-        case 3: puts(" at level 3 "); break;
-      }
-    }
-    if (esr & 0b1000000) {
-      puts(", write op");
-    }
-    else {
-      puts(", read op");
-    }
-    if (esr & (1 << 24)) {
-      puts(", ISV valid");
-    }
-    if (esr & (1 << 15)) {
-      puts(", 64 bit");
-    }
-    else {
-      puts(", 32 bit");
-    }
+//    if (print_level) {
+//      switch(el_num) {
+//        case 0: puts(" at level 0 "); break;
+//        case 1: puts(" at level 1 "); break;
+//        case 2: puts(" at level 2 "); break;
+//        case 3: puts(" at level 3 "); break;
+//      }
+//    }
+//    if (e->esr & 0b1000000) {
+//      puts(", write op");
+//    }
+//    else {
+//      puts(", read op");
+//    }
+//    if (e->esr & (1 << 24)) {
+//      puts(", ISV valid");
+//    }
+//    if (e->esr & (1 << 15)) {
+//      puts(", 64 bit");
+//    }
+//    else {
+//      puts(", 32 bit");
+//    }
+    dump_exception_ctx(e, 0, 4);
+}
+
+static void __handle_instr_abort(exception_info_t *e, uint64_t elr)
+{
+  puts("instruction abort handler", 10, 9);
+  dump_exception_ctx(e, 10, 10);
+}
+
+static void __handle_interrupt_synchronous(exception_info_t *e)
+{
+  /* exception class */
+  uint8_t ec;
+  char buf[256];
+
+  ec = (e->esr >> 26) & 0xff; 
+
+  sprintf(buf, "class: %s, esr: %08x, elr: %08x, sp now at: %08x", 
+      get_exception_class_string(ec), 
+      (int)e->esr, 
+      (int)e->elr, 
+      &buf[0]);
+  puts(buf, 0, 1);
+  dump_stack(e->stack, 40, 0, 2);
+  wait_msec(5000);
+  dump_exception_ctx(e, 60, 3);
+  while(1);
+
+
+  switch (ec) {
+    case EXC_CLASS_DATA_ABRT_LO_EL:
+    case EXC_CLASS_DATA_ABRT_EQ_EL:
+      __handle_data_abort(e);
+      break;
+    case EXC_CLASS_INST_ABRT_LO_EL:
+    case EXC_CLASS_INST_ABRT_EQ_EL:
+      __handle_instr_abort(e, e->elr);
+      break;
+    case EXC_CLASS_INST_ALIGNMENT:
+      puts("instruction alignment handler", 0, 0);
+      break;
+    default:
+      break;
   }
 }
 
-void __handle_interrupt_serror()
+
+static void __handle_interrupt_serror()
 {
 }
 
-void __handle_interrupt(
-  unsigned long type, 
-  unsigned long esr, 
-  unsigned long elr, 
-  unsigned long spsr, 
-  unsigned long far)
+static void __handle_interrupt_irq()
 {
-  char buf[64];
-  int cx = 40; 
-  int cy = 0;
-  int *x = &cx;
-  int *y = &cy; 
-  return;
+  if (irq_cb)
+    irq_cb();
+}
 
-  puts("interrupt: type: ");
-  puts(get_interrupt_type_string(type));
-  puts(": ");
-  switch (type) {
+void __handle_interrupt(exception_info_t *e)
+{
+  char buf[256];
+
+  p_cpu_ctx = e->cpu_ctx;
+
+  sprintf(buf, "interrupt: t: %s", get_interrupt_type_string(e->type));
+  puts(buf, 0, 0);
+
+  switch (e->type) {
     case INTERRUPT_TYPE_IRQ:
-      if (irq_cb)
-        irq_cb();
+      __handle_interrupt_irq();
       break;
     case INTERRUPT_TYPE_FIQ:
       if (fiq_cb)
         fiq_cb();
       break;
     case INTERRUPT_TYPE_SYNCHRONOUS:
-      __handle_interrupt_synchronous(esr, x, y);
+      __handle_interrupt_synchronous(e);
       break;
     case INTERRUPT_TYPE_SERROR:
       __handle_interrupt_serror();
       break;
   } 
-
-  // dump registers
-  sprintf(buf, "esr: %08x", (int)esr);
-  *x = 40, *y = 1;
-  vcanvas_puts(x, y, buf);
-  sprintf(buf, "elr: %08x", (int)elr);
-  *x = 40, *y = 2;
-  vcanvas_puts(x, y, buf);
-  sprintf(buf, "spsr: %08x", (int)spsr);
-  *x = 40, *y = 3;
-  vcanvas_puts(x, y, buf);
-  sprintf(buf, "far: %08x", (int)far);
-  *x = 40, *y = 4;
-  vcanvas_puts(x, y, buf);
 }
