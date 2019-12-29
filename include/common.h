@@ -19,6 +19,8 @@ void _putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
 
+void kernel_panic(const char *message);
+
 #define print_reg32(regname) printf(#regname " %08x\n",  *regname)
 
 #define print_reg32_at(regname) printf(#regname " %08x\n",  *(reg32_t)regname)
