@@ -44,7 +44,7 @@ typedef struct aarch64_cpu_ctx {
 } aarch64_cpu_ctx_t;
 
 /* dump cpu context to buffer */
-void aarch64_cpu_ctx_dump_to_buf(char *buf, int bufsize, aarch64_cpu_ctx_t *ctx);
+int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *ctx, char *buf, int bufsize);
 
 void aarch64_cpu_ctx_save_ctx(aarch64_cpu_ctx_t *to);
 

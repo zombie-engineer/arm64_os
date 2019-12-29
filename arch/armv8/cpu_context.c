@@ -2,28 +2,29 @@
 #include <common.h>
 #include <stringlib.h>
 
-#define CHECKED_ADVANCE(p, n, end) \
-  { p += n; if (p > end) kernel_panic("aarch64_cpu_ctx_dump_to_buf: buf overflow\n"); }
-
+#define do_sprintf(fmt, ...) \
+  n += snprintf(buf + n, bufsize - n, fmt, ##__VA_ARGS__)
+   
 /* dump cpu context to buffer */
-void aarch64_cpu_ctx_dump_to_buf(char *buf, int bufsize, aarch64_cpu_ctx_t *ctx)
+int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *ctx, char *buf, int bufsize)
 {
   int i;
+  int n;
   const int num_regs_in_line = 2;
-  char *p = buf;
-  char *end = buf + bufsize;
-  for (i = 0; i < sizeof(ctx->u.regs) / sizeof(ctx->u.regs[0]); ++i) {
-    CHECKED_ADVANCE(p, sprintf(p, "x%d: %016llx", i, ctx->u.regs[i]), end);
+  n = 0;
+  for (i = 0; i < ARRAY_SIZE(ctx->u.regs); ++i) {
+    do_sprintf("x%d: %016llx", i, ctx->u.regs[i]);
     if (i % num_regs_in_line == 0) {
-      CHECKED_ADVANCE(p, sprintf(p, "\n"), end);
+      do_sprintf("\n");
     }
     else {
-      CHECKED_ADVANCE(p, sprintf(p, "  "), end);
+      do_sprintf("  ");
     }
   }
+  return n;
 }
 
-void cpu_dump_ctx(char *buf, int bufsize, void *ctx)
+int cpu_dump_ctx(void *ctx, char *buf, int bufsize)
 {
-  aarch64_cpu_ctx_dump_to_buf(buf, bufsize, (aarch64_cpu_ctx_t *)ctx);
+  return aarch64_print_cpu_ctx((aarch64_cpu_ctx_t *)ctx, buf, bufsize);
 }

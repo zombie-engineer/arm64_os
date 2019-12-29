@@ -84,10 +84,18 @@ static void dump_exception_ctx(exception_info_t *e, int x, int y)
 {
   int stop;
   char *p1, *p2;
+  int n;
   p1 = cpu_ctx_buf;
   p2 = p1;
   stop = 0;
-  cpu_dump_ctx(cpu_ctx_buf, sizeof(cpu_ctx_buf), p_cpu_ctx);
+
+  n = cpu_dump_ctx(e->cpu_ctx, cpu_ctx_buf, sizeof(cpu_ctx_buf));
+
+  if (n >= sizeof(cpu_ctx_buf)) {
+    puts("Failed to dump cpu context.\n", 0, 0);
+    while(1);
+  }
+
   while(!stop) {
     while(*p2 && *p2 != '\n') p2++;
     if (*p2 == 0)
@@ -264,6 +272,7 @@ void __handle_interrupt(exception_info_t *e)
 
   sprintf(buf, "interrupt: t: %s", get_interrupt_type_string(e->type));
   puts(buf, 0, 0);
+  dump_exception_ctx(e, 60, 3);
 
   switch (e->type) {
     case INTERRUPT_TYPE_IRQ:
