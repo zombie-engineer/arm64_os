@@ -21,7 +21,7 @@ const char * _printf(const char* fmt, ...)
   const char *res = fmt;
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
-  vsprintf(printfbuf, fmt, args);
+  vsnprintf(printfbuf, 512, fmt, args);
   console_puts(printfbuf);
   return res;
 }

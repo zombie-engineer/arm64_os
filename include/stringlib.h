@@ -15,11 +15,14 @@
 #define memcpy   _memcpy
 #define strtoll  _strtoll
 #define sprintf  _sprintf
+#define snprintf  _snprintf
 #define vsprintf _vsprintf
+#define vsnprintf _vsnprintf
 #define isprint  _isprint
-#define isspace  _isspace
 #define isdigit  _isdigit
 #endif
+
+#define isspace  _isspace
 
 
 int _strcmp(const char *s1, const char *s2);
@@ -40,9 +43,13 @@ void * _memcpy(void *dst, const void *src, size_t n);
 
 long long int _strtoll(const char *str, char **endptr, int basis);
 
-unsigned int _vsprintf(char *dst, const char *fmt, __builtin_va_list args);
+int _vsprintf(char *dst, const char *fmt, __builtin_va_list args);
 
-unsigned int _sprintf(char *dst, const char *fmt, ...);
+int _vsnprintf(char *dst, size_t n, const char *fmt, __builtin_va_list args);
+
+int _sprintf(char *dst, const char *fmt, ...);
+
+int _snprintf(char *dst, size_t n, const char *fmt, ...);
 
 int _isspace(char c);
 

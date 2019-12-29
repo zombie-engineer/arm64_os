@@ -37,10 +37,24 @@ char to_char_8_10(int i, int base) {
   return i + '0';
 }
 
-unsigned int optimized _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
+#define APPEND(c) \
+  if (dst < end) *(dst++) = c; else c;\
+  counter++;
+
+
+#define MEMSET(c, len) \
+  {\
+    int memset_len = min(len, ((end > dst) ? (end - dst) : 0));\
+    memset(dst, c, memset_len);\
+    dst += memset_len;\
+    counter += len;\
+  }
+
+int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list args)
 {
   unsigned long long arg, divider;
   char type;
+  int counter;
   int wordlen;
   int padding;
   int space_padding;
@@ -57,20 +71,28 @@ unsigned int optimized _vsprintf(char *dst, const char *fmt, __builtin_va_list a
   int width;
   int precision;
   int size;
+  char *end;
+  char *orig;
   const char *s_src;
 
-  char *orig;
+  counter = 0;
+
+  if (dst_len > 0)
+    end = dst + dst_len - 1;
+  else
+    end = dst;
+
   orig = dst;
 
   while(*fmt) {
     if (*fmt != '%') {
-      *dst++ = *fmt++;
+      APPEND(*fmt++);
       continue;
     }
 
     fmt++;
     if (*fmt == '%') {
-      *dst++ = *fmt++;
+      APPEND(*fmt++);
       continue;
     }
 
@@ -183,15 +205,18 @@ unsigned int optimized _vsprintf(char *dst, const char *fmt, __builtin_va_list a
       default: goto _sprintf_loop_end;
     }
 _sprintf_char:
-    if (_isprint((char)arg))
-      *dst++ = (char)arg;
+    if (_isprint((char)arg)) {
+      APPEND((char)arg);
+    }
     else
-      *dst++ = '.';
+      APPEND('.');
     goto _sprintf_loop_end;
 
 _sprintf_ptr:
     base = 16;
-    *dst++ = '0'; *dst++ = 'x';
+    APPEND('.');
+    APPEND('x');
+
     width = 16;
     type = 'x';
 _sprintf_number:
@@ -213,8 +238,8 @@ _sprintf_number:
       else {
         maxbits = 0;
         leading_zeroes = 0;
-        *dst++ = '<';
-        *dst++ = '>';
+        APPEND('<');
+        APPEND('>');
       }
 
       // padding
@@ -229,16 +254,14 @@ _sprintf_number:
       else if (flags_zero)
         space_padding = 0;
 
-      memset(dst, ' ', space_padding);
-      dst += space_padding;
+      MEMSET(' ', space_padding);
       padding -= space_padding;
 
-      memset(dst, '0', padding);
-      dst += padding;
+      MEMSET('0', padding);
 
       for (;rightmost_nibble >= 0; rightmost_nibble--) {
         nibble = (int)((LLU(arg) >> (rightmost_nibble * 4)) & 0xf);
-        *dst++ = to_char_16(nibble, /* uppercase */ type < 'a');
+        APPEND(to_char_16(nibble, /* uppercase */ type < 'a'));
       }
 
       goto _sprintf_loop_end;
@@ -279,22 +302,23 @@ _sprintf_number:
       if (flags_zero && precision == -1)
         space_padding = 0;
 
-      memset(dst, ' ', space_padding);
-      dst += space_padding;
+      MEMSET(' ', space_padding);
       padding -= space_padding;
 
-      if (is_neg_sign)
-        *dst++ = '-';
-      else if (flags_plus)
-        *dst++ = '+';
-      else if (flags_space)
-        *dst++ = ' ';
+      if (is_neg_sign) {
+        APPEND('-');
+      }
+      else if (flags_plus) {
+        APPEND('+');
+      }
+      else if (flags_space) {
+        APPEND(' ');
+      }
 
-      memset(dst, '0', padding);
-      dst += padding;
+      MEMSET('0', padding);
 
       while(divider) {
-        *dst++ = to_char_8_10(DIV_LLD(arg, divider), base);
+        APPEND(to_char_8_10(DIV_LLD(arg, divider), base));
         arg = arg % divider;
         divider /= base;
       }
@@ -319,22 +343,23 @@ _sprintf_number:
       if (flags_zero && precision == -1)
         space_padding = 0;
 
-      memset(dst, ' ', space_padding);
-      dst += space_padding;
+      MEMSET(' ', space_padding);
       padding -= space_padding;
 
-      if (is_neg_sign)
-        *dst++ = '-';
-      else if (flags_plus)
-        *dst++ = '+';
-      else if (flags_space)
-        *dst++ = ' ';
+      if (is_neg_sign) {
+        APPEND('-');
+      }
+      else if (flags_plus) {
+        APPEND('+');
+      }
+      else if (flags_space) {
+        APPEND(' ');
+      }
 
-      memset(dst, '0', padding);
-      dst += padding;
+      MEMSET('0', padding);
 
       while(divider) {
-        *dst++ = to_char_8_10(DIV_LLU(arg, divider), base);
+        APPEND(to_char_8_10(DIV_LLU(arg, divider), base));
         arg = arg % divider;
         divider /= base;
       }
@@ -349,20 +374,35 @@ _sprintf_float_exp:
 _sprintf_string:
     s_src = (const char *)arg;
     while(*s_src) {
-      *dst++ = *s_src++;
+      APPEND(*s_src++);
     }
     goto _sprintf_loop_end;
 _sprintf_loop_end:;
   }
-  *dst = 0;
-  return dst - orig;
+
+  if (dst - orig < dst_len)
+    *dst = 0; 
+
+  return counter;
 }
 
-unsigned int _sprintf(char *dst, const char *fmt, ...)
+int /*optimized*/ _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
+{
+  return _vsnprintf(dst, 0xffffffff, fmt, args);
+}
+
+
+int _sprintf(char *dst, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
   return _vsprintf(dst, fmt, args);
 }
 
+int _snprintf(char *dst, size_t dst_size, const char *fmt, ...)
+{
+  __builtin_va_list args;
+  __builtin_va_start(args, fmt);
+  return _vsnprintf(dst, dst_size, fmt, args);
+}
 
