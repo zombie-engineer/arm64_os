@@ -48,8 +48,14 @@ void interrupt_ctrl_dump_regs(const char* tag)
 }
 
 
+uint32_t interrupt_ctrl_read_pending_gpu_1()
+{
+  return read_reg(BCM2835_IC_PENDING_GPU_1);
+}
+
 void interrupt_ctrl_enable_systimer_1(void)
 {
+  // puts("interrupt_ctrl_enable_systimer_1\n");
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
@@ -60,6 +66,7 @@ void interrupt_ctrl_enable_systimer_3(void)
 
 void interrupt_ctrl_disable_systimer_1(void)
 {
+  // puts("interrupt_ctrl_disable_systimer_1\n");
   write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
@@ -70,6 +77,7 @@ void interrupt_ctrl_disable_systimer_3(void)
 
 void interrupt_ctrl_enable_timer_irq(void)
 {
+  puts("interrupt_ctrl_enable_timer_irq\n");
   write_reg(BCM2835_IC_ENABLE_BASIC, BCM2835_IC_ENABLE_BASIC);
 }
 

@@ -34,6 +34,7 @@ typedef struct {
   unsigned disable_base_irqs;
 } __attribute__((packed)) irq_controller_t;
 
+uint32_t interrupt_ctrl_read_pending_gpu_1();
 
 void interrupt_ctrl_dump_regs(const char* tag);
 
