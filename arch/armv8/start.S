@@ -160,6 +160,39 @@ _in_el1:
 
 
 2:
+  // clear GP registers
+  mov x0, #0
+  mov x1, #0
+  mov x2, #0
+  mov x3, #0
+  mov x4, #0
+  mov x5, #0
+  mov x6, #0
+  mov x7, #0
+  mov x8, #0
+  mov x9, #0
+  mov x10, #0
+  mov x11, #0
+  mov x12, #0
+  mov x13, #0
+  mov x14, #0
+  mov x15, #0
+  mov x16, #0
+  mov x17, #0
+  mov x18, #0
+  mov x19, #0
+  mov x20, #0
+  mov x21, #0
+  mov x22, #0
+  mov x23, #0
+  mov x24, #0
+  mov x25, #0
+  mov x26, #0
+  mov x27, #0
+  mov x28, #0
+  mov x29, #0
+  mov x30, #0
+
   // Jump to main
   bl    main
   // After main returns halt 
@@ -176,7 +209,7 @@ _cpu_wait_for_event:
 .align 3
 .globl __aarch64_cpu_ctx
 __aarch64_cpu_ctx:
-.rept 31
+.rept 33
 .quad 0x6666666666666666
 .endr
 
@@ -214,8 +247,11 @@ __store_cpu_ctx:
 
   // store original link register (x30)
   // of the caller function
-  ldr   x29, [sp] 
-  str   x29, [x30]
+  ldr   x28, [sp] 
+  mov   x29, #0
+  stp   x28, x29, [x30], #16
+  mrs   x28, elr_el1
+  str   x28, [x30]
 
   // restore this function's link register (x30)
   // to return

@@ -13,7 +13,14 @@ int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *ctx, char *buf, int bufsize)
   const int num_regs_in_line = 2;
   n = 0;
   for (i = 0; i < ARRAY_SIZE(ctx->u.regs); ++i) {
-    do_sprintf("x%d: %016llx", i, ctx->u.regs[i]);
+    if (i < 31) {
+      do_sprintf("x%d: %016llx", i, ctx->u.regs[i]);
+    } else if (i == 31) {
+      do_sprintf("sp: %016llx", i, ctx->u.regs[i]);
+    } else {
+      do_sprintf("pc: %016llx", ctx->u.regs[i]);
+    }
+
     if (i % num_regs_in_line == 0) {
       do_sprintf("\n");
     }

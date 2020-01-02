@@ -12,3 +12,5 @@ void uart_putc(char c);
 
 // TODO remove that
 void uart_hex(unsigned int d);
+
+void uart_send_buf(const void *buf, int n);

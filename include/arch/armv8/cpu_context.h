@@ -34,12 +34,13 @@ typedef struct aarch64_cpu_ctx {
       uint64_t x26;
       uint64_t x27;
       uint64_t x28;
-      /* x29 <=> sp register */
       uint64_t x29;
       /* x30 <=> sp register */
       uint64_t x30;
+      uint64_t sp;
+      uint64_t pc;
     } n;
-    uint64_t regs[31];
+    uint64_t regs[33];
   } u;
 } aarch64_cpu_ctx_t;
 

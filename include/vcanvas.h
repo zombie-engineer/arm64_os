@@ -12,9 +12,12 @@ void vcanvas_showpicture();
 
 // video console method. put single char on screen
 void vcanvas_putc(int *x, int *y, char);
+void vcanvas_putc2(int *x, int *y, char);
 
 // video console method. put string on screen
 void vcanvas_puts(int *x, int *y, const char *s);
+
+void vcanvas_set_pixel(int x, int y, int rgba);
 
 int vcanvas_get_width_height(int *width, int *height);
 
@@ -56,3 +59,4 @@ int vcanvas_get_fontsize(int *size_x, int *size_y);
  * to [x1:y1, x1+size_x:y2+sizey]
  */
 void viewport_copy_rect(viewport_t *v, int x, int y0, int size_x, int size_y, int x1, int y1);
+
