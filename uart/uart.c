@@ -7,14 +7,16 @@
 #error only one implementation of UART is possible.
 #endif
 
-#if defined(UART_PL011)
+#if defined(CONFIG_UART_PL011)
 #define uart_send pl011_uart_send 
 #define uart_recv pl011_uart_getc
 #define _uart_init pl011_uart_init
-#elif defined(UART_MINI)
+#define _uart_send_buf pl011_uart_send_buf
+#elif defined(CONFIG_UART_MINI)
 #define uart_send mini_uart_send 
 #define uart_recv mini_uart_getc
 #define _uart_init mini_uart_init
+#define _uart_send_buf mini_uart_send_buf
 #endif
 
 void uart_init(int baudrate, int system_clock)
@@ -53,4 +55,9 @@ void uart_hex(unsigned int d)
     n += n > 9 ? 0x37 : 0x30;
     uart_send(n);
   }
+}
+
+void uart_send_buf(const void *buf, int n)
+{
+  _uart_send_buf((const char *)buf, n);
 }

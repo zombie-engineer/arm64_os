@@ -14,6 +14,9 @@
 static void *p_cpu_ctx;
 static char cpu_ctx_buf[2048];
 
+/* exception level to control nested entry to exception code */
+static int elevel = 0;
+
 typedef struct printer {
   int x;
   int y;
@@ -78,6 +81,51 @@ static void dump_stack(uint64_t *stack, int depth, int x, int y)
      sprintf(buf, "%08x: %016x", stack + i, *(stack + i));
      puts(buf, x, y++);
   }
+}
+
+typedef struct bin_data_header {
+  char magic[8];
+  uint32_t crc;
+  uint32_t len;
+} packed bin_data_header_t;
+
+typedef struct bin_stack_header {
+  char magic[8];
+  uint32_t crc;
+  uint32_t len;
+  uint64_t stack_addr;
+} packed bin_stack_header_t;
+
+uint32_t count_crc(void *src, int size, uint32_t init_crc)
+{
+  int i;
+  uint32_t result;
+  result = init_crc;
+  for (i = 0; i < size; ++i)
+    result += ((const char *)src)[i];
+  return result;
+}
+
+#define MAGIC_STACK "STACK"
+#define MAGIC_BINBLOCK "BINBLOCK"
+
+static void dump_stack_to_uart(void *stack, int num_recs)
+{
+  bin_stack_header_t sh = { 0 };
+  bin_data_header_t h = { 0 };
+
+  memcpy(sh.magic, MAGIC_STACK, sizeof(MAGIC_STACK));
+  sh.len = sizeof(uint64_t) * num_recs;
+  sh.stack_addr = (uint64_t)stack;
+  sh.crc = count_crc(stack, sh.len, 0);
+
+  memcpy(h.magic, MAGIC_BINBLOCK, sizeof(MAGIC_BINBLOCK));
+  h.len = sizeof(sh) + sh.len;
+  h.crc = count_crc(&sh, sizeof(sh.crc), sh.crc);
+
+  uart_send_buf(&h, sizeof(h));
+  uart_send_buf(&sh, sizeof(sh));
+  uart_send_buf(stack, sizeof(uint64_t) * num_recs);
 }
 
 static void dump_exception_ctx(exception_info_t *e, int x, int y)
@@ -152,27 +200,22 @@ const char *get_exception_class_string(uint8_t exception_class)
 static void __handle_data_abort(exception_info_t *e)
 {
   int dfsc;
-  int el_num;
-  int print_level;
 
-  el_num = e->esr & 0x3;
+  // el_num = e->esr & 0x3;
   dfsc = (int)e->esr & 0x0000003f;
-  print_level = 0;
 
   switch(dfsc & 0x3c) {
-      case 0b000000: puts("Address size fault", 0, 1); print_level = 1; break;
-      case 0b000100: puts("Translation fault", 0, 1);  print_level = 1; break;
-      case 0b001000: puts("Access flag fault", 0, 1);  print_level = 1; break;
-      case 0b001100: puts("Permission fault", 0, 1);   print_level = 1; break;
+      case 0b000000: puts("Address size fault", 0, 1); break;
+      case 0b000100: puts("Translation fault", 0, 1);  break;
+      case 0b001000: puts("Access flag fault", 0, 1);  break;
+      case 0b001100: puts("Permission fault", 0, 1);   break;
       case 0b010000: puts("Synchronous External abort, not table walk", 0, 1); break;
       case 0b010001: puts("Synchronous Tag Check", 0, 1); break;
       case 0b010100: puts("Synchronous External abort, on table walk", 0, 1); 
-        print_level = 1; 
         break;
       case 0b011000: puts("Synchronous parity or ECC error on memory access, not on table walk", 0, 1);
         break;
       case 0b011100: puts("Synchronous parity or ECC error on memory access, on table walk", 0, 1);
-        print_level = 1;
         break;
       default:
         switch(dfsc) {
@@ -184,14 +227,6 @@ static void __handle_data_abort(exception_info_t *e)
           default: puts("Undefined Data abort code", 0, 1); break;
         }
     }
-//    if (print_level) {
-//      switch(el_num) {
-//        case 0: puts(" at level 0 "); break;
-//        case 1: puts(" at level 1 "); break;
-//        case 2: puts(" at level 2 "); break;
-//        case 3: puts(" at level 3 "); break;
-//      }
-//    }
 //    if (e->esr & 0b1000000) {
 //      puts(", write op");
 //    }
@@ -216,30 +251,35 @@ static void __handle_instr_abort(exception_info_t *e, uint64_t elr)
   dump_exception_ctx(e, 10, 10);
 }
 
+static int inline __get_synchr_exception_class(uint64_t esr)
+{
+  return (esr >> 26) & 0xff; 
+}
+
 static void __handle_interrupt_synchronous(exception_info_t *e)
 {
   /* exception class */
   uint8_t ec;
   char buf[256];
 
-  ec = (e->esr >> 26) & 0xff; 
+  ec = __get_synchr_exception_class(e->esr);
 
-  sprintf(buf, "class: %s, esr: %08x, elr: %08x, sp now at: %08x", 
+  sprintf(buf, "class: %s, esr: %08x, elr: %08x, far: %08x, sp now at: %08x", 
       get_exception_class_string(ec), 
       (int)e->esr, 
       (int)e->elr, 
+      (int)e->far,
       &buf[0]);
   puts(buf, 0, 1);
-  dump_stack(e->stack, 40, 0, 2);
-  wait_msec(5000);
-  dump_exception_ctx(e, 60, 3);
+  dump_stack(e->stack, 30, 160, 0);
+  dump_stack_to_uart(e->stack, 100);
   while(1);
-
 
   switch (ec) {
     case EXC_CLASS_DATA_ABRT_LO_EL:
     case EXC_CLASS_DATA_ABRT_EQ_EL:
       __handle_data_abort(e);
+      while(1);
       break;
     case EXC_CLASS_INST_ABRT_LO_EL:
     case EXC_CLASS_INST_ABRT_EQ_EL:
@@ -264,15 +304,26 @@ static void __handle_interrupt_irq()
     irq_cb();
 }
 
-void __handle_interrupt(exception_info_t *e)
-{
+static void __print_exception_info(exception_info_t *e, int elevel) {
+  int x;
+  int y;
   char buf[256];
 
-  p_cpu_ctx = e->cpu_ctx;
+  x = 100;
+  y = 0;
+  snprintf(buf, 256, "interrupt: l: %d, t: %s", elevel, get_interrupt_type_string(e->type));
+  puts(buf, x, y + 2 * (elevel - 1));
+  y += 3;
+  dump_exception_ctx(e, x, y + 17 * (elevel - 1));
+}
 
-  sprintf(buf, "interrupt: t: %s", get_interrupt_type_string(e->type));
-  puts(buf, 0, 0);
-  dump_exception_ctx(e, 60, 3);
+void __handle_interrupt(exception_info_t *e)
+{
+  elevel++;
+
+  dump_stack_to_uart(e->stack, 100);
+  p_cpu_ctx = e->cpu_ctx;
+  __print_exception_info(e, elevel);
 
   switch (e->type) {
     case INTERRUPT_TYPE_IRQ:
@@ -289,4 +340,5 @@ void __handle_interrupt(exception_info_t *e)
       __handle_interrupt_serror();
       break;
   } 
+  elevel--;
 }

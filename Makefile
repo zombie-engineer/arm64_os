@@ -41,6 +41,7 @@ OBJS += $(LIBS) font.o to_raspi.nokia5110.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
+NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
 
@@ -59,6 +60,7 @@ to_raspi.nokia5110.o:
 
 kernel8.img: $(OBJS)
 	$(LD) -nostdlib -nostartfiles $(OBJS) -T arch/armv8/link.ld -o kernel8.elf -Map kernel8.map
+	$(NM) --numeric-sort kernel8.elf > all_symbols.map
 	$(OBJCOPY) -O binary kernel8.elf $@
 
 run:

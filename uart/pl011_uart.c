@@ -83,8 +83,18 @@ void pl011_uart_send(unsigned int c)
   *UART0_DR = c;
 }
 
+void pl011_uart_send_buf(const char *buf, int n)
+{
+  int i;
+  for (i = 0; i < n; ++i) {
+    while(*UART0_FR & UART0_FR_TXFF);
+    *UART0_DR = buf[i];
+  }
+}
+
 char pl011_uart_getc()
 {
   while(*UART0_FR & UART0_FR_RXFE); 
   return (char)(*UART0_DR);
 }
+

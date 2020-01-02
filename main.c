@@ -130,9 +130,26 @@ void* my_timer_callback_periodic(void* arg)
   return 0;
 }
 
+// static int x = 150;
+// static int y = 0;
+static char c = '0';
+
 void* my_timer_callback_oneshot(void* arg)
 {
-  puts("oneshot");
+  int x, y;
+  x = 0;
+  y = 0;
+  vcanvas_putc2(c, &x, &y);
+  x--;
+  y++;
+  if (y == 0) {
+    y = 0;
+    c ++;
+    if (c > '9')
+      c = '0';
+  }
+
+  // puts("oneshot");
   systimer_set_oneshot(MSEC_TO_USEC(80), my_timer_callback_oneshot, 0);
   return 0;
 }
@@ -147,8 +164,8 @@ void wait_timer()
   for (i = 0; i < 0xffffffff; ++i) {
     if (i > 0xfffffff1)
       i = 0;
-    if (i % 20000 == 0)
-      putc('.');
+    // if (i % 20000 == 0)
+    //  putc('.');
   }
 
 
