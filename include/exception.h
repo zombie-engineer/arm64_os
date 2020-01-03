@@ -21,4 +21,5 @@ typedef struct exception_info {
   uint64_t type;
   void *cpu_ctx;
   uint64_t *stack;
+  uint64_t *stack_base;
 } packed exception_info_t;

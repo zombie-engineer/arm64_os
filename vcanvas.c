@@ -145,6 +145,11 @@ static void vcanvas_draw_glyph(
     mask = 1 << (font->width - 1);
     for (_x = 0; _x < limit_x; ++_x) {
       pixel_addr = fb_get_pixel_addr(x + _x, y + _y);
+      asm volatile ("mov x21, %0\n" : : "r"(pixel_addr));
+      asm volatile ("mov x22, %0\n" : : "r"(_x));
+      asm volatile ("mov x23, %0\n" : : "r"(_y));
+      asm volatile ("mov x24, %0\n" : : "r"(x));
+      asm volatile ("mov x25, %0\n" : : "r"(y));
       *pixel_addr = (int)*glyph & mask ? fg_color : bg_color;
       mask >>= 1;
     }
@@ -192,16 +197,13 @@ unsigned char * font_get_glyph(psf_t *font, char c)
   return glyphs + glyph_idx * font->bytesperglyph;
 }
 
+
 void vcanvas_putc(int* x, int* y, char chr)
 {
   unsigned char *glyph;
-  int framebuf_off;
   psf_t *font = (psf_t*)&_binary_font_psf_start;
   glyph = font_get_glyph(font, chr);
 
-  // calculate offset on screen
-  framebuf_off = (*y * font->height * fb_pitch) + (*x * (font->width + 1) * 4);
-  
   switch(chr) {
     case CONSOLE_CHAR_CARRIAGE_RETURN:
       *x = 0;

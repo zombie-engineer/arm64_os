@@ -130,27 +130,23 @@ void* my_timer_callback_periodic(void* arg)
   return 0;
 }
 
-// static int x = 150;
-// static int y = 0;
+static int x = 150;
+static int y = 0;
 static char c = '0';
 
 void* my_timer_callback_oneshot(void* arg)
 {
-  int x, y;
-  x = 0;
-  y = 0;
-  vcanvas_putc2(c, &x, &y);
+  vcanvas_putc(&x, &y, c);
   x--;
   y++;
-  if (y == 0) {
+  if (y == 100) {
     y = 0;
     c ++;
     if (c > '9')
       c = '0';
   }
 
-  // puts("oneshot");
-  systimer_set_oneshot(MSEC_TO_USEC(80), my_timer_callback_oneshot, 0);
+  systimer_set_oneshot(MSEC_TO_USEC(1), my_timer_callback_oneshot, 0);
   return 0;
 }
 

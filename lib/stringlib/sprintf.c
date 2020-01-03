@@ -37,9 +37,9 @@ char to_char_8_10(int i, int base) {
   return i + '0';
 }
 
-#define APPEND(c) \
-  if (dst < end) *(dst++) = c; else c;\
-  counter++;
+#define APPEND(c) { \
+  if (dst < end) *(dst++) = c; else c; \
+  counter++; }
 
 
 #define MEMSET(c, len) \
@@ -152,6 +152,7 @@ int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __built
     
     // Handle size
     switch(*fmt) {
+      case 'c': fmt--;
       case 'l': size = SIZE_l; break;
       case 'h': size = SIZE_h; break;
       case 'j': size = SIZE_j; break;
@@ -207,9 +208,10 @@ int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __built
 _sprintf_char:
     if (_isprint((char)arg)) {
       APPEND((char)arg);
-    }
-    else
+    } 
+    else {
       APPEND('.');
+    }
     goto _sprintf_loop_end;
 
 _sprintf_ptr:

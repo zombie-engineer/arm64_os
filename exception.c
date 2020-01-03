@@ -83,6 +83,18 @@ static void dump_stack(uint64_t *stack, int depth, int x, int y)
   }
 }
 
+typedef struct bin_exc_hdr {
+  char magic[8];
+  uint32_t crc;
+  uint32_t len;
+  struct {
+    uint64_t esr; 
+    uint64_t spsr; 
+    uint64_t far;
+    uint64_t type;
+  } e;
+} packed bin_exc_hdr_t;
+
 typedef struct bin_data_header {
   char magic[8];
   uint32_t crc;
@@ -106,26 +118,56 @@ uint32_t count_crc(void *src, int size, uint32_t init_crc)
   return result;
 }
 
-#define MAGIC_STACK "STACK"
+#define MAGIC_REGS     "REGS"
+#define MAGIC_STACK    "STACK"
 #define MAGIC_BINBLOCK "BINBLOCK"
+#define MAGIC_CONTEXT  "CONTEXT"
+#define MAGIC_EXCEPTION "EXCPT"
 
-static void dump_stack_to_uart(void *stack, int num_recs)
+static void dump_context_to_uart(exception_info_t *e)
 {
-  bin_stack_header_t sh = { 0 };
+  char regs[2048];
   bin_data_header_t h = { 0 };
+  bin_stack_header_t sh = { 0 };
+  bin_regs_hdr_t rh = { 0 };
+  bin_exc_hdr_t eh = { 0 };
+
+  memcpy(eh.magic, MAGIC_EXCEPTION, sizeof(MAGIC_EXCEPTION));
+  eh.len = sizeof(eh.e);
+  eh.e.esr = e->esr;
+  eh.e.spsr = e->spsr;
+  eh.e.far = e->far;
+  eh.e.type = e->type;
+  eh.crc = count_crc(&eh.e, sizeof(eh.e), 0);
+
 
   memcpy(sh.magic, MAGIC_STACK, sizeof(MAGIC_STACK));
-  sh.len = sizeof(uint64_t) * num_recs;
-  sh.stack_addr = (uint64_t)stack;
-  sh.crc = count_crc(stack, sh.len, 0);
+  sh.len = sizeof(uint64_t) * (e->stack_base - e->stack);
+  sh.stack_addr = (uint64_t)e->stack;
+  sh.crc = count_crc(e->stack, sh.len, 0);
+
+  memcpy(rh.magic, MAGIC_REGS, sizeof(MAGIC_REGS));
+  if (cpu_serialize_regs(e->cpu_ctx, &rh, regs, sizeof(regs)) > sizeof(regs))
+    kernel_panic("dump_cpu_context: regs too small.\n");
+
+  rh.crc = count_crc(regs, rh.len, 0); 
 
   memcpy(h.magic, MAGIC_BINBLOCK, sizeof(MAGIC_BINBLOCK));
-  h.len = sizeof(sh) + sh.len;
-  h.crc = count_crc(&sh, sizeof(sh.crc), sh.crc);
+  h.len += sizeof(eh);
+  h.len += sizeof(sh) + sh.len;
+  h.len += sizeof(rh) + rh.len;
+
+  h.crc = count_crc(&eh.e, sizeof(eh.e), 0);
+  h.crc = count_crc(&sh, sizeof(sh.crc), h.crc);
+  h.crc = count_crc(e->stack, sh.len, h.crc);
+  h.crc = count_crc(regs, rh.len, h.crc);
 
   uart_send_buf(&h, sizeof(h));
+  uart_send_buf(&eh, sizeof(eh));
+  uart_send_buf(&rh, sizeof(rh));
+  uart_send_buf(&regs, rh.len);
   uart_send_buf(&sh, sizeof(sh));
-  uart_send_buf(stack, sizeof(uint64_t) * num_recs);
+  uart_send_buf(e->stack, sh.len);
 }
 
 static void dump_exception_ctx(exception_info_t *e, int x, int y)
@@ -272,7 +314,7 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
       &buf[0]);
   puts(buf, 0, 1);
   dump_stack(e->stack, 30, 160, 0);
-  dump_stack_to_uart(e->stack, 100);
+  dump_context_to_uart(e);
   while(1);
 
   switch (ec) {
@@ -321,9 +363,9 @@ void __handle_interrupt(exception_info_t *e)
 {
   elevel++;
 
-  dump_stack_to_uart(e->stack, 100);
+  // dump_context_to_uart(e);
   p_cpu_ctx = e->cpu_ctx;
-  __print_exception_info(e, elevel);
+  // __print_exception_info(e, elevel);
 
   switch (e->type) {
     case INTERRUPT_TYPE_IRQ:

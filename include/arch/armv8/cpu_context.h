@@ -1,5 +1,6 @@
 #pragma once
 #include <types.h>
+#include <cpu.h>
 
 /* interrupt info */
 typedef struct aarch64_cpu_ctx {
@@ -51,3 +52,4 @@ void aarch64_cpu_ctx_save_ctx(aarch64_cpu_ctx_t *to);
 
 void aarch64_cpu_ctx_load_ctx(aarch64_cpu_ctx_t *from);
 
+int aarch64_cpu_serialize_regs(aarch64_cpu_ctx_t *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);

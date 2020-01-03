@@ -216,7 +216,7 @@ __aarch64_cpu_ctx:
 .align 3
 .globl __exception_info
 __exception_info:
-.rept 7
+.rept 8
 .quad 0x6666666666666666
 .endr
 
@@ -292,10 +292,11 @@ __prep_exception_info:
   mrs   x2, spsr_el1
   mrs   x3, elr_el1
   mrs   x4, far_el1
+  ldr   x9, =__stack_base
   stp   x1, x2, [x5], #16
   stp   x3, x4, [x5], #16
   stp   x0, x6, [x5], #16
-  str   x8, [x5]
+  stp   x8, x9, [x5]
   mov   x0, x7
   ret
 

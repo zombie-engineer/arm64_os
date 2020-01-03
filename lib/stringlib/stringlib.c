@@ -3,7 +3,7 @@
 
 int _isprint(char ch)
 {
-  return ch >= 0x20 && ch < 0x7f;
+  return (ch >= 0x20 && ch < 0x7f) || ch == '\n' || ch == ' ';
 }
 
 int _isdigit(char ch)

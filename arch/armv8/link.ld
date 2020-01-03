@@ -2,6 +2,7 @@
 SECTIONS
 {
   . = 0x80000;
+  __stack_base = .;
   .text : 
   { 
     KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) 
