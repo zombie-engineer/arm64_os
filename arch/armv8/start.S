@@ -105,7 +105,7 @@ _check_el1:
   // SCTLR.EIS    = 1 Exception entry is synchronizing
   // SCTLR.SPAN   = 1 PSTATE.PAN is unchanged on taking an exception to EL1
   //                  (Set Privelidged Access Never = false)
-  // SCTLR.TLSMD  = 1 All EL0 A32/T32 accesses to stage 1 marged as 
+  // SCTLR.TLSMD  = 1 All EL0 A32/T32 accesses to stage 1 marked as 
   //                  Device-nGRE/Device-nGnRE/Device-nGnRnE are not trapped
   // SCTLR.LSMAOE = 1 Load multiple/Store multiple Atomicity and Ordering Enable
 
@@ -119,6 +119,10 @@ _check_el1:
   msr   vbar_el1, x2
 
 
+  // Set initial cpu context
+  ldr   x2, =__current_cpuctx
+  ldr   x3, =__armv8_cpuctx_e
+  str   x3, [x2]
 
   // Change execution level to EL1
 
@@ -144,8 +148,15 @@ _check_el1:
 // ******************************************************************************
 .local _in_el1
 _in_el1:
-  mov   x2, #1
-  msr   SPSel, x2
+
+  // Use sp_el0
+  // While catching exception from el1 to el1
+  // use sp_el0 to store stack pointer to 
+  // restore to after eret
+  // sp_el1 is not convenient to write/read
+  // mov   x2, #0
+  // msr   SPSel, x2
+
   // Set stack
   mov   sp, x1
 
@@ -207,8 +218,8 @@ _cpu_wait_for_event:
 
 // 8 byte aligned cpu context
 .align 3
-.globl __aarch64_cpu_ctx
-__aarch64_cpu_ctx:
+.globl __armv8_cpuctx_e
+__armv8_cpuctx_e:
 .rept 33
 .quad 0x6666666666666666
 .endr
@@ -220,65 +231,10 @@ __exception_info:
 .quad 0x6666666666666666
 .endr
 
-
-.local __store_cpu_ctx
-__store_cpu_ctx:
-  // of all general purpose registers
-  // x0 - x29 are uncorrupted and
-  // link register x30 is in [sp]
-  str   x30, [sp, #-8]
-  ldr   x30, =__aarch64_cpu_ctx
-
-  stp   x0 , x1 , [x30], #16
-  stp   x2 , x3 , [x30], #16
-  stp   x4 , x5 , [x30], #16
-  stp   x6 , x7 , [x30], #16
-  stp   x8 , x9 , [x30], #16
-  stp   x10, x11, [x30], #16
-  stp   x12, x13, [x30], #16
-  stp   x14, x15, [x30], #16
-  stp   x16, x17, [x30], #16
-  stp   x18, x19, [x30], #16
-  stp   x20, x21, [x30], #16
-  stp   x22, x23, [x30], #16
-  stp   x24, x25, [x30], #16
-  stp   x26, x27, [x30], #16
-  stp   x28, x29, [x30], #16
-
-  // store original link register (x30)
-  // of the caller function
-  ldr   x28, [sp] 
-  mov   x29, #0
-  stp   x28, x29, [x30], #16
-  mrs   x28, elr_el1
-  str   x28, [x30]
-
-  // restore this function's link register (x30)
-  // to return
-  ldr   x30, [sp, #-8]
-  ret
-
-.local __eret_to_cpu_ctx
-__eret_to_cpu_ctx:
-  ldr   x30 , =__aarch64_cpu_ctx
-  ldp   x0 , x1 , [x30], #16
-  ldp   x2 , x3 , [x30], #16
-  ldp   x4 , x5 , [x30], #16
-  ldp   x6 , x7 , [x30], #16
-  ldp   x8 , x9 , [x30], #16
-  ldp   x10, x11, [x30], #16
-  ldp   x12, x13, [x30], #16
-  ldp   x14, x15, [x30], #16
-  ldp   x16, x17, [x30], #16
-  ldp   x18, x19, [x30], #16
-  ldp   x20, x21, [x30], #16
-  ldp   x22, x23, [x30], #16
-  ldp   x24, x25, [x30], #16
-  ldp   x26, x27, [x30], #16
-  ldp   x28, x29, [x30], #16
-  ldr   x30, [x30]
-  eret
-
+// pointer to current cpu context
+.globl __current_cpuctx
+__current_cpuctx:
+.quad 0
 
 .local __prep_exception_info
 __prep_exception_info:
@@ -286,7 +242,8 @@ __prep_exception_info:
   // x1 - top of stack at exception enter
   mov   x8, x1
   ldr   x5, =__exception_info
-  ldr   x6, =__aarch64_cpu_ctx
+  ldr   x6, =__current_cpuctx
+  ldr   x6, [x6]
   mov   x7, x5
   mrs   x1, esr_el1
   mrs   x2, spsr_el1
@@ -309,13 +266,13 @@ __prep_exception_info:
   # x30 is lr (link register)
   # it should be saved in a correct order
   str   x30, [sp, #-8]!
-  bl    __store_cpu_ctx
+  bl    __armv8_cpuctx_store
   add   sp, sp, 8
   mov   x0, #\type
   mov   x1, sp
   bl    __prep_exception_info  
   bl    \handler
-  b     __eret_to_cpu_ctx
+  b     __armv8_cpuctx_eret
 .endm
 
 .macro vector_entry symbol type

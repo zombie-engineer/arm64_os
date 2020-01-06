@@ -25,6 +25,16 @@
 
 .section ".text"
 
+FUNC(__armv8_set_elr_el1):
+  # x0 - value
+  msr elr_el1, x0
+  ret
+
+FUNC(__armv8_set_sp_el1):
+  # x0 - value
+  msr sp_el1, x0
+  ret
+
 FUNC(enable_irq):
   msr daifclr, #DAIF_IRQ_BIT
   ret
@@ -469,7 +479,7 @@ FUNC(arm_set_tcr_el1):
   str   w7, [x6]
 .endm
 
-FUNC(armv8_enable_mmu):
+FUNC(__armv8_enable_mmu):
   msr   ttbr0_el1, x0
   msr   ttbr1_el1, x1
 

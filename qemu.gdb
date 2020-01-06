@@ -4,9 +4,11 @@ delete
 b bcm2835_systmr_update_compare
 commands
 silent
-printf "bcm2835_systmr_update_compare\n"
+# printf "bcm2835_systmr_update_compare\n"
 c
 end
+
+b trace_opt_parse
 
 b timer_expired_ns
 commands

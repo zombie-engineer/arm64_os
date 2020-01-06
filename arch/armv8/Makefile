@@ -1,4 +1,4 @@
-OBJS_ARMV8 = mmu.o armv8.o armv8_timer.o start.o cpu_context.o
+OBJS_ARMV8 = mmu.o armv8.o armv8_timer.o start.o cpu_context.o armv8_cpu.o
 $(info OBJS_ARMV8 $(OBJS_ARMV8))
 
 OBJS_ARMV8 := $(addprefix arch/armv8/, $(OBJS_ARMV8))

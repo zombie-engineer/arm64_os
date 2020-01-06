@@ -5,3 +5,4 @@
 #define ERR_NOT_INIT        -2
 #define ERR_NOT_IMPLEMENTED -3
 #define ERR_FATAL           -4
+#define ERR_MEMALLOC        -5

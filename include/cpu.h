@@ -1,9 +1,9 @@
 #pragma once
 #include <compiler.h>
 
-typedef struct cpu_ctx cpu_ctx_t;
+typedef struct cpuctx cpuctx_t;
 
-int cpu_dump_ctx(void *ctx, char *buf, int bufsize);
+int cpuctx_dump(void *ctx, char *buf, int bufsize);
 
 typedef struct reg_info {
   char name[8];
@@ -17,5 +17,35 @@ typedef struct bin_regs_hdr {
   int numregs;
 } packed bin_regs_hdr_t;
 
-int cpu_serialize_regs(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
+int cpuctx_serialize(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
 
+typedef struct cpuctx_init_opts {
+  /* address to buffer, used as a cpu context
+   * generic for architectures
+   */
+  void *cpuctx;
+
+  /* size of the above buffer
+   */
+  int cpuctx_sz;
+
+  /* start of stack will be set to this value
+   */
+  uint64_t sp;
+
+  /* program counter will be set to this value
+   */
+  uint64_t pc;
+
+  /* arguments that will be passed to function
+   */
+  struct {
+    int argc;
+    char **argv;
+  } args;
+
+} cpuctx_init_opts_t;
+
+int cpuctx_init(cpuctx_init_opts_t *o);
+
+int cpuctx_jmp(void *cpuctx);

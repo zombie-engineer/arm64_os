@@ -1,0 +1,42 @@
+
+
+start_scheduler
+      \
+       create_interval_timer -> set timer callback to sheduler_job
+       |
+       create_initial_task
+        \ 
+         call create_task
+         |\
+         | call_init_ctx
+         |
+         call switch_to_task
+          \
+           set current_task = task
+           |
+           set elr_elN = current_task->pc
+           set sp_elN  = current_task->sp
+           eret
+           |
+           ...
+           |
+           run task until timer interrupts
+           |
+           ...
+           |
+
+interrupt
+|
+store_current_task_ctx
+|
+timer_interrupt
+   \
+    call scheduler_job
+     \
+      current_task ctx already stored
+      |
+      call sheduler_pick_next_task
+          \
+           call switch_to_task
+          
+        

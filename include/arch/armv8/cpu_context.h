@@ -2,8 +2,7 @@
 #include <types.h>
 #include <cpu.h>
 
-/* interrupt info */
-typedef struct aarch64_cpu_ctx {
+typedef struct aarch64_cpuctx {
   union {
     struct {
       uint64_t x0;
@@ -36,20 +35,21 @@ typedef struct aarch64_cpu_ctx {
       uint64_t x27;
       uint64_t x28;
       uint64_t x29;
-      /* x30 <=> sp register */
+      /* x30 <=> link register */
       uint64_t x30;
+
       uint64_t sp;
       uint64_t pc;
     } n;
     uint64_t regs[33];
   } u;
-} aarch64_cpu_ctx_t;
+} aarch64_cpuctx_t;
 
 /* dump cpu context to buffer */
-int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *ctx, char *buf, int bufsize);
+int aarch64_print_cpu_ctx(aarch64_cpuctx_t *ctx, char *buf, int bufsize);
 
-void aarch64_cpu_ctx_save_ctx(aarch64_cpu_ctx_t *to);
+void aarch64_cpu_ctx_save_ctx(aarch64_cpuctx_t *to);
 
-void aarch64_cpu_ctx_load_ctx(aarch64_cpu_ctx_t *from);
+void aarch64_cpu_ctx_load_ctx(aarch64_cpuctx_t *from);
 
-int aarch64_cpu_serialize_regs(aarch64_cpu_ctx_t *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
+int aarch64_cpu_serialize_regs(aarch64_cpuctx_t *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);

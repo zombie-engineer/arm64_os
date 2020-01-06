@@ -301,5 +301,5 @@ void mmu_init()
   mmu_caps.max_pa_bits = mem_model_max_pa_bits();
   va_start = 0;
   map_linear_range(va_start, &mmu_caps, &pt_config);
-  armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
+  __armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
 }

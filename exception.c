@@ -11,8 +11,7 @@
 #define INTERRUPT_TYPE_SERROR      3
 
 
-static void *p_cpu_ctx;
-static char cpu_ctx_buf[2048];
+static char cpuctx_buf[2048];
 
 /* exception level to control nested entry to exception code */
 static int elevel = 0;
@@ -147,7 +146,7 @@ static void dump_context_to_uart(exception_info_t *e)
   sh.crc = count_crc(e->stack, sh.len, 0);
 
   memcpy(rh.magic, MAGIC_REGS, sizeof(MAGIC_REGS));
-  if (cpu_serialize_regs(e->cpu_ctx, &rh, regs, sizeof(regs)) > sizeof(regs))
+  if (cpuctx_serialize(e->cpu_ctx, &rh, regs, sizeof(regs)) > sizeof(regs))
     kernel_panic("dump_cpu_context: regs too small.\n");
 
   rh.crc = count_crc(regs, rh.len, 0); 
@@ -175,13 +174,13 @@ static void dump_exception_ctx(exception_info_t *e, int x, int y)
   int stop;
   char *p1, *p2;
   int n;
-  p1 = cpu_ctx_buf;
+  p1 = cpuctx_buf;
   p2 = p1;
   stop = 0;
 
-  n = cpu_dump_ctx(e->cpu_ctx, cpu_ctx_buf, sizeof(cpu_ctx_buf));
+  n = cpuctx_dump(e->cpu_ctx, cpuctx_buf, sizeof(cpuctx_buf));
 
-  if (n >= sizeof(cpu_ctx_buf)) {
+  if (n >= sizeof(cpuctx_buf)) {
     puts("Failed to dump cpu context.\n", 0, 0);
     while(1);
   }
@@ -364,7 +363,6 @@ void __handle_interrupt(exception_info_t *e)
   elevel++;
 
   // dump_context_to_uart(e);
-  p_cpu_ctx = e->cpu_ctx;
   // __print_exception_info(e, elevel);
 
   switch (e->type) {

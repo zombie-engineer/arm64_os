@@ -1,6 +1,8 @@
 #include <arch/armv8/cpu_context.h>
+#include <compiler.h>
 #include <common.h>
 #include <stringlib.h>
+#include "armv8_asm.h"
 
 #define do_sprintf(fmt, ...) \
   n += snprintf(buf + n, bufsz - n, fmt, ##__VA_ARGS__)
@@ -24,7 +26,10 @@ static char *aarch64_cpu_reg_names[] = {
   "lr", "sp" , "pc"
 };
 
-static void aarch64_cpu_iter_regs(aarch64_cpu_ctx_t *c, aarch64_cpu_iter_cb cb, void *cb_arg)
+static void aarch64_cpuctx_iter(
+  aarch64_cpuctx_t *c, 
+  aarch64_cpu_iter_cb cb, 
+  void *cb_arg)
 {
   int i;
   aarch64_cpu_iter_t it = { 0 };
@@ -57,7 +62,7 @@ static int aarch64_print_cpu_cb(const aarch64_cpu_iter_t *r, void *cb_arg)
 }
 
 /* dump cpu context to buffer */
-int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *c, char *buf, int bufsz)
+int aarch64_cpuctx_print(aarch64_cpuctx_t *c, char *buf, int bufsz)
 {
   aarch64_print_cpu_arg_t a = {
     .buf = buf,
@@ -65,7 +70,7 @@ int aarch64_print_cpu_ctx(aarch64_cpu_ctx_t *c, char *buf, int bufsz)
     .n = 0
   };
 
-  aarch64_cpu_iter_regs(c, aarch64_print_cpu_cb, &a);
+  aarch64_cpuctx_iter(c, aarch64_print_cpu_cb, &a);
   return a.n;
 }
 
@@ -94,7 +99,7 @@ static int aarch64_ser_regs_cb(const aarch64_cpu_iter_t *it, void *cb_arg)
   return 0;
 }
 
-int aarch64_cpu_serialize_regs(aarch64_cpu_ctx_t *c, bin_regs_hdr_t *h, char *buf, int bufsz)
+int aarch64_cpuctx_serialize(aarch64_cpuctx_t *c, bin_regs_hdr_t *h, char *buf, int bufsz)
 {
   aarch64_ser_regs_arg_t a = {
     .buf = buf,
@@ -103,19 +108,48 @@ int aarch64_cpu_serialize_regs(aarch64_cpu_ctx_t *c, bin_regs_hdr_t *h, char *bu
     .numregs = 0
   };
 
-  aarch64_cpu_iter_regs(c, aarch64_ser_regs_cb, &a);
+  aarch64_cpuctx_iter(c, aarch64_ser_regs_cb, &a);
   h->numregs = a.numregs;
   h->len = h->numregs * sizeof(reg_info_t);
   return a.n;
 }
 
-int cpu_dump_ctx(void *ctx, char *buf, int bufsz)
+
+int aarch64_cpuctx_init(cpuctx_init_opts_t *o)
 {
-  return aarch64_print_cpu_ctx((aarch64_cpu_ctx_t *)ctx, buf, bufsz);
+  memset(o->cpuctx, 0, o->cpuctx_sz);
+  ((aarch64_cpuctx_t *)o->cpuctx)->u.n.pc = o->pc;
+  ((aarch64_cpuctx_t *)o->cpuctx)->u.n.sp = o->sp;
+  return ERR_OK;
+}
+
+int aarch64_cpuctx_jmp(aarch64_cpuctx_t *c)
+{
+  memcpy(&__armv8_cpuctx_e, c, sizeof(*c));
+
+  __armv8_set_elr_el1(c->u.n.pc);
+  __armv8_set_sp_el1(c->u.n.sp);
+
+  __armv8_cpuctx_eret();
+}
+
+int cpuctx_dump(void *ctx, char *buf, int bufsz)
+{
+  return aarch64_cpuctx_print((aarch64_cpuctx_t *)ctx, buf, bufsz);
 }
 
 
-int cpu_serialize_regs(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsz)
+int cpuctx_serialize(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsz)
 {
-  return aarch64_cpu_serialize_regs((aarch64_cpu_ctx_t *)ctx, h, buf, bufsz);
+  return aarch64_cpuctx_serialize((aarch64_cpuctx_t *)ctx, h, buf, bufsz);
+}
+
+int cpuctx_init(cpuctx_init_opts_t *o)
+{
+  return aarch64_cpuctx_init(o);
+}
+
+int cpuctx_jmp(void *cpuctx)
+{
+  return aarch64_cpuctx_jmp((aarch64_cpuctx_t *)cpuctx);
 }

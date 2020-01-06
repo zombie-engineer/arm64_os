@@ -33,10 +33,12 @@ static void bcm2835_systimer_clear_irq_1()
 static int bcm2835_systimer_set(uint32_t usec)
 {
   uint32_t clo;
+
   clo = read_reg(SYSTEM_TIMER_CLO);
   write_reg(SYSTEM_TIMER_C1, clo + usec);
   write_reg(SYSTEM_TIMER_CS, 1);
-  interrupt_ctrl_enable_systimer_1();
+
+  // interrupt_ctrl_enable_systimer_1();
   return ERR_OK;
 }
 
@@ -70,7 +72,7 @@ static int bcm2835_systimer_cb_oneshot_timer_1()
 {
   // puts("bcm2835_systimer_cb_oneshot_timer_1\n");
   bcm2835_systimer_clear_irq_1();
-  interrupt_ctrl_disable_systimer_1();
+  // interrupt_ctrl_disable_systimer_1();
   bcm2835_systimer_run_cb_1();
   return ERR_OK;
 }

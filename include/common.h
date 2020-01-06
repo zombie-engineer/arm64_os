@@ -35,3 +35,9 @@ int fn(__VA_ARGS__) { \
 
 #define RET_IF_ERR(fn, ...) if ((err = fn(__VA_ARGS__))) return err;
 
+#define __ptr_off(ptr, offset) ((const char *)(ptr)) + offset
+
+#define address_of(type, member) (unsigned long long)(&((type *)0)->member)
+
+#define container_of(ptr, type, member) (type *)(__ptr_off(ptr, - address_of(type, member)))
+
