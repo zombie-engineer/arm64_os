@@ -106,14 +106,13 @@ void* scheduler_job(void* arg)
 {
   task_t *current_task;
   current_task = container_of(__current_cpuctx, task_t, cpuctx);
-
   current_task = scheduler_pick_next_task(current_task);
-  __current_cpuctx = current_task->cpuctx;
 
   if (!current_task)
     kernel_panic("scheduler logic failed.\n");
+
+  __current_cpuctx = current_task->cpuctx;
   systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, scheduler_job, 0);
-  
   return 0;
 }
 
@@ -125,9 +124,11 @@ void scheduler_init()
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
+
   char *argv1[] = {
     "initial_task"
   };
+
   initial_task = task_create(scheduler_test_job, ARRAY_SIZE(argv1), argv1);
 
   char *argv2[] = {
