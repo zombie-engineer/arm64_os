@@ -77,9 +77,10 @@ rungdb:
 #		-ex 'b el_from_spsr' \
 #		-ex 'b helper_exception_return' 
 #
+QEMU_TRACE_ARGS := -trace enable=*bcm2835*
 rungdb2:
 	gdb -x qemu.gdb\
-	 	--args $(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S
+	 	--args $(QEMU) $(QEMU_TRACE_ARGS) -M raspi3 -kernel kernel8.img -nographic -s -S
 
 rungdbq:
 	./qemu.sh
