@@ -4,11 +4,12 @@ delete
 b bcm2835_systmr_update_compare
 commands
 silent
+b qemu_clock_get_us
 # printf "bcm2835_systmr_update_compare\n"
-c
+# c
 end
 
-b trace_opt_parse
+# b trace_opt_parse
 
 b timer_expired_ns
 commands

@@ -140,7 +140,12 @@ static char c = '0';
 int scheduler_test_job(int argc, char *argv[])
 {
   while(1) {
+    uart_puts("123456789");
+  }
+
+  while(1) {
     vcanvas_putc(&x, &y, c);
+    uart_putc('0');
     x--;
     y++;
     
@@ -158,10 +163,15 @@ int scheduler_test_job(int argc, char *argv[])
 int scheduler_test_job2(int argc, char *argv[])
 {
   int x1, y1;
+  while(1) {
+    uart_puts("abcdefjhi");
+  }
+
   x1 = 0;
   y1 = 1;
   while(1) {
     vcanvas_putc(&x1, &y1, '-');
+    uart_putc('1');
     asm volatile("wfi");
     x1++;
   }
@@ -264,6 +274,7 @@ void switch_to_task(task_t *t)
   cpuctx_jmp(t->cpuctx);
 }
 
+
 void* scheduler_job(void* arg)
 {
   task_t *current_task;
@@ -274,7 +285,7 @@ void* scheduler_job(void* arg)
 
   if (!current_task)
     kernel_panic("scheduler logic failed.\n");
-  systimer_set_oneshot(MSEC_TO_USEC(10), scheduler_job, 0);
+  systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, scheduler_job, 0);
   
   return 0;
 }
@@ -311,7 +322,7 @@ void scheduler_init()
   next_task->sched_list.next = initial_task;
   __current_cpuctx = initial_task->cpuctx;
   scheduler_job(0);
-  // enable_irq();
+
   interrupt_ctrl_enable_systimer_1();
   asm volatile (
       "mov x0, #1\n"
@@ -320,12 +331,9 @@ void scheduler_init()
       "msr spsr_el1, x0\n"
       "b __armv8_cpuctx_eret\n"
       );
-//  systimer_set_oneshot(SEC_TO_USEC(6), scheduler_job, 0);
-
   while(1) {
     asm volatile ("wfi");
   }
-  // asm volatile("svc #0");
 }
 
 void wait_gpio()

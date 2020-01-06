@@ -1,6 +1,5 @@
 #include <timer.h>
 #include <board/bcm2835/bcm2835_systimer.h>
-#include <interrupts.h>
 #include <exception.h>
 #include <stringlib.h>
 #include <common.h>
@@ -38,7 +37,6 @@ static int bcm2835_systimer_set(uint32_t usec)
   write_reg(SYSTEM_TIMER_C1, clo + usec);
   write_reg(SYSTEM_TIMER_CS, 1);
 
-  // interrupt_ctrl_enable_systimer_1();
   return ERR_OK;
 }
 
@@ -72,7 +70,6 @@ static int bcm2835_systimer_cb_oneshot_timer_1()
 {
   // puts("bcm2835_systimer_cb_oneshot_timer_1\n");
   bcm2835_systimer_clear_irq_1();
-  // interrupt_ctrl_disable_systimer_1();
   bcm2835_systimer_run_cb_1();
   return ERR_OK;
 }
@@ -98,8 +95,40 @@ int bcm2835_systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_ar
   return bcm2835_systimer_set(usec);
 }
 
+// Count maximum cycles for execution of bcm2835_systimer_set function
+uint32_t bcm2835_systimer_get_min_set_time()
+{
+  uint32_t t1, t2;
+  uint32_t max_delta;
+  const unsigned num_samples = 8;
+  unsigned i;
+  if (read_reg(SYSTEM_TIMER_CS))
+    kernel_panic("bcm2835_systimer_get_min_set_time should not be called after timer is set\n");
+
+  max_delta = 0;
+  // While loop here to calculate time range only when 
+  // non overflowed values
+  for (i = 0; i < num_samples; ++i) {
+    while(1) {
+      t1 = read_reg(SYSTEM_TIMER_CLO);
+      bcm2835_systimer_set(10);
+      t2 = read_reg(SYSTEM_TIMER_CLO);
+      write_reg(SYSTEM_TIMER_CS, 0);
+      if (t2 > t1) {
+        if (t2 - t1 > max_delta)
+          max_delta = t2 - t1;
+        break;
+      }
+    }
+  }
+  return max_delta;
+}
+
 int bcm2835_systimer_init()
 {
+  uint32_t min_timer_set;
+  min_timer_set = bcm2835_systimer_get_min_set_time();
+  printf("bcm2835_systimer_init: min timer_set value: %u\n", min_timer_set);
   bcm2835_systimer_info_reset(&bcm2835_systimer_info_1);
   return ERR_OK;
 }
