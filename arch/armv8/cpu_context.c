@@ -123,16 +123,6 @@ int aarch64_cpuctx_init(cpuctx_init_opts_t *o)
   return ERR_OK;
 }
 
-int aarch64_cpuctx_jmp(aarch64_cpuctx_t *c)
-{
-  memcpy(&__armv8_cpuctx_e, c, sizeof(*c));
-
-  __armv8_set_elr_el1(c->u.n.pc);
-  __armv8_set_sp_el1(c->u.n.sp);
-
-  __armv8_cpuctx_eret();
-}
-
 int cpuctx_dump(void *ctx, char *buf, int bufsz)
 {
   return aarch64_cpuctx_print((aarch64_cpuctx_t *)ctx, buf, bufsz);
@@ -147,9 +137,4 @@ int cpuctx_serialize(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsz)
 int cpuctx_init(cpuctx_init_opts_t *o)
 {
   return aarch64_cpuctx_init(o);
-}
-
-int cpuctx_jmp(void *cpuctx)
-{
-  return aarch64_cpuctx_jmp((aarch64_cpuctx_t *)cpuctx);
 }

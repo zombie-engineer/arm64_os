@@ -47,5 +47,3 @@ typedef struct cpuctx_init_opts {
 } cpuctx_init_opts_t;
 
 int cpuctx_init(cpuctx_init_opts_t *o);
-
-int cpuctx_jmp(void *cpuctx);

@@ -69,28 +69,3 @@ FUNC(__armv8_cpuctx_eret):
   ldp   x28, x29, [x30], #16
   ldr   x30, [x30]
   eret
-
-FUNC(__armv8_cpuctx_eret_to_proc):
-  // x0 - set pc address to value in x0
-  // x1 - set sp address to value in x1
-  // x2 - set spsr_el1 to value in x2
-  msr   elr_el1, x0
-
-  mrs   x0, CurrentEL
-  // Switch to el0 stack pointer
-  mov   x0, #1
-  msr   SPSel, x0
-  // mov   x1, #0x123
-  msr   sp_el0, x1
-  // Set stack pointer that's going to be 
-  // set after eret
-  // mov   sp, x1
-
-  // Move back to current stack pointer. 
-  mov   x0, #0
-  msr   SPSel, x1
-
-  // Set spsr to a valid value or else 
-  // MMU wont work
-  msr   spsr_el1, x2
-  eret
