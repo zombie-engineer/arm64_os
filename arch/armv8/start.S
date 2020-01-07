@@ -1,3 +1,5 @@
+#include <asm_macros.h>
+
 // @ instructions at 0x00
 // @ d2a80000 @ b900001f @ 52b00001 @ b9000801
 // @ 58000400 @ d51be000 @ d51ce07f @ d2867fe0
@@ -146,9 +148,7 @@ _check_el1:
 // ******************************************************************************
 // In EL1
 // ******************************************************************************
-.local _in_el1
-_in_el1:
-
+LFUNC(_in_el1):
   // Use sp_el0
   // While catching exception from el1 to el1
   // use sp_el0 to store stack pointer to 
@@ -211,33 +211,29 @@ _in_el1:
 
 // ******************************************************************************
 
-.local _cpu_wait_for_event
-_cpu_wait_for_event: 
+LFUNC(_cpu_wait_for_event):
   wfe
   b _cpu_wait_for_event
 
 // 8 byte aligned cpu context
+GLOBAL_VAR(__armv8_cpuctx_e):
 .align 3
-.globl __armv8_cpuctx_e
-__armv8_cpuctx_e:
 .rept 33
 .quad 0x6666666666666666
 .endr
 
+GLOBAL_VAR(__exception_info):
 .align 3
-.globl __exception_info
-__exception_info:
 .rept 8
 .quad 0x6666666666666666
 .endr
 
 // pointer to current cpu context
-.globl __current_cpuctx
-__current_cpuctx:
+GLOBAL_VAR(__current_cpuctx):
+.align 3
 .quad 0
 
-.local __prep_exception_info
-__prep_exception_info:
+LFUNC(__prep_exception_info):
   // x0 - exception type
   // x1 - top of stack at exception enter
   mov   x8, x1
