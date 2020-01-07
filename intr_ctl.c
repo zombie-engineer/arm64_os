@@ -31,7 +31,7 @@
 #define GPU_1_USB        (1 << 9)
 #define GPU_1_AUX        (1 << 29)
 
-void interrupt_ctrl_dump_regs(const char* tag)
+void intr_ctl_dump_regs(const char* tag)
 {
   printf("ARM_TIMER_REGS: tag: %s\n", tag);
   print_reg32(BCM2835_IC_PENDING_BASIC);
@@ -48,37 +48,37 @@ void interrupt_ctrl_dump_regs(const char* tag)
 }
 
 
-uint32_t interrupt_ctrl_read_pending_gpu_1()
+uint32_t intr_ctl_read_pending_gpu_1()
 {
   return read_reg(BCM2835_IC_PENDING_GPU_1);
 }
 
-void interrupt_ctrl_enable_systimer_1(void)
+void intr_ctl_enable_systimer_1(void)
 {
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
-void interrupt_ctrl_enable_systimer_3(void)
+void intr_ctl_enable_systimer_3(void)
 {
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_3);
 }
 
-void interrupt_ctrl_disable_systimer_1(void)
+void intr_ctl_disable_systimer_1(void)
 {
   write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
-void interrupt_ctrl_disable_systimer_3(void)
+void intr_ctl_disable_systimer_3(void)
 {
   write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_3);
 }
 
-void interrupt_ctrl_enable_timer_irq(void)
+void intr_ctl_enable_arm_timer_irq(void)
 {
-  write_reg(BCM2835_IC_ENABLE_BASIC, BCM2835_IC_ENABLE_BASIC);
+  write_reg(BCM2835_IC_ENABLE_BASIC, BASIC_IRQ_TIMER);
 }
 
-void interrupt_ctrl_enable_gpio_irq(int gpio_num)
+void intr_ctl_enable_gpio_irq(int gpio_num)
 {
   uint32_t irq_enable_reg;
 
@@ -91,4 +91,6 @@ void interrupt_ctrl_enable_gpio_irq(int gpio_num)
   write_reg(BCM2835_IC_ENABLE_BASIC, 1 << gpio_num);
 }
 
-
+void intr_ctl_handle_irq(void)
+{
+}
