@@ -14,7 +14,7 @@
 #include <stringlib.h>
 #include <console.h>
 #include <sched.h>
-#include <interrupts.h>
+#include <intr_ctl.h>
 #include <exception.h>
 #include <timer.h>
 #include <cmdrunner.h>
@@ -269,6 +269,8 @@ void nokia5110_test()
   nokia5110_run_test_loop_2(30, 10);
 }
 
+extern void pl011_uart_set_interrupt_mode();
+
 void main()
 {
   char buf[16];
@@ -288,6 +290,7 @@ void main()
   // puts("4\n");
   snprintf(buf, 16, "my: %016x\n", 234);
   print_cpu_info();
+  pl011_uart_set_interrupt_mode();
   print_mbox_props();
   systimer_init();
   scheduler_init();

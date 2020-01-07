@@ -3,7 +3,7 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <common.h>
-#include <interrupts.h>
+#include <intr_ctl.h>
 #include <exception.h>
 #include <error.h>
 

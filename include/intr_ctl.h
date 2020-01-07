@@ -2,8 +2,6 @@
 #include "reg_access.h"
 #include "gpio.h"
 
-#define INTERRUPT_CONTROLLER_BASE (PERIPHERAL_BASE_PHY + 0xb200)
-
 uint32_t interrupt_ctrl_read_pending_gpu_1();
 
 void interrupt_ctrl_dump_regs(const char* tag);

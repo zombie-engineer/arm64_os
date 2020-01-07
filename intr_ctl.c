@@ -1,4 +1,4 @@
-#include <interrupts.h>
+#include <intr_ctl.h>
 #include <common.h>
 #include <arch/armv8/armv8.h>
 #include <bits_api.h>
@@ -55,7 +55,6 @@ uint32_t interrupt_ctrl_read_pending_gpu_1()
 
 void interrupt_ctrl_enable_systimer_1(void)
 {
-  // puts("interrupt_ctrl_enable_systimer_1\n");
   write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
@@ -66,7 +65,6 @@ void interrupt_ctrl_enable_systimer_3(void)
 
 void interrupt_ctrl_disable_systimer_1(void)
 {
-  // puts("interrupt_ctrl_disable_systimer_1\n");
   write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_1);
 }
 
@@ -77,7 +75,6 @@ void interrupt_ctrl_disable_systimer_3(void)
 
 void interrupt_ctrl_enable_timer_irq(void)
 {
-  puts("interrupt_ctrl_enable_timer_irq\n");
   write_reg(BCM2835_IC_ENABLE_BASIC, BCM2835_IC_ENABLE_BASIC);
 }
 
@@ -93,4 +90,5 @@ void interrupt_ctrl_enable_gpio_irq(int gpio_num)
   write_reg(BCM2835_IC_ENABLE_GPU_2, irq_enable_reg);
   write_reg(BCM2835_IC_ENABLE_BASIC, 1 << gpio_num);
 }
+
 

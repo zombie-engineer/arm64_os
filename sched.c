@@ -5,7 +5,7 @@
 #include <cpu.h>
 #include <stringlib.h>
 #include <timer.h>
-#include <interrupts.h>
+#include <intr_ctl.h>
 #include <cmdrunner.h>
 
 extern void *__current_cpuctx;
