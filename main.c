@@ -288,11 +288,11 @@ void main()
   // puts("4\n");
   snprintf(buf, 16, "my: %016x\n", 234);
   print_cpu_info();
+  print_mbox_props();
   systimer_init();
   scheduler_init();
   // nokia5110_test();
   print_current_ex_level();
-  print_mbox_props();
 
   print_mmu_features();
   print_cache_stats();

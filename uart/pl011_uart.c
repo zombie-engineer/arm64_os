@@ -43,7 +43,7 @@
 
 static void pl011_uart_disable()
 {
-  *UART0_CR = 0;
+  write_reg(UART0_CR, 0);
 }
 
 static void pl011_uart_gpio_enable(int tx_pin, int rx_pin)
@@ -52,49 +52,91 @@ static void pl011_uart_gpio_enable(int tx_pin, int rx_pin)
   gpio_set_function(tx_pin, GPIO_FUNC_ALT_0);
   gpio_set_function(rx_pin, GPIO_FUNC_ALT_0);
 
-  // gpio_set_pullupdown(14, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
   gpio_set_pullupdown(rx_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+}
+
+
+static void pl011_calc_divisor(int baudrate, uint64_t clock_hz, uint32_t *idiv, uint32_t *fdiv)
+{
+  /* Calculate integral and fractional parts of divisor, using the formula
+   * from the bcm2835 manual.
+   * DIVISOR = CLOCK_HZ / (16 * BAUDRATE)
+   * where DIVISOR is represented by idiv.fdiv floating point number,
+   * where idiv is intergral part of DIVISOR and fdiv is fractional
+   * part of DIVISOR
+   * ex: 2.11 = 4 000 000 Hz / (16 * 115200), idiv = 2, fdiv = 11
+   */
+
+  uint64_t div;
+  uint32_t i, f;
+  /* Defaults for a 4Mhz clock */
+  // *idiv = 2;
+  // *fdiv = 11;
+
+  /* Defaults for a 48Mhz clock */
+  // *idiv = 26;
+  // *fdiv = 0;
+
+  div = clock_hz * 10 / (16 * baudrate);
+  i = div / 10;
+  f = div % 10;
+  if (i > 0xffff) 
+    return;
+
+  if (f > 0b11111)
+    f = 0b11111;
+
+  *idiv = i;
+  *fdiv = f;
 }
 
 void pl011_uart_init(int baudrate, int unused)
 {
-  uint32_t hz;
+  uint32_t hz, idiv, fdiv;
   pl011_uart_disable();
-  while(*UART0_FR & (UART0_FR_BUSY | UART0_FR_TXFF));
+  while(read_reg(UART0_FR) & (UART0_FR_BUSY | UART0_FR_TXFF));
   pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
 
   /* set up clock for consistent divisor values */
-  hz = 4000000;
-  mbox_set_clock_rate(MBOX_CLOCK_ID_UART, &hz, 0);
+  mbox_get_clock_rate(MBOX_CLOCK_ID_UART, &hz);
 
-  *UART0_ICR = 0x7ff;      // clear interrupts
-  *UART0_IBRD = 2;         // 115200 baud
-  *UART0_FBRD = 0xb;       // 
+  /* mask all interrupts */
+  write_reg(UART0_ICR, 0x7ff);
+
+  /* IBRD - interger part of divisor
+   * FBRD - floating-point part of divisor
+   * divisor = IBRD.FBRD
+   */
+  pl011_calc_divisor(baudrate, hz, &idiv, &fdiv);
+
+  write_reg(UART0_IBRD, idiv);
+  write_reg(UART0_FBRD, fdiv);
+
   // Word length is 8 bits
-  *UART0_LCRH = UART0_LCRH_WLEN_8BITS; 
+  write_reg(UART0_LCRH, UART0_LCRH_WLEN_8BITS); 
   // enable Tx, Rx, FIFO
-  *UART0_CR = UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE;
+  write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
 void pl011_uart_send(unsigned int c)
 {
-  while(*UART0_FR & UART0_FR_TXFF); 
-  *UART0_DR = c;
+  while(read_reg(UART0_FR) & UART0_FR_TXFF); 
+  write_reg(UART0_DR, c);
 }
 
 void pl011_uart_send_buf(const char *buf, int n)
 {
   int i;
   for (i = 0; i < n; ++i) {
-    while(*UART0_FR & UART0_FR_TXFF);
-    *UART0_DR = buf[i];
+    while(read_reg(UART0_FR) & UART0_FR_TXFF);
+    write_reg(UART0_DR, buf[i]);
   }
 }
 
 char pl011_uart_getc()
 {
-  while(*UART0_FR & UART0_FR_RXFE); 
-  return (char)(*UART0_DR);
+  while(read_reg(UART0_FR) & UART0_FR_RXFE); 
+  return (char)read_reg(UART0_DR);
 }
 
