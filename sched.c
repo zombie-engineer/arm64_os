@@ -150,7 +150,7 @@ void scheduler_init()
   __current_cpuctx = initial_task->cpuctx;
   scheduler_job(0);
 
-  interrupt_ctrl_enable_systimer_1();
+  intr_ctl_enable_systimer_1();
 
   asm volatile (
       "mov x0, #1\n"

@@ -144,15 +144,15 @@ void* my_timer_callback_periodic(void* arg)
 
 void wait_gpio()
 {
-  interrupt_ctrl_dump_regs("before set\n");
-  interrupt_ctrl_enable_gpio_irq(20);
+  intr_ctl_dump_regs("before set\n");
+  intr_ctl_enable_gpio_irq(20);
   enable_irq();
   // gpio_set_function(20, GPIO_FUNC_IN);
   // gpio_set_detect_high(20);
   // GPLEN0 |= 1 << 2;
   gpio_set_detect_falling_edge(2);
   
-  interrupt_ctrl_dump_regs("after set\n");
+  intr_ctl_dump_regs("after set\n");
   while(1) {
     // f: 1111 b: 1011
     wait_cycles(0x300000);
@@ -239,12 +239,12 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
     }
   }
 
-  interrupt_ctrl_enable_gpio_irq(gpio_num_dout);
+  intr_ctl_enable_gpio_irq(gpio_num_dout);
   gpio_set_detect_rising_edge(gpio_num_dout);
   gpio_set_detect_falling_edge(gpio_num_dout);
   enable_irq();
   
-  interrupt_ctrl_dump_regs("after set\n");
+  intr_ctl_dump_regs("after set\n");
   while(1) {
     wait_cycles(0x300000);
   }
