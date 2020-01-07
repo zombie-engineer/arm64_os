@@ -49,3 +49,5 @@ uint32_t get_system_timer_freq(void);
 
 // Returns system clock counter value
 uint64_t get_system_timer(void);
+
+uint64_t armv8_get_mpidr_el1(int core_num);

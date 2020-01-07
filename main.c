@@ -70,6 +70,14 @@ void check_printf()
 
 extern char __arm_initial_reg_value_address_hcr_el2;
 
+void print_cpu_info()
+{
+  int i;
+  for (i = 0; i < 4; ++i) {
+    printf("Core %d: mpidr_el1: %016llx\n", i, armv8_get_mpidr_el1(i));
+  }
+}
+
 void print_current_ex_level()
 {
   unsigned long el;
@@ -263,6 +271,7 @@ void nokia5110_test()
 
 void main()
 {
+  char buf[16];
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
@@ -277,8 +286,8 @@ void main()
   // puts("3\n");
   // asm volatile("svc #2");
   // puts("4\n");
-  char buf[16];
   snprintf(buf, 16, "my: %016x\n", 234);
+  print_cpu_info();
   systimer_init();
   scheduler_init();
   // nokia5110_test();

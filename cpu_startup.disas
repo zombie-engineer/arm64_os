@@ -1,0 +1,132 @@
+// Write 0 at 0x40000000
+       0:	d2a80000 	mov	x0, #0x40000000
+       4:	b900001f 	str	wzr, [x0]        
+       8:	52b00001 	mov	w1, #0x80000000
+
+// Write 0x80000000 at 0x40000008
+       c:	b9000801 	str	w1, [x0, #8]
+
+// Set frequency of a system timer to 0x124f800 (19.2 KHz)
+      10:	58000400 	ldr	x0, 0x90
+      14:	d51be000 	msr	cntfrq_el0, x0
+
+// Set virtual counter offset to 0
+      18:	d51ce07f 	msr	cntvoff_el2, xzr
+
+// Set trapping to EL3 access (do not trap anything)
+      1c:	d2867fe0 	mov	x0, #0x33ff
+      20:	d51e1140 	msr	cptr_el3, x0
+
+// Set secure config register at el3.
+// Enable HVC call
+// SMD bit - SMC instructions are disabled and UNDEFINED
+// NS bit - EL0/EL1/EL3 are Non-Secure, will not access Secure memory from
+// there
+      24:	d280b620 	mov	x0, #0x5b1
+      28:	d51e1100 	msr	scr_el3, x0
+
+// Implementation defined magic
+      2c:	d2800800 	mov	x0, #0x40
+      30:	d519f220 	msr	s3_1_c15_c2_1, x0
+
+// Enable MMU EL2&0 stage 1 
+// SP alignment at EL2 enable
+// Non-Aligned access check enable
+// Disable SETEND (endianness) for EL0
+      34:	58000320 	ldr	x0, 0x98
+      38:	d51c1000 	msr	sctlr_el2, x0
+
+
+// Exception return to EL2h
+// Mask all exceptions DAIF
+      3c:	d2807920 	mov	x0, #0x3c9
+      40:	d51e4000 	msr	spsr_el3, x0
+
+// eret to 0x94
+// x0 = 0x94
+      44:	10000060 	adr	x0, 0x50
+      48:	d51e4020 	msr	elr_el3, x0
+      4c:	d69f03e0 	eret
+
+// x6 = cpu core number
+      50:	d53800a6 	mrs	x6, mpidr_el1
+      54:	924004c6 	and	x6, x6, #0x3
+
+// if cpu core number == 0 goto 0x74:
+      58:	b40000e6 	cbz	x6, 0x74
+core_n0:
+// x5 = 0xd8 and sleep
+      5c:	100003e5 	adr	x5, 0xd8
+core_n0_sleep:
+      60:	d503205f 	wfe
+// x4 = 0xd8[i]
+      64:	f86678a4 	ldr	x4, [x5, x6, lsl #3]
+// if x4 == 0 goto sleep
+      68:	b4ffffc4 	cbz	x4, 0x60
+      6c:	d2800000 	mov	x0, #0x0                   	// #0
+      70:	14000003 	b	0x7c
+
+core_0:
+// w4 = 0x80000
+      74:	18000444 	ldr	w4, 0xfc
+// w0 = 0
+      78:	18000400 	ldr	w0, 0xf8
+// x1,x2,x3 = 0
+      7c:	d2800001 	mov	x1, #0x0                   	// #0
+      80:	d2800002 	mov	x2, #0x0                   	// #0
+      84:	d2800003 	mov	x3, #0x0                   	// #0
+      88:	d61f0080 	br	x4
+      8c:	00000000
+cpu_freq:
+      90:	0124f800
+      94:	00000000
+      98:	30c50830
+      9c: 00000000
+      a0: 00000000
+      a4: 00000000
+      a8: 00000000
+      ac: 00000000
+      b0: 00000000
+      b4: 00000000
+      b8: 00000000
+      bc: 00000000
+      c0: 00000000
+      c4: 00000000
+      c8: 00000000
+      cc: 00000000
+      d0: 00000000
+      d4: 00000000
+      d8: 00000000
+      dc: 00000000
+      e0: 00000000
+      e4: 00000000
+      e8: 00000000
+      ec: 00000000
+      f0: 00000000
+      f4: 00000000
+      f8: 00000000
+      fc:	00080000
+     100:	00000005
+     104:	54410001
+     108:	00000000
+     10c:	00000000
+     110:	00000000
+     114:	00000004
+     118:	54410002
+     11c:	08000000
+     120:	00000000
+     124:	00000055
+     128:	54410009
+bcm2708_fb.fbwidth=1824 
+bcm2708_fb.fbheight=984 
+bcm2708_fb.fbswap=1 
+dma.dmachans=0x7f35 
+bcm2709.boardrev=0xa020d3 
+bcm2709.serial=0xa86b265 
+bcm2709.uart_clock=48000000 
+bcm2709.disk_led_gpio=29 
+bcm2709.disk_led_active_low=0 
+smsc95xx.macaddr=B8:27:EB:86:B2:65 
+vc_mem.mem_base=0xec00000 
+vc_mem.mem_size=0x10000000 
+kernel=u-boot.bin

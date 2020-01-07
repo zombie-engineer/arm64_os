@@ -15,7 +15,7 @@
 // @ same, but singled lined 
 
 .section ".text.boot"
-.global _start
+.globl _start
 
 // Bootstap code at 0x0 first runs at EL3, it goes through the followind setup steps:
 // - Sets EL0, EL1 to Non-Secure mode, no access to Secure Memory
@@ -34,17 +34,39 @@ _start:
   mrs   x1, hcr_el2
   ldr   x2, =__arm_initial_reg_value_address_hcr_el2
   str   x1, [x2]
+  
+// wake up other cores from swe
+// at 0xd8 an array of pointers is located, that is
+// checked by each of the remaining 3 cores by their
+// index (1,2,3) to see if there is a non zero memory
+// address there and if there is they jump to that place
+// We set same address for each core and wake them up
+// by setting event (sev instruction)
+  mov   x1, #0xd8
+  ldr   x2, =_cores_checkin
+  str   x2, [x1, #8]
+  str   x2, [x1, #16]
+  str   x2, [x1, #24]
+  sev
 
+_cores_checkin:
   mrs   x1, mpidr_el1
   // get CPU core number
-  and   x1, x1, #3        
+  and   x2, x1, #3        
+  // mpidr_el1 & 3 = Aff1 for 4-core systems holds 
+  // the core number
   // jump if core number is 0
-  cbnz   x1, _cpu_wait_for_event
+  ldr   x3, =__armv8_per_cor_mpidr_el1
+  add   x3, x3, x2, lsl #3
+  str   x1, [x3]
+  cbz   x2, _core0_exec
+_core_wait:
+  b _cpu_wait_for_event
   // cpu id > 0, stop
 
 
-2: // cpu id == 0
-  
+_core0_exec:
+  // cpu id == 0
   // set stack 
   ldr   x1, =_start
 
@@ -215,22 +237,28 @@ LFUNC(_cpu_wait_for_event):
   wfe
   b _cpu_wait_for_event
 
-// 8 byte aligned cpu context
-GLOBAL_VAR(__armv8_cpuctx_e):
 .align 3
+GLOBAL_VAR(__armv8_per_cor_mpidr_el1):
+.rept 4
+.quad 0x6666666666666666
+.endr
+
+// 8 byte aligned cpu context
+.align 3
+GLOBAL_VAR(__armv8_cpuctx_e):
 .rept 33
 .quad 0x6666666666666666
 .endr
 
-GLOBAL_VAR(__exception_info):
 .align 3
+GLOBAL_VAR(__exception_info):
 .rept 8
 .quad 0x6666666666666666
 .endr
 
 // pointer to current cpu context
-GLOBAL_VAR(__current_cpuctx):
 .align 3
+GLOBAL_VAR(__current_cpuctx):
 .quad 0
 
 LFUNC(__prep_exception_info):
