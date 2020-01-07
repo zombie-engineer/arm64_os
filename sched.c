@@ -6,6 +6,7 @@
 #include <stringlib.h>
 #include <timer.h>
 #include <interrupts.h>
+#include <cmdrunner.h>
 
 extern void *__current_cpuctx;
 
@@ -99,7 +100,7 @@ out:
 
 task_t *scheduler_pick_next_task(task_t *ct)
 {
-  return ct->sched_list.next;
+  return ct->run_queue.next;
 }
 
 void* scheduler_job(void* arg)
@@ -118,7 +119,7 @@ void* scheduler_job(void* arg)
 
 void scheduler_init()
 {
-  task_t *initial_task, *next_task;
+  task_t *initial_task, *next_task, *cmdrunner_task;
 
   puts("Starting task scheduler\n");
   task_idx = 0;
@@ -137,8 +138,15 @@ void scheduler_init()
 
   next_task = task_create(scheduler_test_job2, ARRAY_SIZE(argv2), argv2);
 
-  initial_task->sched_list.next = next_task;
-  next_task->sched_list.next = initial_task;
+  char *argv3[] = {
+      "cmdrunner"
+  };
+
+  cmdrunner_task = task_create(cmdrunner_process, ARRAY_SIZE(argv3), argv3);
+
+  initial_task->run_queue.next = &next_task->run_queue;
+  next_task->run_queue.next = &cmdrunner_task->run_queue;
+  cmdrunner_task->run_queue.next = &initial_task->run_queue;
   __current_cpuctx = initial_task->cpuctx;
   scheduler_job(0);
 
@@ -151,8 +159,4 @@ void scheduler_init()
       "msr spsr_el1, x0\n"
       "b __armv8_cpuctx_eret\n"
       );
-
-  while(1) {
-    asm volatile ("wfi");
-  }
 }
