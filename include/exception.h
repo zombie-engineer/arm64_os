@@ -3,7 +3,7 @@
 #include <compiler.h>
 #include <types.h>
 
-typedef int(*irq_cb_t)();
+typedef void(*irq_cb_t)();
 
 void set_irq_cb(irq_cb_t cb);
 

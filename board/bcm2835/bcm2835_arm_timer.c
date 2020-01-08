@@ -108,6 +108,7 @@ static uint32_t get_core_clock_rate()
 static inline
 int bcm2835_arm_timer_set_and_enable(uint32_t load_reg_value)
 {
+  int ret;
   // set counter 
   write_reg(ARM_TIMER_LOAD_REG, load_reg_value);
   write_reg(ARM_TIMER_CONTROL_REG, ARM_TIMER_CONTROL_REG_WIDTH | ARM_TIMER_CONTROL_REG_ENABLE_IRQ | ARM_TIMER_CONTROL_REG_ENABLE);
@@ -116,8 +117,8 @@ int bcm2835_arm_timer_set_and_enable(uint32_t load_reg_value)
   write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 0xffffffff);
 
   // unmask basic interrupt in interrupt controller
-  intr_ctl_enable_arm_timer_irq();
-  return ERR_OK;
+  ret = intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
+  return ret;
 }
 
 #define GET_COUNTER_VALUE(clock_rate, predivider_clock, usec) \

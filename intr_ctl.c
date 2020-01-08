@@ -24,12 +24,16 @@
 #define BASIC_IRQ_ACCESS_ERR_TYPE_0 (1 << 6)
 #define BASIC_IRQ_ACCESS_ERR_TYPE_1 (1 << 7)
 
-#define GPU_1_SYSTIMER_0 (1 << 0)
-#define GPU_1_SYSTIMER_1 (1 << 1)
-#define GPU_1_SYSTIMER_2 (1 << 2)
-#define GPU_1_SYSTIMER_3 (1 << 3)
-#define GPU_1_USB        (1 << 9)
-#define GPU_1_AUX        (1 << 29)
+static intr_ctl_irq_cb irq_callbacks[64 + 8];
+
+int intr_ctl_set_cb(int irq_type, int irq_num, intr_ctl_irq_cb cb)
+{
+  if (irq_num + irq_type > ARRAY_SIZE(irq_callbacks))
+    return ERR_INVAL_ARG;
+
+  irq_callbacks[irq_num + irq_type] = cb;
+  return ERR_OK;
+}
 
 void intr_ctl_dump_regs(const char* tag)
 {
@@ -53,30 +57,51 @@ uint32_t intr_ctl_read_pending_gpu_1()
   return read_reg(BCM2835_IC_PENDING_GPU_1);
 }
 
-void intr_ctl_enable_systimer_1(void)
+
+int intr_ctl_arm_irq_enable(int irq_num)
 {
-  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_1);
+  if (irq_num > INTR_CTL_IRQ_ARM_MAX)
+    return ERR_INVAL_ARG;
+
+  write_reg(BCM2835_IC_ENABLE_BASIC, (1 << irq_num));
+  return ERR_OK;
 }
 
-void intr_ctl_enable_systimer_3(void)
+
+int intr_ctl_arm_irq_disable(int irq_num)
 {
-  write_reg(BCM2835_IC_ENABLE_GPU_1, GPU_1_SYSTIMER_3);
+  if (irq_num > INTR_CTL_IRQ_ARM_MAX)
+    return ERR_INVAL_ARG;
+
+  write_reg(BCM2835_IC_DISABLE_BASIC, (1 << irq_num));
+  return ERR_OK;
 }
 
-void intr_ctl_disable_systimer_1(void)
+
+#define ACCESS_GPU_IRQ(r, irq) \
+  reg32_t dst;                        \
+  if (irq_num > INTR_CTL_IRQ_ARM_MAX) \
+    return ERR_INVAL_ARG;             \
+  dst = r;                            \
+  if (irq_num > 31) {                 \
+    irq_num -= 32;                    \
+    dst += 4;                         \
+  }                                   \
+  write_reg(dst, (1 << irq_num));     \
+  return ERR_OK;
+
+
+int intr_ctl_gpu_irq_enable(int irq_num)
 {
-  write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_1);
+  ACCESS_GPU_IRQ(BCM2835_IC_ENABLE_GPU_1, irq_num);
 }
 
-void intr_ctl_disable_systimer_3(void)
+
+int intr_ctl_gpu_irq_disable(int irq_num)
 {
-  write_reg(BCM2835_IC_DISABLE_GPU_1, GPU_1_SYSTIMER_3);
+  ACCESS_GPU_IRQ(BCM2835_IC_DISABLE_GPU_1, irq_num);
 }
 
-void intr_ctl_enable_arm_timer_irq(void)
-{
-  write_reg(BCM2835_IC_ENABLE_BASIC, BASIC_IRQ_TIMER);
-}
 
 void intr_ctl_enable_gpio_irq(int gpio_num)
 {
@@ -91,6 +116,63 @@ void intr_ctl_enable_gpio_irq(int gpio_num)
   write_reg(BCM2835_IC_ENABLE_BASIC, 1 << gpio_num);
 }
 
+#define CHECK_PENDING_GPU(i, gpu_i) \
+  if (basic_pending & (1<<i)) {\
+    gpu_pending |= gpu_i;\
+  }
+
+#define CHECKED_RUN_CB(cb) \
+  if ((cb)) cb()
+
 void intr_ctl_handle_irq(void)
 {
+  int i;
+  uint32_t basic_pending;
+  uint64_t gpu_pending;
+
+  basic_pending = read_reg(BCM2835_IC_PENDING_BASIC);
+
+  // if we are here some interrupt has fired.
+  // the check is not needed 99% 
+  // if (!basic_pending)
+  //   return;
+
+  gpu_pending = 0;
+
+  CHECK_PENDING_GPU(10, 7);
+  CHECK_PENDING_GPU(11, 9);
+  CHECK_PENDING_GPU(12, 10);
+  CHECK_PENDING_GPU(13, 18);
+  CHECK_PENDING_GPU(14, 19);
+  CHECK_PENDING_GPU(15, 53);
+  CHECK_PENDING_GPU(16, 54);
+  CHECK_PENDING_GPU(17, 55);
+  CHECK_PENDING_GPU(18, 56);
+  CHECK_PENDING_GPU(19, 57);
+  CHECK_PENDING_GPU(20, 62);
+
+  if (basic_pending & (1 << 8))
+    gpu_pending |= read_reg(BCM2835_IC_PENDING_GPU_1);
+  if (basic_pending & (1 << 9))
+    gpu_pending |= ((uint64_t)(read_reg(BCM2835_IC_PENDING_GPU_2))) << 32;
+
+  // start irq handling
+  if (basic_pending & 0xff) {
+    // run arm irq callbacks
+    for (i = 0; i < 8; ++i) {
+      if (basic_pending & (1 << i)) {
+        CHECKED_RUN_CB(irq_callbacks[INTR_CTL_IRQ_TYPE_GPU + i]);
+      }
+    }
+  }
+
+  if (!gpu_pending)
+    return;
+
+  // run gpu irq callbacks
+  for (i = 0; i < 64; ++i) {
+    if (gpu_pending & (1 << i)) {
+      CHECKED_RUN_CB(irq_callbacks[i]);
+    }
+  }
 }

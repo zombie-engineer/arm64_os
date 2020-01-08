@@ -290,9 +290,11 @@ void main()
   // puts("4\n");
   snprintf(buf, 16, "my: %016x\n", 234);
   print_cpu_info();
-  pl011_uart_set_interrupt_mode();
+  // pl011_uart_set_interrupt_mode();
   print_mbox_props();
   systimer_init();
+  set_irq_cb(intr_ctl_handle_irq);
+  enable_irq();
   scheduler_init();
   // nokia5110_test();
   print_current_ex_level();

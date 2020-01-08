@@ -42,7 +42,6 @@ void *alloc_stack()
   return stacks + stack_idx * STACK_SIZE;
 }
 
-
 int scheduler_test_job(int argc, char *argv[])
 {
   while(1)
@@ -150,7 +149,7 @@ void scheduler_init()
   __current_cpuctx = initial_task->cpuctx;
   scheduler_job(0);
 
-  intr_ctl_enable_systimer_1();
+  intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
 
   asm volatile (
       "mov x0, #1\n"
