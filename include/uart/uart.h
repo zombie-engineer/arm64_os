@@ -4,6 +4,8 @@
 
 void uart_init(int freq, int system_clock);
 
+void uart_set_interrupt_mode();
+
 char uart_getc();
 
 void uart_puts(const char *s);

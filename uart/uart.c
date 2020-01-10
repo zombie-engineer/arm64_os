@@ -12,11 +12,13 @@
 #define uart_recv pl011_uart_getc
 #define _uart_init pl011_uart_init
 #define _uart_send_buf pl011_uart_send_buf
+#define _uart_set_interrupt_mode pl011_uart_set_interrupt_mode
 #elif defined(CONFIG_UART_MINI)
 #define uart_send mini_uart_send 
 #define uart_recv mini_uart_getc
 #define _uart_init mini_uart_init
 #define _uart_send_buf mini_uart_send_buf
+#define _uart_set_interrupt_mode mini_uart_set_interrupt_mode
 #endif
 
 void uart_init(int baudrate, int system_clock)
@@ -60,4 +62,9 @@ void uart_hex(unsigned int d)
 void uart_send_buf(const void *buf, int n)
 {
   _uart_send_buf((const char *)buf, n);
+}
+
+void uart_set_interrupt_mode()
+{
+  _uart_set_interrupt_mode();
 }

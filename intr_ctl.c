@@ -2,6 +2,7 @@
 #include <common.h>
 #include <arch/armv8/armv8.h>
 #include <bits_api.h>
+#include <reg_access.h>
 
 #define BCM2835_IC_BASE          (PERIPHERAL_BASE_PHY  + 0xb200)
 #define BCM2835_IC_PENDING_BASIC (reg32_t)(BCM2835_IC_BASE + 0x00)
@@ -80,12 +81,12 @@ int intr_ctl_arm_irq_disable(int irq_num)
 
 #define ACCESS_GPU_IRQ(r, irq) \
   reg32_t dst;                        \
-  if (irq_num > INTR_CTL_IRQ_ARM_MAX) \
+  if (irq_num > INTR_CTL_IRQ_GPU_MAX) \
     return ERR_INVAL_ARG;             \
   dst = r;                            \
   if (irq_num > 31) {                 \
     irq_num -= 32;                    \
-    dst += 4;                         \
+    dst++;                            \
   }                                   \
   write_reg(dst, (1 << irq_num));     \
   return ERR_OK;
@@ -118,7 +119,7 @@ void intr_ctl_enable_gpio_irq(int gpio_num)
 
 #define CHECK_PENDING_GPU(i, gpu_i) \
   if (basic_pending & (1<<i)) {\
-    gpu_pending |= gpu_i;\
+    gpu_pending |= (((uint64_t)1)<<gpu_i);\
   }
 
 #define CHECKED_RUN_CB(cb) \
@@ -171,7 +172,7 @@ void intr_ctl_handle_irq(void)
 
   // run gpu irq callbacks
   for (i = 0; i < 64; ++i) {
-    if (gpu_pending & (1 << i)) {
+    if (gpu_pending & (1ull << i)) {
       CHECKED_RUN_CB(irq_callbacks[i]);
     }
   }

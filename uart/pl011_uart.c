@@ -3,6 +3,9 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <types.h>
+#include <intr_ctl.h>
+#include <vcanvas.h>
+#include <common.h>
 
 
 #define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
@@ -12,7 +15,12 @@
 #define UART0_FBRD  ((reg32_t)(UART0_BASE + 0x28))
 #define UART0_LCRH  ((reg32_t)(UART0_BASE + 0x2c))
 #define UART0_CR    ((reg32_t)(UART0_BASE + 0x30))
+// Interrupt mask set clear
 #define UART0_IMSC  ((reg32_t)(UART0_BASE + 0x38))
+// Raw interrupt status
+#define UART0_RIS   ((reg32_t)(UART0_BASE + 0x3c))
+// Masked interrupt status
+#define UART0_MIS   ((reg32_t)(UART0_BASE + 0x3c))
 #define UART0_ICR   ((reg32_t)(UART0_BASE + 0x44))
 
 
@@ -100,7 +108,7 @@ void pl011_uart_init(int baudrate, int unused)
   /* set up clock for consistent divisor values */
   mbox_get_clock_rate(MBOX_CLOCK_ID_UART, &hz);
 
-  /* mask all interrupts */
+  /* Clear all interrupts */
   write_reg(UART0_ICR, 0x7ff);
 
   /* IBRD - interger part of divisor
@@ -117,6 +125,66 @@ void pl011_uart_init(int baudrate, int unused)
   // enable Tx, Rx, FIFO
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
   // 0000 0010 <> 1011 - 0x0002 0xb
+}
+
+#define UART0_INT_BIT_CTS (1<<1)
+#define UART0_INT_BIT_RX  (1<<4)
+#define UART0_INT_BIT_TX  (1<<5)
+#define UART0_INT_BIT_RT  (1<<6)
+#define UART0_INT_BIT_FE  (1<<7)
+#define UART0_INT_BIT_PE  (1<<8)
+#define UART0_INT_BIT_BE  (1<<9)
+#define UART0_INT_BIT_OE  (1<<10)
+
+static char c;
+static int cx = 60;
+static int cy = 0;
+
+void pl011_uart_handle_interrupt()
+{
+  int ris_value = read_reg(UART0_RIS); 
+  if (ris_value & UART0_INT_BIT_RX) {
+    c = read_reg(UART0_DR);
+    vcanvas_putc(&cx, &cy, c);
+    cx = 60;
+    cy++;
+  }
+  if (ris_value & UART0_INT_BIT_TX) {
+
+  }
+  write_reg(UART0_ICR, 0x7ff);
+}
+
+void pl011_uart_print_regs()
+{
+  printf("pl011_uart registers: ris: %08x, mis: %08x, imsc: %08x\n",
+      read_reg(UART0_RIS),
+      read_reg(UART0_MIS),
+      read_reg(UART0_IMSC)
+      );
+}
+
+static void pl011_uart_reprogram_cr_prep()
+{
+  pl011_uart_disable();
+  while(read_reg(UART0_FR) & (UART0_FR_BUSY | UART0_FR_TXFF));
+  write_reg(UART0_LCRH, read_reg(UART0_LCRH) & ~(1<<4));
+}
+
+void pl011_uart_set_interrupt_mode()
+{
+  pl011_uart_reprogram_cr_prep();
+
+  intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
+      pl011_uart_handle_interrupt);
+  intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
+
+  pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
+  /* Clear pending interrupts */
+  write_reg(UART0_ICR, 0x7ff);
+  /* Unmask all interrupts */
+  write_reg(UART0_IMSC, 0x7ff);
+  write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
 }
 
 void pl011_uart_send(unsigned int c)

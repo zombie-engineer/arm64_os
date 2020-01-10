@@ -15,6 +15,7 @@
 #define INTR_CTL_IRQ_GPU_SYSTIMER_3 3
 #define INTR_CTL_IRQ_GPU_USB        9
 #define INTR_CTL_IRQ_GPU_AUX        29
+#define INTR_CTL_IRQ_GPU_UART0      57
 #define INTR_CTL_IRQ_GPU_MAX        63
 
 #define INTR_CTL_IRQ_ARM_TIMER             0
