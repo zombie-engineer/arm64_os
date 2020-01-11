@@ -1,15 +1,19 @@
 set pagination off
 delete
 
-b bcm2835_systmr_update_compare
-commands
-silent
-b qemu_clock_get_us
+# b bcm2835_systmr_update_compare
+# commands
+# silent
+# b qemu_clock_get_us
 # printf "bcm2835_systmr_update_compare\n"
 # c
-end
+# end
 
 # b trace_opt_parse
+# b bcm2835_ic_set_gpu_irq
+# b bcm2835_ic_write
+# b bcm2836_control_write
+b pl011_realize
 
 b timer_expired_ns
 commands
