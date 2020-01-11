@@ -11,3 +11,4 @@ void pl011_set_interrupt_mode();
 
 char pl011_uart_getc();
 
+int pl011_io_thread(int argc, char *argv[]);

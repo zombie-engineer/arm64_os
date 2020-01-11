@@ -6,6 +6,7 @@
 #include <stringlib.h>
 #include <timer.h>
 #include <intr_ctl.h>
+#include <uart/pl011_uart.h>
 #include <cmdrunner.h>
 
 extern void *__current_cpuctx;
@@ -44,15 +45,8 @@ void *alloc_stack()
 
 int scheduler_test_job(int argc, char *argv[])
 {
-  while(1)
+  while(1);
     uart_puts("123456789");
-}
-
-int scheduler_test_job2(int argc, char *argv[])
-{
-  while(1) {
-    uart_puts("abcdefjhi");
-  }
 }
 
 task_t *task_create(int(*work)(int, char *[]), int argc, char *argv[])
@@ -135,7 +129,7 @@ void scheduler_init()
     "test_job2"
   };
 
-  next_task = task_create(scheduler_test_job2, ARRAY_SIZE(argv2), argv2);
+  next_task = task_create(pl011_io_thread, ARRAY_SIZE(argv2), argv2);
 
   char *argv3[] = {
       "cmdrunner"

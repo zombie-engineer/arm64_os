@@ -269,7 +269,7 @@ void nokia5110_test()
   nokia5110_run_test_loop_2(30, 10);
 }
 
-extern void pl011_uart_set_interrupt_mode();
+extern void pl011_uart_print_regs();
 
 void main()
 {
@@ -281,6 +281,7 @@ void main()
   mmu_init();
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
+  pl011_uart_print_regs();
   // puts("1\n");
   // asm volatile("svc #0");
   // puts("2\n");
@@ -290,14 +291,15 @@ void main()
   // puts("4\n");
   snprintf(buf, 16, "my: %016x\n", 234);
   print_cpu_info();
-  // pl011_uart_set_interrupt_mode();
   print_mbox_props();
   systimer_init();
+  print_current_ex_level();
+
   set_irq_cb(intr_ctl_handle_irq);
-  enable_irq();
+  // enable_irq();
+  // while(1);
   scheduler_init();
   // nokia5110_test();
-  print_current_ex_level();
 
   print_mmu_features();
   print_cache_stats();
