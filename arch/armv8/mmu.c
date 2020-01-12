@@ -10,6 +10,7 @@
 #include "armv8_sctlr.h"
 #include "mmu_memattr.h"
 #include "mmu_lpdesc.h"
+#include <stringlib.h>
 
 /* We setup 4096 bytes GRANULE.
  *
@@ -77,6 +78,7 @@
 
 #define MEMATTR_IDX_NORMAL    0
 #define MEMATTR_IDX_DEV_NGNRE 1
+#define MEMATTR_IDX_NORMAL2   2
 
   // MAP a range of 32 megabytes
   // map range 32Mb
@@ -175,7 +177,7 @@ void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pag
     mem_attr_idx,
     1 /* ns */, 
     0 /* ap */, 
-    0 /* sh */, 
+    3 /* sh */, 
     1 /* af */, 
     0 /* ng */);
 
@@ -236,43 +238,21 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
   }
 }
 
-void armv8_set_mem_attribute(int attr_idx, char attribute)
-{
-  asm volatile (
-    "lsl   %0, %0, #3\n"
-    "lsl   %1, %1, %0\n"
+extern void __armv8_enable_mmu(uint64_t, uint64_t);
+extern char __mmu_table_base;
 
-    "mov   x2, #0xff\n"
-    "lsl   x2, x2, %0\n"
-
-    "mrs   x0, mair_el1\n"
-    "bic   x0, x0, x2\n"
-    "orr   x0, x0, x1\n"
-
-    "msr   mair_el1, x1\n" :: "r" (attr_idx), "r" (attribute)
-  );
-}
-
-char armv8_get_mem_attribute(int attr_idx)
-{
-  char attribute;
-  asm volatile (
-    "lsl   %1, %1, #3\n"
-    "mrs   x1, mair_el1\n"
-    "lsr   x1, x1, %1\n"
-    "and   x1, x1, #0xff\n"
-    "mov   %0, x1\n" :"=r"(attribute) : "r"(attr_idx)
-  );
-  return attribute;
-}
+uint64_t __shared_mem_start = 0;
 
 void mmu_init()
 {
   uint64_t va_start;
   mmu_caps_t mmu_caps;
   pt_config_t pt_config;
+  mair_repr_64_t mair_repr;
 
-  pt_config.base_address = 0x900000;
+  __shared_mem_start = PERIPHERAL_ADDR_RANGE_START / 2;
+
+  pt_config.base_address = (uint64_t)&__mmu_table_base;
   pt_config.page_size = MMU_PAGE_GRANULE;
   pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
   // Cover from 0 to 1GB of physical address space
@@ -281,21 +261,33 @@ void mmu_init()
 
   pt_config.mem_ranges[0].pa_start_page = 0;
   pt_config.mem_ranges[0].va_start_page = 0;
-  pt_config.mem_ranges[0].num_pages     = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[0].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[0].mem_attr_idx  = MEMATTR_IDX_NORMAL;
 
   pt_config.mem_ranges[1].pa_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].va_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].num_pages     = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
-  pt_config.num_ranges = 2;
 
-  armv8_set_mem_attribute(MEMATTR_IDX_NORMAL,   
-    MAKE_MEMATTR_NORMAL(
+  pt_config.mem_ranges[2].pa_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[2].va_start_page = __shared_mem_start / MMU_PAGE_GRANULE;;
+  pt_config.mem_ranges[2].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[2].mem_attr_idx  = MEMATTR_IDX_NORMAL2;
+
+  pt_config.num_ranges = 3;
+
+  memset(&mair_repr, 0, sizeof(mair_repr));
+
+  // memory region attributes of 0xff enable stxr / ldxr operations
+  mair_repr.memattrs[MEMATTR_IDX_NORMAL]   = MAKE_MEMATTR_NORMAL(
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA), 
-      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA)));
-
-  armv8_set_mem_attribute(MEMATTR_IDX_DEV_NGNRE, MEMATTR_DEVICE_NGNRE);
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
+  mair_repr.memattrs[MEMATTR_IDX_DEV_NGNRE] = MEMATTR_DEVICE_NGNRE;
+  mair_repr.memattrs[MEMATTR_IDX_NORMAL2]   = MAKE_MEMATTR_NORMAL(
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA), 
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
+  
+  armv8_set_mair_el1(mair_repr_64_to_value(&mair_repr));
 
   // Number of entries (ptes) in a single page table
   mmu_caps.max_pa_bits = mem_model_max_pa_bits();

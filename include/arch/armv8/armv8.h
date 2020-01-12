@@ -38,11 +38,11 @@ void arm_set_ttbr1_el1(unsigned long);
 void arm_set_tcr_el1(unsigned long );
 
 void arm_mmu_init(void);
-void armv8_enable_mmu(long long ttbr0, long long ttbr1);
+// void armv8_enable_mmu(long long ttbr0, long long ttbr1);
 
-void armv8_set_mem_attribute(int attr_idx, char attribute);
+void armv8_set_mair_el1(uint64_t);
 
-char armv8_get_mem_attribute(int attr_idx);
+uint64_t armv8_get_mair_el1();
 
 // Returns system clock frequency in Hz
 uint32_t get_system_timer_freq(void);

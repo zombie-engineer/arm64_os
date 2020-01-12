@@ -34,7 +34,8 @@ SECTIONS
 
   . = ALIGN(4096);
   __bin_start = .;
+
+  . = ALIGN(16384);
+  __mmu_table_base = .;
 }
 __bss_size = (__bss_end - __bss_start)>>3;
-/* https://github.com/bztsrc/raspi3-tutorial/blob/master/02_multicorec/link.ld */
-

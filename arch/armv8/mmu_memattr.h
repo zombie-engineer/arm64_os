@@ -74,4 +74,22 @@
 
 #define MAKE_MEMATTR_NORMAL(oooo, iiii)     (((oooo & 0xf) << 4) | (iiii & 0xf))
 
+typedef struct mair_repr_64 {
+  char memattrs[8];
+} mair_repr_64_t;
+
+#define __mair_put(r, i) ((uint64_t)(r)->memattrs[i] << (8 * i))
+
+#define mair_repr_64_to_value(r) \
+  (uint64_t)(\
+      __mair_put(r, 0)|\
+      __mair_put(r, 1)|\
+      __mair_put(r, 2)|\
+      __mair_put(r, 3)|\
+      __mair_put(r, 4)|\
+      __mair_put(r, 5)|\
+      __mair_put(r, 6)|\
+      __mair_put(r, 7)\
+      )
+// #undef mair_put
 

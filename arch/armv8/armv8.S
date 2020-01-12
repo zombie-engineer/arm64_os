@@ -486,26 +486,50 @@ FUNC(arm_set_tcr_el1):
   str   w7, [x6]
 .endm
 
+FUNC(armv8_set_mair_el1):
+  msr mair_el1, x0
+  ret
+
+FUNC(armv8_get_mair_el1):
+  mrs x0, mair_el1
+  ret
+   
 FUNC(__armv8_enable_mmu):
   msr   ttbr0_el1, x0
   msr   ttbr1_el1, x1
 
   mrs   x2, tcr_el1
+   
   // Set T0SZ to 16
   orr   x2, x2, #0b1000
+
+  // Ensure EPD0 bit
+  bic   x2, x2, #(1<<7)
+
+  //    IGRN0 - Normal memory, Inner Write-Back Write-Allocate Cacheable.
+  bic   x2, x2, #(3<<8)
+  orr   x2, x2, #(1<<8)
+
+  //    OGRN0 - Normal memory, Outer Write-Back Write-Allocate Cacheable.
+  bic   x2, x2, #(3<<10)
+  orr   x2, x2, #(1<<10)
+
+  //    SH0 - Inner shareable
+  bic   x2, x2, #(3<<12)
+  orr   x2, x2, #(3<<12)
+
   // Set HA bit
   orr   x2, x2, #(1<<39)
   msr   tcr_el1, x2
   isb
   
   mrs   x0, sctlr_el1
-  // mov   x1, x0
-  orr   x0, x0, #1
-  bic   x0, x0, #(1<<19)
-  // Cacheability control
-  // bic   x0, x0, #(1<<2)
+  // M bit
+  orr   x0, x0, #(1<<0)
+  // bic   x0, x0, #(1<<19)
+  // C bit
+  orr   x0, x0, #(1<<2)
   msr   sctlr_el1, x0
-  // msr   sctlr_el1, x1
   
   isb
   ret
