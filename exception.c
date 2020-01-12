@@ -301,11 +301,11 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
 {
   /* exception class */
   uint8_t ec;
-  char buf[256];
+  char buf[512];
 
   ec = __get_synchr_exception_class(e->esr);
 
-  sprintf(buf, "class: %s, esr: %08x, elr: %08x, far: %08x, sp now at: %08x", 
+  snprintf(buf, 512, "class: %s, esr: %08x, elr: %08x, far: %08x, sp now at: %08x", 
       get_exception_class_string(ec), 
       (int)e->esr, 
       (int)e->elr, 
