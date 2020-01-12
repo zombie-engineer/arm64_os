@@ -54,7 +54,7 @@
 static char pl011_rx_buf[2048];
 static int pl011_rx_buf_sz = 0;
 
-static __attribute__((aligned(64))) uint64_t pl011_rx_buf_lock = 0;
+__attribute__((aligned(64))) uint64_t pl011_rx_buf_lock = 0;
 
 
 static void pl011_uart_disable()
@@ -158,36 +158,40 @@ void pl011_uart_handle_interrupt()
   cx = 60;
   cy = 2;
   if (ris_value & UART0_INT_BIT_RX) {
-    vcanvas_puts(&cx, &cy, "RX");
+    cx = 65;
+    // vcanvas_puts(&cx, &cy, "RX");
     c = read_reg(UART0_DR);
     mutex_lock(&pl011_rx_buf_lock);
     pl011_rx_buf[pl011_rx_buf_sz++] = c;
+    pl011_uart_send(c);
+    // kernel_panic("hello");
     mutex_unlock(&pl011_rx_buf_lock);
-    vcanvas_putc(&cx, &cy, c);
+    //vcanvas_putc(&cx, &cy, c);
     ris_value &= ~UART0_INT_BIT_RX;
   }
   if (ris_value & UART0_INT_BIT_TX) {
-    vcanvas_puts(&cx, &cy, "TX");
+    cx = 64;
+    // vcanvas_puts(&cx, &cy, "TX");
     ris_value &= ~UART0_INT_BIT_TX;
   }
   if (ris_value & UART0_INT_BIT_RT) {
-    vcanvas_puts(&cx, &cy, "RT");
+    // vcanvas_puts(&cx, &cy, "RT");
     ris_value &= ~UART0_INT_BIT_RT;
   }
   if (ris_value & UART0_INT_BIT_FE) {
-    vcanvas_puts(&cx, &cy, "FE");
+    // vcanvas_puts(&cx, &cy, "FE");
     ris_value &= ~UART0_INT_BIT_FE;
   }
   if (ris_value & UART0_INT_BIT_PE) {
-    vcanvas_puts(&cx, &cy, "PE");
+    // vcanvas_puts(&cx, &cy, "PE");
     ris_value &= ~UART0_INT_BIT_PE;
   }
   if (ris_value & UART0_INT_BIT_BE) {
-    vcanvas_puts(&cx, &cy, "BE");
+    // vcanvas_puts(&cx, &cy, "BE");
     ris_value &= ~UART0_INT_BIT_BE;
   }
   if (ris_value & UART0_INT_BIT_OE) {
-    vcanvas_puts(&cx, &cy, "OE");
+    // vcanvas_puts(&cx, &cy, "OE");
     ris_value &= ~UART0_INT_BIT_OE;
   }
   write_reg(UART0_ICR, 0x7ff);
@@ -248,11 +252,10 @@ char pl011_uart_getc()
 
 static void pl011_io_thread_work()
 {
-  return;
     mutex_lock(&pl011_rx_buf_lock);
-    if (pl011_rx_buf_sz) {
+    if (pl011_rx_buf_sz > 5) {
       pl011_rx_buf[pl011_rx_buf_sz] = 0;
-      puts(pl011_rx_buf);
+      pl011_uart_send_buf(pl011_rx_buf, pl011_rx_buf_sz);
       pl011_rx_buf_sz = 0;
     }
 

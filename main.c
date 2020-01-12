@@ -213,8 +213,9 @@ void print_mmu_stats()
 void print_mmu_features()
 {
   char memattrs[8];
-  memattrs[0] = armv8_get_mem_attribute(0);
-  memattrs[1] = armv8_get_mem_attribute(1);
+  uint64_t mair_value = armv8_get_mair_el1();
+  memattrs[0] = mair_value & 0xff;
+  memattrs[1] = (mair_value >> 8) & 0xff;
   printf("mmu: mem_attr_0: %02x, mem_attr_1: %02x\n", memattrs[0], memattrs[1]);
 }
 
@@ -270,18 +271,29 @@ void nokia5110_test()
 }
 
 extern void pl011_uart_print_regs();
+extern uint64_t __shared_mem_start;
 
 void main()
 {
-  char buf[16];
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
-  mmu_init();
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
+  print_mbox_props();
+  set_irq_cb(intr_ctl_handle_irq);
+  mmu_init();
+  // uint64_t mair;
+  // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
+  // printf("mair: %016llx\n", mair);
   pl011_uart_print_regs();
+  printf("__shared_mem_start: %016llx\n", *(uint64_t *)__shared_mem_start);
+  // asm volatile("AT S1E0R, %0"::"r"(&pl011_rx_buf_lock));
+  // asm volatile("at s1e1r, %0"::"r"(__shared_mem_start));
+  // __shared_mem_start = 0x80000;
+  // asm volatile("ldxr w1, [%0]"::"r"(__shared_mem_start));
+  // asm volatile("at s1e1r, %0"::"r"(__shared_mem_start));
   // puts("1\n");
   // asm volatile("svc #0");
   // puts("2\n");
@@ -289,16 +301,14 @@ void main()
   // puts("3\n");
   // asm volatile("svc #2");
   // puts("4\n");
-  snprintf(buf, 16, "my: %016x\n", 234);
   print_cpu_info();
-  print_mbox_props();
   systimer_init();
   print_current_ex_level();
 
-  set_irq_cb(intr_ctl_handle_irq);
   // enable_irq();
   // while(1);
   scheduler_init();
+  while(1);
   // nokia5110_test();
 
   print_mmu_features();
