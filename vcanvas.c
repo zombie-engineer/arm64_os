@@ -236,10 +236,10 @@ void vcanvas_puts(int *x, int *y, const char *s)
   int width_limit, height_limit;
 
   if (x == 0 || y == 0 || s == 0)
-    generate_exception();
+    kernel_panic("vcanvas_puts: some args not provided.");
 
   if (vcanvas_get_width_height(&width_limit, &height_limit))
-    generate_exception();
+    kernel_panic("vcanvas_puts: Failed to get screen resolution.");
 
   width_limit /= (font->width + 1);
   height_limit /= (font->height + 1);
@@ -275,7 +275,7 @@ int vcanvas_get_width_height(int *width, int *height)
     return 0;
   }
 
-  uart_puts("Unable to set screen resolution to 1024x768x32\n");
+  uart_puts("Unable to get screen resolution to 1024x768x32\n");
   return -1;
 }
 

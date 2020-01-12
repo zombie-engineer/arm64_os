@@ -269,7 +269,7 @@ void cmdrunner_run_interactive_loop(void)
         }
         else {
           //cmdrunner_clear_line();
-          generate_exception();
+          kernel_panic("cmdrunner_run_interactive_loop: Logic error.");
           continue;
         }
       } else {

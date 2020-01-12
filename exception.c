@@ -4,6 +4,7 @@
 #include <vcanvas.h>
 #include <delays.h>
 #include <cpu.h>
+#include <syscall.h>
 
 #define INTERRUPT_TYPE_SYNCHRONOUS 0
 #define INTERRUPT_TYPE_IRQ         1
@@ -38,14 +39,12 @@ void printer_putc(printer_t *p, char c, int x, int y)
 #define puts(str, x, y) printer_puts(&printer, str, x, y)
 #define putc(c, x, y) printer_putc(&printer, c, x, y)
 
-void generate_exception()
-{
-  *(volatile long int*)(0xffffffffffffffff) = 1;
-}
+static const char *panic_msg = 0;
 
 void kernel_panic(const char *msg)
 {
-  generate_exception();
+  panic_msg = msg;
+  asm volatile ("svc #0x1000");
 }
 
 irq_cb_t irq_cb = 0;
@@ -59,13 +58,6 @@ void set_irq_cb(irq_cb_t cb)
 void set_fiq_cb(irq_cb_t cb)
 {
   fiq_cb = cb;
-}
-
-static inline void exception_panic(const char *msg)
-{
-  puts("exception_panic: ", 0, 0);
-  puts(msg, 0, 1);
-  while(1);
 }
 
 static void dump_stack(uint64_t *stack, int depth, int x, int y)
@@ -211,7 +203,8 @@ const char *get_interrupt_type_string(int interrupt_type) {
 #define EXC_CLASS_UNKNOWN           0b000000
 #define EXC_CLASS_TRAPPED_WFI_WFE   0b000001
 #define EXC_CLASS_ILLEGAL_EXECUTION 0b001110
-#define EXC_CLASS_SYSTEM_CALL       0b010101
+#define EXC_CLASS_SVC_AARCH32       0b010001
+#define EXC_CLASS_SVC_AARCH64       0b010101
 #define EXC_CLASS_INST_ABRT_LO_EL   0b100000
 #define EXC_CLASS_INST_ABRT_EQ_EL   0b100001
 #define EXC_CLASS_INST_ALIGNMENT    0b100010
@@ -226,7 +219,8 @@ const char *get_exception_class_string(uint8_t exception_class)
     case EXC_CLASS_UNKNOWN          : return "Unknown";
     case EXC_CLASS_TRAPPED_WFI_WFE  : return "Trapped WFI/WFE";
     case EXC_CLASS_ILLEGAL_EXECUTION: return "Illegal execution";
-    case EXC_CLASS_SYSTEM_CALL      : return "System call";
+    case EXC_CLASS_SVC_AARCH32      : return "System call 32bit";
+    case EXC_CLASS_SVC_AARCH64      : return "System call 64bit";
     case EXC_CLASS_INST_ABRT_LO_EL  : return "Instruction abort, lower EL";
     case EXC_CLASS_INST_ABRT_EQ_EL  : return "Instruction abort, same EL";
     case EXC_CLASS_INST_ALIGNMENT   : return "Instruction alignment fault";
@@ -297,6 +291,28 @@ static int inline __get_synchr_exception_class(uint64_t esr)
   return (esr >> 26) & 0xff; 
 }
 
+static void __handle_svc_32(exception_info_t *e)
+{
+}
+
+static void __handle_svc_64(exception_info_t *e)
+{
+  char buf[512];
+  int syscall_id;
+  syscall_id = e->esr & 0xffff;
+  switch(syscall_id) {
+    case SYSCALL_KERNEL_PANIC:
+      snprintf(buf, sizeof(buf), "Kernel panic: %s\n", panic_msg); 
+      puts(buf, 10, 9);
+      while(1);
+      break;
+    default:
+      snprintf(buf, sizeof(buf), "Unknown syscall: %d", syscall_id);
+      puts(buf, 10, 9);
+      break;
+  }
+}
+
 static void __handle_interrupt_synchronous(exception_info_t *e)
 {
   /* exception class */
@@ -312,9 +328,9 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
       (int)e->far,
       &buf[0]);
   puts(buf, 0, 1);
-  dump_stack(e->stack, 30, 160, 0);
-  dump_context_to_uart(e);
-  while(1);
+  // dump_stack(e->stack, 30, 160, 0);
+  // dump_context_to_uart(e);
+  // while(1);
 
   switch (ec) {
     case EXC_CLASS_DATA_ABRT_LO_EL:
@@ -328,6 +344,12 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
       break;
     case EXC_CLASS_INST_ALIGNMENT:
       puts("instruction alignment handler", 0, 0);
+      break;
+    case EXC_CLASS_SVC_AARCH64:
+      __handle_svc_64(e);
+      break;
+    case EXC_CLASS_SVC_AARCH32:
+      __handle_svc_32(e);
       break;
     default:
       break;

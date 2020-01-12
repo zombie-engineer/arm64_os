@@ -97,7 +97,7 @@ void * memcpy_8aligned(void *dst, const void *src, size_t n)
   int i;
 #ifndef TEST_STRING
   if (!IS_8_ALIGNED(dst) || !IS_8_ALIGNED(src) || n % 8)
-    generate_exception();
+    kernel_panic("memcpy not aligned");
 #endif
 
   for (i = 0; i < n / 8; ++i)

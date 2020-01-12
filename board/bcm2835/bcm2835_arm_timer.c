@@ -96,7 +96,7 @@ static uint32_t get_core_clock_rate()
   uint32_t result;
   // clock rate - is HZ : number of clocks per sec
   if (mbox_get_clock_rate(MBOX_CLOCK_ID_CORE, &result))
-     generate_exception();
+     kernel_panic("get_core_clock_rate: mbox request failed.");
   // 250 000 000 Hz
 
   // if (mbox_get_clock_rate(MBOX_CLOCK_ID_ARM, &arm_clock_rate))

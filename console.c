@@ -28,7 +28,7 @@ int console_add_device(console_dev_t* dev, const char* devname)
 {
   console_dev_ent_t *con;
   if (num_console_devices > MAX_CONSOLE_DEVICES)
-    generate_exception();
+    kernel_panic("Failed to add more console devices.");
 
   if (num_console_devices == MAX_CONSOLE_DEVICES)
     return -1;
@@ -101,13 +101,13 @@ void init_consoles()
   dev.puts = uart_puts;
   dev.putc = uart_putc;
   if (console_add_device(&dev, UART_CONSOLE_NAME))
-    generate_exception();
+    kernel_panic("Failed to add uart console device.");
 
   if (viewport_console_init())
-    generate_exception();
+    kernel_panic("Failed to init viewport console device.");
 
   dev.puts = viewport_console_puts;
   dev.putc = viewport_console_putc;
   if (console_add_device(&dev, VIEWPORT_CONSOLE_NAME))
-    generate_exception();
+    kernel_panic("Failed to add viewport console device.");
 }
