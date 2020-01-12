@@ -6,7 +6,7 @@
 # UNLOCKED 0
 FUNC(__armv8_mutex_lock):
   # pld   x0
-  prfm	pstl1strm, [x0]
+  # prfm	pstl1strm, [x0]
   mov   x1, #1
   ldxr  x2, [x0]
   cbnz  x2, 1f
