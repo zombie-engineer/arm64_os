@@ -134,7 +134,7 @@ int dma_setup(dma_ch_opts_t *o)
 {
   dma_cb_t *cb = &dma_channels[o->channel];
 
-  cb->ti = DMA_TI_PERMAP(o->src_dreq | o->dst_dreq)
+  cb->ti = DMA_TI_PERMAP(((o->src_dreq) | (o->dst_dreq)))
          | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
          | (o->src_ign  ? DMA_TI_DEST_IGNORE : 0)
          | (o->src_dreq != DMA_DREQ_NONE ? DMA_TI_SRC_DREQ : 0)

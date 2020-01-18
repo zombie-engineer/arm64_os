@@ -16,8 +16,8 @@ void wait_cycles(uint32_t n)
 
 void wait_usec(uint32_t n)
 {
-  register uint64_t now, counter, counter_target;
-  register uint32_t counter_freq, counter_freq_milli_sec, wait_counts;
+  register uint64_t counter, counter_target;
+  register uint32_t counter_freq, wait_counts;
 
   counter = get_system_timer();
   counter_freq = get_system_timer_freq();
@@ -30,8 +30,8 @@ void wait_usec(uint32_t n)
 void wait_msec(uint32_t n)
 {
   // get Hz (counts per second) 19200000
-  register uint64_t now, counter, counter_target;
-  register uint32_t counter_freq, counter_freq_milli_sec, wait_counts;
+  register uint64_t counter, counter_target;
+  register uint32_t counter_freq, wait_counts;
 
   counter = get_system_timer();
   counter_freq = get_system_timer_freq();

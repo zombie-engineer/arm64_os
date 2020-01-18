@@ -5,6 +5,8 @@
 #include <console_char.h>
 #include <vcanvas.h>
 #include <exception.h>
+#include "cmdrunner_internal.h"
+#include <error.h>
 
 CMDRUNNER_DECL_CMD(clock);
 CMDRUNNER_DECL_CMD(f5161ah);
@@ -241,67 +243,71 @@ int cmdrunner_add_cmd(
   return 0;
 }
 
+int cmdrunner_handle_char(cmdrunner_state_t *s, char c)
+{
+  if (s->escbuflen > 0) {
+    if (s->escbuflen == 1) {
+      if (c == CONSOLE_CHAR_LEFT_BRACKET) {
+        // vcanvas_puts(&x, &y, "[");
+        s->escbuflen++;
+      }
+      else {
+        //cmdrunner_clear_line();
+        kernel_panic("cmdrunner_run_interactive_loop: Logic error.");
+        return ERR_FATAL;
+      }
+    } else {
+      switch (c) {
+        case CONSOLE_CHAR_UP_ARROW:    cmdrunner_on_arrow_up()   ; break;
+        case CONSOLE_CHAR_DOWN_ARROW:  cmdrunner_on_arrow_down() ; break;
+        case CONSOLE_CHAR_LEFT_ARROW:  /*vcanvas_puts(&x, &y, "LEFT") ; */break;
+        case CONSOLE_CHAR_RIGHT_ARROW: /*vcanvas_puts(&x, &y, "RIGHT"); */break;
+        default: /*vcanvas_puts(&x, &y, "0");*/ break;
+      }
+      s->escbuflen = 0;
+    }
+    return ERR_OK;
+  } 
+
+  if (c == CONSOLE_CHAR_ESC) {
+    // vcanvas_puts(&x, &y, "ESC");
+    s->escbuflen = 1;
+    return ERR_OK;
+  }
+
+  if (c == CONSOLE_CHAR_LINEFEED) {
+    cmdrunner_on_newline();
+    cmdrunner_flush_inputbuf();
+    puts("\n\r >");
+  } else if (c == CONSOLE_CHAR_BACKSPACE || c == CONSOLE_CHAR_ASCII_BACKSPACE) {
+    cmdrunner_backspace();
+  } else {
+    if (inputbuf_carret < inputbuf_end)
+      *inputbuf_carret++ = c;
+    putc(c);
+  }
+  return ERR_OK;
+}
+
+void cmdrunner_state_init(cmdrunner_state_t *s)
+{
+  s->escbuflen = 0;
+  memset(s->escbuf, 0, sizeof(s->escbuf));
+}
+
 void cmdrunner_run_interactive_loop(void)
 {
   char ch;
-
-  char escbuflen;
+  cmdrunner_state_t s;
+  cmdrunner_state_init(&s);
 
   puts("\n >");
-  char buf[64];
-  int x;
-  int y;
 
-  escbuflen = 0;
-
-  x = 0; y = 0;
   while(1) {
     ch = uart_getc();
-
-    sprintf(buf, "%02x ", ch);
-    vcanvas_puts(&x, &y, buf);
-
-    if (escbuflen > 0) {
-      if (escbuflen == 1) {
-        if (ch == CONSOLE_CHAR_LEFT_BRACKET) {
-          vcanvas_puts(&x, &y, "[");
-          escbuflen++;
-        }
-        else {
-          //cmdrunner_clear_line();
-          kernel_panic("cmdrunner_run_interactive_loop: Logic error.");
-          continue;
-        }
-      } else {
-        switch (ch) {
-          case CONSOLE_CHAR_UP_ARROW:    cmdrunner_on_arrow_up()   ; break;
-          case CONSOLE_CHAR_DOWN_ARROW:  cmdrunner_on_arrow_down() ; break;
-          case CONSOLE_CHAR_LEFT_ARROW:  vcanvas_puts(&x, &y, "LEFT") ; break;
-          case CONSOLE_CHAR_RIGHT_ARROW: vcanvas_puts(&x, &y, "RIGHT"); break;
-          default: vcanvas_puts(&x, &y, "0"); break;
-        }
-        escbuflen = 0;
-      }
-      continue;
-    }
-
-    if (ch == CONSOLE_CHAR_ESC) {
-      vcanvas_puts(&x, &y, "ESC");
-      escbuflen = 1;
-      continue;
-    }
-
-    if (ch == CONSOLE_CHAR_LINEFEED) {
-      cmdrunner_on_newline();
-      cmdrunner_flush_inputbuf();
-      puts("\n\r >");
-    } else if (ch == CONSOLE_CHAR_BACKSPACE || ch == CONSOLE_CHAR_ASCII_BACKSPACE) {
-      cmdrunner_backspace();
-    } else {
-      if (inputbuf_carret < inputbuf_end)
-        *inputbuf_carret++ = ch;
-      putc(ch);
-    }
+    cmdrunner_handle_char(&s, ch);
+    // sprintf(buf, "%02x ", ch);
+    // vcanvas_puts(&x, &y, buf);
   }
 }
 
@@ -355,3 +361,4 @@ int string_token_eq(const string_token_t *t, const char *str)
 {
   return strncmp(t->s, str, t->len) == 0;
 }
+

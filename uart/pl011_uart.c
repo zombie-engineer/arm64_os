@@ -8,6 +8,8 @@
 #include <vcanvas.h>
 #include <common.h>
 #include <stringlib.h>
+#include <ringbuf.h>
+#include <compiler.h>
 
 
 #define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
@@ -54,7 +56,10 @@
 static char pl011_rx_buf[2048];
 static int pl011_rx_buf_sz = 0;
 
-__attribute__((aligned(64))) uint64_t pl011_rx_buf_lock = 0;
+aligned(64) uint64_t pl011_rx_buf_lock = 0;
+
+aligned(64) uint64_t pipe_lock = 0;
+// circular pipe buffer
 
 
 static void pl011_uart_disable()
@@ -106,7 +111,7 @@ static void pl011_calc_divisor(int baudrate, uint64_t clock_hz, uint32_t *idiv, 
   *fdiv = f;
 }
 
-void pl011_uart_init(int baudrate, int unused)
+void pl011_uart_init(int baudrate, int _not_used)
 {
   uint32_t hz, idiv, fdiv;
   pl011_uart_disable();
@@ -161,11 +166,11 @@ void pl011_uart_handle_interrupt()
     cx = 65;
     // vcanvas_puts(&cx, &cy, "RX");
     c = read_reg(UART0_DR);
-    mutex_lock(&pl011_rx_buf_lock);
+    spinlock_lock(&pl011_rx_buf_lock);
     pl011_rx_buf[pl011_rx_buf_sz++] = c;
     pl011_uart_send(c);
     // kernel_panic("hello");
-    mutex_unlock(&pl011_rx_buf_lock);
+    spinlock_unlock(&pl011_rx_buf_lock);
     //vcanvas_putc(&cx, &cy, c);
     ris_value &= ~UART0_INT_BIT_RX;
   }
@@ -250,22 +255,46 @@ char pl011_uart_getc()
   return (char)read_reg(UART0_DR);
 }
 
+// static void pl011_copy_to_pipe(const char *buf, int sz)
+// {
+//  int to_copy;
+//  int copied = 0;
+//  while(sz != copied) {
+//    spinlock_lock(&pipe_lock);
+//    pipe_free = sizeof(pipe_buf) - pipe_num_bytes;
+//    to_copy = min(pipe_free, sz - copied);
+//
+//    memcpy(pipe_buf + pipe_sz, buf + copied, to_copy);
+//    pipe_sz += to_copy;
+//    copied = to_copy;
+//
+//    spinlock_unlock(&pipe_lock);
+//  }
+// }
+
 static void pl011_io_thread_work()
 {
-    mutex_lock(&pl011_rx_buf_lock);
-    if (pl011_rx_buf_sz > 5) {
-      pl011_rx_buf[pl011_rx_buf_sz] = 0;
-      pl011_uart_send_buf(pl011_rx_buf, pl011_rx_buf_sz);
-      pl011_rx_buf_sz = 0;
-    }
-
-    mutex_unlock(&pl011_rx_buf_lock);
+//  int to_copy, pipe_free;
+//  char buf[256];
+//  if (pl011_rx_buf_sz) {
+//    spinlock_lock(&pl011_rx_buf_lock);
+//    pl011_rx_buf[pl011_rx_buf_sz] = 0;
+//
+//    to_copy = min(pl011_rx_buf_sz, sizeof(buf));
+//
+//    pl011_rx_buf_sz = 0;
+//    memcpy(buf, pl011_rx_buf, to_copy);
+//    spinlock_unlock(&pl011_rx_buf_lock);
+//    pl011_copy_to_pipe(buf, to_copy);
+//
+//  }
 }
 
 int pl011_io_thread(int argc, char *argv[])
 {
   int ret = 0;
   pl011_uart_set_interrupt_mode();
+  pipe_lock = 0;
   while(1) {
     asm volatile("wfe");
     pl011_io_thread_work();

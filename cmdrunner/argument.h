@@ -1,4 +1,5 @@
 #pragma once
+#include <compiler.h>
 
 #define ASSERT_NUMARGS_EQ(n) \
   if (args->len != n) { \
@@ -20,7 +21,7 @@
   }
 
 #define DECL_ARGS_CTX()           \
-  string_tokens_t subargs;        \
+  unused string_tokens_t subargs; \
   string_token_t *subcmd_token;   \
   subcmd_token = &args->ts[0];    \
   subargs.ts  = subcmd_token + 1; \

@@ -39,6 +39,9 @@ char to_char_8_10(int i, int base) {
 
 #define APPEND(c) { if (dst < end) *(dst++) = c; counter++; }
 
+#ifdef TEST_STRING
+#include <string.h>
+#endif
 
 #define MEMSET(c, len) \
   {\

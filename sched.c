@@ -45,8 +45,9 @@ void *alloc_stack()
 
 int scheduler_test_job(int argc, char *argv[])
 {
-  while(1);
-    uart_puts("123456789");
+  while(1) {
+  }
+  uart_puts("123456789");
 }
 
 task_t *task_create(int(*work)(int, char *[]), int argc, char *argv[])

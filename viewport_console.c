@@ -50,21 +50,21 @@ int viewport_console_init()
   return 0;
 }
 
-static const char* textbuf_skiplines(const char *textbuf, int n)
-{
-  int i;
-  const char *ptr;
-  ptr = textbuf;
-  i = 0;
-  while(*ptr && i != n) {
-    if (i == n)
-      break;
-    if (*ptr == '\n')
-      ++i;
-    ++ptr;
-  }
-  return ptr;
-}
+// static const char* textbuf_skiplines(const char *textbuf, int n)
+// {
+//   int i;
+//   const char *ptr;
+//   ptr = textbuf;
+//   i = 0;
+//   while(*ptr && i != n) {
+//     if (i == n)
+//       break;
+//     if (*ptr == '\n')
+//       ++i;
+//     ++ptr;
+//   }
+//   return ptr;
+// }
 
 static void textviewport_print_char(textviewport_t *tv, char c)
 {

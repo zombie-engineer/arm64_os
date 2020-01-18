@@ -4,6 +4,7 @@
 #include <uart/uart.h>
 #include <video_console.h>
 #include <viewport_console.h>
+#include <kernel_panic.h>
 
 #define MAX_CONSOLE_DEVICES 4
 #define MAX_DEVNAME_SIZE 14

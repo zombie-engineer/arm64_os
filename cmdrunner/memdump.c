@@ -63,13 +63,12 @@ int command_memdump_get_elementsize(char c)
 
 int command_memdump(const string_tokens_t *args)
 {
-  int i, linesize;;
   // aptr - arguments pointer
   // ptr  - memdump pointer
   const char *ptr;
   char *endptr;
   size_t bytescount;
-  char nameless_args, element_size;
+  char element_size;
 
   element_size = DUMPSIZE_BYTES;
   bytescount = 16;
@@ -115,12 +114,12 @@ static int command_ww_print_help()
   return CMD_ERR_NO_ERROR;
 }
 
-static int command_rw_print_help()
-{
-  puts("rw OFFSET\n");
-  puts("\tOFFSET - 4 byte aligned memory source address\n");
-  return CMD_ERR_NO_ERROR;
-}
+//static int command_rw_print_help()
+//{
+//  puts("rw OFFSET\n");
+//  puts("\tOFFSET - 4 byte aligned memory source address\n");
+//  return CMD_ERR_NO_ERROR;
+//}
 
 int command_ww(const string_tokens_t *args)
 {

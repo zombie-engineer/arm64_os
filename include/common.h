@@ -1,5 +1,6 @@
 #pragma once
 #include <error.h>
+#include <kernel_panic.h>
 
 #define min(a, b) (a < b ? a : b)
 
@@ -18,8 +19,6 @@ void _puts(const char *str);
 void _putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
-
-void kernel_panic(const char *message);
 
 #define print_reg32(regname) printf(#regname " %08x\n",  *regname)
 

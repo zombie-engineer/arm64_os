@@ -1,5 +1,5 @@
 #include <stringlib.h>
-#include <exception.h>
+#include <common.h>
 
 int _isprint(char ch)
 {

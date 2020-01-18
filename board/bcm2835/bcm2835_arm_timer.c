@@ -31,13 +31,13 @@ typedef struct {
 
 static bcm2835_timer_t bcm2835_arm_timer;
 
-static void bcm2835_arm_timer_enable_freerunning()
-{
-  uint32_t control_reg; 
-  control_reg = read_reg(ARM_TIMER_CONTROL_REG);
-  control_reg |= ARM_TIMER_CONTROL_REG_ENABLE_FREE;
-  write_reg(ARM_TIMER_CONTROL_REG, control_reg);
-}
+//static void bcm2835_arm_timer_enable_freerunning()
+//{
+//  uint32_t control_reg; 
+//  control_reg = read_reg(ARM_TIMER_CONTROL_REG);
+//  control_reg |= ARM_TIMER_CONTROL_REG_ENABLE_FREE;
+//  write_reg(ARM_TIMER_CONTROL_REG, control_reg);
+//}
 
 static inline 
 void bcm2835_arm_timer_disable()

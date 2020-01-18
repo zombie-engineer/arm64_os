@@ -11,6 +11,13 @@
 #define INTERRUPT_TYPE_FIQ         2
 #define INTERRUPT_TYPE_SERROR      3
 
+/* Exception handling options */
+typedef struct ehdlopt {
+  int dump_ctx_to_uart;
+  int dump_stack;
+} ehdlopt_t;
+
+static ehdlopt_t ehdlopt = { 0 };
 
 static char cpuctx_buf[2048];
 
@@ -115,7 +122,7 @@ uint32_t count_crc(void *src, int size, uint32_t init_crc)
 #define MAGIC_CONTEXT  "CONTEXT"
 #define MAGIC_EXCEPTION "EXCPT"
 
-static void dump_context_to_uart(exception_info_t *e)
+static void dump_ctx_to_uart(exception_info_t *e)
 {
   char regs[2048];
   bin_data_header_t h = { 0 };
@@ -328,8 +335,11 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
       (int)e->far,
       &buf[0]);
   puts(buf, 0, 1);
-  // dump_stack(e->stack, 30, 160, 0);
-  // dump_context_to_uart(e);
+
+  if (ehdlopt.dump_stack) {
+    dump_stack(e->stack, 30, 160, 0);
+  }
+  // dump_ctx_to_uart(e);
   // while(1);
 
   switch (ec) {
@@ -367,24 +377,26 @@ static void __handle_interrupt_irq()
     irq_cb();
 }
 
-static void __print_exception_info(exception_info_t *e, int elevel) {
-  int x;
-  int y;
-  char buf[256];
-
-  x = 100;
-  y = 0;
-  snprintf(buf, 256, "interrupt: l: %d, t: %s", elevel, get_interrupt_type_string(e->type));
-  puts(buf, x, y + 2 * (elevel - 1));
-  y += 3;
-  dump_exception_ctx(e, x, y + 17 * (elevel - 1));
-}
+// static void __print_exception_info(exception_info_t *e, int elevel) 
+// {
+//   int x;
+//   int y;
+//   char buf[256];
+// 
+//   x = 100;
+//   y = 0;
+//   snprintf(buf, 256, "interrupt: l: %d, t: %s", elevel, get_interrupt_type_string(e->type));
+//   puts(buf, x, y + 2 * (elevel - 1));
+//   y += 3;
+//   dump_exception_ctx(e, x, y + 17 * (elevel - 1));
+// }
 
 void __handle_interrupt(exception_info_t *e)
 {
   elevel++;
-
-  // dump_context_to_uart(e);
+  if (ehdlopt.dump_ctx_to_uart) {
+    dump_ctx_to_uart(e);
+  }
   // __print_exception_info(e, elevel);
 
   switch (e->type) {
