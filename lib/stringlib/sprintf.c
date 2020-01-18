@@ -37,9 +37,7 @@ char to_char_8_10(int i, int base) {
   return i + '0';
 }
 
-#define APPEND(c) { \
-  if (dst < end) *(dst++) = c; else c; \
-  counter++; }
+#define APPEND(c) { if (dst < end) *(dst++) = c; counter++; }
 
 
 #define MEMSET(c, len) \
@@ -64,10 +62,10 @@ int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __built
   int rightmost_nibble;
   int is_neg_sign;
   int base;
-  int flags_left_align;
   int flags_plus;
   int flags_space;
   int flags_zero;
+  int flags_left_align;
   int width;
   int precision;
   int size;
@@ -86,13 +84,13 @@ int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __built
 
   while(*fmt) {
     if (*fmt != '%') {
-      APPEND(*fmt++);
+      APPEND(*fmt); fmt++;
       continue;
     }
 
     fmt++;
     if (*fmt == '%') {
-      APPEND(*fmt++);
+      APPEND(*fmt); fmt++;
       continue;
     }
 
@@ -108,6 +106,9 @@ int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __built
       flags_left_align = 1;
       fmt++;
     }
+    // TODO implement left-align flag '-'
+    // This is to disable compiler warning
+    if (flags_left_align);
 
     flags_plus = 0;
     if (*fmt == '+') {
@@ -376,7 +377,7 @@ _sprintf_float_exp:
 _sprintf_string:
     s_src = (const char *)arg;
     while(*s_src) {
-      APPEND(*s_src++);
+      APPEND(*s_src); s_src++;
     }
     goto _sprintf_loop_end;
 _sprintf_loop_end:;
