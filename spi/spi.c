@@ -164,7 +164,7 @@ static int spi0_init_dma()
 }
 
 
-static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
+static int spi0_xmit_dma(const void *data_out, void *data_in, uint32_t bytelen)
 {
   uint32_t stub_in, stub_out;
   // printf("spi0_xmit_dma: data_out: %08x\n", data_out);
@@ -193,6 +193,8 @@ static int spi0_xmit_dma(void *data_out, void *data_in, uint32_t bytelen)
   o.dst_dreq   = DMA_DREQ_SPI_TX;
 
   if (data_out) {
+    // TODO: this is a problem, as the buffer is passed here by
+    // a const pointer, so we shouldn't modify it
     ((uint32_t*)data_out)[0] = bytelen << 16 | SPI_CS_TA;
     o.src        = RAM_PHY_TO_BUS_UNCACHED(data_out);
     o.src_inc    = 1;

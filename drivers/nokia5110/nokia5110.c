@@ -73,20 +73,20 @@ static char frame_8[504 + 4];
 
 #define NOKIA5110_INSTRUCTION_SET_NORMAL 0
 #define NOKIA5110_INSTRUCTION_SET_EX     1
-static CHECKED_FUNC(nokia5110_set_instructions, int instruction_set)
-  int err;
-  if (instruction_set == NOKIA5110_INSTRUCTION_SET_NORMAL) {
-    SEND_CMD(0xc0);
-  }
-  else {
-    SEND_CMD(0x21);
-  }
-  return ERR_OK;
-}
+//static CHECKED_FUNC(nokia5110_set_instructions, int instruction_set)
+//  int err;
+//  if (instruction_set == NOKIA5110_INSTRUCTION_SET_NORMAL) {
+//    SEND_CMD(0xc0);
+//  }
+//  else {
+//    SEND_CMD(0x21);
+//  }
+//  return ERR_OK;
+//}
 
 int nokia5110_run_test_loop_1(int iterations, int wait_interval)
 {
-  int i, j, err;
+  int i, err;
   char *ptr;
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   memset(frame_1, 0xff, 4);
@@ -158,8 +158,8 @@ int nokia5110_run_test_loop_1(int iterations, int wait_interval)
 
 int nokia5110_run_test_loop_2(int iterations, int wait_interval)
 {
-  int i, j, err;
-  char *ptr;
+  int i;
+  int err;
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   memset(frame_1, 0b10000000, 508);
   memset(frame_2, 0b01000000, 508);

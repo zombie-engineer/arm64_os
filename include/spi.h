@@ -40,7 +40,7 @@
 typedef struct spi_dev {
   int (*xmit)(char* bytes, uint32_t len);
   int (*xmit_byte)(char data);
-  int (*xmit_dma)(void *data_out, void *data_in, uint32_t len);
+  int (*xmit_dma)(const void *data_out, void *data_in, uint32_t len);
 } spi_dev_t;
 
 int spi0_init();

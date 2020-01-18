@@ -65,7 +65,7 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
 }
 
 
-DECL_ASSERTED_FN(spi_emulated_xmit_dma, void *data_out, void *data_in, uint32_t len)
+DECL_ASSERTED_FN(spi_emulated_xmit_dma, const void *data_out, void *data_in, uint32_t len)
   return ERR_OK;
 }
 
