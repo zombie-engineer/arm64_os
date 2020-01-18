@@ -1,6 +1,7 @@
 #pragma once
 
-#define mutex_lock __armv8_mutex_lock
-#define mutex_unlock __armv8_mutex_unlock
-extern void __armv8_mutex_lock(void *mutex);
-extern void __armv8_mutex_unlock(void *mutex);
+#define spinlock_lock __armv8_spinlock_lock
+#define spinlock_unlock __armv8_spinlock_unlock
+
+extern void __armv8_spinlock_lock(void *spinlock);
+extern void __armv8_spinlock_unlock(void *spinlock);
