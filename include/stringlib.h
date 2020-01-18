@@ -5,23 +5,22 @@
 
 // This trick helps testing scenarios on a host machine, when we should 
 #ifndef TEST_STRING
-#define strcmp   _strcmp
-#define strncmp  _strncmp
-#define strlen   _strlen
-#define strnlen  _strnlen
-#define strcpy   _strcpy
-#define strncpy  _strncpy
-#define memset   _memset
-#define memcpy   _memcpy
-#define strtoll  _strtoll
-#define sprintf  _sprintf
-#define snprintf  _snprintf
-#define vsprintf _vsprintf
-#define vsnprintf _vsnprintf
-#define isprint  _isprint
-#define isdigit  _isdigit
+#define strcmp     _strcmp
+#define strncmp    _strncmp
+#define strlen     _strlen
+#define strnlen    _strnlen
+#define strcpy     _strcpy
+#define strncpy    _strncpy
+#define memset     _memset
+#define memcpy     _memcpy
+#define strtoll    _strtoll
+#define sprintf    _sprintf
+#define snprintf   _snprintf
+#define vsprintf   _vsprintf
+#define vsnprintf  _vsnprintf
+#define isprint    _isprint
+#define isdigit    _isdigit
 #endif
-
 #define isspace  _isspace
 
 
