@@ -90,4 +90,4 @@ void cmdrunner_iterate_commands(iter_cmd_cb cb);
 /* main interactive loop where user inputs commands */
 void cmdrunner_run_interactive_loop(void);
 
-
+int cmdrunner_process(int argc, char **argv);
