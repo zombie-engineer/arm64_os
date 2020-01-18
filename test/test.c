@@ -1,4 +1,5 @@
 #include <rectangle.h>
+#include <ringbuf.h>
 #include <stringlib.h>
 #include <stdio.h>
 #include <stdlib.h>
