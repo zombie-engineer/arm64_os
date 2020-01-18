@@ -1,9 +1,10 @@
 #pragma once
+#include <compiler.h>
 
 typedef struct segment {
   int offset;
   unsigned size;
-} segment_t __attribute__ ((aligned(8)));
+} segment_t aligned(8);
 
 typedef struct rect {
   segment_t x;
