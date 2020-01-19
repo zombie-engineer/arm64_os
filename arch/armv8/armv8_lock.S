@@ -4,6 +4,11 @@
 
 # LOCKED 1
 # UNLOCKED 0
+FUNC(__armv8_spinlock_init):
+  mov x1, #0
+  str x1, [x0]
+  ret
+
 FUNC(__armv8_spinlock_lock):
   # pld   x0
   # prfm	pstl1strm, [x0]
