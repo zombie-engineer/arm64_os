@@ -56,11 +56,11 @@
 static char pl011_rx_buf[2048];
 static int pl011_rx_buf_sz = 0;
 
-aligned(64) uint64_t pl011_rx_buf_lock = 0;
+static ringbuf_t pl011_rx_ringbuf;
+static aligned(64) uint64_t pl011_rx_buf_lock;
 
-aligned(64) uint64_t pipe_lock = 0;
-// circular pipe buffer
-
+ringbuf_t uart_pipe;
+aligned(64) uint64_t uart_pipe_lock;
 
 static void pl011_uart_disable()
 {
@@ -167,10 +167,12 @@ void pl011_uart_handle_interrupt()
     // vcanvas_puts(&cx, &cy, "RX");
     c = read_reg(UART0_DR);
     spinlock_lock(&pl011_rx_buf_lock);
-    pl011_rx_buf[pl011_rx_buf_sz++] = c;
-    pl011_uart_send(c);
+    ringbuf_write(&pl011_rx_ringbuf, &c, 1);
     // kernel_panic("hello");
     spinlock_unlock(&pl011_rx_buf_lock);
+
+    /* echo uart back for debug */
+    pl011_uart_send(c);
     //vcanvas_putc(&cx, &cy, c);
     ris_value &= ~UART0_INT_BIT_RX;
   }
@@ -220,10 +222,14 @@ static void pl011_uart_reprogram_cr_prep()
 
 void pl011_uart_set_interrupt_mode()
 {
-  pl011_uart_reprogram_cr_prep();
+  ringbuf_init(&pl011_rx_ringbuf, pl011_rx_buf, sizeof(pl011_rx_buf));
+  spinlock_init(&pl011_rx_buf_lock);
 
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
       pl011_uart_handle_interrupt);
+
+  pl011_uart_reprogram_cr_prep();
+
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
 
   pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
@@ -274,31 +280,40 @@ char pl011_uart_getc()
 
 static void pl011_io_thread_work()
 {
-//  int to_copy, pipe_free;
-//  char buf[256];
-//  if (pl011_rx_buf_sz) {
-//    spinlock_lock(&pl011_rx_buf_lock);
-//    pl011_rx_buf[pl011_rx_buf_sz] = 0;
-//
-//    to_copy = min(pl011_rx_buf_sz, sizeof(buf));
-//
-//    pl011_rx_buf_sz = 0;
-//    memcpy(buf, pl011_rx_buf, to_copy);
-//    spinlock_unlock(&pl011_rx_buf_lock);
-//    pl011_copy_to_pipe(buf, to_copy);
-//
-//  }
+  char tmp[2048];
+  int n;
+  int progress = 0;
+
+  spinlock_lock(&pl011_rx_buf_lock);
+  while(1) {
+    n = ringbuf_read(&pl011_rx_ringbuf, tmp + progress, sizeof(tmp) - progress);
+    asm volatile ("dsb sy");
+    if (!n)
+      break;
+    progress += n;
+  }
+  spinlock_unlock(&pl011_rx_buf_lock);
+
+  n = 0;
+  while(progress > n) {
+    spinlock_lock(&uart_pipe_lock);
+    n += ringbuf_write(&uart_pipe, tmp + n, progress - n);
+    spinlock_unlock(&uart_pipe_lock);
+  }
 }
+
+static uart_pipe_buf[2048];
 
 int pl011_io_thread(int argc, char *argv[])
 {
   int ret = 0;
+  spinlock_init(&uart_pipe_lock);
+  ringbuf_init(&uart_pipe, uart_pipe_buf, sizeof(uart_pipe_buf));
+
   pl011_uart_set_interrupt_mode();
-  pipe_lock = 0;
   while(1) {
     asm volatile("wfe");
     pl011_io_thread_work();
   }
   return ret;
 }
-

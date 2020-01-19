@@ -2,6 +2,7 @@
 #include "cmdrunner_internal.h"
 #include <types.h>
 #include <spinlock.h>
+#include <ringbuf.h>
 
 
 //typedef struct uart_worker {
@@ -12,16 +13,24 @@
 //  .initialized = 0,
 //};
 
-extern uint64_t pipe_lock;
+extern ringbuf_t uart_pipe;
+extern uint64_t uart_pipe_lock;
 
-static char cmdrunner_getch()
-{
-  while(1) {
-    spinlock_lock(&pipe_lock);
-    asm volatile ("wfi"); 
-  }
-  return '0';
-}
+//static char cmdrunner_getch()
+//{
+//  int n;
+//  char c;
+//
+//  while(1) {
+//    spinlock_lock(&uart_pipe_lock);
+//    n = ringbuf_read(&uart_pipe, &c, 1);
+//    spinlock_unlock(&uart_pipe_lock);
+//    if (n)
+//      break;
+//    asm volatile ("wfi"); 
+//  }
+//  return c;
+//}
 
 int cmdrunner_process(int argc, char *argv[])
 {
@@ -30,8 +39,11 @@ int cmdrunner_process(int argc, char *argv[])
   cmdrunner_state_init(&s);
 
   while(1) {
-    c = cmdrunner_getch();
-    cmdrunner_handle_char(&s, c);
+    asm volatile ("wfe");
+
+//    c = cmdrunner_getch();
+//    pl011_uart_send('&');
+//    cmdrunner_handle_char(&s, c);
   }
 
   return 0;

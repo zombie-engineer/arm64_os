@@ -73,9 +73,8 @@ extern char __arm_initial_reg_value_address_hcr_el2;
 void print_cpu_info()
 {
   int i;
-  for (i = 0; i < 4; ++i) {
+  for (i = 0; i < 4; ++i)
     printf("Core %d: mpidr_el1: %016llx\n", i, armv8_get_mpidr_el1(i));
-  }
 }
 
 void print_current_ex_level()
