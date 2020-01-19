@@ -6,7 +6,7 @@ SRC := lib/stringlib/strtol lib/stringlib/sprintf lib/stringlib/stringlib rectan
 SRC := $(addsuffix .o, $(addprefix $(PROJECT)/, $(SRC)))
 SRC += test.o
 
-CFLAGS := -g -I$(INCLUDES) -DTEST_STRING
+CFLAGS := -O0 -g -I$(INCLUDES) -DTEST_STRING
 
 $(info SRC = $(SRC))
 
@@ -16,6 +16,7 @@ $(info SRC = $(SRC))
 
 test: $(SRC)
 	gcc $(SRC) -o test $(CFLAGS)
+	gdb -ex 'b run_cases_ringbuf' -ex 'r' ./test
 
 
 #test: $(SRC) $(INCLUDES)/rectangle.h $(INCLUDES)/stringlib.h

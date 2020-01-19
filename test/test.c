@@ -4,9 +4,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ringbuf.h>
 
-#define ASSERT_VALUE_EQ(v1, v2, desc) \
-  if ((v1) != (v2)) { printf("assertion! values not equal for '%s': %lld != %lld\n", desc, (long long)v1, (long long)v2); exit(1); }
+#define ASSERT_VALUE_EQ(A, B, desc, ...) \
+  if ((A) != (B)) { \
+    printf("assertion! values not equal %lld != %lld (" desc ")\n",\
+      (long long)(A), (long long)(B), ## __VA_ARGS__);\
+    exit(1); \
+  }
+
+#define ASSERT_MEM_EQ(ptr_A, ptr_B, N, desc, ...) \
+  if (memcmp(ptr_A, ptr_B, N)) { \
+    printf("assertion! memory regions not equal (" desc " )\n", ## __VA_ARGS__);\
+    printf("ptr_A: %p: ", ptr_A); hexdump(ptr_A, N); putchar('\n');\
+    printf("ptr_B: %p: ", ptr_B); hexdump(ptr_B, N); putchar('\n');\
+    exit(1); \
+  }
+
+void hexdump(const char *buf, int sz)
+{
+  int i;
+  putchar('\'');
+  for (i = 0; i + 1 < sz; ++i)
+    printf("%02x ", buf[i]);
+  printf("%02x\'", buf[i]);
+}
 
 void test_rectangle(rect_t *r0, rect_t *r1, intersection_regions_t *r_exp, int retval_exp)
 {
@@ -225,9 +247,64 @@ void run_cases_sprintf()
   test_snprintf(20, "%016llx", 0x2000);
 }
 
+#define RNGBUF_WRITE(src, exp_ret) \
+  { int ret = ringbuf_write(&r, src, strlen(src)); \
+    ASSERT_VALUE_EQ(ret, exp_ret, "ringbuf_write: %s", src); \
+  }
+
+#define RNGBUF_READ(count, exp) \
+  { char scratch[32] = { 0 }; \
+    int ret = ringbuf_read(&r, scratch, count); \
+    ASSERT_VALUE_EQ(ret, strlen(exp), "ringbuf_read: %s", exp); \
+    ASSERT_MEM_EQ(exp, scratch, strlen(exp), "ringbuf_read: %s ", exp); \
+  }
+
+ringbuf_t r;
+char buf[16];
+
+void run_cases_ringbuf_loop(const char *pat)
+{
+  int i;
+  int sz = strlen(pat);
+
+  for (i = 0; i < 20; ++i) { 
+    RNGBUF_WRITE(pat, sz);  
+    RNGBUF_READ(sz, pat);
+  }
+}
+
+void run_cases_ringbuf()
+{
+  ringbuf_init(&r, buf, sizeof(buf));
+  RNGBUF_WRITE("1111", 4);
+  RNGBUF_WRITE("2222", 4);
+  RNGBUF_WRITE("3333", 4);
+  RNGBUF_WRITE("4444", 4);
+  RNGBUF_WRITE("5555", 0);
+  RNGBUF_READ(4, "1111");
+  RNGBUF_READ(4, "2222");
+  RNGBUF_WRITE("666677778888", 8);
+  RNGBUF_READ(16, "3333444466667777");
+
+  run_cases_ringbuf_loop("123");
+  run_cases_ringbuf_loop("x123");
+  run_cases_ringbuf_loop("xz123");
+  run_cases_ringbuf_loop("xyz123");
+  run_cases_ringbuf_loop("xyz0123");
+  run_cases_ringbuf_loop("kxyz0123");
+  run_cases_ringbuf_loop("kixyz0123");
+  run_cases_ringbuf_loop("kixuyz0123");
+  run_cases_ringbuf_loop("kixutyz0123");
+  run_cases_ringbuf_loop("kixutyz01234");
+  run_cases_ringbuf_loop("kixutyz012345");
+  run_cases_ringbuf_loop("kixutyz0123456");
+  run_cases_ringbuf_loop("kixutyz01234567");
+}
+
 int main() 
 {
   run_cases_rectangle();
   run_cases_strtol();
   run_cases_sprintf();
+  run_cases_ringbuf();
 }

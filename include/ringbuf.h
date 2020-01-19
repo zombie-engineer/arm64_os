@@ -1,10 +1,21 @@
 #pragma once
 
 typedef struct ringbuf {
+  /* linear array start */
   char *buf;
+  /* linear array end */
   char *buf_end;
-  char *start;
-  char *end;
+
+  /* writes feed write_ptr, write_ptr extends until 
+   * it reaches read_ptr 
+   */
+  char *write_ptr;
+
+  /* reads eat up read_ptr until reach write_ptr */
+  char *read_ptr;
+
+  /* read awrite_ptr of write */
+  int read_is_ahead;
 } ringbuf_t;
 
 char pipe_buf[2048];
