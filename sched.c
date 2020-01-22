@@ -43,51 +43,55 @@ void *alloc_stack()
   return stacks + stack_idx * STACK_SIZE;
 }
 
-int scheduler_test_job(int argc, char *argv[])
+int scheduler_test_job(void)
 {
   while(1) {
   }
   uart_puts("123456789");
 }
 
-task_t *task_create(int(*work)(int, char *[]), int argc, char *argv[])
+task_t *task_create(task_fn fn, const char *task_name)
 {
-  task_t *tsk;
+  task_t *t;
+
   uint64_t *stack; 
   cpuctx_init_opts_t opt;
 
-  tsk = 0;
+  t = 0;
   stack = 0;
 
-  tsk = alloc_task();
+  t = alloc_task();
 
-  if (!tsk) {
+  if (!t)
     goto out;
-  }
+
+  if (strlen(task_name) > sizeof(t->name))
+    goto out;
+
+  strcpy(t->name, task_name);
 
   stack = alloc_stack(4096);
-  if (!stack) {
+  if (!stack)
     goto out;
-  }
 
-  opt.cpuctx = tsk->cpuctx;
-  opt.cpuctx_sz = sizeof(tsk->cpuctx);
+  opt.cpuctx = t->cpuctx;
+  opt.cpuctx_sz = sizeof(t->cpuctx);
   opt.sp = (uint64_t)stack;
-  opt.pc = (uint64_t)work;
-  opt.args.argc = argc;
-  opt.args.argv = argv;
+  opt.pc = (uint64_t)fn;
+  // opt.args.argc = argc;
+  // opt.args.argv = argv;
 
   cpuctx_init(&opt);
 
-  tsk->work = work;
-  tsk->stack_base = (uint64_t)stack;
+  t->fn = fn;
+  t->stack_base = (uint64_t)stack;
 
-  return tsk;
+  return t;
 out:
   if (stack)
     dealloc_stack(stack);
-  if (tsk)
-    dealloc_task(tsk);
+  if (t)
+    dealloc_task(t);
   return 0;
 }
 
@@ -120,23 +124,9 @@ void scheduler_init()
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
 
-  char *argv1[] = {
-    "initial_task"
-  };
-
-  initial_task = task_create(scheduler_test_job, ARRAY_SIZE(argv1), argv1);
-
-  char *argv2[] = {
-    "test_job2"
-  };
-
-  next_task = task_create(pl011_io_thread, ARRAY_SIZE(argv2), argv2);
-
-  char *argv3[] = {
-      "cmdrunner"
-  };
-
-  cmdrunner_task = task_create(cmdrunner_process, ARRAY_SIZE(argv3), argv3);
+  initial_task = task_create(scheduler_test_job, "scheduler_test_job");
+  next_task = task_create(pl011_io_thread, "pl011_io_thread");
+  cmdrunner_task = task_create(cmdrunner_process, "cmdrunner_process");
 
   initial_task->run_queue.next = &next_task->run_queue;
   next_task->run_queue.next = &cmdrunner_task->run_queue;
