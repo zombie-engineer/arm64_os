@@ -10,6 +10,7 @@
 #include <stringlib.h>
 #include <ringbuf.h>
 #include <compiler.h>
+#include <arch/armv8/armv8.h>
 
 
 #define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
@@ -54,10 +55,7 @@
 
 
 static char pl011_rx_buf[2048];
-static int pl011_rx_buf_sz = 0;
-
-static ringbuf_t pl011_rx_ringbuf;
-static aligned(64) uint64_t pl011_rx_buf_lock;
+static int pl011_rx_data_sz = 0;
 
 ringbuf_t uart_pipe;
 aligned(64) uint64_t uart_pipe_lock;
@@ -138,10 +136,6 @@ void pl011_uart_init(int baudrate, int _not_used)
   // enable Tx, Rx, FIFO
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
   // 0000 0010 <> 1011 - 0x0002 0xb
-
-  memset(pl011_rx_buf, 0, sizeof(pl011_rx_buf));
-  pl011_rx_buf_sz = 0;
-  pl011_rx_buf_lock = 0;
 }
 
 #define UART0_INT_BIT_CTS (1<<1)
@@ -156,6 +150,37 @@ void pl011_uart_init(int baudrate, int _not_used)
 static int cx = 60;
 static int cy = 0;
 
+static inline void pl011_rx_buf_init()
+{
+  pl011_rx_data_sz = 0;
+}
+
+static inline void pl011_rx_buf_putchar(char c)
+{
+  if (pl011_rx_data_sz == sizeof(pl011_rx_buf))
+    pl011_rx_data_sz--;
+
+  pl011_rx_buf[pl011_rx_data_sz++] = c;
+  asm volatile("dsb sy" :::"memory");
+}
+
+static inline char pl011_rx_buf_getchar()
+{
+  char c;
+  while(1) {
+    // disable_irq();
+    asm volatile("dsb sy" ::: "memory");
+    if (pl011_rx_data_sz) {
+      c = pl011_rx_buf[--pl011_rx_data_sz];
+      // enable_irq();
+      break;
+    }
+    // enable_irq();
+  }
+
+  return c;
+}
+
 void pl011_uart_handle_interrupt()
 {
   int c;
@@ -166,10 +191,7 @@ void pl011_uart_handle_interrupt()
     cx = 65;
     // vcanvas_puts(&cx, &cy, "RX");
     c = read_reg(UART0_DR);
-    spinlock_lock(&pl011_rx_buf_lock);
-    ringbuf_write(&pl011_rx_ringbuf, &c, 1);
-    // kernel_panic("hello");
-    spinlock_unlock(&pl011_rx_buf_lock);
+    pl011_rx_buf_putchar(c);
 
     /* echo uart back for debug */
     pl011_uart_send(c);
@@ -222,8 +244,7 @@ static void pl011_uart_reprogram_cr_prep()
 
 void pl011_uart_set_interrupt_mode()
 {
-  ringbuf_init(&pl011_rx_ringbuf, pl011_rx_buf, sizeof(pl011_rx_buf));
-  spinlock_init(&pl011_rx_buf_lock);
+  pl011_rx_buf_init();
 
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
       pl011_uart_handle_interrupt);
@@ -280,31 +301,21 @@ char pl011_uart_getc()
 
 static void pl011_io_thread_work()
 {
-  char tmp[2048];
-  int n;
-  int progress = 0;
-
-  spinlock_lock(&pl011_rx_buf_lock);
+  char c;
+  int num;
+  c = pl011_rx_buf_getchar();
   while(1) {
-    n = ringbuf_read(&pl011_rx_ringbuf, tmp + progress, sizeof(tmp) - progress);
-    asm volatile ("dsb sy");
-    if (!n)
-      break;
-    progress += n;
-  }
-  spinlock_unlock(&pl011_rx_buf_lock);
-
-  n = 0;
-  while(progress > n) {
     spinlock_lock(&uart_pipe_lock);
-    n += ringbuf_write(&uart_pipe, tmp + n, progress - n);
+    num = ringbuf_write(&uart_pipe, &c, 1);
     spinlock_unlock(&uart_pipe_lock);
+    if (num)
+      break;
   }
 }
 
-static uart_pipe_buf[2048];
+static char uart_pipe_buf[2048];
 
-int pl011_io_thread(int argc, char *argv[])
+int pl011_io_thread(void)
 {
   int ret = 0;
   spinlock_init(&uart_pipe_lock);
