@@ -1,6 +1,7 @@
 #include <vcanvas.h>
 #include <common.h>
 #include <uart/uart.h>
+#include <mbox/mbox_props.h>
 #include <mbox/mbox.h>
 #include <console_char.h>
 #include "homer.h"
@@ -42,57 +43,57 @@ int vcanvas_is_initialized()
 
 void vcanvas_init(int width, int height)
 {
-  mbox[0] = 35 * 4;
-  mbox[1] = MBOX_REQUEST;
+  mbox_buffer[0] = 35 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
 
-  mbox[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = width;
-  mbox[6] = height;
+  mbox_buffer[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
+  mbox_buffer[3] = 8;
+  mbox_buffer[4] = 8;
+  mbox_buffer[5] = width;
+  mbox_buffer[6] = height;
 
-  mbox[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
-  mbox[8] = 8;
-  mbox[9] = 8;
-  mbox[10] = width;
-  mbox[11] = height;
+  mbox_buffer[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
+  mbox_buffer[8] = 8;
+  mbox_buffer[9] = 8;
+  mbox_buffer[10] = width;
+  mbox_buffer[11] = height;
 
-  mbox[12] = MBOX_TAG_SET_VIRT_OFFSET;
-  mbox[13] = 8;
-  mbox[14] = 8;
-  mbox[15] = 0;
-  mbox[16] = 0;
+  mbox_buffer[12] = MBOX_TAG_SET_VIRT_OFFSET;
+  mbox_buffer[13] = 8;
+  mbox_buffer[14] = 8;
+  mbox_buffer[15] = 0;
+  mbox_buffer[16] = 0;
 
-  mbox[17] = MBOX_TAG_SET_DEPTH;
-  mbox[18] = 4;
-  mbox[19] = 4;
-  mbox[20] = 32;
+  mbox_buffer[17] = MBOX_TAG_SET_DEPTH;
+  mbox_buffer[18] = 4;
+  mbox_buffer[19] = 4;
+  mbox_buffer[20] = 32;
 
-  mbox[21] = MBOX_TAG_SET_PIXEL_ORDER;
-  mbox[22] = 4;
-  mbox[23] = 4;
-  mbox[24] = 1;
+  mbox_buffer[21] = MBOX_TAG_SET_PIXEL_ORDER;
+  mbox_buffer[22] = 4;
+  mbox_buffer[23] = 4;
+  mbox_buffer[24] = 1;
 
-  mbox[25] = MBOX_TAG_ALLOCATE_BUFFER;
-  mbox[26] = 8;
-  mbox[27] = 8;
-  mbox[28] = 4096;
-  mbox[29] = 0;
+  mbox_buffer[25] = MBOX_TAG_ALLOCATE_BUFFER;
+  mbox_buffer[26] = 8;
+  mbox_buffer[27] = 8;
+  mbox_buffer[28] = 4096;
+  mbox_buffer[29] = 0;
 
-  mbox[30] = MBOX_TAG_GET_PITCH;
-  mbox[31] = 4;
-  mbox[32] = 4;
-  mbox[33] = 0;
+  mbox_buffer[30] = MBOX_TAG_GET_PITCH;
+  mbox_buffer[31] = 4;
+  mbox_buffer[32] = 4;
+  mbox_buffer[33] = 0;
 
-  mbox[34] = MBOX_TAG_LAST;
+  mbox_buffer[34] = MBOX_TAG_LAST;
 
-  if (mbox_call(MBOX_CH_PROP) && mbox[20] == 32 && mbox[28] != 0)
+  if (mbox_call(MBOX_CH_PROP) && mbox_buffer[20] == 32 && mbox_buffer[28] != 0)
   {
-    mbox[28] &= 0x3fffffff;
-    fb_width = mbox[5];
-    fb_height = mbox[6];
-    fb_pitch = mbox[33];
-    framebuf = (void*)((unsigned long)mbox[28]);
+    mbox_buffer[28] &= 0x3fffffff;
+    fb_width = mbox_buffer[5];
+    fb_height = mbox_buffer[6];
+    fb_pitch = mbox_buffer[33];
+    framebuf = (void*)((unsigned long)mbox_buffer[28]);
     fb_pixelsize = 4;
   }
   else
@@ -103,6 +104,11 @@ void vcanvas_init(int width, int height)
   vcanvas_tabwidth = 4;
   vcanvas_initialized = 1;
   num_viewports = 0;
+}
+
+int vcanvas_get_width_height(uint32_t *width, uint32_t *height)
+{
+  return mbox_get_virt_wh(width, height);
 }
 
 //static void fill_background(psf_t *font, char *framebuf_off, int pitch)
@@ -233,13 +239,15 @@ void vcanvas_putc(int* x, int* y, char chr)
 void vcanvas_puts(int *x, int *y, const char *s)
 {
   psf_t *font = (psf_t*)&_binary_font_psf_start;
-  int width_limit, height_limit;
+  uint32_t width_limit, height_limit;
 
   if (x == 0 || y == 0 || s == 0)
     kernel_panic("vcanvas_puts: some args not provided.");
 
-  if (vcanvas_get_width_height(&width_limit, &height_limit))
+  if (mbox_get_virt_wh(&width_limit, &height_limit))
     kernel_panic("vcanvas_puts: Failed to get screen resolution.");
+  width_limit = 300;
+  height_limit = 300;
 
   width_limit /= (font->width + 1);
   height_limit /= (font->height + 1);
@@ -254,29 +262,6 @@ void vcanvas_puts(int *x, int *y, const char *s)
 
     vcanvas_putc(x, y, *s++);
   }
-}
-
-int vcanvas_get_width_height(int *width, int *height)
-{
-  mbox[0] = 8 * 4;
-  mbox[1] = MBOX_REQUEST;
-
-  mbox[2] = MBOX_TAG_GET_VIRT_WIDTH_HEIGHT;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = 0;
-  mbox[6] = 0;
-  mbox[7] = MBOX_TAG_LAST;
-
-  if (mbox_call(MBOX_CH_PROP))
-  {
-    *width = mbox[5];
-    *height = mbox[6];
-    return 0;
-  }
-
-  uart_puts("Unable to get screen resolution to 1024x768x32\n");
-  return -1;
 }
 
 void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, int rgba)

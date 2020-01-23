@@ -1,8 +1,9 @@
 #include <mbox/mbox.h>
+#include <compiler.h>
 #include <gpio.h>
 #include <common.h>
 
-volatile unsigned int __attribute__ ((aligned(16))) mbox[36];
+volatile aligned(16) uint32_t mbox_buffer[36];
 
 #define VIDEOCORE_MBOX (PERIPHERAL_BASE_PHY + 0xb880)
 #define MBOX_READ   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x00))
@@ -50,22 +51,24 @@ void flush_dcache_range(uint64_t start, uint64_t stop)
 
 int mbox_call(unsigned char ch)
 {
+  //ldr x1, =mbox;
+  // mo v 
   uint32_t regval;
-  uint64_t mbox_addr = (uint64_t)&mbox[0];
+  uint64_t mbox_addr = (uint64_t)mbox_buffer;
   regval = (uint32_t)mbox_addr | (ch & 0xf);
 
   // wait until we can write to mailbox
   while(read_reg(MBOX_STATUS) & MBOX_FULL);
 
-  // flush_dcache_range(mbox_addr, mbox_addr);
+  flush_dcache_range(mbox_addr, mbox_addr);
   // write address of out message
   write_reg(MBOX_WRITE, regval);
 
   while(1) {
     while (read_reg(MBOX_STATUS) & MBOX_EMPTY);
     if (read_reg(MBOX_READ) == regval) {
-      // flush_dcache_range(mbox_addr, mbox_addr);
-      return mbox[1] == MBOX_RESPONSE;
+      flush_dcache_range(mbox_addr, mbox_addr);
+      return mbox_buffer[1] == MBOX_RESPONSE;
     }
   }
   return 0;

@@ -1,5 +1,6 @@
 #include <mbox/mbox_props.h>
 #include <mbox/mbox.h>
+#include <stringlib.h>
 
 
 #define MBOX_MSG_T(message) mbox_msg_ ## message ## _t
@@ -7,6 +8,9 @@
 #define MBOX_REQ_T(message) mbox_req_ ## message ## _t
 #define MBOX_RSP_T(message) mbox_rsp_ ## message ## _t
 
+#define MBOX_PROP_CHECKED_CALL \
+  if (!mbox_call(MBOX_CH_PROP)) \
+    return -1
 
 #define DECL_STRUCT_0(name)\
   typedef struct {\
@@ -68,12 +72,13 @@
 
 
 #define DECL_MBOX_MSG(message, tg) \
-  volatile MBOX_MSG_T(message) *m = (MBOX_MSG_T(message)*)(&mbox[0]);\
+  volatile MBOX_MSG_T(message) *m = (MBOX_MSG_T(message)*)(mbox_buffer);\
+  memset((void*)m, 0, sizeof(*m));\
   m->msg_size = sizeof(*m);\
   m->msg_type = MBOX_REQUEST;\
   m->tag.id = tg;\
-  m->tag.req_len = sizeof(m->tag.u.req);\
-  m->tag.rsp_len = sizeof(m->tag.u.rsp);\
+  m->tag.req_len = sizeof(m->tag.u);\
+  /*m->tag.rsp_len = sizeof(m->tag.u.rsp);*/\
   m->end_tag = MBOX_TAG_LAST;
 
 
@@ -82,15 +87,15 @@
 
 int mbox_get_firmware_rev()
 {
-  mbox[0] = 7 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_FIRMWARE_REV;
-  mbox[3] = 4;
-  mbox[4] = 4;
-  mbox[5] = 0;
-  mbox[6] = MBOX_TAG_LAST;
+  mbox_buffer[0] = 7 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_FIRMWARE_REV;
+  mbox_buffer[3] = 4;
+  mbox_buffer[4] = 4;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = MBOX_TAG_LAST;
   if (mbox_call(MBOX_CH_PROP))
-    return mbox[5];
+    return mbox_buffer[5];
   return -1;
 }
 
@@ -107,62 +112,38 @@ int mbox_get_mac_addr(char *mac_start, char *mac_end)
     {
       if (mac_start + i >= mac_end)
         break;
-      mac_start[i] = ((char*)(&mbox[5]))[i];
+      mac_start[i] = ((char*)(&mbox_buffer[5]))[i];
     }
     return 0;
   }
   return -1;
 }
-//
-//int mbox_get_mac_addr(char *mac_start, char *mac_end)
-//{
-//  int i;
-//  mbox[0] = 8 * 4;
-//  mbox[1] = MBOX_REQUEST;
-//  mbox[2] = MBOX_TAG_GET_MAC_ADDR;
-//  mbox[3] = 8;
-//  mbox[4] = 8;
-//  mbox[5] = 0;
-//  mbox[6] = 0;
-//  mbox[7] = MBOX_TAG_LAST;
-//  if (mbox_call(MBOX_CH_PROP))
-//  {
-//    for (i = 0; i < 6; ++i)
-//    {
-//      if (mac_start + i >= mac_end)
-//        break;
-//      mac_start[i] = ((char*)(&mbox[5]))[i];
-//    }
-//    return 0;
-//  }
-//  return -1;
-//}
 
 int mbox_get_board_model()
 {
-  mbox[0] = 7 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_BOARD_MODEL;
-  mbox[3] = 4;
-  mbox[4] = 4;
-  mbox[5] = 0;
-  mbox[6] = MBOX_TAG_LAST;
+  mbox_buffer[0] = 7 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_BOARD_MODEL;
+  mbox_buffer[3] = 4;
+  mbox_buffer[4] = 4;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = MBOX_TAG_LAST;
   if (mbox_call(MBOX_CH_PROP))
-    return mbox[5];
+    return mbox_buffer[5];
   return -1;
 }
 
 int mbox_get_board_rev()
 {
-  mbox[0] = 7 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_BOARD_REV;
-  mbox[3] = 4;
-  mbox[4] = 4;
-  mbox[5] = 0;
-  mbox[6] = MBOX_TAG_LAST;
+  mbox_buffer[0] = 7 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_BOARD_REV;
+  mbox_buffer[3] = 4;
+  mbox_buffer[4] = 4;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = MBOX_TAG_LAST;
   if (mbox_call(MBOX_CH_PROP))
-    return mbox[5];
+    return mbox_buffer[5];
   return -1;
 }
 
@@ -170,17 +151,17 @@ unsigned long mbox_get_board_serial()
 {
   unsigned long res;
 
-  mbox[0] = 8 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_BOARD_SERIAL;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = 0;
-  mbox[6] = 0;
-  mbox[7] = MBOX_TAG_LAST;
-  res = mbox[5];
+  mbox_buffer[0] = 8 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_BOARD_SERIAL;
+  mbox_buffer[3] = 8;
+  mbox_buffer[4] = 8;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = 0;
+  mbox_buffer[7] = MBOX_TAG_LAST;
+  res = mbox_buffer[5];
   res <<= 32;
-  res |= mbox[6];
+  res |= mbox_buffer[6];
   return res;
 }
 
@@ -189,18 +170,18 @@ int mbox_get_arm_memory(int *base_addr, int *byte_size)
   if (base_addr == 0 || byte_size == 0)
     return -1;
 
-  mbox[0] = 8 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_ARM_MEMORY;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = 0;
-  mbox[6] = 0;
-  mbox[7] = MBOX_TAG_LAST;
+  mbox_buffer[0] = 8 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_ARM_MEMORY;
+  mbox_buffer[3] = 8;
+  mbox_buffer[4] = 8;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = 0;
+  mbox_buffer[7] = MBOX_TAG_LAST;
   if (mbox_call(MBOX_CH_PROP))
   {
-    *base_addr = mbox[5];
-    *byte_size = mbox[6];
+    *base_addr = mbox_buffer[5];
+    *byte_size = mbox_buffer[6];
     return 0;
   }
   return -1;
@@ -211,18 +192,18 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size)
   if (base_addr == 0 || byte_size == 0)
     return -1;
 
-  mbox[0] = 8 * 4;
-  mbox[1] = MBOX_REQUEST;
-  mbox[2] = MBOX_TAG_GET_VC_MEMORY;
-  mbox[3] = 8;
-  mbox[4] = 8;
-  mbox[5] = 0;
-  mbox[6] = 0;
-  mbox[7] = MBOX_TAG_LAST;
+  mbox_buffer[0] = 8 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+  mbox_buffer[2] = MBOX_TAG_GET_VC_MEMORY;
+  mbox_buffer[3] = 8;
+  mbox_buffer[4] = 8;
+  mbox_buffer[5] = 0;
+  mbox_buffer[6] = 0;
+  mbox_buffer[7] = MBOX_TAG_LAST;
   if (mbox_call(MBOX_CH_PROP))
   {
-    *base_addr = mbox[5];
-    *byte_size = mbox[6];
+    *base_addr = mbox_buffer[5];
+    *byte_size = mbox_buffer[6];
     return 0;
   }
   return -1;
@@ -304,4 +285,18 @@ int mbox_set_clock_rate(uint32_t clock_id, uint32_t *clock_rate, uint32_t skip_t
     return 0;
   }
   return -1;
+}
+
+DECL_MBOX_REQ_0T(get_virt_wh);
+DECL_MBOX_RSP_2T(get_virt_wh, width, height);
+DECL_MBOX_1TAG_MSG_T(get_virt_wh);
+
+int mbox_get_virt_wh(uint32_t *out_width, uint32_t *out_height)
+{
+  DECL_MBOX_MSG(get_virt_wh, MBOX_TAG_GET_VIRT_WIDTH_HEIGHT);
+  MBOX_PROP_CHECKED_CALL;
+
+  *out_width = MBOX_GET_RSP(width);
+  *out_height = MBOX_GET_RSP(height);
+  return 0;
 }

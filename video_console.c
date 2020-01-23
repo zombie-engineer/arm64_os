@@ -17,7 +17,7 @@ int video_console_init()
 
   sc.x = 0;
   sc.y = 0;
-  vcanvas_get_width_height(&sc.width, &sc.height);
+  vcanvas_get_width_height((uint32_t *)&sc.width, (uint32_t*)&sc.height);
   return 0;
 }
 

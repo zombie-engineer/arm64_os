@@ -1,6 +1,7 @@
 #pragma once
+#include <types.h>
 
-extern volatile unsigned int mbox[36];
+extern volatile uint32_t mbox_buffer[36];
 
 #define MBOX_REQUEST 0
 
