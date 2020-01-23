@@ -92,12 +92,12 @@ void init_consoles()
   console_init();
   /*
   if (video_console_init())
-    generate_exception();
+    kernel_panic("Failed to init video console.");
 
   dev.puts = video_console_puts;
   dev.putc = video_console_putc;
   if (console_add_device(&dev, VIDEO_CONSOLE_NAME))
-    generate_exception();
+    kernel_panic("Failed to add video console device to console devices.");
   */
   dev.puts = uart_puts;
   dev.putc = uart_putc;
