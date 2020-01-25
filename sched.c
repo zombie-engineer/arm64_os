@@ -46,6 +46,7 @@ void *alloc_stack()
 int scheduler_test_job(void)
 {
   while(1) {
+    asm volatile("wfe");
   }
   uart_puts("123456789");
 }

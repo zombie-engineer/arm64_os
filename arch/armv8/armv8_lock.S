@@ -18,18 +18,18 @@ FUNC(__armv8_spinlock_lock):
   # If zero (not LOCKED), try to set LOCKED
   # state to that address
   stxr  w3, x1, [x0]
-  # stxr sets store result to w3
-  # if w3 == 0, store completed with success.
-  # if w3 == 1, store failed. This can happen 
-  # if for example we context switched right 
-  # before the store operation. This effectively
-  # cleared exclusive state and some other process
-  # used ldxr to reown the access.
-  # in this case we go to sleep until next time 
+ //   # stxr sets store result to w3
+ //   # if w3 == 0, store completed with success.
+ //   # if w3 == 1, store failed. This can happen 
+ //   # if for example we context switched right 
+ //   # before the store operation. This effectively
+ //   # cleared exclusive state and some other process
+ //   # used ldxr to reown the access.
+ //   # in this case we go to sleep until next time 
   cbnz  w3, 1f
-  # if w3 is 0 - we are ready to enter critical section
-  # barrier is to order all memory accesses in critical
-  # section after LOCK was stored
+ //   # if w3 is 0 - we are ready to enter critical section
+ //   # barrier is to order all memory accesses in critical
+ //   # section after LOCK was stored
   dmb   sy
   ret
 1:  

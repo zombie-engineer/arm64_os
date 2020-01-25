@@ -51,8 +51,6 @@ void flush_dcache_range(uint64_t start, uint64_t stop)
 
 int mbox_call(unsigned char ch)
 {
-  //ldr x1, =mbox;
-  // mo v 
   uint32_t regval;
   uint64_t mbox_addr = (uint64_t)mbox_buffer;
   regval = (uint32_t)mbox_addr | (ch & 0xf);

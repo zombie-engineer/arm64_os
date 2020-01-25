@@ -168,14 +168,17 @@ static inline char pl011_rx_buf_getchar()
 {
   char c;
   while(1) {
-    // disable_irq();
+    disable_irq();
     asm volatile("dsb sy" ::: "memory");
     if (pl011_rx_data_sz) {
+      asm volatile("dmb sy" ::: "memory");
       c = pl011_rx_buf[--pl011_rx_data_sz];
-      // enable_irq();
+      pl011_uart_send('-');
+      pl011_uart_send(c);
+      enable_irq();
       break;
     }
-    // enable_irq();
+    enable_irq();
   }
 
   return c;
@@ -194,6 +197,7 @@ void pl011_uart_handle_interrupt()
     pl011_rx_buf_putchar(c);
 
     /* echo uart back for debug */
+    pl011_uart_send('+');
     pl011_uart_send(c);
     //vcanvas_putc(&cx, &cy, c);
     ris_value &= ~UART0_INT_BIT_RX;

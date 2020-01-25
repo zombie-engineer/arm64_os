@@ -1,0 +1,38 @@
+
+L1 Instruction Cache
+Line length 64 bytes
+2-way set associative
+
+    set-0    set-1   set-2   set-3   set -..
+0-  _________________________________________
+    |   .   |   .   |   .   |   .   |   .   |
+    |   .   |   .   |   .   |   .   |   .   |
+    |   .   |   .   |   .   |   .   |   .   |
+32- |   .   |   .   |   .   |   .   |   .   |
+    |   .   |   .   |   .   |   .   |   .   |
+    |   .   |   .   |   .   |   .   |   .   |
+    |   .   |   .   |   .   |   .   |   .   |
+63 -|___.___|___.___|___.___|___.___|___.___|
+      ^
+      |
+     64byte
+    cache line
+     ^    ^   
+      \  /
+       ||
+      2-way set
+      2-way means <=> 2 cache lines = 128 byte 
+  
+for 16kb there must be 16364 / 128 = 128 sets 
+
+Tag Index Offset
+Tag is to find the proper line in a set
+Index is the index of a set
+Offset is the offset in a line
+
+64bit address is 
+[   tag            ][  index ][  offset ]
+ offset is 6bits (64byte line)
+ index is 7 bits
+51 bits for tag
+

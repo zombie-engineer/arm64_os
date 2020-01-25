@@ -27,6 +27,7 @@ static char cmdrunner_getch()
     spinlock_unlock(&uart_pipe_lock);
     if (n)
       break;
+    asm volatile ("dsb sy");
     asm volatile ("wfe"); 
   }
   return c;
@@ -40,6 +41,8 @@ int cmdrunner_process(void)
 
   while(1) {
     c = cmdrunner_getch();
+    pl011_uart_send(c);
+    pl011_uart_send(c);
     pl011_uart_send(c);
 //    cmdrunner_handle_char(&s, c);
   }

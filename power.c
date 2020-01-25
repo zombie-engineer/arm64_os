@@ -13,18 +13,18 @@
 void power_off()
 {
   unsigned long r;
-  for (r = 0; r < 16; ++r) {
-    mbox[0] = 8 * 4;
-    mbox[1] = MBOX_REQUEST;
-    mbox[2] = MBOX_TAG_SET_POWER;
-    mbox[3] = 8;
-    mbox[4] = 8;
-    mbox[5] = (unsigned int)r;
-    mbox[6] = 0;
-    mbox[7] = MBOX_TAG_LAST;
-    mbox_call(MBOX_CH_PROP);
-  }
-
+//  for (r = 0; r < 16; ++r) {
+//    mbox[0] = 8 * 4;
+//    mbox[1] = MBOX_REQUEST;
+//    mbox[2] = MBOX_TAG_SET_POWER;
+//    mbox[3] = 8;
+//    mbox[4] = 8;
+//    mbox[5] = (unsigned int)r;
+//    mbox[6] = 0;
+//    mbox[7] = MBOX_TAG_LAST;
+//    mbox_call(MBOX_CH_PROP);
+//  }
+//
   gpio_power_off();
   // power off the SoC (GPU + CPU)
   r = *PM_RSTS;
