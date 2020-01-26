@@ -1,6 +1,7 @@
 #include <mbox/mbox_props.h>
 #include <mbox/mbox.h>
 #include <stringlib.h>
+#include <error.h>
 
 #define MBOX_MSG_T(message) mbox_msg_ ## message ## _t
 #define MBOX_TAG_T(message) mbox_tag_ ## message ## _t
@@ -298,4 +299,64 @@ int mbox_get_virt_wh(uint32_t *out_width, uint32_t *out_height)
   *out_width = MBOX_GET_RSP(width);
   *out_height = MBOX_GET_RSP(height);
   return 0;
+}
+
+int mbox_set_fb(mbox_set_fb_args_t *args, mbox_set_fb_res_t *res)
+{
+  mbox_buffer[0] = 35 * 4;
+  mbox_buffer[1] = MBOX_REQUEST;
+
+  mbox_buffer[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
+  mbox_buffer[3] = 8;
+  mbox_buffer[4] = 8;
+  mbox_buffer[5] = args->psize_x;
+  mbox_buffer[6] = args->psize_y;
+
+  mbox_buffer[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
+  mbox_buffer[8] = 8;
+  mbox_buffer[9] = 8;
+  mbox_buffer[10] = args->vsize_x;
+  mbox_buffer[11] = args->vsize_y;
+
+  mbox_buffer[12] = MBOX_TAG_SET_VIRT_OFFSET;
+  mbox_buffer[13] = 8;
+  mbox_buffer[14] = 8;
+  mbox_buffer[15] = args->voffset_x;
+  mbox_buffer[16] = args->voffset_y;
+
+  mbox_buffer[17] = MBOX_TAG_SET_DEPTH;
+  mbox_buffer[18] = 4;
+  mbox_buffer[19] = 4;
+  mbox_buffer[20] = args->depth;
+
+  mbox_buffer[21] = MBOX_TAG_SET_PIXEL_ORDER;
+  mbox_buffer[22] = 4;
+  mbox_buffer[23] = 4;
+  mbox_buffer[24] = args->pixel_order;
+
+  mbox_buffer[25] = MBOX_TAG_ALLOCATE_BUFFER;
+  mbox_buffer[26] = 8;
+  mbox_buffer[27] = 8;
+  mbox_buffer[28] = 4096;
+  mbox_buffer[29] = 0;
+
+  mbox_buffer[30] = MBOX_TAG_GET_PITCH;
+  mbox_buffer[31] = 4;
+  mbox_buffer[32] = 4;
+  mbox_buffer[33] = 0;
+
+  mbox_buffer[34] = MBOX_TAG_LAST;
+
+  if (mbox_prop_call(MBOX_CH_PROP)) 
+    return -1;
+
+  if (mbox_buffer[20] != 32 || mbox_buffer[28] == 0)
+    return -1;
+
+  res->fb_addr = mbox_buffer[28] & 0x3fffffff;
+  res->fb_width = mbox_buffer[5];
+  res->fb_height = mbox_buffer[6];
+  res->fb_pitch = mbox_buffer[33];
+  res->fb_pixel_size = 4;
+  return ERR_OK;
 }

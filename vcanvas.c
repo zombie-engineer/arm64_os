@@ -11,16 +11,28 @@
 
 #define MAX_VIEWPORTS 16
 
-unsigned int fb_width, fb_height, fb_pitch, fb_pixelsize;
-unsigned char *framebuf;
-static int vcanvas_initialized = 0;
-static int vcanvas_fg_color = 0;
-static int vcanvas_bg_color = 0;
-static int vcanvas_tabwidth = 1;
+typedef struct fb {
+  uint32_t addr;
+  uint32_t width;
+  uint32_t height;
+  uint32_t pitch;
+  uint32_t pixel_size;
+} fb_t;
+
+#define VCANVAS_INITIALIZED_KEY 0xffaadead
+
+typedef struct vcanvas {
+  int initialization_key;
+  fb_t fb;
+  uint32_t fg_color;
+  uint32_t bg_color;
+  uint32_t tabwidth;
+} vcanvas_t;
+
+static vcanvas_t vcanvas;
 
 static unsigned int num_viewports = 0;
 static viewport_t viewports[MAX_VIEWPORTS];
-
 
 typedef struct {
   unsigned int magic;
@@ -38,71 +50,44 @@ extern volatile unsigned char _binary_font_psf_start;
 
 int vcanvas_is_initialized()
 {
-  return vcanvas_initialized;
+  return vcanvas.initialization_key == VCANVAS_INITIALIZED_KEY; 
+}
+
+static void vcanvas_set_initialized()
+{
+  vcanvas.initialization_key = VCANVAS_INITIALIZED_KEY;
 }
 
 void vcanvas_init(int width, int height)
 {
-  mbox_buffer[0] = 35 * 4;
-  mbox_buffer[1] = MBOX_REQUEST;
+  if (vcanvas_is_initialized())
+    kernel_panic("Trying to initialize vcanvas twice");
 
-  mbox_buffer[2] = MBOX_TAG_SET_PHYS_WIDTH_HEIGHT;
-  mbox_buffer[3] = 8;
-  mbox_buffer[4] = 8;
-  mbox_buffer[5] = width;
-  mbox_buffer[6] = height;
+  mbox_set_fb_res_t mbox_res;
 
-  mbox_buffer[7] = MBOX_TAG_SET_VIRT_WIDTH_HEIGHT;
-  mbox_buffer[8] = 8;
-  mbox_buffer[9] = 8;
-  mbox_buffer[10] = width;
-  mbox_buffer[11] = height;
+  mbox_set_fb_args_t mbox_args = {
+    .vsize_x = width,
+    .vsize_y = height,
+    .psize_x = width,
+    .psize_y = height,
+    .voffset_x = 0,
+    .voffset_y = 0,
+    .depth = 32,
+    .pixel_order = 1
+  };
 
-  mbox_buffer[12] = MBOX_TAG_SET_VIRT_OFFSET;
-  mbox_buffer[13] = 8;
-  mbox_buffer[14] = 8;
-  mbox_buffer[15] = 0;
-  mbox_buffer[16] = 0;
-
-  mbox_buffer[17] = MBOX_TAG_SET_DEPTH;
-  mbox_buffer[18] = 4;
-  mbox_buffer[19] = 4;
-  mbox_buffer[20] = 32;
-
-  mbox_buffer[21] = MBOX_TAG_SET_PIXEL_ORDER;
-  mbox_buffer[22] = 4;
-  mbox_buffer[23] = 4;
-  mbox_buffer[24] = 1;
-
-  mbox_buffer[25] = MBOX_TAG_ALLOCATE_BUFFER;
-  mbox_buffer[26] = 8;
-  mbox_buffer[27] = 8;
-  mbox_buffer[28] = 4096;
-  mbox_buffer[29] = 0;
-
-  mbox_buffer[30] = MBOX_TAG_GET_PITCH;
-  mbox_buffer[31] = 4;
-  mbox_buffer[32] = 4;
-  mbox_buffer[33] = 0;
-
-  mbox_buffer[34] = MBOX_TAG_LAST;
-  if (!mbox_prop_call(MBOX_CH_PROP) && mbox_buffer[20] == 32 && mbox_buffer[28] != 0)
-  {
-    mbox_buffer[28] &= 0x3fffffff;
-    fb_width = mbox_buffer[5];
-    fb_height = mbox_buffer[6];
-    fb_pitch = mbox_buffer[33];
-    framebuf = (void*)((unsigned long)mbox_buffer[28]);
-    fb_pixelsize = 4;
-  }
-  else
-  {
+  if (mbox_set_fb(&mbox_args, &mbox_res))
     uart_puts("Unable to set screen resolution to 1024x768x32\n");
-  }
 
-  vcanvas_tabwidth = 4;
-  vcanvas_initialized = 1;
+  vcanvas.fb.addr = mbox_res.fb_addr;
+  vcanvas.fb.width = mbox_res.fb_width;
+  vcanvas.fb.height = mbox_res.fb_height;
+  vcanvas.fb.pitch = mbox_res.fb_pitch;
+  vcanvas.fb.pixel_size = mbox_res.fb_pixel_size;
+  
+  vcanvas.tabwidth = 4;
   num_viewports = 0;
+  vcanvas_set_initialized();
 }
 
 int vcanvas_get_width_height(uint32_t *width, uint32_t *height)
@@ -117,14 +102,14 @@ int vcanvas_get_width_height(uint32_t *width, uint32_t *height)
 //  for (y = 0; y < font->height; ++y) {
 //    for (x = 0; x < font->width; ++x) {
 //      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-//      *pixel_addr = vcanvas_bg_color;
+//      *pixel_addr = vcanvas.bg_color;
 //    }
 //  }
 //}
 
 static unsigned int * fb_get_pixel_addr(int x, int y)
 {
-  return (unsigned int*)(framebuf + y * fb_pitch + x * fb_pixelsize);
+  return (unsigned int*)((uint64_t)vcanvas.fb.addr + y * vcanvas.fb.pitch + x * vcanvas.fb.pixel_size);
 }
 
 static void vcanvas_draw_glyph(
@@ -165,20 +150,20 @@ static void vcanvas_draw_glyph(
 
 void vcanvas_set_fg_color(int value)
 {
-  vcanvas_fg_color = value;
+  vcanvas.fg_color = value;
 }
 
 void vcanvas_set_bg_color(int value)
 {
-  vcanvas_bg_color = value;
+  vcanvas.bg_color = value;
 }
 
 void vcanvas_showpicture()
 {
   int x,y;
-  unsigned char *ptr = framebuf;
+  unsigned char *ptr = (unsigned char *)(uint64_t)vcanvas.fb.addr;
   char *data = homer_data, pixel[4];
-  ptr += (fb_height - homer_height) / 2 * fb_pitch + (fb_width - homer_width) * 2;
+  ptr += (vcanvas.fb.height - homer_height) / 2 * vcanvas.fb.pitch + (vcanvas.fb.width - homer_width) * 2;
   for (y = 0; y < homer_height; ++y)
   {
     for (x = 0; x < homer_width; ++x)
@@ -187,7 +172,7 @@ void vcanvas_showpicture()
       *((unsigned int*)ptr) = *((unsigned int*)&pixel);
       ptr += 4;
     }
-    ptr += fb_pitch - homer_width * 4;
+    ptr += vcanvas.fb.pitch - homer_width * 4;
   }
 }
 
@@ -218,7 +203,7 @@ void vcanvas_putc(int* x, int* y, char chr)
       (*y)++;
       break;
     case CONSOLE_CHAR_HORIZONTAL_TAB:
-      *x += vcanvas_tabwidth;
+      *x += vcanvas.tabwidth;
       break;
     case CONSOLE_CHAR_BACKSPACE:
     //case CONSOLE_CHAR_DEL:
@@ -228,7 +213,7 @@ void vcanvas_putc(int* x, int* y, char chr)
       //fill_background(font, ((char*)framebuf) + framebuf_off, fb_pitch);
       break;
     default:
-      vcanvas_draw_glyph(font, glyph, *x * font->width, *y * font->height, font->width, font->height, vcanvas_fg_color, vcanvas_bg_color);
+      vcanvas_draw_glyph(font, glyph, *x * font->width, *y * font->height, font->width, font->height, vcanvas.fg_color, vcanvas.bg_color);
       (*x)++;
       break;
   }
@@ -267,13 +252,13 @@ void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, i
 {
   int _x, _y, xend, yend;
 
-  xend = min(x + size_x, fb_width);
-  yend = min(y + size_y, fb_height);
+  xend = min(x + size_x, vcanvas.fb.width);
+  yend = min(y + size_y, vcanvas.fb.height);
 
   int *p_pixel;
   for (_x = x; _x < xend; ++_x) {
     for (_y = y; _y < yend; ++_y) {
-      p_pixel = (int*)(((char*)framebuf) + _x * fb_pixelsize + _y * fb_pitch);
+      p_pixel = (int*)((uint64_t)vcanvas.fb.addr + _x * vcanvas.fb.pixel_size + _y * vcanvas.fb.pitch);
       *p_pixel = rgba;
     }
   }
@@ -386,9 +371,9 @@ void viewport_copy_rect_unsafe(viewport_t *v, int x0, int y0, int size_x, int si
   dst = (char *)fb_get_pixel_addr(v->pos_x + x1, v->pos_y + y1);
   
   for (i = 0; i < size_y; i++) {
-    memcpy(dst, src, size_x * fb_pixelsize);
-    src += fb_pitch;
-    dst += fb_pitch;
+    memcpy(dst, src, size_x * vcanvas.fb.pixel_size);
+    src += vcanvas.fb.pitch;
+    dst += vcanvas.fb.pitch;
   }
 }
 
@@ -411,7 +396,7 @@ void viewport_copy_rect(viewport_t *v, int x0, int y0, int size_x, int size_y, i
 
   if (!get_intersection_regions(&r0, &r1, rs)) {
     // r0 is outside viewport 
-    viewport_fill_rect(v, x1, y1, size_x, size_y, vcanvas_bg_color);
+    viewport_fill_rect(v, x1, y1, size_x, size_y, vcanvas.bg_color);
     return;
   }
   for (yi = 0; yi < 3; yi ++) {
@@ -420,7 +405,7 @@ void viewport_copy_rect(viewport_t *v, int x0, int y0, int size_x, int size_y, i
         continue;
       ir = RGN(xi, yi);
       if (ir->exists && ir->r.x.size && ir->r.y.size)
-        viewport_fill_rect(v, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1, ir->r.x.size, ir->r.y.size, vcanvas_bg_color); 
+        viewport_fill_rect(v, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1, ir->r.x.size, ir->r.y.size, vcanvas.bg_color); 
     }
   }
   ir = RGN(1, 1);
