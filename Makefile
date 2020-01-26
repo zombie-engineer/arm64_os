@@ -63,37 +63,44 @@ kernel8.img: $(OBJS)
 	$(NM) --numeric-sort kernel8.elf > all_symbols.map
 	$(OBJCOPY) -O binary kernel8.elf $@
 
-run:
-	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s
-
-rungdb:
-	$(QEMU) -M raspi3 -kernel kernel8.img -nographic -s -S
-
-
-#		-ex 'b bcm2835_ic_write'\
-#		-ex 'b bcm2835_timer_tick_common'\
-#		-ex 'b bcm2835_peripherals_init'\
-#	 	-ex 'b bcm2835_peripherals_realize'\
-#		-ex 'b el_from_spsr' \
-#		-ex 'b helper_exception_return' 
-#
+QEMU_FLAGS := -M raspi3 -accel tcg -nographic
 QEMU_TRACE_ARGS := -trace enable=*bcm2835*
-QEMU_TRACE_ARGS := 
-rungdb2:
+
+TRACE_QEMU := 0
+ifeq ($(TRACE_QEMU), 1)
+QEMU_FLAGS += $(QEMU_TRACE_FLAGS)
+endif
+
+# Run in qemu
+.PHONY: qemu
+qemu:
+	$(QEMU) $(QEMU_FLAGS) -kernel kernel8.img
+
+# Run in qemu, wait until debugger attached
+.PHONY: qemud
+qemud:
+	$(QEMU) $(QEMU_FLAGS) -kernel kernel8.img -s -S
+
+# Run in qemu, with qemu also debugged AND wait until debugger attached
+# Note: qemu.gdb holds script that will be executed while debugging
+# qemu process. Other gdb also needed to be attached externally via
+# -s -S flags for a normal debug session.
+.PHONY: qemuds
+qemuds:
 	gdb -x qemu.gdb\
-	 	--args $(QEMU) $(QEMU_TRACE_ARGS) -M raspi3 -kernel kernel8.img -nographic -s -S
+	 	--args $(QEMU) $(QEMU_FLAGS) -kernel kernel8.img -s -S
 
-rungdbq:
-	./qemu.sh
-
-#	gdb-multiarch -x rungdb.gdb
-gdb:
+# Attach to started qemu process with gdb
+.PHONY: qemuat
+qemuat:
 	/home/zombie/binutils-gdb/gdb/gdb -x rungdb.gdb
 
+.PHONY: serial
 serial:
 	minicom -b 115200 -D /dev/ttyUSB0
 
 .PHONY: clean
 clean:
 	find -name '*.o' -exec rm -v {} \;
+
 
