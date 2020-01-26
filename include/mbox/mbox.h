@@ -68,5 +68,7 @@ extern volatile uint32_t mbox_buffer[36];
 
 #define MBOX_TAG_LAST      0
 
+int mbox_prop_call_no_lock();
+int mbox_prop_call();
 
-int mbox_call(unsigned char ch);
+int mbox_call_blocking(int mbox_channel);

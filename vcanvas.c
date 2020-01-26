@@ -86,8 +86,7 @@ void vcanvas_init(int width, int height)
   mbox_buffer[33] = 0;
 
   mbox_buffer[34] = MBOX_TAG_LAST;
-
-  if (mbox_call(MBOX_CH_PROP) && mbox_buffer[20] == 32 && mbox_buffer[28] != 0)
+  if (!mbox_prop_call(MBOX_CH_PROP) && mbox_buffer[20] == 32 && mbox_buffer[28] != 0)
   {
     mbox_buffer[28] &= 0x3fffffff;
     fb_width = mbox_buffer[5];

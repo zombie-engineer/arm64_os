@@ -2,8 +2,11 @@
 #include <compiler.h>
 #include <gpio.h>
 #include <common.h>
+#include <spinlock.h>
+#include <cpu.h>
+#include <error.h>
 
-volatile aligned(16) uint32_t mbox_buffer[36];
+static aligned(64) uint64_t mbox_lock;
 
 #define VIDEOCORE_MBOX (PERIPHERAL_BASE_PHY + 0xb880)
 #define MBOX_READ   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x00))
@@ -49,25 +52,39 @@ void flush_dcache_range(uint64_t start, uint64_t stop)
   );
 }
 
-int mbox_call(unsigned char ch)
+int mbox_prop_call_no_lock()
 {
-  uint32_t regval;
-  uint64_t mbox_addr = (uint64_t)mbox_buffer;
-  regval = (uint32_t)mbox_addr | (ch & 0xf);
+  int ret;
 
-  // wait until we can write to mailbox
-  while(read_reg(MBOX_STATUS) & MBOX_FULL);
+#ifdef CONFIG_DEBUG_LED_MBOX
+  blink_led(1, 10);
+#endif
+  ret = mbox_call_blocking(MBOX_CH_PROP);
+  /* Here I leave return value so other code could check if
+   * ret val is 0 on success or non-zero on failer common logic,
+   * but tight now any non-zero returns should be immediately paniced
+   * Later, some ret codes could be non-zero and still not paniced
+   * and got to the caller.
+   */
 
-  flush_dcache_range(mbox_addr, mbox_addr);
-  // write address of out message
-  write_reg(MBOX_WRITE, regval);
+  if (ret)
+    kernel_panic("mbox_call_blocking failed");
+#ifdef CONFIG_DEBUG_LED_MBOX
+  blink_led(1, 10);
+#endif
+  return ret;
+}
 
-  while(1) {
-    while (read_reg(MBOX_STATUS) & MBOX_EMPTY);
-    if (read_reg(MBOX_READ) == regval) {
-      flush_dcache_range(mbox_addr, mbox_addr);
-      return mbox_buffer[1] == MBOX_RESPONSE;
-    }
-  }
-  return 0;
+int mbox_prop_call()
+{
+  int ret, should_lock;
+  should_lock = spinlocks_enabled && is_irq_enabled();
+  if (should_lock)
+    spinlock_lock(&mbox_lock);
+
+  ret = mbox_prop_call_no_lock();
+
+  if (should_lock)
+    spinlock_unlock(&mbox_lock);
+  return ret;
 }

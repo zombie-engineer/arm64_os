@@ -4,6 +4,7 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
+#include <spinlock.h>
 #include <vcanvas.h>
 #include <rand.h>
 #include <timer.h>
@@ -283,6 +284,7 @@ void main()
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
   mmu_init();
+  spinlocks_enabled = 1;
   // uint64_t mair;
   // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
   // printf("mair: %016llx\n", mair);
@@ -343,13 +345,4 @@ void main()
   cmdrunner_run_interactive_loop();
 
   wait_gpio();
-
-  if (mbox_call(MBOX_CH_PROP)) {
-    uart_puts("My serial number is: ");
-    uart_hex(mbox[6]);
-    uart_hex(mbox[5]);
-    uart_puts("\n");
-  } else {
-    uart_puts("Unable to query serial!\n");
-  }
 }

@@ -1,10 +1,6 @@
 #pragma once
 #include <types.h>
 
-void enable_irq(void);
-void disable_irq(void);
-int is_irq_enabled(void);
-
 int mem_model_max_pa_bits(void);
 int mem_model_num_asid_bits(void);
 int mem_model_4k_granule_support(void);

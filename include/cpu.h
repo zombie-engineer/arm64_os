@@ -47,3 +47,8 @@ typedef struct cpuctx_init_opts {
 } cpuctx_init_opts_t;
 
 int cpuctx_init(cpuctx_init_opts_t *o);
+
+void enable_irq(void);
+void disable_irq(void);
+int is_irq_enabled(void);
+

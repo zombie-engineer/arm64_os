@@ -1,6 +1,12 @@
 #include <asm_macros.h>
 
-.section ".text"
+.bss
+.align 3
+.globl spinlocks_enabled
+spinlocks_enabled:
+.quad 0x0
+
+.text
 
 #define LOCKED 1
 #define UNLOCKED 0

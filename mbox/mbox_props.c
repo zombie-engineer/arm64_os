@@ -2,14 +2,13 @@
 #include <mbox/mbox.h>
 #include <stringlib.h>
 
-
 #define MBOX_MSG_T(message) mbox_msg_ ## message ## _t
 #define MBOX_TAG_T(message) mbox_tag_ ## message ## _t
 #define MBOX_REQ_T(message) mbox_req_ ## message ## _t
 #define MBOX_RSP_T(message) mbox_rsp_ ## message ## _t
 
 #define MBOX_PROP_CHECKED_CALL \
-  if (!mbox_call(MBOX_CH_PROP)) \
+  if (mbox_prop_call()) \
     return -1
 
 #define DECL_STRUCT_0(name)\
@@ -94,7 +93,7 @@ int mbox_get_firmware_rev()
   mbox_buffer[4] = 4;
   mbox_buffer[5] = 0;
   mbox_buffer[6] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
+  if (!mbox_prop_call(MBOX_CH_PROP))
     return mbox_buffer[5];
   return -1;
 }
@@ -107,7 +106,7 @@ int mbox_get_mac_addr(char *mac_start, char *mac_end)
 {
   int i;
   DECL_MBOX_MSG(get_mac_addr, MBOX_TAG_GET_MAC_ADDR);
-  if (mbox_call(MBOX_CH_PROP)) {
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
     for (i = 0; i < 6; ++i)
     {
       if (mac_start + i >= mac_end)
@@ -128,7 +127,7 @@ int mbox_get_board_model()
   mbox_buffer[4] = 4;
   mbox_buffer[5] = 0;
   mbox_buffer[6] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
+  if (!mbox_prop_call(MBOX_CH_PROP))
     return mbox_buffer[5];
   return -1;
 }
@@ -142,7 +141,7 @@ int mbox_get_board_rev()
   mbox_buffer[4] = 4;
   mbox_buffer[5] = 0;
   mbox_buffer[6] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
+  if (!mbox_prop_call(MBOX_CH_PROP))
     return mbox_buffer[5];
   return -1;
 }
@@ -178,7 +177,7 @@ int mbox_get_arm_memory(int *base_addr, int *byte_size)
   mbox_buffer[5] = 0;
   mbox_buffer[6] = 0;
   mbox_buffer[7] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
+  if (!mbox_prop_call(MBOX_CH_PROP))
   {
     *base_addr = mbox_buffer[5];
     *byte_size = mbox_buffer[6];
@@ -200,7 +199,7 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size)
   mbox_buffer[5] = 0;
   mbox_buffer[6] = 0;
   mbox_buffer[7] = MBOX_TAG_LAST;
-  if (mbox_call(MBOX_CH_PROP))
+  if (!mbox_prop_call(MBOX_CH_PROP))
   {
     *base_addr = mbox_buffer[5];
     *byte_size = mbox_buffer[6];
@@ -217,7 +216,7 @@ int mbox_get_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists)
 {
   DECL_MBOX_MSG(get_clock_state, MBOX_TAG_GET_CLOCK_STATE);
   m->tag.u.req.clock_id = clock_id;
-  if (mbox_call(MBOX_CH_PROP)) {
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
     *enabled = MBOX_GET_RSP(enabled);
     *exists = MBOX_GET_RSP(exists);
     return 0;
@@ -233,7 +232,7 @@ int mbox_set_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists)
 {
   DECL_MBOX_MSG(set_clock_state, MBOX_TAG_SET_CLOCK_STATE);
   m->tag.u.req.clock_id = clock_id;
-  if (mbox_call(MBOX_CH_PROP)) {
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
     *enabled = MBOX_GET_RSP(enabled);
     *exists = MBOX_GET_RSP(exists);
     return 0;
@@ -248,7 +247,7 @@ DECL_MBOX_1TAG_MSG_T(get_clock_rate);
 #define GET_CLOCK_RATE(tg) \
   DECL_MBOX_MSG(get_clock_rate, tg); \
   m->tag.u.req.clock_id = clock_id;\
-  if (mbox_call(MBOX_CH_PROP) && MBOX_GET_RSP(clock_id) == clock_id) {\
+  if (!mbox_prop_call(MBOX_CH_PROP) && MBOX_GET_RSP(clock_id) == clock_id) {\
     *clock_rate = MBOX_GET_RSP(rate_hz);\
     return 0;\
   }\
@@ -280,7 +279,7 @@ int mbox_set_clock_rate(uint32_t clock_id, uint32_t *clock_rate, uint32_t skip_t
   m->tag.u.req.clock_id = clock_id;
   m->tag.u.req.rate_hz = *clock_rate;
   m->tag.u.req.skip_turbo = skip_turbo;
-  if (mbox_call(MBOX_CH_PROP) && MBOX_GET_RSP(clock_id) == clock_id) {
+  if (mbox_prop_call(MBOX_CH_PROP) && MBOX_GET_RSP(clock_id) == clock_id) {
     *clock_rate = MBOX_GET_RSP(rate_hz);
     return 0;
   }
