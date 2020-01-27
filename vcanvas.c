@@ -2,7 +2,6 @@
 #include <common.h>
 #include <uart/uart.h>
 #include <mbox/mbox_props.h>
-#include <mbox/mbox.h>
 #include <console_char.h>
 #include "homer.h"
 #include <exception.h>
@@ -90,22 +89,11 @@ void vcanvas_init(int width, int height)
   vcanvas_set_initialized();
 }
 
-int vcanvas_get_width_height(uint32_t *width, uint32_t *height)
+void vcanvas_get_width_height(uint32_t *width, uint32_t *height)
 {
-  return mbox_get_virt_wh(width, height);
+  *width = vcanvas.fb.width;
+  *height = vcanvas.fb.height;
 }
-
-//static void fill_background(psf_t *font, char *framebuf_off, int pitch)
-//{
-//  int x, y;
-//  unsigned int *pixel_addr;
-//  for (y = 0; y < font->height; ++y) {
-//    for (x = 0; x < font->width; ++x) {
-//      pixel_addr = (unsigned int*)(framebuf_off + y * pitch + x * 4);
-//      *pixel_addr = vcanvas.bg_color;
-//    }
-//  }
-//}
 
 static unsigned int * fb_get_pixel_addr(int x, int y)
 {
@@ -135,11 +123,6 @@ static void vcanvas_draw_glyph(
     mask = 1 << (font->width - 1);
     for (_x = 0; _x < limit_x; ++_x) {
       pixel_addr = fb_get_pixel_addr(x + _x, y + _y);
-      asm volatile ("mov x21, %0\n" : : "r"(pixel_addr));
-      asm volatile ("mov x22, %0\n" : : "r"(_x));
-      asm volatile ("mov x23, %0\n" : : "r"(_y));
-      asm volatile ("mov x24, %0\n" : : "r"(x));
-      asm volatile ("mov x25, %0\n" : : "r"(y));
       *pixel_addr = (int)*glyph & mask ? fg_color : bg_color;
       mask >>= 1;
     }
@@ -228,10 +211,8 @@ void vcanvas_puts(int *x, int *y, const char *s)
   if (x == 0 || y == 0 || s == 0)
     kernel_panic("vcanvas_puts: some args not provided.");
 
-  if (mbox_get_virt_wh(&width_limit, &height_limit))
-    kernel_panic("vcanvas_puts: Failed to get screen resolution.");
-  width_limit = 300;
-  height_limit = 300;
+  width_limit = vcanvas.fb.width;
+  height_limit = vcanvas.fb.height;
 
   width_limit /= (font->width + 1);
   height_limit /= (font->height + 1);
