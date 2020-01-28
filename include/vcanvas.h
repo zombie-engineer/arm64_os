@@ -20,7 +20,7 @@ void vcanvas_puts(int *x, int *y, const char *s);
 
 void vcanvas_set_pixel(int x, int y, int rgba);
 
-int vcanvas_get_width_height(uint32_t *width, uint32_t *height);
+void vcanvas_get_width_height(uint32_t *width, uint32_t *height);
 
 void vcanvas_fill_rect(int x, int y, unsigned int size_x, unsigned int size_y, int rgba);
 

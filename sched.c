@@ -8,6 +8,7 @@
 #include <intr_ctl.h>
 #include <uart/pl011_uart.h>
 #include <cmdrunner.h>
+#include <debug.h>
 
 extern void *__current_cpuctx;
 
@@ -46,6 +47,9 @@ void *alloc_stack()
 int scheduler_test_job(void)
 {
   while(1) {
+   // disable_irq();
+   // blink_led(1, 100);
+   // enable_irq();
     asm volatile("wfe");
   }
   uart_puts("123456789");
@@ -102,9 +106,23 @@ task_t *scheduler_pick_next_task(task_t *ct)
   return ct->run_queue.next;
 }
 
+static int sched_num_switches = 0;
+
+void scheduler_job_debug()
+{
+  sched_num_switches++;
+  if (sched_num_switches % 1000 == 0) {
+    blink_led(1, 10);
+    pl011_uart_send('+');
+  }
+}
+
 void* scheduler_job(void* arg)
 {
   task_t *current_task;
+
+  scheduler_job_debug();
+
   current_task = container_of(__current_cpuctx, task_t, cpuctx);
   current_task = scheduler_pick_next_task(current_task);
 

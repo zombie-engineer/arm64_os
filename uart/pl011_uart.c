@@ -11,6 +11,8 @@
 #include <ringbuf.h>
 #include <compiler.h>
 #include <arch/armv8/armv8.h>
+#include <cpu.h>
+#include <debug.h>
 
 
 #define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
@@ -118,6 +120,8 @@ void pl011_uart_init(int baudrate, int _not_used)
 
   /* set up clock for consistent divisor values */
   mbox_get_clock_rate(MBOX_CLOCK_ID_UART, &hz);
+  if (hz != 48000000)
+    debug_event_1();
 
   /* Clear all interrupts */
   write_reg(UART0_ICR, 0x7ff);
@@ -184,50 +188,62 @@ static inline char pl011_rx_buf_getchar()
   return c;
 }
 
+void pl011_uart_debug_interrupt()
+{
+  int n;
+  int ris; /* raw interrupt status */
+  int mis; /* masked interrupt status */
+  char buf[128];
+
+  debug_event_1();
+
+  ris = read_reg(UART0_RIS); 
+  mis = read_reg(UART0_RIS); 
+  n = snprintf(buf, sizeof(buf), "MIS: %08x, RIS: %08x\n", mis, ris);
+  pl011_uart_send_buf(buf, n);
+}
+
 void pl011_uart_handle_interrupt()
 {
   int c;
-  int ris_value = read_reg(UART0_RIS); 
-  cx = 60;
-  cy = 2;
-  if (ris_value & UART0_INT_BIT_RX) {
-    cx = 65;
-    // vcanvas_puts(&cx, &cy, "RX");
+  int mis; /* masked interrupt status */
+
+  pl011_uart_debug_interrupt();
+  mis = read_reg(UART0_MIS);
+  asm volatile("dsb sy");
+
+  if (mis & UART0_INT_BIT_RX) {
     c = read_reg(UART0_DR);
-    pl011_rx_buf_putchar(c);
+    // pl011_rx_buf_putchar(c);
 
     /* echo uart back for debug */
-    pl011_uart_send('+');
-    pl011_uart_send(c);
-    //vcanvas_putc(&cx, &cy, c);
-    ris_value &= ~UART0_INT_BIT_RX;
+    pl011_uart_send('.');
+    write_reg(UART0_ICR, UART0_INT_BIT_RX);
   }
-  if (ris_value & UART0_INT_BIT_TX) {
-    cx = 64;
-    // vcanvas_puts(&cx, &cy, "TX");
-    ris_value &= ~UART0_INT_BIT_TX;
+  if (mis & UART0_INT_BIT_TX) {
+    pl011_uart_send('T');
+    write_reg(UART0_ICR, UART0_INT_BIT_TX);
   }
-  if (ris_value & UART0_INT_BIT_RT) {
-    // vcanvas_puts(&cx, &cy, "RT");
-    ris_value &= ~UART0_INT_BIT_RT;
+  if (mis & UART0_INT_BIT_RT) {
+    pl011_uart_send('R');
+    write_reg(UART0_ICR, UART0_INT_BIT_RT);
   }
-  if (ris_value & UART0_INT_BIT_FE) {
-    // vcanvas_puts(&cx, &cy, "FE");
-    ris_value &= ~UART0_INT_BIT_FE;
+  if (mis & UART0_INT_BIT_FE) {
+    pl011_uart_send('F');
+    write_reg(UART0_ICR, UART0_INT_BIT_FE);
   }
-  if (ris_value & UART0_INT_BIT_PE) {
-    // vcanvas_puts(&cx, &cy, "PE");
-    ris_value &= ~UART0_INT_BIT_PE;
+  if (mis & UART0_INT_BIT_PE) {
+    pl011_uart_send('P');
+    write_reg(UART0_ICR, UART0_INT_BIT_PE);
   }
-  if (ris_value & UART0_INT_BIT_BE) {
-    // vcanvas_puts(&cx, &cy, "BE");
-    ris_value &= ~UART0_INT_BIT_BE;
+  if (mis & UART0_INT_BIT_BE) {
+    pl011_uart_send('B');
+    write_reg(UART0_ICR, UART0_INT_BIT_BE);
   }
-  if (ris_value & UART0_INT_BIT_OE) {
-    // vcanvas_puts(&cx, &cy, "OE");
-    ris_value &= ~UART0_INT_BIT_OE;
+  if (mis & UART0_INT_BIT_OE) {
+    pl011_uart_send('O');
+    write_reg(UART0_ICR, UART0_INT_BIT_OE);
   }
-  write_reg(UART0_ICR, 0x7ff);
 }
 
 void pl011_uart_print_regs()
@@ -248,27 +264,40 @@ static void pl011_uart_reprogram_cr_prep()
 
 void pl011_uart_set_interrupt_mode()
 {
+  int interrupt_mask;
   pl011_rx_buf_init();
 
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
       pl011_uart_handle_interrupt);
 
-  pl011_uart_reprogram_cr_prep();
+  // pl011_uart_reprogram_cr_prep();
 
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
 
-  pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
+  // pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
+
   /* Clear pending interrupts */
   write_reg(UART0_ICR, 0x7ff);
   /* Unmask all interrupts */
-  write_reg(UART0_IMSC, 0x7ff);
+
+  interrupt_mask = 
+    UART0_INT_BIT_CTS /*|
+    UART0_INT_BIT_RX  |
+    // UART0_INT_BIT_TX  |
+    UART0_INT_BIT_RT  |
+    UART0_INT_BIT_FE  |
+    UART0_INT_BIT_PE  |
+    UART0_INT_BIT_BE  |
+    UART0_INT_BIT_OE*/;
+  write_reg(UART0_IMSC, UART0_INT_BIT_RX);
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
 }
 
+extern pl011_uart_putchar(uint8_t c);
+
 void pl011_uart_send(unsigned int c)
 {
-  while(read_reg(UART0_FR) & UART0_FR_TXFF); 
-  write_reg(UART0_DR, c);
+  pl011_uart_putchar(c & 0xff);
 }
 
 void pl011_uart_send_buf(const char *buf, int n)
@@ -303,11 +332,32 @@ char pl011_uart_getc()
 //  }
 // }
 
+static int x = 0;
 static void pl011_io_thread_work()
 {
   char c;
+  int i;
   int num;
-  c = pl011_rx_buf_getchar();
+  char buf[256];
+  // debug_event_1();
+  return;
+
+  {
+    int mis_value = read_reg(UART0_MIS); 
+    int ris_value = read_reg(UART0_RIS); 
+    snprintf(buf, 256, "MIS: %08x, RIS: %08x\n", mis_value, ris_value);
+    for (i = 0; i < 256; ++i) {
+      if (buf[i] == 0)
+        break;
+      pl011_uart_send(buf[i]);
+    }
+    pl011_uart_send('\n');
+    pl011_uart_send('\r');
+    // blink_led(1, 10);
+    enable_irq();
+  }
+  // c = pl011_rx_buf_getchar();
+  return;
   while(1) {
     spinlock_lock(&uart_pipe_lock);
     num = ringbuf_write(&uart_pipe, &c, 1);
@@ -322,13 +372,13 @@ static char uart_pipe_buf[2048];
 int pl011_io_thread(void)
 {
   int ret = 0;
-  spinlock_init(&uart_pipe_lock);
-  ringbuf_init(&uart_pipe, uart_pipe_buf, sizeof(uart_pipe_buf));
+ // spinlock_init(&uart_pipe_lock);
+ // ringbuf_init(&uart_pipe, uart_pipe_buf, sizeof(uart_pipe_buf));
 
   pl011_uart_set_interrupt_mode();
   while(1) {
-    asm volatile("wfe");
     pl011_io_thread_work();
+    asm volatile("wfe");
   }
   return ret;
 }

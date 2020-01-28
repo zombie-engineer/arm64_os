@@ -21,6 +21,7 @@
 #include <cmdrunner.h>
 #include <max7219.h>
 #include <drivers/display/nokia5110.h>
+#include <debug.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -275,6 +276,7 @@ extern uint64_t __shared_mem_start;
 
 void main()
 {
+  debug_init();
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);

@@ -22,6 +22,9 @@ static char cmdrunner_getch()
   char c;
 
   while(1) {
+    asm volatile ("wfe"); 
+  }
+  while(1) {
     spinlock_lock(&uart_pipe_lock);
     n = ringbuf_read(&uart_pipe, &c, 1);
     spinlock_unlock(&uart_pipe_lock);

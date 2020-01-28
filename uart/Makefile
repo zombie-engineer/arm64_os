@@ -1,4 +1,4 @@
-OBJS_UART = uart/uart.o uart/mini_uart.o uart/pl011_uart.o
+OBJS_UART = uart/uart.o uart/mini_uart.o uart/pl011_uart.o uart/pl011_routine.o
 
 
 

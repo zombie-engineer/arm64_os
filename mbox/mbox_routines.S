@@ -29,11 +29,6 @@ GLOBAL_VAR(mbox_buffer):
 .byte 0
 .endr
 
-.macro reg_set_addr32 reg addr32
-  mov \reg, #(\addr32 & 0xffff)
-  movk \reg, #(\addr32 >> 16), lsl #16
-.endm
-
 .text
 
 /* Refer to this document to understand the logic of this function 
@@ -41,6 +36,7 @@ GLOBAL_VAR(mbox_buffer):
  */
 
 FUNC(mbox_call_blocking):
+  stp   x29, x30, [sp, #-0x10]!
   stp   x1, x2, [sp, #-0x10]!
   /* Combine buffer address with channel number
    * mbox_buffer addr is aligned, so it can be combined with
@@ -77,4 +73,5 @@ FUNC(mbox_call_blocking):
   mov  w0, #1
 1:
   ldp   x1, x2, [sp], #0x10
+  ldp   x29, x30, [sp], #0x10
   ret

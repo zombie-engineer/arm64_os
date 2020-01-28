@@ -1,7 +1,7 @@
 GDB := 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
-INCLUDES = include
+INCLUDES := include
 
 OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
