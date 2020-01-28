@@ -162,10 +162,10 @@ static inline void pl011_rx_buf_init()
 static inline void pl011_rx_buf_putchar(char c)
 {
   if (pl011_rx_data_sz == sizeof(pl011_rx_buf))
-    pl011_rx_data_sz--;
+    return;
 
-  pl011_rx_buf[pl011_rx_data_sz++] = c;
-  asm volatile("dsb sy" :::"memory");
+  pl011_rx_buf[pl011_rx_data_sz] = c;
+  pl011_rx_data_sz++;
 }
 
 static inline char pl011_rx_buf_getchar()
@@ -176,31 +176,34 @@ static inline char pl011_rx_buf_getchar()
     asm volatile("dsb sy" ::: "memory");
     if (pl011_rx_data_sz) {
       asm volatile("dmb sy" ::: "memory");
-      c = pl011_rx_buf[--pl011_rx_data_sz];
-      pl011_uart_send('-');
-      pl011_uart_send(c);
+      --pl011_rx_data_sz;
+      c = pl011_rx_buf[pl011_rx_data_sz];
       enable_irq();
       break;
     }
     enable_irq();
+    asm volatile("wfe" ::: "memory");
   }
 
   return c;
 }
 
-void pl011_uart_debug_interrupt()
+static void pl011_uart_print_int_status()
 {
   int n;
+  char buf[128];
   int ris; /* raw interrupt status */
   int mis; /* masked interrupt status */
-  char buf[128];
-
-  debug_event_1();
-
   ris = read_reg(UART0_RIS); 
   mis = read_reg(UART0_RIS); 
   n = snprintf(buf, sizeof(buf), "MIS: %08x, RIS: %08x\n", mis, ris);
   pl011_uart_send_buf(buf, n);
+}
+
+void pl011_uart_debug_interrupt()
+{
+  // pl011_uart_print_int_status();
+  debug_event_1();
 }
 
 void pl011_uart_handle_interrupt()
@@ -214,10 +217,10 @@ void pl011_uart_handle_interrupt()
 
   if (mis & UART0_INT_BIT_RX) {
     c = read_reg(UART0_DR);
-    // pl011_rx_buf_putchar(c);
+    pl011_rx_buf_putchar(c);
 
     /* echo uart back for debug */
-    pl011_uart_send('.');
+    // pl011_uart_send('.');
     write_reg(UART0_ICR, UART0_INT_BIT_RX);
   }
   if (mis & UART0_INT_BIT_TX) {
@@ -339,32 +342,21 @@ static void pl011_io_thread_work()
   int i;
   int num;
   char buf[256];
-  // debug_event_1();
+  asm volatile ("dsb sy");
+  debug_event_1();
+  while(1) {
+    c = pl011_rx_buf_getchar();
+    pl011_uart_putchar(c);
+  }
   return;
 
-  {
-    int mis_value = read_reg(UART0_MIS); 
-    int ris_value = read_reg(UART0_RIS); 
-    snprintf(buf, 256, "MIS: %08x, RIS: %08x\n", mis_value, ris_value);
-    for (i = 0; i < 256; ++i) {
-      if (buf[i] == 0)
-        break;
-      pl011_uart_send(buf[i]);
-    }
-    pl011_uart_send('\n');
-    pl011_uart_send('\r');
-    // blink_led(1, 10);
-    enable_irq();
-  }
-  // c = pl011_rx_buf_getchar();
-  return;
-  while(1) {
-    spinlock_lock(&uart_pipe_lock);
-    num = ringbuf_write(&uart_pipe, &c, 1);
-    spinlock_unlock(&uart_pipe_lock);
-    if (num)
-      break;
-  }
+//  while(1) {
+//    spinlock_lock(&uart_pipe_lock);
+//    num = ringbuf_write(&uart_pipe, &c, 1);
+//    spinlock_unlock(&uart_pipe_lock);
+//    if (num)
+//      break;
+//  }
 }
 
 static char uart_pipe_buf[2048];
