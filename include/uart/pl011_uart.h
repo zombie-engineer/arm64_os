@@ -1,4 +1,5 @@
 #pragma once
+#include <uart/uart.h>
 
 /* Init PL011 UART */
 void pl011_uart_init(int baudrate, int _not_used);

@@ -2,6 +2,10 @@
 
 #define UART_CONSOLE_NAME "uartcon"
 
+typedef void (*uart_rx_event_cb)(void *, char);
+
+int uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *priv);
+
 void uart_init(int freq, int system_clock);
 
 void uart_set_interrupt_mode();

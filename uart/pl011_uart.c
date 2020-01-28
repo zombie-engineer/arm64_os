@@ -13,6 +13,8 @@
 #include <arch/armv8/armv8.h>
 #include <cpu.h>
 #include <debug.h>
+#include <error.h>
+#include <barriers.h>
 
 
 #define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
@@ -58,9 +60,6 @@
 
 static char pl011_rx_buf[2048];
 static int pl011_rx_data_sz = 0;
-
-ringbuf_t uart_pipe;
-aligned(64) uint64_t uart_pipe_lock;
 
 static void pl011_uart_disable()
 {
@@ -151,9 +150,6 @@ void pl011_uart_init(int baudrate, int _not_used)
 #define UART0_INT_BIT_BE  (1<<9)
 #define UART0_INT_BIT_OE  (1<<10)
 
-static int cx = 60;
-static int cy = 0;
-
 static inline void pl011_rx_buf_init()
 {
   pl011_rx_data_sz = 0;
@@ -173,16 +169,16 @@ static inline char pl011_rx_buf_getchar()
   char c;
   while(1) {
     disable_irq();
-    asm volatile("dsb sy" ::: "memory");
+    SYNC_BARRIER;
     if (pl011_rx_data_sz) {
-      asm volatile("dmb sy" ::: "memory");
+      SYNC_BARRIER;
       --pl011_rx_data_sz;
       c = pl011_rx_buf[pl011_rx_data_sz];
       enable_irq();
       break;
     }
     enable_irq();
-    asm volatile("wfe" ::: "memory");
+    WAIT_FOR_EVENT;
   }
 
   return c;
@@ -200,50 +196,52 @@ static void pl011_uart_print_int_status()
   pl011_uart_send_buf(buf, n);
 }
 
-void pl011_uart_debug_interrupt()
+static int pl011_debug_level = 1;
+
+static void pl011_uart_debug_interrupt()
 {
-  // pl011_uart_print_int_status();
-  debug_event_1();
+  if (pl011_debug_level > 0)
+    debug_event_1();
+  if (pl011_debug_level > 2)
+    pl011_uart_print_int_status();
 }
 
-void pl011_uart_handle_interrupt()
+static void pl011_uart_handle_interrupt()
 {
   int c;
   int mis; /* masked interrupt status */
 
   pl011_uart_debug_interrupt();
   mis = read_reg(UART0_MIS);
-  asm volatile("dsb sy");
+
+  DATA_BARRIER;
 
   if (mis & UART0_INT_BIT_RX) {
     c = read_reg(UART0_DR);
     pl011_rx_buf_putchar(c);
-
-    /* echo uart back for debug */
-    // pl011_uart_send('.');
     write_reg(UART0_ICR, UART0_INT_BIT_RX);
   }
-  if (mis & UART0_INT_BIT_TX) {
+  else if (mis & UART0_INT_BIT_TX) {
     pl011_uart_send('T');
     write_reg(UART0_ICR, UART0_INT_BIT_TX);
   }
-  if (mis & UART0_INT_BIT_RT) {
+  else if (mis & UART0_INT_BIT_RT) {
     pl011_uart_send('R');
     write_reg(UART0_ICR, UART0_INT_BIT_RT);
   }
-  if (mis & UART0_INT_BIT_FE) {
+  else if (mis & UART0_INT_BIT_FE) {
     pl011_uart_send('F');
     write_reg(UART0_ICR, UART0_INT_BIT_FE);
   }
-  if (mis & UART0_INT_BIT_PE) {
+  else if (mis & UART0_INT_BIT_PE) {
     pl011_uart_send('P');
     write_reg(UART0_ICR, UART0_INT_BIT_PE);
   }
-  if (mis & UART0_INT_BIT_BE) {
+  else if (mis & UART0_INT_BIT_BE) {
     pl011_uart_send('B');
     write_reg(UART0_ICR, UART0_INT_BIT_BE);
   }
-  if (mis & UART0_INT_BIT_OE) {
+  else if (mis & UART0_INT_BIT_OE) {
     pl011_uart_send('O');
     write_reg(UART0_ICR, UART0_INT_BIT_OE);
   }
@@ -284,19 +282,19 @@ void pl011_uart_set_interrupt_mode()
   /* Unmask all interrupts */
 
   interrupt_mask = 
-    UART0_INT_BIT_CTS /*|
-    UART0_INT_BIT_RX  |
-    // UART0_INT_BIT_TX  |
+    /* UART0_INT_BIT_CTS | */
+    UART0_INT_BIT_RX /* |
+    UART0_INT_BIT_TX  |
     UART0_INT_BIT_RT  |
     UART0_INT_BIT_FE  |
     UART0_INT_BIT_PE  |
     UART0_INT_BIT_BE  |
     UART0_INT_BIT_OE*/;
-  write_reg(UART0_IMSC, UART0_INT_BIT_RX);
+  write_reg(UART0_IMSC, interrupt_mask);
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
 }
 
-extern pl011_uart_putchar(uint8_t c);
+extern int pl011_uart_putchar(uint8_t c);
 
 void pl011_uart_send(unsigned int c)
 {
@@ -318,59 +316,57 @@ char pl011_uart_getc()
   return (char)read_reg(UART0_DR);
 }
 
-// static void pl011_copy_to_pipe(const char *buf, int sz)
-// {
-//  int to_copy;
-//  int copied = 0;
-//  while(sz != copied) {
-//    spinlock_lock(&pipe_lock);
-//    pipe_free = sizeof(pipe_buf) - pipe_num_bytes;
-//    to_copy = min(pipe_free, sz - copied);
-//
-//    memcpy(pipe_buf + pipe_sz, buf + copied, to_copy);
-//    pipe_sz += to_copy;
-//    copied = to_copy;
-//
-//    spinlock_unlock(&pipe_lock);
-//  }
-// }
+typedef struct rx_subscriber {
+  uart_rx_event_cb cb;
+  void * cb_arg;
+} rx_subscriber_t;
 
-static int x = 0;
-static void pl011_io_thread_work()
+static rx_subscriber_t rx_subscribers[8];
+static aligned(64) uint64_t rx_subscribers_lock;
+
+static inline void rx_subscribers_init()
 {
-  char c;
-  int i;
-  int num;
-  char buf[256];
-  asm volatile ("dsb sy");
-  debug_event_1();
-  while(1) {
-    c = pl011_rx_buf_getchar();
-    pl011_uart_putchar(c);
-  }
-  return;
-
-//  while(1) {
-//    spinlock_lock(&uart_pipe_lock);
-//    num = ringbuf_write(&uart_pipe, &c, 1);
-//    spinlock_unlock(&uart_pipe_lock);
-//    if (num)
-//      break;
-//  }
+  spinlock_init(&rx_subscribers_lock);
+  memset(&rx_subscribers, 0, sizeof(rx_subscribers));
 }
 
-static char uart_pipe_buf[2048];
+static inline int rx_subscriber_slot_is_free(int slot)
+{
+  return rx_subscribers[slot].cb == 0 ? 1 : 0;
+}
+
+static inline void rx_subscriber_slot_occupy(int slot, uart_rx_event_cb cb, void *cb_arg)
+{ 
+   rx_subscribers[slot].cb = cb;
+   rx_subscribers[slot].cb_arg = cb_arg;
+}
+
+int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg)
+{
+  int i;
+  spinlock_lock(&rx_subscribers_lock);
+  for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
+    if (rx_subscriber_slot_is_free(i)) {
+      rx_subscriber_slot_occupy(i, cb, cb_arg);
+      break;
+    }
+  }
+  spinlock_unlock(&rx_subscribers_lock);
+  return ERR_OK;
+}
 
 int pl011_io_thread(void)
 {
-  int ret = 0;
- // spinlock_init(&uart_pipe_lock);
- // ringbuf_init(&uart_pipe, uart_pipe_buf, sizeof(uart_pipe_buf));
-
+  char c;
+  int i;
+  rx_subscribers_init();
   pl011_uart_set_interrupt_mode();
   while(1) {
-    pl011_io_thread_work();
-    asm volatile("wfe");
+    c = pl011_rx_buf_getchar();
+    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
+      rx_subscribers[i].cb(rx_subscribers[i].cb_arg, c);
+    }
+    pl011_uart_putchar(c);
   }
-  return ret;
+  return ERR_OK;
 }

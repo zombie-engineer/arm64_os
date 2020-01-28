@@ -13,12 +13,14 @@
 #define _uart_init pl011_uart_init
 #define _uart_send_buf pl011_uart_send_buf
 #define _uart_set_interrupt_mode pl011_uart_set_interrupt_mode
+#define _uart_subscribe_to_rx_event pl011_uart_subscribe_to_rx_event
 #elif defined(CONFIG_UART_MINI)
 #define uart_send mini_uart_send 
 #define uart_recv mini_uart_getc
 #define _uart_init mini_uart_init
 #define _uart_send_buf mini_uart_send_buf
 #define _uart_set_interrupt_mode mini_uart_set_interrupt_mode
+#define _uart_subscribe_to_rx_event mini_uart_subscribe_to_rx_event
 #endif
 
 void uart_init(int baudrate, int system_clock)
@@ -67,4 +69,9 @@ void uart_send_buf(const void *buf, int n)
 void uart_set_interrupt_mode()
 {
   _uart_set_interrupt_mode();
+}
+
+int uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *priv)
+{
+  return _uart_subscribe_to_rx_event(cb, priv);
 }
