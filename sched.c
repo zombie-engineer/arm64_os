@@ -112,8 +112,8 @@ void scheduler_job_debug()
 {
   sched_num_switches++;
   if (sched_num_switches % 1000 == 0) {
-    blink_led(1, 10);
-    pl011_uart_send('+');
+    // blink_led(1, 10);
+    // pl011_uart_send('+');
   }
 }
 

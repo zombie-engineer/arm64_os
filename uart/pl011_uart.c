@@ -60,6 +60,7 @@
 
 static char pl011_rx_buf[2048];
 static int pl011_rx_data_sz = 0;
+static int pl011_uart_initialized = 0;
 
 static void pl011_uart_disable()
 {
@@ -196,7 +197,7 @@ static void pl011_uart_print_int_status()
   pl011_uart_send_buf(buf, n);
 }
 
-static int pl011_debug_level = 1;
+static int pl011_debug_level = 0;
 
 static void pl011_uart_debug_interrupt()
 {
@@ -327,7 +328,7 @@ static aligned(64) uint64_t rx_subscribers_lock;
 static inline void rx_subscribers_init()
 {
   spinlock_init(&rx_subscribers_lock);
-  memset(&rx_subscribers, 0, sizeof(rx_subscribers));
+  memset(rx_subscribers, 0, sizeof(rx_subscribers));
 }
 
 static inline int rx_subscriber_slot_is_free(int slot)
@@ -339,6 +340,11 @@ static inline void rx_subscriber_slot_occupy(int slot, uart_rx_event_cb cb, void
 { 
    rx_subscribers[slot].cb = cb;
    rx_subscribers[slot].cb_arg = cb_arg;
+}
+
+static inline int rx_subscriber_is_valid(int slot)
+{
+  return rx_subscribers[slot].cb ? 1 : 0;
 }
 
 int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg)
@@ -360,13 +366,25 @@ int pl011_io_thread(void)
   char c;
   int i;
   rx_subscribers_init();
+  pl011_uart_initialized = 1;
   pl011_uart_set_interrupt_mode();
+  DATA_BARRIER;
   while(1) {
     c = pl011_rx_buf_getchar();
     for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
-      rx_subscribers[i].cb(rx_subscribers[i].cb_arg, c);
+      if (rx_subscriber_is_valid(i)) {
+        rx_subscribers[i].cb(rx_subscribers[i].cb_arg, c);
+        debug_event_1();
+      }
     }
-    pl011_uart_putchar(c);
   }
   return ERR_OK;
+}
+
+int uart_is_initialized()
+{
+  int ret;
+  ret = pl011_uart_initialized;
+  DATA_BARRIER;
+  return ret;
 }
