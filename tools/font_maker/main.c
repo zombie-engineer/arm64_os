@@ -37,7 +37,7 @@ int read_pbm_number(int fd)
   return strtol(to_atoi, 0, 10);
 }
 
-const char *read_pbm_image(const char *filepath, int *width, int *height)
+char *read_pbm_image(const char *filepath, int *width, int *height)
 {
   int fd;
   char magic[2];
@@ -90,18 +90,16 @@ int fmtcvt_pbm_to_bitmap(font_desc_t *d, int width, int height, const char *raw_
   int x, y, bit;
   d->bitmap_sz = width * height / 8;
   d->bitmap = malloc(d->bitmap_sz);
-  char *dst = (char *)d->bitmap;
-  char byteval = 0;
+  char *dst = (char *)(d->bitmap);
   bit = 0;
   for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      char value = *(raw_img + y * width + x);
-      byteval |= (value ? 1 : 0) << bit;
-      if (bit++ == 8) {
-        bit = 0;
-        *(dst++) = byteval;
-        byteval = 0;
+    for (x = 0; x < width / 8; ++x) {
+      char byteval = 0;
+      for (bit = 0; bit < 8; ++bit) {
+        char value = raw_img[y * width + x * 8 + bit];
+        byteval |= (value ? 1 : 0) << bit;
       }
+      *(dst++) = byteval;
     } 
   }
   return 0;
@@ -140,13 +138,13 @@ int bitmap_print_as_char_array(FILE *fp, const char *font_name, const unsigned c
   fprintf(fp, "char font_bitmap_raw_%s[] = {", font_name);
   fprintf(fp, "\n    ");
   for (i = 0; i < bitmap_sz - 1; ++i) {
-    fprintf(fp, "%02x", bitmap[i]);
+    fprintf(fp, "0x%02x", bitmap[i]);
     if ((i + 1) % n_cols)
       fprintf(fp, ", ");
     else 
       fprintf(fp, ",\n    ");
   }
-  fprintf(fp, "%02x\n}\n;", bitmap[i]);
+  fprintf(fp, "0x%02x\n};\n", bitmap[i]);
   return 0;
 }
 
@@ -162,16 +160,27 @@ int generate_font_header_file(font_desc_t *d, const char *filename)
   return ret;
 }
 
+int filter_invert(char *buf, int bufsz)
+{
+  int i;
+  for(i = 0; i < bufsz; ++i)
+    buf[i] = ~buf[i];
+}
+
 int main(int argc, char ** argv)
 {
-  const char *raw_img;
+  char *raw_img;
   const char *header_img;
   int width, height;
+  int invert = 1;
   font_desc_t d = { 0 };
   raw_img = read_pbm_image(argv[1], &width, &height);
 
   strcpy(d.name, "myfont");
   d.glyph_size = 8;
+
+  if (invert)
+    filter_invert(raw_img, width * height);
 
   if (fmtcvt_pbm_to_bitmap(&d, width, height, raw_img))
     return -1;

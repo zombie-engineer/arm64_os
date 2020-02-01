@@ -1,5 +1,6 @@
 #pragma once
 #include <spi.h>
+#include <font.h>
 
 #define NOKIA5110_PIXEL_SIZE_X    84 
 #define NOKIA5110_PIXEL_SIZE_Y    48
@@ -63,6 +64,13 @@ int nokia5110_draw_line(int x0, int y0, int x1, int y1);
 // Draw rectangle 
 int nokia5110_draw_rect(int x, int y, int sx, int sy);
 
+// Set current font
+void nokia5110_set_font(const font_desc_t *f);
+
+// Draw text using currently set font starting from 
+// coordinates x,y
+int nokia5110_draw_text(const char *text, int x, int y);
+
 // Prints debug information about the display
 void nokia5110_print_info();
 
@@ -71,3 +79,4 @@ int nokia5110_run_test_loop_1(int interations, int wait_interval);
 int nokia5110_run_test_loop_2(int interations, int wait_interval);
 
 int nokia5110_run_test_loop_3(int interations, int wait_interval);
+

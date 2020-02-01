@@ -3,6 +3,7 @@
 #include <delays.h>
 #include <gpio.h>
 #include <stringlib.h>
+#include <font.h>
 
 #define NOKIA_5110_FUNCTION_SET(PD, V, H) (0b00100000 | (PD << 2) | (V << 1) | (H << 0))
 #define PD_BIT_SET 1
@@ -28,6 +29,15 @@
 
 #define DISPLAY_MODE_MAX 3
 
+#define NOKIA_5110_WIDTH  84
+#define NOKIA_5110_HEIGHT 48 
+#define NOKIA_5110_PIXELS_PER_BYTE 8
+
+/* Number of bytes that totally fill screen space 
+ * in fact it's 504 bytes
+ */
+#define NOKIA_5110_CANVAS_SIZE (NOKIA_5110_WIDTH * NOKIA_5110_HEIGHT / NOKIA_5110_PIXELS_PER_BYTE)
+
 extern const char _binary_to_raspi_nokia5110_start;
 extern const char _binary_to_raspi_nokia5110_end;
 
@@ -38,19 +48,19 @@ typedef struct nokia5110_dev {
 } nokia5110_dev_t;
 
 
+static const font_desc_t *nokia5110_font;
 static nokia5110_dev_t nokia5110_device;
-
-
 static nokia5110_dev_t *nokia5110_dev = 0;
 
-static char frame_1[504 + 4];
-static char frame_2[504 + 4];
-static char frame_3[504 + 4];
-static char frame_4[504 + 4];
-static char frame_5[504 + 4];
-static char frame_6[504 + 4];
-static char frame_7[504 + 4];
-static char frame_8[504 + 4];
+static char frame_1[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_2[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_3[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_4[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_5[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_6[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_7[NOKIA_5110_CANVAS_SIZE + 4];
+static char frame_8[NOKIA_5110_CANVAS_SIZE + 4];
+static char canvas[NOKIA_5110_CANVAS_SIZE];
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -238,6 +248,8 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   SEND_CMD(NOKIA_5110_DISPLAY_CONTROL_NORMAL);
 
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+  nokia5110_font = 0;
+
   puts("nokia5110 init is complete\n");
   return ERR_OK;
 }
@@ -333,3 +345,78 @@ void nokia5110_print_info()
 {
   puts("NOKIA 5110 LCD Display\n");
 }
+
+static int nokia_5110_draw_char(const font_desc_t *f, int glyph_idx, uint8_t *dst)
+{
+  int i, j;
+  int glyph_pos_x, glyph_pos_y;
+  const uint8_t *glyph;
+  memset(dst, 0, 8);
+  glyph_idx -= 0x20;
+  if (glyph_idx < 0)
+    glyph_idx = '.' - 0x20;
+
+  glyph_pos_y = glyph_idx / f->glyphs_per_x;
+  glyph_pos_x = glyph_idx % f->glyphs_per_x;
+  // we want symbol number 1
+  // 16 glyphs each 8 pixels width = 16 bytes
+  glyph = (const uint8_t *)f->bitmap + glyph_pos_y * f->glyph_pixels_y * f->glyph_stride + glyph_pos_x;
+  for (j = 0; j < 8; ++j) {
+    for (i = 0; i < 8; ++i) {
+      char line = glyph[i * f->glyph_stride];
+      char is_set = (line & (1 << j)) ? 1 : 0;
+      dst[j] |= is_set << i;
+    }
+  }
+  return 0;
+}
+
+
+int nokia5110_draw_text(const char *text, int x, int y)
+{
+  int ret, err;
+  uint8_t *dst = (uint8_t *)canvas;
+
+  if (!nokia5110_font)
+    return ERR_NOT_INIT;
+
+  RET_IF_ERR(nokia5110_set_cursor, x, y);
+  
+  while(*text) {
+    nokia_5110_draw_char(nokia5110_font, *text++, dst);
+    dst += 8;
+  }
+
+  SEND_DATA(canvas, 500);
+
+  return ERR_OK;
+}
+
+static int nokia5110_run_test_loop_4(int iterations, int wait_interval)
+{
+  int i, err;
+  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
+  memset(frame_2, 0b01000000, 504);
+  uint8_t *dst = (uint8_t *)canvas;
+  const char *text = "Love-my+pups.";
+  for (i = 0; i < strlen(text); ++i) {
+    nokia_5110_draw_char(nokia5110_font, text[i] - 0x20, dst);
+    dst += 6;
+  }
+
+  for (i = 0; i < iterations; ++i) {
+    SEND_DATA(canvas, 8 * 10);
+    while(1);
+    wait_msec(wait_interval);
+    SEND_DATA_DMA(frame_2, 504);
+    wait_msec(wait_interval);
+  }
+
+  return 0;
+}
+
+void nokia5110_set_font(const font_desc_t *f)
+{
+  nokia5110_font = f; 
+}
+

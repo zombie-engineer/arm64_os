@@ -37,7 +37,7 @@ LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font.o to_raspi.nokia5110.o
+OBJS += $(LIBS) font.o to_raspi.nokia5110.o font/font.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld

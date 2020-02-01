@@ -5,6 +5,7 @@
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
 #include <spinlock.h>
+#include <font.h>
 #include <vcanvas.h>
 #include <rand.h>
 #include <timer.h>
@@ -97,7 +98,6 @@ void print_mbox_props()
   char buf[6];
   val = mbox_get_firmware_rev();
   printf("firmware rev:    %08x\n", val);
-  gpio_set_function(18, GPIO_FUNC_ALT_5);
   val = mbox_get_board_model();
   printf("board model:     %08x\n", val);
   val = mbox_get_board_rev();
@@ -252,13 +252,24 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
-void nokia5110_test()
+void nokia5110_display_init()
 {
   spi_dev_t *spidev;
+  const font_desc_t *font;
   spi0_init();
   spidev = spi_get_dev(SPI_TYPE_SPI0);
+
+  font_get_font("myfont", &font);
+  
   nokia5110_init(spidev, 23, 18, 1, 1);
+  nokia5110_set_font(font);
+}
+
+void nokia5110_test()
+{
   // nokia5110_run_test_loop_1(5, 200);
+  nokia5110_draw_text("Good evening, sir!", 0, 0);
+  while(1);
   nokia5110_run_test_loop_3(30, 10);
   nokia5110_run_test_loop_1(8, 100);
   nokia5110_run_test_loop_1(8, 50);
@@ -283,10 +294,19 @@ void main()
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
   init_consoles();
+  nokia5110_display_init();
+
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
+  printf("hello");
+  nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
+  nokia5110_draw_text("MMU OK!", 0, 0);
+  while(1);
   spinlocks_enabled = 1;
+  font_init_lib();
+  nokia5110_test();
+  while(1);
   // uint64_t mair;
   // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
   // printf("mair: %016llx\n", mair);
@@ -312,7 +332,6 @@ void main()
   // while(1);
   scheduler_init();
   while(1);
-  // nokia5110_test();
 
   print_mmu_features();
   print_cache_stats();
