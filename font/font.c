@@ -7,11 +7,13 @@
 
 
 #define BITMAP(_name) font_bitmap_raw_ ## _name
+#define METRICS(_name) font_glyph_metrics_ ## _name
 #define DECL_FONT(_name, _bits_per_pixel, _glyph_pixels_x, _glyph_pixels_y, _glyphs_per_x, _glyphs_per_y) \
 {                                       \
   .name = #_name,                       \
   .bitmap = BITMAP(_name),              \
   .bitmap_sz = sizeof(BITMAP(_name)),   \
+  .glyph_metrics = METRICS(_name),      \
   .bits_per_pixel = _bits_per_pixel,    \
   .glyph_pixels_x = _glyph_pixels_x,    \
   .glyph_pixels_y = _glyph_pixels_y,    \
@@ -89,20 +91,20 @@ static void font_canvas_put_pixel(font_canvas_desc_t *c, int pixel, int x, int y
   *((unsigned char *)c->addr + byte_off) = val;
 }
 
-int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p)
-{
-  // glyph coordinates
-  const uint8_t *glyph;
-  int gx, gy;
-  int gpixel;
-
-  glyph = font_get_glyph(f, p->c);
-
-  for (gy = 0; gy < f->glyph_pixels_x; gy++) {
-    for (gx = 0; gx < f->glyph_pixels_y; ++gx) {
-      gpixel = font_glyph_bit_is_set(f, glyph, gx, gy);
-      font_canvas_put_pixel(c, gpixel, p->x + gx, p->y + gy);
-    }
-  }
-  return 0;
-}
+//int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p)
+//{
+//  // glyph coordinates
+//  const uint8_t *glyph;
+//  int gx, gy;
+//  int gpixel;
+//
+//  glyph = font_get_glyph(f, p->c);
+//
+//  for (gy = 0; gy < f->glyph_pixels_x; gy++) {
+//    for (gx = 0; gx < f->glyph_pixels_y; ++gx) {
+//      gpixel = font_glyph_bit_is_set(f, glyph, gx, gy);
+//      font_canvas_put_pixel(c, gpixel, p->x + gx, p->y + gy);
+//    }
+//  }
+//  return 0;
+//}

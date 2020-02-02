@@ -1,6 +1,8 @@
 #pragma once
 #include <error.h>
 #include <kernel_panic.h>
+#include <cpu.h>
+#include <spinlock.h>
 
 #define min(a, b) (a < b ? a : b)
 
@@ -40,3 +42,7 @@ int fn(__VA_ARGS__) { \
 
 #define container_of(ptr, type, member) (type *)(__ptr_off(ptr, - address_of(type, member)))
 
+static inline int should_lock() 
+{
+  return spinlocks_enabled && is_irq_enabled();
+}

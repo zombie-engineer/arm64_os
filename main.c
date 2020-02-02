@@ -293,20 +293,17 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   // shiftreg setup is for 8x8 led matrix 
   uart_init(115200, BCM2835_SYSTEM_CLOCK);
+  font_init_lib();
   init_consoles();
   nokia5110_display_init();
 
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
-  printf("hello");
   nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
   nokia5110_draw_text("MMU OK!", 0, 0);
-  while(1);
   spinlocks_enabled = 1;
-  font_init_lib();
-  nokia5110_test();
-  while(1);
+  // nokia5110_test();
   // uint64_t mair;
   // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
   // printf("mair: %016llx\n", mair);

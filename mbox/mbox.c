@@ -6,7 +6,7 @@
 #include <cpu.h>
 #include <error.h>
 
-static aligned(64) uint64_t mbox_lock;
+static DECL_SPINLOCK(mbox_lock);
 
 #define VIDEOCORE_MBOX (PERIPHERAL_BASE_PHY + 0xb880)
 #define MBOX_READ   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x00))

@@ -283,7 +283,6 @@ void pl011_uart_set_interrupt_mode()
   /* Unmask all interrupts */
 
   interrupt_mask = 
-    /* UART0_INT_BIT_CTS | */
     UART0_INT_BIT_RX /* |
     UART0_INT_BIT_TX  |
     UART0_INT_BIT_RT  |

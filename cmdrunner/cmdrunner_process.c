@@ -7,6 +7,7 @@
 #include <compiler.h>
 #include <barriers.h>
 #include <cpu.h>
+#include <debug.h>
 
 static char ringbuf_buf[256];
 static ringbuf_t char_pipe;
@@ -39,8 +40,13 @@ static void cmdrunner_rx_cb(void *priv, char c)
 }
 
 extern int pl011_uart_putchar(uint8_t c);
+
+extern int nokia5110_draw_text(const char *text, int x, int y);
+
 int cmdrunner_process(void)
 {
+  char buf[128];
+  int bufsz;
   char c;
   cmdrunner_state_t s;
   cmdrunner_state_init(&s);
@@ -50,9 +56,13 @@ int cmdrunner_process(void)
   while(!uart_is_initialized());
   uart_subscribe_to_rx_event(cmdrunner_rx_cb, 0);
 
+  bufsz = 0;
   while(1) {
     c = cmdrunner_getch();
     pl011_uart_putchar(c);
+    buf[bufsz] = c;
+    buf[++bufsz] = 0;
+    nokia5110_draw_text(buf, 0, 0);
   }
 
   return 0;

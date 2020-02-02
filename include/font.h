@@ -1,9 +1,33 @@
 #pragma once
 
+typedef struct glyph_metrics {
+  /* x, y coordinates of a glyph on a bitmap plate */
+  int pos_x;
+  int pos_y;
+  /* x, y sizes of bounding box of a glyph */
+  int bound_x;
+  int bound_y;
+  /* x, y offsets from the current cursor point
+   * until the start of the leftmost/bottommost boundary
+   * of a glyph
+   */
+  int bearing_x;
+  int bearing_y;
+  /* offsets of a cursor after the glyph has been drawn */
+  int advance_x;
+  int advance_y;
+} font_glyph_metrics_t;
+
 typedef struct font_desc {
+  /* Font name */
   char name[32];
+  /* Address to buffer that holds bitmap plate */
   void *bitmap;
+  /* Size of a bitmap buffer */
   int bitmap_sz;
+
+  /* Address of glyph_metrics array */
+  font_glyph_metrics_t *glyph_metrics;
   /* Number of bits that describe one pixel, 1-monochrome, 8 - grayscale, etc.. */
   int bits_per_pixel;
   /* Number of pixels per glyph x dimension */
@@ -42,10 +66,4 @@ int font_init_lib();
 
 int font_get_font(const char *name, const font_desc_t **f);
 
-typedef struct font_draw_char_param {
-  char c;
-  int x;
-  int y;
-} font_draw_char_param_t;
-
-int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p);
+// int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p);

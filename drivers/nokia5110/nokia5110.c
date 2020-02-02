@@ -4,6 +4,8 @@
 #include <gpio.h>
 #include <stringlib.h>
 #include <font.h>
+#include <spinlock.h>
+#include <cpu.h>
 
 #define NOKIA_5110_FUNCTION_SET(PD, V, H) (0b00100000 | (PD << 2) | (V << 1) | (H << 0))
 #define PD_BIT_SET 1
@@ -51,6 +53,7 @@ typedef struct nokia5110_dev {
 static const font_desc_t *nokia5110_font;
 static nokia5110_dev_t nokia5110_device;
 static nokia5110_dev_t *nokia5110_dev = 0;
+static DECL_SPINLOCK(nokia5110_lock);
 
 static char frame_1[NOKIA_5110_CANVAS_SIZE + 4];
 static char frame_2[NOKIA_5110_CANVAS_SIZE + 4];
@@ -60,7 +63,7 @@ static char frame_5[NOKIA_5110_CANVAS_SIZE + 4];
 static char frame_6[NOKIA_5110_CANVAS_SIZE + 4];
 static char frame_7[NOKIA_5110_CANVAS_SIZE + 4];
 static char frame_8[NOKIA_5110_CANVAS_SIZE + 4];
-static char canvas[NOKIA_5110_CANVAS_SIZE];
+static uint8_t nokia5110_canvas[NOKIA_5110_CANVAS_SIZE];
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -78,7 +81,16 @@ static char canvas[NOKIA_5110_CANVAS_SIZE];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
+static int nokia_5110_send_data(const void *data, int sz) 
+{
+  int ret;
+  gpio_set_on(nokia5110_dev->dc);
+  ret = nokia5110_dev->spi->xmit(data, sz);
+  return ret;
+}
+
 #define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len)
+
 
 
 #define NOKIA5110_INSTRUCTION_SET_NORMAL 0
@@ -249,6 +261,7 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
 
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   nokia5110_font = 0;
+  spinlock_init(&nokia5110_lock);
 
   puts("nokia5110 init is complete\n");
   return ERR_OK;
@@ -346,77 +359,95 @@ void nokia5110_print_info()
   puts("NOKIA 5110 LCD Display\n");
 }
 
-static int nokia_5110_draw_char(const font_desc_t *f, int glyph_idx, uint8_t *dst)
+#define draw_char_debug() \
+  printf("draw_char: %c: i:%d, x:%d, y:%d, first_pixel_idx:%d\n", ch, glyph_idx, gm->pos_x, gm->pos_y, src_off);\
+  printf("---------: bearing: %d:%d, bbox: %d:%d, adv: %d:%d\n",\
+      gm->bearing_x, gm->bearing_y,\
+      gm->bound_x, gm->bound_y,\
+      gm->advance_x, gm->advance_y);\
+  printf("bitmap: %08llx, glyph: %08llx, off: %08x\n",\
+      (long long)f->bitmap, (long long)glyph, (char *)glyph - (char *)f->bitmap)
+
+uint8_t *nokia_5110_draw_char(const font_desc_t *f, char ch, uint8_t *dst)
 {
-  int i, j;
-  int glyph_pos_x, glyph_pos_y;
+  int gx, gy;
+  int glyph_idx;
+  int src_off;
+  uint8_t tmp;
+  int glyph_y;
+  font_glyph_metrics_t *gm;
   const uint8_t *glyph;
   memset(dst, 0, 8);
-  glyph_idx -= 0x20;
+  glyph_idx = ch - 0x20;
   if (glyph_idx < 0)
     glyph_idx = '.' - 0x20;
 
-  glyph_pos_y = glyph_idx / f->glyphs_per_x;
-  glyph_pos_x = glyph_idx % f->glyphs_per_x;
-  // we want symbol number 1
-  // 16 glyphs each 8 pixels width = 16 bytes
-  glyph = (const uint8_t *)f->bitmap + glyph_pos_y * f->glyph_pixels_y * f->glyph_stride + glyph_pos_x;
-  for (j = 0; j < 8; ++j) {
-    for (i = 0; i < 8; ++i) {
-      char line = glyph[i * f->glyph_stride];
-      char is_set = (line & (1 << j)) ? 1 : 0;
-      dst[j] |= is_set << i;
-    }
-  }
-  return 0;
-}
+  gm = &f->glyph_metrics[glyph_idx];
+  glyph_y = gm->pos_y - gm->bound_y + 1;
+  src_off = glyph_y * f->glyph_stride + (gm->pos_x >> 3);
+  glyph = (const uint8_t *)f->bitmap + src_off;
 
+  // draw_char_debug();
+  /* Skip space of width 'bearing_x' before actual symbol */
+  for (gx = 0; gx < gm->bearing_x; ++gx)
+    *(dst++) = 0;
+
+  for (gx = 0; gx < gm->bound_x; ++gx) {
+    tmp = 0;
+    for (gy = 0; gy < gm->bound_y; ++gy) {
+      char line = glyph[gy * f->glyph_stride];
+      char is_set = (line & (1 << gx)) ? 1 : 0;
+      int v = gy + 8 - gm->bound_y - gm->bearing_y;
+      tmp |= is_set << v;
+    }
+    *(dst++) = tmp;
+  }
+
+  /* Advance cursor now */
+  return dst;
+}
 
 int nokia5110_draw_text(const char *text, int x, int y)
 {
-  int ret, err;
-  uint8_t *dst = (uint8_t *)canvas;
+  int err;
+  int under_lock;
+  uint8_t *dst = nokia5110_canvas;
 
-  if (!nokia5110_font)
-    return ERR_NOT_INIT;
+  if (should_lock()) {
+    spinlock_lock(&nokia5110_lock);
+    under_lock = 1;
+  }
 
-  RET_IF_ERR(nokia5110_set_cursor, x, y);
+  if (!nokia5110_font) {
+    err = ERR_NOT_INIT;
+    goto out;
+  }
+
+  err = nokia5110_set_cursor(x, y);
+  if (err)
+    goto out;
   
-  while(*text) {
-    nokia_5110_draw_char(nokia5110_font, *text++, dst);
-    dst += 8;
-  }
+  while(*text)
+    dst = nokia_5110_draw_char(nokia5110_font, *text++, dst);
 
-  SEND_DATA(canvas, 500);
-
-  return ERR_OK;
-}
-
-static int nokia5110_run_test_loop_4(int iterations, int wait_interval)
-{
-  int i, err;
-  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  memset(frame_2, 0b01000000, 504);
-  uint8_t *dst = (uint8_t *)canvas;
-  const char *text = "Love-my+pups.";
-  for (i = 0; i < strlen(text); ++i) {
-    nokia_5110_draw_char(nokia5110_font, text[i] - 0x20, dst);
-    dst += 6;
-  }
-
-  for (i = 0; i < iterations; ++i) {
-    SEND_DATA(canvas, 8 * 10);
-    while(1);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_2, 504);
-    wait_msec(wait_interval);
-  }
-
-  return 0;
+  err = nokia_5110_send_data(nokia5110_canvas, NOKIA_5110_CANVAS_SIZE);
+out:
+  if (under_lock)
+    spinlock_unlock(&nokia5110_lock);
+  return err;
 }
 
 void nokia5110_set_font(const font_desc_t *f)
 {
+  int under_lock;
+  if (should_lock()) {
+    spinlock_lock(&nokia5110_lock);
+    under_lock = 1;
+  }
+
   nokia5110_font = f; 
+
+  if (under_lock)
+    spinlock_unlock(&nokia5110_lock);
 }
 
