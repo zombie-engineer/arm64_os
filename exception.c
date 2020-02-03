@@ -4,209 +4,18 @@
 #include <vcanvas.h>
 #include <delays.h>
 #include <cpu.h>
+#include <error.h>
 #include <syscall.h>
+#include <common.h>
 
 #define INTERRUPT_TYPE_SYNCHRONOUS 0
 #define INTERRUPT_TYPE_IRQ         1
 #define INTERRUPT_TYPE_FIQ         2
 #define INTERRUPT_TYPE_SERROR      3
 
-/* Exception handling options */
-typedef struct ehdlopt {
-  int dump_ctx_to_uart;
-  int dump_stack;
-} ehdlopt_t;
-
-static ehdlopt_t ehdlopt = { 0 };
-
-static char cpuctx_buf[2048];
-
-/* exception level to control nested entry to exception code */
-static int elevel = 0;
-
-typedef struct printer {
-  int x;
-  int y;
-} printer_t;
-
-static printer_t printer;
-
-void printer_puts(printer_t *p, const char *str, int x, int y)
-{
-  uart_puts(str);
-  vcanvas_puts(&x, &y, str);
-}
-
-void printer_putc(printer_t *p, char c, int x, int y)
-{
-  uart_putc(c);
-  vcanvas_putc(&x, &y, c);
-}
-
-#define puts(str, x, y) printer_puts(&printer, str, x, y)
-#define putc(c, x, y) printer_putc(&printer, c, x, y)
-
-static const char *panic_msg = 0;
-
-void kernel_panic(const char *msg)
-{
-  panic_msg = msg;
-  asm volatile ("svc #0x1000");
-}
-
-irq_cb_t irq_cb = 0;
-irq_cb_t fiq_cb = 0;
-
-void set_irq_cb(irq_cb_t cb)
-{
-  irq_cb = cb;
-}
-
-void set_fiq_cb(irq_cb_t cb)
-{
-  fiq_cb = cb;
-}
-
-static void dump_stack(uint64_t *stack, int depth, int x, int y)
-{
-  char buf[64];
-  int i;
-
-  sprintf(buf, "stack at: %016x", stack);
-  puts(buf, x, y++);
-
-  for (i = 0; i < depth; ++i) {
-     sprintf(buf, "%08x: %016x", stack + i, *(stack + i));
-     puts(buf, x, y++);
-  }
-}
-
-typedef struct bin_exc_hdr {
-  char magic[8];
-  uint32_t crc;
-  uint32_t len;
-  struct {
-    uint64_t esr; 
-    uint64_t spsr; 
-    uint64_t far;
-    uint64_t type;
-  } e;
-} packed bin_exc_hdr_t;
-
-typedef struct bin_data_header {
-  char magic[8];
-  uint32_t crc;
-  uint32_t len;
-} packed bin_data_header_t;
-
-typedef struct bin_stack_header {
-  char magic[8];
-  uint32_t crc;
-  uint32_t len;
-  uint64_t stack_addr;
-} packed bin_stack_header_t;
-
-uint32_t count_crc(void *src, int size, uint32_t init_crc)
-{
-  int i;
-  uint32_t result;
-  result = init_crc;
-  for (i = 0; i < size; ++i)
-    result += ((const char *)src)[i];
-  return result;
-}
-
-#define MAGIC_REGS     "REGS"
-#define MAGIC_STACK    "STACK"
-#define MAGIC_BINBLOCK "BINBLOCK"
-#define MAGIC_CONTEXT  "CONTEXT"
-#define MAGIC_EXCEPTION "EXCPT"
-
-static void dump_ctx_to_uart(exception_info_t *e)
-{
-  char regs[2048];
-  bin_data_header_t h = { 0 };
-  bin_stack_header_t sh = { 0 };
-  bin_regs_hdr_t rh = { 0 };
-  bin_exc_hdr_t eh = { 0 };
-
-  memcpy(eh.magic, MAGIC_EXCEPTION, sizeof(MAGIC_EXCEPTION));
-  eh.len = sizeof(eh.e);
-  eh.e.esr = e->esr;
-  eh.e.spsr = e->spsr;
-  eh.e.far = e->far;
-  eh.e.type = e->type;
-  eh.crc = count_crc(&eh.e, sizeof(eh.e), 0);
-
-
-  memcpy(sh.magic, MAGIC_STACK, sizeof(MAGIC_STACK));
-  sh.len = sizeof(uint64_t) * (e->stack_base - e->stack);
-  sh.stack_addr = (uint64_t)e->stack;
-  sh.crc = count_crc(e->stack, sh.len, 0);
-
-  memcpy(rh.magic, MAGIC_REGS, sizeof(MAGIC_REGS));
-  if (cpuctx_serialize(e->cpu_ctx, &rh, regs, sizeof(regs)) > sizeof(regs))
-    kernel_panic("dump_cpu_context: regs too small.\n");
-
-  rh.crc = count_crc(regs, rh.len, 0); 
-
-  memcpy(h.magic, MAGIC_BINBLOCK, sizeof(MAGIC_BINBLOCK));
-  h.len += sizeof(eh);
-  h.len += sizeof(sh) + sh.len;
-  h.len += sizeof(rh) + rh.len;
-
-  h.crc = count_crc(&eh.e, sizeof(eh.e), 0);
-  h.crc = count_crc(&sh, sizeof(sh.crc), h.crc);
-  h.crc = count_crc(e->stack, sh.len, h.crc);
-  h.crc = count_crc(regs, rh.len, h.crc);
-
-  uart_send_buf(&h, sizeof(h));
-  uart_send_buf(&eh, sizeof(eh));
-  uart_send_buf(&rh, sizeof(rh));
-  uart_send_buf(&regs, rh.len);
-  uart_send_buf(&sh, sizeof(sh));
-  uart_send_buf(e->stack, sh.len);
-}
-
-static void dump_exception_ctx(exception_info_t *e, int x, int y)
-{
-  int stop;
-  char *p1, *p2;
-  int n;
-  p1 = cpuctx_buf;
-  p2 = p1;
-  stop = 0;
-
-  n = cpuctx_dump(e->cpu_ctx, cpuctx_buf, sizeof(cpuctx_buf));
-
-  if (n >= sizeof(cpuctx_buf)) {
-    puts("Failed to dump cpu context.\n", 0, 0);
-    while(1);
-  }
-
-  while(!stop) {
-    while(*p2 && *p2 != '\n') p2++;
-    if (*p2 == 0)
-      stop = 1;
-
-    *(p2++) = 0;
-    puts(p1, x, y++);
-    p1 = p2;
-  }
-}
-
-
-const char *get_interrupt_type_string(int interrupt_type) {
-  switch(interrupt_type) {
-    case INTERRUPT_TYPE_SYNCHRONOUS: return "Synchronous"; 
-    case INTERRUPT_TYPE_IRQ        : return "IRQ";         
-    case INTERRUPT_TYPE_FIQ        : return "FIQ";         
-    case INTERRUPT_TYPE_SERROR     : return "SError";      
-    default                        : return "Undefined";    
-  }
-}
-
-// decode exception type (some, not all. See ARM DDI0487B_b chapter D10.2.28)
+/* Incomplete list of ARMv8 exception class types encoded into ELx_ECR register.
+ * See ARM DDI0487B_b chapter D10.2.28
+ */
 #define EXC_CLASS_UNKNOWN           0b000000
 #define EXC_CLASS_TRAPPED_WFI_WFE   0b000001
 #define EXC_CLASS_ILLEGAL_EXECUTION 0b001110
@@ -220,80 +29,136 @@ const char *get_interrupt_type_string(int interrupt_type) {
 #define EXC_CLASS_STACK_ALIGN_FLT   0b100110
 #define EXC_CLASS_FLOATING_POINT    0b101100
 
-const char *get_exception_class_string(uint8_t exception_class) 
+/* Data abort decoded values from ARM DDI0487B_b
+ */
+/* Address size fault */
+#define DAT_ABRT_ADDR_SIZE                             0b000000
+/* Translation fault */
+#define DAT_ABRT_TRANSLATION                           0b000100
+/* Access flag fault */
+#define DAT_ABRT_ACCESS_FLAG                           0b001000
+/* Permission fault */
+#define DAT_ABRT_PERM                                  0b001100
+/* Synchronous External abort, not table walk */
+#define DAT_ABRT_SYNCH_EXT                             0b010000
+/* Synchronous Tag Check */
+#define DAT_ABRT_SYNCH_TAG_CHECK                       0b010001
+/* Synchronous External abort, on table walk */
+#define DAT_ABRT_SYNCH_EXT_TABLE_WALK                  0b010100
+/* Synchronous parity or ECC error on memory access, not on table walk */
+#define DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC            0b011000
+/* Synchronous parity or ECC error on memory access, on table walk */
+#define DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC_TABLE_WALK 0b011100
+/* Alignment fault */
+#define DAT_ABRT_ALIGNMENT                             0b100001
+/* Unsup atomic hardware update fault */
+#define DAT_ABRT_UNSUP_ATOMIC_HARDWARE_UPDATE          0b110001
+/* TLB conflict abort */
+#define DAT_ABRT_TLB_CONFLICT                          0b110000
+/* Section Domain Fault */
+#define DAT_ABRT_SECTION_DOMAIN                        0b111101
+/* Page Domain Fault */
+#define DAT_ABRT_PAGE_DOMAIN                           0b111110
+
+/* Exception handling options */
+typedef struct e_hdl_opts {
+  int dump_ctx_to_uart;
+  int dump_stack;
+} e_hdl_opts_t;
+
+static e_hdl_opts_t e_hdl_opts = { 0 };
+static const char *kernel_panic_msg = 0;
+/* exception level to control nested entry to exception code */
+static int elevel = 0;
+
+/* Fatal exception hooks can be set by kernel startup code as 
+ * hook functions, which will be executed in case of an exception 
+ * that was considered to be fatal / unrecoverable.
+ * The system will execute all the hooks one after another before
+ * entering a halted state.
+ */
+static exception_hook fatal_exception_hooks[8] = { 0 };
+static int fatal_exception_hooks_count = 0;
+
+/* Kernel panic hooks are set by the system to provide control
+ * of how panic messages are reported.
+ */
+static kernel_panic_reporter kernel_panic_reporters[8] = { 0 };
+static int kernel_panic_reporters_count = 0;
+
+/* irq_cb / fiq_cb - callbacks set by kernel startup code 
+ * that totally control the behavior of the system at triggered 
+ * external interrupts.
+ */
+static irq_cb_t irq_cb = 0;
+static irq_cb_t fiq_cb = 0;
+
+void kernel_panic(const char *msg)
 {
-  switch(exception_class) {
-    case EXC_CLASS_UNKNOWN          : return "Unknown";
-    case EXC_CLASS_TRAPPED_WFI_WFE  : return "Trapped WFI/WFE";
-    case EXC_CLASS_ILLEGAL_EXECUTION: return "Illegal execution";
-    case EXC_CLASS_SVC_AARCH32      : return "System call 32bit";
-    case EXC_CLASS_SVC_AARCH64      : return "System call 64bit";
-    case EXC_CLASS_INST_ABRT_LO_EL  : return "Instruction abort, lower EL";
-    case EXC_CLASS_INST_ABRT_EQ_EL  : return "Instruction abort, same EL";
-    case EXC_CLASS_INST_ALIGNMENT   : return "Instruction alignment fault";
-    case EXC_CLASS_DATA_ABRT_LO_EL  : return "Data abort, lower EL";
-    case EXC_CLASS_DATA_ABRT_EQ_EL  : return "Data abort, same EL";
-    case EXC_CLASS_STACK_ALIGN_FLT  : return "Stack alignment fault";
-    case EXC_CLASS_FLOATING_POINT   : return "Floating point";
-    default                         : return "Unknown2";
-  }
+  kernel_panic_msg = msg;
+  asm volatile ("svc #0x1000");
+}
+
+int add_kernel_panic_reporter(kernel_panic_reporter cb)
+{
+  if (kernel_panic_reporters_count == ARRAY_SIZE(kernel_panic_reporters))
+    return ERR_NO_RESOURCE;
+
+  kernel_panic_reporters[kernel_panic_reporters_count++] = cb;
+  return ERR_OK;
+}
+
+static void exec_kernel_panic_reporters(exception_info_t *e, const char *msg)
+{
+  int i;
+  for (i = 0; i < kernel_panic_reporters_count; ++i)
+    kernel_panic_reporters[i](e, msg);
+
+  //    snprintf(buf, sizeof(buf), "Kernel panic: %s\n", panic_msg); 
+  //    puts(buf, 10, 9);
+  //    while(1);
+}
+  
+
+int add_fatal_exception_hook(exception_hook cb)
+{
+  if (kernel_panic_reporters_count == ARRAY_SIZE(kernel_panic_reporters))
+    return ERR_NO_RESOURCE;
+
+  fatal_exception_hooks[fatal_exception_hooks_count++] = cb;
+  return ERR_OK;
+}
+
+static void exec_fatal_exception_hooks(exception_info_t *e)
+{
+  int i;
+  for (i = 0; i < fatal_exception_hooks_count; ++i)
+    fatal_exception_hooks[i](e);
+}
+
+void set_irq_cb(irq_cb_t cb)
+{
+  irq_cb = cb;
+}
+
+void set_fiq_cb(irq_cb_t cb)
+{
+  fiq_cb = cb;
 }
 
 static void __handle_data_abort(exception_info_t *e)
 {
-  int dfsc;
-
-  // el_num = e->esr & 0x3;
-  dfsc = (int)e->esr & 0x0000003f;
-
-  switch(dfsc & 0x3c) {
-      case 0b000000: puts("Address size fault", 0, 1); break;
-      case 0b000100: puts("Translation fault", 0, 1);  break;
-      case 0b001000: puts("Access flag fault", 0, 1);  break;
-      case 0b001100: puts("Permission fault", 0, 1);   break;
-      case 0b010000: puts("Synchronous External abort, not table walk", 0, 1); break;
-      case 0b010001: puts("Synchronous Tag Check", 0, 1); break;
-      case 0b010100: puts("Synchronous External abort, on table walk", 0, 1); 
-        break;
-      case 0b011000: puts("Synchronous parity or ECC error on memory access, not on table walk", 0, 1);
-        break;
-      case 0b011100: puts("Synchronous parity or ECC error on memory access, on table walk", 0, 1);
-        break;
-      default:
-        switch(dfsc) {
-          case 0b100001: puts("Alignment fault", 0, 1); break;
-          case 0b110001: puts("Unsup atomic hardware update fault", 0, 1); break;
-          case 0b110000: puts("TLB conflict abort", 0, 1); break;
-          case 0b111101: puts("Section Domain Fault", 0, 1); break;
-          case 0b111110: puts("Page Domain Fault", 0, 1); break;
-          default: puts("Undefined Data abort code", 0, 1); break;
-        }
-    }
-//    if (e->esr & 0b1000000) {
-//      puts(", write op");
-//    }
-//    else {
-//      puts(", read op");
-//    }
-//    if (e->esr & (1 << 24)) {
-//      puts(", ISV valid");
-//    }
-//    if (e->esr & (1 << 15)) {
-//      puts(", 64 bit");
-//    }
-//    else {
-//      puts(", 32 bit");
-//    }
-    dump_exception_ctx(e, 0, 4);
+  exec_fatal_exception_hooks(e);
+  while(1);
 }
 
 static void __handle_instr_abort(exception_info_t *e, uint64_t elr)
 {
-  puts("instruction abort handler", 10, 9);
-  dump_exception_ctx(e, 10, 10);
+  exec_fatal_exception_hooks(e);
+  while(1);
 }
 
-static int inline __get_synchr_exception_class(uint64_t esr)
+static int inline get_synchr_exception_class(uint64_t esr)
 {
   return (esr >> 26) & 0xff; 
 }
@@ -302,20 +167,20 @@ static void __handle_svc_32(exception_info_t *e)
 {
 }
 
+#define get_syscall_id(esr) (esr & 0xffff)
+
 static void __handle_svc_64(exception_info_t *e)
 {
   char buf[512];
-  int syscall_id;
-  syscall_id = e->esr & 0xffff;
-  switch(syscall_id) {
+  switch(get_syscall_id(e->esr)) {
     case SYSCALL_KERNEL_PANIC:
-      snprintf(buf, sizeof(buf), "Kernel panic: %s\n", panic_msg); 
-      puts(buf, 10, 9);
+      // exec_kernel_panic_reporters(e, kernel_panic_msg);
+      exec_fatal_exception_hooks(e);
       while(1);
       break;
     default:
-      snprintf(buf, sizeof(buf), "Unknown syscall: %d", syscall_id);
-      puts(buf, 10, 9);
+      snprintf(buf, sizeof(buf), "Unknown syscall: %d", get_syscall_id(e->esr));
+      // puts(buf, 10, 9);
       break;
   }
 }
@@ -324,36 +189,20 @@ static void __handle_interrupt_synchronous(exception_info_t *e)
 {
   /* exception class */
   uint8_t ec;
-  char buf[512];
 
-  ec = __get_synchr_exception_class(e->esr);
-
-  snprintf(buf, 512, "class: %s, esr: %08x, elr: %08x, far: %08x, sp now at: %08x", 
-      get_exception_class_string(ec), 
-      (int)e->esr, 
-      (int)e->elr, 
-      (int)e->far,
-      &buf[0]);
-  puts(buf, 0, 1);
-
-  if (ehdlopt.dump_stack) {
-    dump_stack(e->stack, 30, 160, 0);
-  }
-  // dump_ctx_to_uart(e);
-  // while(1);
+  ec = get_synchr_exception_class(e->esr);
 
   switch (ec) {
     case EXC_CLASS_DATA_ABRT_LO_EL:
     case EXC_CLASS_DATA_ABRT_EQ_EL:
       __handle_data_abort(e);
-      while(1);
       break;
     case EXC_CLASS_INST_ABRT_LO_EL:
     case EXC_CLASS_INST_ABRT_EQ_EL:
       __handle_instr_abort(e, e->elr);
       break;
     case EXC_CLASS_INST_ALIGNMENT:
-      puts("instruction alignment handler", 0, 0);
+      // puts("instruction alignment handler", 0, 0);
       break;
     case EXC_CLASS_SVC_AARCH64:
       __handle_svc_64(e);
@@ -377,27 +226,145 @@ static void __handle_interrupt_irq()
     irq_cb();
 }
 
-// static void __print_exception_info(exception_info_t *e, int elevel) 
-// {
-//   int x;
-//   int y;
-//   char buf[256];
-// 
-//   x = 100;
-//   y = 0;
-//   snprintf(buf, 256, "interrupt: l: %d, t: %s", elevel, get_interrupt_type_string(e->type));
-//   puts(buf, x, y + 2 * (elevel - 1));
-//   y += 3;
-//   dump_exception_ctx(e, x, y + 17 * (elevel - 1));
-// }
+const char *get_data_abort_string(int esr)
+{
+  int dfsc = esr & 0x0000003f;
+
+#define SWICASE(x) case x: return #x
+  switch(dfsc & 0x3c) {
+    SWICASE(DAT_ABRT_ADDR_SIZE);
+    SWICASE(DAT_ABRT_TRANSLATION);
+    SWICASE(DAT_ABRT_ACCESS_FLAG);
+    SWICASE(DAT_ABRT_PERM);
+    SWICASE(DAT_ABRT_SYNCH_EXT);
+    SWICASE(DAT_ABRT_SYNCH_TAG_CHECK);
+    SWICASE(DAT_ABRT_SYNCH_EXT_TABLE_WALK);
+    SWICASE(DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC);
+    SWICASE(DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC_TABLE_WALK);
+  }
+  switch(dfsc) {
+    SWICASE(DAT_ABRT_ALIGNMENT);
+    SWICASE(DAT_ABRT_UNSUP_ATOMIC_HARDWARE_UPDATE);
+    SWICASE(DAT_ABRT_TLB_CONFLICT);
+    SWICASE(DAT_ABRT_SECTION_DOMAIN);
+    SWICASE(DAT_ABRT_PAGE_DOMAIN);
+  }
+  return "DAT_ABRT_UNDEF";
+}
+
+const char *get_exception_type_string(int type) 
+{
+  switch(type) {
+    case INTERRUPT_TYPE_SYNCHRONOUS: return "Synchronous";
+    case INTERRUPT_TYPE_IRQ        : return "IRQ";
+    case INTERRUPT_TYPE_FIQ        : return "FIQ";
+    case INTERRUPT_TYPE_SERROR     : return "SError";
+    default                        : return "Undefined";
+  }
+}
+
+const char *get_synchr_exception_class_string(int esr) 
+{
+  int exception_class = get_synchr_exception_class(esr);
+
+  switch(exception_class) {
+    case EXC_CLASS_UNKNOWN          : return "Unknown";
+    case EXC_CLASS_TRAPPED_WFI_WFE  : return "Trapped WFI/WFE";
+    case EXC_CLASS_ILLEGAL_EXECUTION: return "Illegal execution";
+    case EXC_CLASS_SVC_AARCH32      : return "System call 32bit";
+    case EXC_CLASS_SVC_AARCH64      : return "System call 64bit";
+    case EXC_CLASS_INST_ABRT_LO_EL  : return "Instruction abort, lower EL";
+    case EXC_CLASS_INST_ABRT_EQ_EL  : return "Instruction abort, same EL";
+    case EXC_CLASS_INST_ALIGNMENT   : return "Instruction alignment fault";
+    case EXC_CLASS_DATA_ABRT_LO_EL  : return "Data abort, lower EL";
+    case EXC_CLASS_DATA_ABRT_EQ_EL  : return "Data abort, same EL";
+    case EXC_CLASS_STACK_ALIGN_FLT  : return "Stack alignment fault";
+    case EXC_CLASS_FLOATING_POINT   : return "Floating point";
+    default                         : return "Unknown2";
+  }
+}
+
+const char *get_svc_aarch64_string(int esr)
+{
+#define SWICASE(x) case SYSCALL_## x: return "SYSCALL64_" #x
+
+  switch(get_syscall_id(esr)) {
+    SWICASE(KERNEL_PANIC);
+  }
+  return "SYSCALL64_UNKNOWN";
+}
+
+const char *get_synch_exception_detail_string(int esr) 
+{
+  int exception_class = get_synchr_exception_class(esr);
+  switch(exception_class) {
+    case EXC_CLASS_DATA_ABRT_LO_EL  : 
+    case EXC_CLASS_DATA_ABRT_EQ_EL  : return get_data_abort_string(esr);
+    case EXC_CLASS_UNKNOWN          : return "";
+    case EXC_CLASS_TRAPPED_WFI_WFE  : return "";
+    case EXC_CLASS_ILLEGAL_EXECUTION: return "";
+    case EXC_CLASS_SVC_AARCH32      : return "";
+    case EXC_CLASS_SVC_AARCH64      : return get_svc_aarch64_string(esr);
+    case EXC_CLASS_INST_ABRT_LO_EL  : return "";
+    case EXC_CLASS_INST_ABRT_EQ_EL  : return "";
+    case EXC_CLASS_INST_ALIGNMENT   : return "";
+    case EXC_CLASS_STACK_ALIGN_FLT  : return "";
+    case EXC_CLASS_FLOATING_POINT   : return "";
+    default                         : return "";
+  }
+}
+
+int gen_exception_string_irq(exception_info_t *e, char *buf, size_t bufsz)
+{
+  return 0;
+}
+
+int gen_exception_string_fiq(exception_info_t *e, char *buf, size_t bufsz)
+{
+  return 0;
+}
+
+int gen_exception_string_synch(exception_info_t *e, char *buf, size_t bufsz)
+{
+  return snprintf(buf, bufsz, "class: %s, detail: %s",
+    get_synchr_exception_class_string(e->esr),
+    get_synch_exception_detail_string(e->esr)
+  );
+}
+
+int gen_exception_string_serror(exception_info_t *e, char *buf, size_t bufsz)
+{
+  return 0;
+}
+
+int gen_exception_string_specific(exception_info_t *e, char *buf, size_t bufsz)
+{
+  switch (e->type) {
+    case INTERRUPT_TYPE_IRQ:         return gen_exception_string_irq(e, buf, bufsz);
+    case INTERRUPT_TYPE_FIQ:         return gen_exception_string_fiq(e, buf, bufsz);
+    case INTERRUPT_TYPE_SYNCHRONOUS: return gen_exception_string_synch(e, buf, bufsz);
+    case INTERRUPT_TYPE_SERROR:      return gen_exception_string_serror(e, buf, bufsz);
+  }
+  return snprintf(buf, bufsz, "<UNKNOWN_TYPE>");
+}
+
+int gen_exception_string_generic(exception_info_t *e, char *buf, size_t bufsz)
+{
+  int n;
+  n = snprintf(
+    buf, 
+    bufsz, 
+    "Excepiton: type:%s, esr: 0x%016llx, elr: 0x%016llx, far: 0x%016llx", 
+    get_exception_type_string(e->type),
+    e->esr,
+    e->elr,
+    e->far);
+  return n;
+}
 
 void __handle_interrupt(exception_info_t *e)
 {
   elevel++;
-  if (ehdlopt.dump_ctx_to_uart) {
-    dump_ctx_to_uart(e);
-  }
-  // __print_exception_info(e, elevel);
 
   switch (e->type) {
     case INTERRUPT_TYPE_IRQ:
@@ -416,3 +383,4 @@ void __handle_interrupt(exception_info_t *e)
   } 
   elevel--;
 }
+

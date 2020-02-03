@@ -37,7 +37,7 @@ LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font.o to_raspi.nokia5110.o font/font.o
+OBJS += $(LIBS) font.o to_raspi.nokia5110.o font/font.o lib/checksum.o
 
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
@@ -97,7 +97,7 @@ qemuat:
 
 .PHONY: serial
 serial:
-	minicom -b 115200 -D /dev/ttyUSB0
+	minicom -b 115200 -D /dev/ttyUSB0 -C uart_capture_$$(date +%S).bin
 
 .PHONY: clean
 clean:

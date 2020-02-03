@@ -51,5 +51,3 @@ int aarch64_print_cpu_ctx(aarch64_cpuctx_t *ctx, char *buf, int bufsize);
 void aarch64_cpu_ctx_save_ctx(aarch64_cpuctx_t *to);
 
 void aarch64_cpu_ctx_load_ctx(aarch64_cpuctx_t *from);
-
-int aarch64_cpu_serialize_regs(aarch64_cpuctx_t *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);

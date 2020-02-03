@@ -13,6 +13,7 @@ bt
 c
 end
 
+b main
 # b _start
 # b switch_to_initial_task
 # b __interrupt_cur_el_spx_irq

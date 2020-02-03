@@ -1,9 +1,8 @@
 #pragma once
 #include <compiler.h>
+#include <types.h>
 
 typedef struct cpuctx cpuctx_t;
-
-int cpuctx_dump(void *ctx, char *buf, int bufsize);
 
 typedef struct reg_info {
   char name[8];
@@ -17,7 +16,7 @@ typedef struct bin_regs_hdr {
   int numregs;
 } packed bin_regs_hdr_t;
 
-int cpuctx_serialize(void *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
+int cpuctx_serialize(const void *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
 
 typedef struct cpuctx_init_opts {
   /* address to buffer, used as a cpu context
@@ -48,8 +47,23 @@ typedef struct cpuctx_init_opts {
 
 int cpuctx_init(cpuctx_init_opts_t *o);
 
+
+/* This is a generic way to pull out any register set from any cpu. */
+typedef struct cpu_reg {
+  char name[16];
+  uint64_t value;
+} cpu_reg_t;
+
+typedef int (*cpuctx_enum_regs_cb)(const cpu_reg_t *, int, void *);
+
+int cpuctx_enum_registers(const void *ctx, cpuctx_enum_regs_cb cb, void *cb_priv);
+
+typedef int (*cpuctx_print_regs_cb)(const char *reg_str, size_t reg_str_sz, void *cb_priv);
+int cpuctx_print_regs(void *ctx, cpuctx_print_regs_cb cb, void *cb_priv);
+
 void enable_irq(void);
 void disable_irq(void);
 int is_irq_enabled(void);
 
 #define WAIT_FOR_EVENT asm volatile("wfe" ::: "memory")
+
