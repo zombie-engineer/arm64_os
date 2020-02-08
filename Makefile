@@ -1,6 +1,36 @@
 GDB := 
-SRCS = $(wildcard *.c)
-OBJS = $(SRCS:.c=.o)
+
+CC      = $(CROSS_COMPILE)gcc
+LD      = $(CROSS_COMPILE)ld
+NM      = $(CROSS_COMPILE)nm
+OBJCOPY = $(CROSS_COMPILE)objcopy
+
+OBJS := \
+	binblock.o\
+	console.o\
+	delays.o\
+	gpio.o\
+	power.o\
+	rectangle.o\
+	shiftreg.o\
+	unhandled_exception.o\
+	viewport_console.o\
+	clock_manager.o\
+	cpuctx_generic.o\
+	dma.o\
+	intr_ctl.o\
+	pwm.o\
+	ringbuf.o\
+	tags.o\
+	vcanvas.o\
+	common.o	\
+	debug.o		 \
+	exception.o\
+	rand.o\
+	sched.o\
+	timer.o\
+	video_console.o
+
 INCLUDES := include
 
 OPTIMIZATION_FLAGS = -O2
@@ -39,17 +69,16 @@ $(info LIBS = $(LIBS))
 
 OBJS += $(LIBS) font.o to_raspi.nokia5110.o font/font.o lib/checksum.o
 
-CC      = $(CROSS_COMPILE)gcc
-LD      = $(CROSS_COMPILE)ld
-NM      = $(CROSS_COMPILE)nm
-OBJCOPY = $(CROSS_COMPILE)objcopy
-
-
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+.PHONY: main_qemu.o
+main_qemu.o: main.c
+	echo $<
+	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
 font.o: font.psf
 	$(LD) -r -b binary -o font.o font.psf
@@ -58,10 +87,16 @@ font.o: font.psf
 to_raspi.nokia5110.o: 
 	$(LD) -r -b binary to_raspi.nokia5110 -o $@
 
-kernel8.img: $(OBJS)
-	$(LD) -nostdlib -nostartfiles $(OBJS) -T arch/armv8/link.ld -o kernel8.elf -Map kernel8.map
-	$(NM) --numeric-sort kernel8.elf > all_symbols.map
+kernel8.img: $(OBJS) main.o
+	$(LD) -nostdlib -nostartfiles $^ -T arch/armv8/link.ld -o $(@:.img=.elf) -Map $(@:.img=.map)
+	$(NM) --numeric-sort kernel8.elf > $@.sym
 	$(OBJCOPY) -O binary kernel8.elf $@
+
+qemubin.img: $(OBJS) main_qemu.o
+	$(LD) -nostdlib -nostartfiles $^ -T arch/armv8/link.ld -o $@.elf -Map $@.map
+	$(NM) --numeric-sort $@.elf > $@.sym
+	$(OBJCOPY) -O binary $@.elf $@
+
 
 QEMU_FLAGS := -M raspi3 -accel tcg -nographic
 QEMU_TRACE_ARGS := -trace enable=*bcm2835*
@@ -73,22 +108,22 @@ endif
 
 # Run in qemu
 .PHONY: qemu
-qemu:
-	$(QEMU) $(QEMU_FLAGS) -kernel kernel8.img
+qemu: qemubin.img
+	$(QEMU) $(QEMU_FLAGS) -kernel $<
 
 # Run in qemu, wait until debugger attached
 .PHONY: qemud
-qemud:
-	$(QEMU) $(QEMU_FLAGS) -kernel kernel8.img -s -S
+qemud: qemubin.img
+	$(QEMU) $(QEMU_FLAGS) -kernel $< -s -S
 
 # Run in qemu, with qemu also debugged AND wait until debugger attached
 # Note: qemu.gdb holds script that will be executed while debugging
 # qemu process. Other gdb also needed to be attached externally via
 # -s -S flags for a normal debug session.
 .PHONY: qemuds
-qemuds:
+qemuds: qemubin.img
 	gdb -x qemu.gdb\
-	 	--args $(QEMU) $(QEMU_FLAGS) -kernel kernel8.img -s -S
+		--args $(QEMU) $(QEMU_FLAGS) -kernel $< -s -S
 
 # Attach to started qemu process with gdb
 .PHONY: qemuat
