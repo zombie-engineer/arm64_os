@@ -7,4 +7,4 @@ extern void __armv8_set_elr_el1(uint64_t value);
 
 extern void __armv8_set_sp_el1(uint64_t value);
 
-extern noret void __armv8_cpuctx_eret(void);
+extern NORET void __armv8_cpuctx_eret(void);

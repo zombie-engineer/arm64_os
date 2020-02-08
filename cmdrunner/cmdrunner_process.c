@@ -11,7 +11,7 @@
 
 static char ringbuf_buf[256];
 static ringbuf_t char_pipe;
-static aligned(64) uint64_t char_pipe_lock;
+static ALIGNED(64) uint64_t char_pipe_lock;
 
 static char cmdrunner_getch()
 {

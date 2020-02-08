@@ -12,14 +12,14 @@ typedef struct binblock_header {
   char binblock_id[8];
   uint32_t checksum;
   uint32_t len;
-} packed binblock_header_t;
+} PACKED binblock_header_t;
 
 typedef struct binblock_cpuctx {
   struct {
     char name[8];
     uint64_t value;
   } cpu_regs[40];
-} packed binblock_cpuctx_t;
+} PACKED binblock_cpuctx_t;
 
 typedef struct binblock_exception {
   uint64_t type;
@@ -27,7 +27,7 @@ typedef struct binblock_exception {
   uint64_t spsr; 
   uint64_t far;
   binblock_cpuctx_t cpu_ctx;
-} packed binblock_exception_t;
+} PACKED binblock_exception_t;
 
 
 typedef int (*sender_fn)(const char *, size_t);

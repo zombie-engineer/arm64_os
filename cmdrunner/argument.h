@@ -21,7 +21,7 @@
   }
 
 #define DECL_ARGS_CTX()           \
-  unused string_tokens_t subargs; \
+  UNUSED string_tokens_t subargs; \
   string_token_t *subcmd_token;   \
   subcmd_token = &args->ts[0];    \
   subargs.ts  = subcmd_token + 1; \

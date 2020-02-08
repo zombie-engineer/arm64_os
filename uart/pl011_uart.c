@@ -322,7 +322,7 @@ typedef struct rx_subscriber {
 } rx_subscriber_t;
 
 static rx_subscriber_t rx_subscribers[8];
-static aligned(64) uint64_t rx_subscribers_lock;
+static ALIGNED(64) uint64_t rx_subscribers_lock;
 
 static inline void rx_subscribers_init()
 {

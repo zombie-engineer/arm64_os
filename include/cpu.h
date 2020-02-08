@@ -7,14 +7,14 @@ typedef struct cpuctx cpuctx_t;
 typedef struct reg_info {
   char name[8];
   uint64_t value;
-} packed reg_info_t;
+} PACKED reg_info_t;
 
 typedef struct bin_regs_hdr {
   char magic[8];
   int crc;
   int len;
   int numregs;
-} packed bin_regs_hdr_t;
+} PACKED bin_regs_hdr_t;
 
 int cpuctx_serialize(const void *ctx, bin_regs_hdr_t *h, char *buf, int bufsize);
 

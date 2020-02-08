@@ -71,7 +71,7 @@
 #define DMA_DEBUG_LITE                    (1 << 28)
 
 
-static __attribute__((aligned(32))) dma_cb_t dma_channels[16];
+static ALIGNED(32) dma_cb_t dma_channels[16];
 
 int dma_set_transfer_width(int channel, int width) 
 {

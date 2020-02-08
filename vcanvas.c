@@ -43,7 +43,7 @@ typedef struct {
   unsigned int height;
   unsigned int width;
   unsigned char glyphs;
-} packed psf_t;
+} PACKED psf_t;
 
 extern volatile unsigned char _binary_font_psf_start;
 

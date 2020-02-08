@@ -4,7 +4,7 @@
 typedef struct segment {
   int offset;
   unsigned size;
-} segment_t aligned(8);
+} segment_t ALIGNED(8);
 
 typedef struct rect {
   segment_t x;

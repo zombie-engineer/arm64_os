@@ -22,7 +22,7 @@ typedef struct exception_info {
   void *cpu_ctx;
   uint64_t *stack;
   uint64_t *stack_base;
-} packed exception_info_t;
+} PACKED exception_info_t;
 
 typedef void (*exception_hook)(exception_info_t *);
 int add_unhandled_exception_hook(exception_hook h);

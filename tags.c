@@ -1,12 +1,13 @@
 #include "tags.h"
 #include "common.h"
+#include <compiler.h>
 
 typedef struct tag {
   unsigned int size;
   unsigned short id;
   unsigned short magic;
   char data[0];
-} __attribute__((packed)) tag_t;
+} PACKED tag_t;
 
 
 void tags_print_cmdline()

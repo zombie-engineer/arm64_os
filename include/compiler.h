@@ -1,9 +1,9 @@
 #pragma once
 
-#define optimized      __attribute__((optimize("O3")))
-#define packed         __attribute__((packed))
-#define unused         __attribute__((unused))
-#define noret          __attribute__((noreturn))
-#define section(name)  __attribute__((section(name)))
-#define weak_symbol    __attribute__((weak))
-#define aligned(bytes) __attribute__((aligned(bytes)))
+#define OPTIMIZED      __attribute__((optimize("O3")))
+#define PACKED         __attribute__((packed))
+#define UNUSED         __attribute__((unused))
+#define NORET          __attribute__((noreturn))
+#define SECTION(name)  __attribute__((section(name)))
+#define WEAK_SYMBOL    __attribute__((weak))
+#define ALIGNED(bytes) __attribute__((aligned(bytes)))
