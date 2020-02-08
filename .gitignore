@@ -5,3 +5,6 @@
 *.map
 test/test
 sdcard
+uart_capture_*.bin
+*fontmaker
+*myfont.raw
