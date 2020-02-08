@@ -49,7 +49,7 @@ typedef struct cpuctx_print_reg_arg {
 static int cpuctx_print_reg(const cpu_reg_t *r, int reg_idx, void *cb_priv)
 {
   char reg_str[64];
-  char regname[4];
+  char regname[5];
   int n;
   cpuctx_print_reg_arg_t *a = (cpuctx_print_reg_arg_t *)cb_priv;
 

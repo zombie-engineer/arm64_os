@@ -246,7 +246,7 @@ GLOBAL_VAR(__armv8_per_cor_mpidr_el1):
 // 8 byte aligned cpu context
 .align 3
 GLOBAL_VAR(__armv8_cpuctx_e):
-.rept 33
+.rept 34
 .quad 0x6666666666666666
 .endr
 

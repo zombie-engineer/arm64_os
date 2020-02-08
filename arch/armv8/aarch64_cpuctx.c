@@ -11,7 +11,7 @@ static const char *aarch64_cpu_reg_names[] = {
   "x15", "x16", "x17", "x18", "x19",
   "x20", "x21", "x22", "x23", "x24",
   "x25", "x26", "x27", "x28", "x29",
-  "lr", "sp" , "pc"
+  "lr", "sp" , "pc"  , "cpsr"
 };
 
 int cpuctx_enum_registers(const void *ctx, cpuctx_enum_regs_cb cb, void *cb_priv)

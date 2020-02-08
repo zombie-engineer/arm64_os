@@ -34,10 +34,11 @@ FUNC(__armv8_cpuctx_store):
   // before exception happened
   mrs   x29, sp_el0
   stp   x28, x29, [x30], #16
-  // store program counter from a task
+  // store program counter and cpsr from a task
   // before exception happened
   mrs   x28, elr_el1
-  str   x28, [x30]
+  mrs   x29, spsr_el1
+  stp   x28, x29, [x30]
 
   // restore this function's link register (x30)
   // to return
@@ -52,6 +53,9 @@ FUNC(__armv8_cpuctx_eret):
   ldp   x0 , x1 , [x30, #(31 << 3)]
   msr   sp_el0, x0
   msr   elr_el1, x1
+  // restore spsr
+  ldr   x0 , [x30, #(33 << 3)]
+  msr   spsr_el1, x0
   ldp   x0 , x1 , [x30], #16
   ldp   x2 , x3 , [x30], #16
   ldp   x4 , x5 , [x30], #16

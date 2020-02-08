@@ -40,8 +40,9 @@ typedef struct aarch64_cpuctx {
 
       uint64_t sp;
       uint64_t pc;
+      uint64_t cpsr;
     } n;
-    uint64_t regs[33];
+    uint64_t regs[34];
   } u;
 } aarch64_cpuctx_t;
 
