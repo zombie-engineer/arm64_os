@@ -49,9 +49,26 @@ typedef struct cpuctx_print_reg_arg {
 static int cpuctx_print_reg(const cpu_reg_t *r, int reg_idx, void *cb_priv)
 {
   char reg_str[64];
+  char regname[4];
   int n;
   cpuctx_print_reg_arg_t *a = (cpuctx_print_reg_arg_t *)cb_priv;
-  n = snprintf(reg_str, sizeof(reg_str), "%s: %016llx%c", r->name, r->value);
+
+  const char *ptr = r->name;
+  char *regptr = regname + sizeof(regname) - 1; // points one char past regname array
+  // zero-terminate last char in regname array later
+
+  while(*ptr) 
+    ptr++;
+
+  // by now ptr and regptr point at both at last char of zero-termed strings.
+
+  while(regptr >= regname && ptr >= r->name)
+    *regptr-- = *ptr--;
+
+  while(regptr >= regname)
+    *regptr-- = ' ';
+
+  n = snprintf(reg_str, sizeof(reg_str), "%s: %016llx", regname, r->value);
   return a->print(reg_str, n, a->print_priv);
 }
 
