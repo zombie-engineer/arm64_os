@@ -30,8 +30,9 @@ int add_unhandled_exception_hook(exception_hook h);
 typedef void (*kernel_panic_reporter)(exception_info_t *, const char *);
 int add_kernel_panic_reporter(kernel_panic_reporter h);
 
-const char *get_synchr_exception_class_string(int esr);
-const char *get_data_abort_string(int esr);
+int get_synchr_exception_class(uint64_t esr);
+const char *get_synchr_exception_class_string(uint64_t esr);
+const char *get_data_abort_string(uint64_t esr);
 const char *get_exception_type_string(int type);
 int gen_exception_string_generic(exception_info_t *e, char *buf, size_t bufsz);
 int gen_exception_string_specific(exception_info_t *e, char *buf, size_t bufsz);

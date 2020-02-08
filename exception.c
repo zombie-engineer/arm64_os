@@ -161,9 +161,9 @@ static void __handle_instr_abort(exception_info_t *e, uint64_t elr)
   while(1);
 }
 
-static int inline get_synchr_exception_class(uint64_t esr)
+int get_synchr_exception_class(uint64_t esr)
 {
-  return (esr >> 26) & 0xff; 
+  return (esr >> 26) & 0x7f; 
 }
 
 static void __handle_svc_32(exception_info_t *e)
@@ -232,7 +232,7 @@ static void __handle_interrupt_irq()
     irq_cb();
 }
 
-const char *get_data_abort_string(int esr)
+const char *get_data_abort_string(uint64_t esr)
 {
   int dfsc = esr & 0x0000003f;
 
@@ -272,7 +272,7 @@ const char *get_exception_type_string(int type)
   }
 }
 
-const char *get_synchr_exception_class_string(int esr) 
+const char *get_synchr_exception_class_string(uint64_t esr) 
 {
   int exception_class = get_synchr_exception_class(esr);
 
@@ -304,11 +304,11 @@ const char *get_svc_aarch64_string(int esr)
 #undef SWICASE
 }
 
-const char *get_synch_exception_detail_string(int esr) 
+const char *get_synch_exception_detail_string(uint64_t esr) 
 {
   int exception_class = get_synchr_exception_class(esr);
   switch(exception_class) {
-    case EXC_CLASS_DATA_ABRT_LO_EL  : 
+    case EXC_CLASS_DATA_ABRT_LO_EL  :
     case EXC_CLASS_DATA_ABRT_EQ_EL  : return get_data_abort_string(esr);
     case EXC_CLASS_UNKNOWN          : return "";
     case EXC_CLASS_TRAPPED_WFI_WFE  : return "";
