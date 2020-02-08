@@ -1,8 +1,5 @@
 #include <exception.h>
-#include <uart/uart.h>
 #include <stringlib.h>
-#include <vcanvas.h>
-#include <delays.h>
 #include <cpu.h>
 #include <error.h>
 #include <syscall.h>
@@ -13,7 +10,8 @@
 #define INTERRUPT_TYPE_FIQ         2
 #define INTERRUPT_TYPE_SERROR      3
 
-/* Incomplete list of ARMv8 exception class types encoded into ELx_ECR register.
+/*
+ * Incomplete list of ARMv8 exception class types encoded into ELx_ECR register.
  * See ARM DDI0487B_b chapter D10.2.28
  */
 #define EXC_CLASS_UNKNOWN           0b000000
@@ -29,7 +27,8 @@
 #define EXC_CLASS_STACK_ALIGN_FLT   0b100110
 #define EXC_CLASS_FLOATING_POINT    0b101100
 
-/* Data abort decoded values from ARM DDI0487B_b
+/*
+ * Data abort decoded values from ARM DDI0487B_b
  */
 /* Address size fault */
 #define DAT_ABRT_ADDR_SIZE                             0b000000
@@ -68,10 +67,12 @@ typedef struct e_hdl_opts {
 
 static e_hdl_opts_t e_hdl_opts = { 0 };
 static const char *kernel_panic_msg = 0;
+
 /* exception level to control nested entry to exception code */
 static int elevel = 0;
 
-/* Fatal exception hooks can be set by kernel startup code as 
+/*
+ * Fatal exception hooks can be set by kernel startup code as 
  * hook functions, which will be executed in case of an exception 
  * that was considered to be fatal / unrecoverable.
  * The system will execute all the hooks one after another before
@@ -80,13 +81,15 @@ static int elevel = 0;
 static exception_hook fatal_exception_hooks[8] = { 0 };
 static int fatal_exception_hooks_count = 0;
 
-/* Kernel panic hooks are set by the system to provide control
+/*
+ * Kernel panic hooks are set by the system to provide control
  * of how panic messages are reported.
  */
 static kernel_panic_reporter kernel_panic_reporters[8] = { 0 };
 static int kernel_panic_reporters_count = 0;
 
-/* irq_cb / fiq_cb - callbacks set by kernel startup code 
+/*
+ * irq_cb / fiq_cb - callbacks set by kernel startup code 
  * that totally control the behavior of the system at triggered 
  * external interrupts.
  */
@@ -120,7 +123,7 @@ static void exec_kernel_panic_reporters(exception_info_t *e, const char *msg)
 }
   
 
-int add_fatal_exception_hook(exception_hook cb)
+int add_unhandled_exception_hook(exception_hook cb)
 {
   if (kernel_panic_reporters_count == ARRAY_SIZE(kernel_panic_reporters))
     return ERR_NO_RESOURCE;
@@ -176,7 +179,10 @@ static void __handle_svc_64(exception_info_t *e)
     case SYSCALL_KERNEL_PANIC:
       // exec_kernel_panic_reporters(e, kernel_panic_msg);
       exec_fatal_exception_hooks(e);
-      while(1);
+
+      while(1) 
+        asm volatile ("wfe");
+
       break;
     default:
       snprintf(buf, sizeof(buf), "Unknown syscall: %d", get_syscall_id(e->esr));
@@ -242,6 +248,7 @@ const char *get_data_abort_string(int esr)
     SWICASE(DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC);
     SWICASE(DAT_ABRT_SYNCH_MEMACCESS_PARITY_ECC_TABLE_WALK);
   }
+
   switch(dfsc) {
     SWICASE(DAT_ABRT_ALIGNMENT);
     SWICASE(DAT_ABRT_UNSUP_ATOMIC_HARDWARE_UPDATE);
@@ -249,6 +256,8 @@ const char *get_data_abort_string(int esr)
     SWICASE(DAT_ABRT_SECTION_DOMAIN);
     SWICASE(DAT_ABRT_PAGE_DOMAIN);
   }
+
+#undef SWICASE
   return "DAT_ABRT_UNDEF";
 }
 
@@ -292,6 +301,7 @@ const char *get_svc_aarch64_string(int esr)
     SWICASE(KERNEL_PANIC);
   }
   return "SYSCALL64_UNKNOWN";
+#undef SWICASE
 }
 
 const char *get_synch_exception_detail_string(int esr) 
@@ -351,9 +361,7 @@ int gen_exception_string_specific(exception_info_t *e, char *buf, size_t bufsz)
 int gen_exception_string_generic(exception_info_t *e, char *buf, size_t bufsz)
 {
   int n;
-  n = snprintf(
-    buf, 
-    bufsz, 
+  n = snprintf( buf, bufsz, 
     "Excepiton: type:%s, esr: 0x%016llx, elr: 0x%016llx, far: 0x%016llx", 
     get_exception_type_string(e->type),
     e->esr,

@@ -1,4 +1,4 @@
-#include <fatal_exception.h>
+#include <unhandled_exception.h>
 #include <stringlib.h>
 #include <cpu.h>
 #include <uart/uart.h>
@@ -51,7 +51,7 @@ static void print_stack_uart(uint64_t stack_top, int depth)
   print_stack_generic(stack_top, depth, print_stack_uart_cb, &arg); 
 }
 
-void fatal_exception_print_summary_uart(exception_info_t *e)
+void unhandled_exception_print_summary_uart(exception_info_t *e)
 {
   char buf[256];
   int n;
@@ -63,7 +63,7 @@ void fatal_exception_print_summary_uart(exception_info_t *e)
   uart_send_buf("\n\r", 2);
 }
 
-void fatal_exception_print_summary_vcanvas(exception_info_t *e)
+void unhandled_exception_print_summary_vcanvas(exception_info_t *e)
 {
   char buf[64];
   int x, y;
@@ -74,7 +74,7 @@ void fatal_exception_print_summary_vcanvas(exception_info_t *e)
   vcanvas_puts(&x, &y, buf);
 }
 
-void fatal_exception_print_summary_nokia5110(exception_info_t *e)
+void unhandled_exception_print_summary_nokia5110(exception_info_t *e)
 {
   char buf[64];
   snprintf(buf, sizeof(buf), "E: %s", get_exception_type_string(e->type));
@@ -98,7 +98,7 @@ static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
   return 0;
 }
 
-static void fatal_exception_print_cpu_ctx_uart(exception_info_t *e)
+static void unhandled_exception_print_cpu_ctx_uart(exception_info_t *e)
 {
   print_cpuctx_ctx_t print_ctx = { 0 };
   if (cpuctx_print_regs(e->cpu_ctx, print_reg_cb, &print_ctx))
@@ -106,7 +106,7 @@ static void fatal_exception_print_cpu_ctx_uart(exception_info_t *e)
   print_stack_uart((uint64_t)(e->stack), 8);
 }
 
-void fatal_exception_dump_cpu_ctx_uart(exception_info_t *e)
+void unhandled_exception_dump_cpu_ctx_uart(exception_info_t *e)
 {
 //  char regs[2048];
 //  bin_data_header_t h = { 0 };
@@ -151,44 +151,54 @@ void fatal_exception_dump_cpu_ctx_uart(exception_info_t *e)
 //  uart_send_buf(e->stack, sh.len);
 }
 
-void fatal_exception_print_cpu_ctx_vcanvas(exception_info_t *e)
+void unhandled_exception_print_cpu_ctx_vcanvas(exception_info_t *e)
 {
 }
 
-void fatal_exception_print_cpu_ctx_nokia5110(exception_info_t *e)
+void unhandled_exception_print_cpu_ctx_nokia5110(exception_info_t *e)
 {
 }
 
-static fatal_exception_reporter_t fatal_exception_reporters[] = {
+static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
   {
     .name = FATAL_EXCEPTION_REPORTER_UART,
     .enabled = 0,
-    .print_summary = fatal_exception_print_summary_uart,
-    .print_cpu_ctx = fatal_exception_print_cpu_ctx_uart,
-    .dump_cpu_ctx = fatal_exception_dump_cpu_ctx_uart,
+    .print_summary = unhandled_exception_print_summary_uart,
+    .print_cpu_ctx = unhandled_exception_print_cpu_ctx_uart,
+    .dump_cpu_ctx = unhandled_exception_dump_cpu_ctx_uart,
   },
   {
     .name = FATAL_EXCEPTION_REPORTER_VCANVAS,
     .enabled = 0,
-    .print_summary = fatal_exception_print_summary_vcanvas,
-    .print_cpu_ctx = fatal_exception_print_cpu_ctx_vcanvas,
+    .print_summary = unhandled_exception_print_summary_vcanvas,
+    .print_cpu_ctx = unhandled_exception_print_cpu_ctx_vcanvas,
     .dump_cpu_ctx = 0
   },
   {
     .name = FATAL_EXCEPTION_REPORTER_NOKIA5110,
     .enabled = 0,
-    .print_summary = fatal_exception_print_summary_nokia5110,
-    .print_cpu_ctx = fatal_exception_print_cpu_ctx_nokia5110,
+    .print_summary = unhandled_exception_print_summary_nokia5110,
+    .print_cpu_ctx = unhandled_exception_print_cpu_ctx_nokia5110,
     .dump_cpu_ctx = 0
   }
 };
 
-void run_fatal_exception_reporters(exception_info_t *e)
+void init_unhandled_exception_reporters()
 {
   int i;
-  fatal_exception_reporter_t *r;
-  for (i = 0; i < ARRAY_SIZE(fatal_exception_reporters); ++i) {
-    r = &fatal_exception_reporters[i];
+  unhandled_exception_reporter_t *r;
+  for (i = 0; i < ARRAY_SIZE(unhandled_exception_reporters); ++i) {
+    r = &unhandled_exception_reporters[i];
+    r->enabled = 1;
+  }
+}
+
+void report_unhandled_exception(exception_info_t *e)
+{
+  int i;
+  unhandled_exception_reporter_t *r;
+  for (i = 0; i < ARRAY_SIZE(unhandled_exception_reporters); ++i) {
+    r = &unhandled_exception_reporters[i];
     if (r->enabled) {
       if (r->print_summary)
         r->print_summary(e);
@@ -197,16 +207,6 @@ void run_fatal_exception_reporters(exception_info_t *e)
       if (r->dump_cpu_ctx)
         r->dump_cpu_ctx(e);
     }
-  }
-}
-
-void init_fatal_exception_reporters()
-{
-  int i;
-  fatal_exception_reporter_t *r;
-  for (i = 0; i < ARRAY_SIZE(fatal_exception_reporters); ++i) {
-    r = &fatal_exception_reporters[i];
-    r->enabled = 1;
   }
 }
 

@@ -23,7 +23,7 @@
 #include <max7219.h>
 #include <drivers/display/nokia5110.h>
 #include <debug.h>
-#include <fatal_exception.h>
+#include <unhandled_exception.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -289,7 +289,7 @@ extern uint64_t __shared_mem_start;
 void main()
 {
   debug_init();
-  init_fatal_exception_reporters();
+  init_unhandled_exception_reporters();
 
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
@@ -330,7 +330,7 @@ void main()
 
   // enable_irq();
   // while(1);
-  add_fatal_exception_hook(run_fatal_exception_reporters);
+  add_unhandled_exception_hook(report_unhandled_exception);
   kernel_panic("hello");
   scheduler_init();
   while(1);

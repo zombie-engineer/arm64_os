@@ -25,7 +25,7 @@ typedef struct exception_info {
 } packed exception_info_t;
 
 typedef void (*exception_hook)(exception_info_t *);
-int add_fatal_exception_hook(exception_hook h);
+int add_unhandled_exception_hook(exception_hook h);
 
 typedef void (*kernel_panic_reporter)(exception_info_t *, const char *);
 int add_kernel_panic_reporter(kernel_panic_reporter h);
