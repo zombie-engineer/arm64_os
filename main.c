@@ -253,24 +253,11 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
   }
 }
 
-void nokia5110_display_init()
-{
-  spi_dev_t *spidev;
-  const font_desc_t *font;
-  spi0_init();
-  spidev = spi_get_dev(SPI_TYPE_SPI0);
-
-  font_get_font("myfont", &font);
-  
-  nokia5110_init(spidev, 23, 18, 1, 1);
-  nokia5110_set_font(font);
-}
-
+#ifndef CONFIG_QEMU
 void nokia5110_test()
 {
-  // nokia5110_run_test_loop_1(5, 200);
+  nokia5110_run_test_loop_1(5, 200);
   nokia5110_draw_text("Good evening, sir!", 0, 0);
-  while(1);
   nokia5110_run_test_loop_3(30, 10);
   nokia5110_run_test_loop_1(8, 100);
   nokia5110_run_test_loop_1(8, 50);
@@ -283,22 +270,59 @@ void nokia5110_test()
   nokia5110_run_test_loop_2(30, 10);
 }
 
+void init_nokia5110_display(int report_exceptions, int run_test)
+{
+  spi_dev_t *spidev;
+  const font_desc_t *font;
+  spi0_init();
+  spidev = spi_get_dev(SPI_TYPE_SPI0);
+
+  font_get_font("myfont", &font);
+
+  nokia5110_init(spidev, 23, 18, 1, 1);
+  nokia5110_set_font(font);
+
+  if (report_exceptions) {
+    if (enable_unhandled_exception_reporter(REPORTER_ID_NOKIA5110))
+      uart_puts("Failed to init exception reporter for nokia5110.\n");
+  }
+
+  if (run_test)
+    nokia5110_test();
+}
+#endif
+
 extern void pl011_uart_print_regs();
 extern uint64_t __shared_mem_start;
+
+void init_uart(int report_exceptions)
+{
+  uart_init(115200, BCM2835_SYSTEM_CLOCK);
+
+  if (report_exceptions) {
+    if (enable_unhandled_exception_reporter(REPORTER_ID_UART_PL011))
+      uart_puts("Failed to init exception reporter for uart_pl011.");
+  }
+}
 
 void main()
 {
   debug_init();
   init_unhandled_exception_reporters();
 
+  font_init_lib();
+
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
-  // shiftreg setup is for 8x8 led matrix 
-  uart_init(115200, BCM2835_SYSTEM_CLOCK);
-  font_init_lib();
+
+  init_uart(1);
+
+#ifndef CONFIG_QEMU
+  init_nokia5110_display(1, 0);
+#endif
+
   init_consoles();
-  nokia5110_display_init();
 
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
@@ -306,7 +330,6 @@ void main()
   mmu_init();
   nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
-  // nokia5110_test();
   // uint64_t mair;
   // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
   // printf("mair: %016llx\n", mair);
@@ -331,7 +354,8 @@ void main()
   // enable_irq();
   // while(1);
   add_unhandled_exception_hook(report_unhandled_exception);
-  kernel_panic("hello");
+  //kernel_panic("hello");
+  // *(int *)0xfffffffffff = 0;
   scheduler_init();
   while(1);
 

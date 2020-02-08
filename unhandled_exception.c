@@ -176,6 +176,7 @@ void unhandled_exception_print_cpu_ctx_nokia5110(exception_info_t *e)
 static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
   {
     .name = FATAL_EXCEPTION_REPORTER_UART,
+    .reporter_id = REPORTER_ID_UART_PL011,
     .enabled = 0,
     .print_summary = unhandled_exception_print_summary_uart,
     .print_cpu_ctx = unhandled_exception_print_cpu_ctx_uart,
@@ -183,6 +184,7 @@ static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
   },
   {
     .name = FATAL_EXCEPTION_REPORTER_VCANVAS,
+    .reporter_id = REPORTER_ID_VCANVAS,
     .enabled = 0,
     .print_summary = unhandled_exception_print_summary_vcanvas,
     .print_cpu_ctx = unhandled_exception_print_cpu_ctx_vcanvas,
@@ -190,6 +192,7 @@ static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
   },
   {
     .name = FATAL_EXCEPTION_REPORTER_NOKIA5110,
+    .reporter_id = REPORTER_ID_NOKIA5110,
     .enabled = 0,
     .print_summary = unhandled_exception_print_summary_nokia5110,
     .print_cpu_ctx = unhandled_exception_print_cpu_ctx_nokia5110,
@@ -224,3 +227,16 @@ void report_unhandled_exception(exception_info_t *e)
   }
 }
 
+int enable_unhandled_exception_reporter(int reporter_id)
+{
+  int i;
+  unhandled_exception_reporter_t *r;
+  for (i = 0; i < ARRAY_SIZE(unhandled_exception_reporters); ++i) {
+    r = &unhandled_exception_reporters[i];
+    if (r->reporter_id == reporter_id) {
+      r->enabled = 1;
+      return ERR_OK;
+    }
+  }
+  return ERR_NOT_FOUND;
+}
