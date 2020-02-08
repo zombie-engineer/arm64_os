@@ -90,11 +90,17 @@ typedef struct print_cpuctx_ctx {
 static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
 {
   print_cpuctx_ctx_t *print_ctx = (print_cpuctx_ctx_t *)cb_priv;
-  uart_puts(reg_str);
-  if (print_ctx->nr++ % 2 == 0) {
-    uart_putc('\n');
-    uart_putc('\r');
+  if (print_ctx->nr) {
+    if (print_ctx->nr % 4 == 0) {
+      uart_putc('\n');
+      uart_putc('\r');
+    } else {
+      uart_putc(',');
+      uart_putc(' ');
+    }
   }
+  uart_puts(reg_str);
+  print_ctx->nr++;
   return 0;
 }
 
@@ -102,7 +108,10 @@ static void unhandled_exception_print_cpu_ctx_uart(exception_info_t *e)
 {
   print_cpuctx_ctx_t print_ctx = { 0 };
   if (cpuctx_print_regs(e->cpu_ctx, print_reg_cb, &print_ctx))
-    /* Nothing we can do but ignore error */;
+  /* Nothing we can do but ignore error */;
+  uart_putc('\n');
+  uart_putc('\n');
+  uart_putc('\r');
   print_stack_uart((uint64_t)(e->stack), 8);
 }
 
