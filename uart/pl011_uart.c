@@ -304,7 +304,7 @@ void pl011_uart_send(unsigned int c)
 int pl011_uart_send_buf(const void *buf, size_t n)
 {
   int i;
-  const char *b = (const char *)buf;
+  const uint8_t *b = (const uint8_t *)buf;
   for (i = 0; i < n; ++i) {
     while(read_reg(UART0_FR) & UART0_FR_TXFF);
     write_reg(UART0_DR, b[i]);
