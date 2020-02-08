@@ -61,9 +61,9 @@ void uart_hex(unsigned int d)
   }
 }
 
-void uart_send_buf(const void *buf, int n)
+int uart_send_buf(const void *buf, size_t n)
 {
-  _uart_send_buf((const char *)buf, n);
+  return _uart_send_buf((const char *)buf, n);
 }
 
 void uart_set_interrupt_mode()

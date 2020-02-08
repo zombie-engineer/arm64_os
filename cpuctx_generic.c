@@ -1,46 +1,40 @@
 #include <cpu.h>
 #include <stringlib.h>
+#include "binblock.h"
+#include <common.h>
 
-typedef struct cpuctx_serialize_cb_arg {
-  char *buf;
-  int bufsz;
+
+typedef struct cpuctx_binblock_fill_regs_cb_arg {
+  binblock_cpuctx_t *binblock;
   int n;
-  int numregs;
-} cpuctx_serialize_cb_arg_t;
+} cpuctx_binblock_fill_regs_cb_arg_t;
 
-static int cpuctx_serialize_cb(const cpu_reg_t *r_it, int r_idx, void *cb_priv)
+static int cpuctx_binblock_fill_regs_cb(const cpu_reg_t *cpu_r, int r_idx, void *cb_priv)
 {
-  cpuctx_serialize_cb_arg_t *a;
-  reg_info_t *r_info;
+  cpuctx_binblock_fill_regs_cb_arg_t *a;
+  a = (cpuctx_binblock_fill_regs_cb_arg_t *)cb_priv;
+  binblock_cpu_reg_t *bin_r = &a->binblock->regs[a->n];
 
-  a = (cpuctx_serialize_cb_arg_t *)cb_priv;
-  r_info = (reg_info_t *)(a->buf + a->n);
-  a->n += sizeof(*r_info);
+  if (a->n >= ARRAY_SIZE(a->binblock->regs))
+    return -1;
 
-  if (a->n < a->bufsz) {
-    memset(r_info->name, 0, sizeof(r_info->name));
-    strncpy(r_info->name, r_it->name, sizeof(r_info->name));
-    r_info->value = r_it->value;
-  }
-  a->numregs++;
+  memset(bin_r->name, 0, REG_NAME_MAX_LEN);
+  strncpy(bin_r->name, cpu_r->name,  REG_NAME_MAX_LEN - 1);
+  bin_r->value = cpu_r->value;
+  a->n++;
   return 0;
 }
 
-int cpuctx_serialize(const void *ctx, bin_regs_hdr_t *h, char *buf, int bufsz)
+int cpuctx_binblock_fill_regs(const void *ctx, binblock_cpuctx_t *binblock)
 {
-  cpuctx_serialize_cb_arg_t a = {
-    .buf = buf,
-    .bufsz = bufsz,
+  cpuctx_binblock_fill_regs_cb_arg_t a = {
+    .binblock = binblock,
     .n = 0,
-    .numregs = 0
   };
 
-  cpuctx_enum_registers(ctx, cpuctx_serialize_cb, &a);
-  h->numregs = a.numregs;
-  h->len = h->numregs * sizeof(reg_info_t);
-  return a.n;
+  cpuctx_enum_registers(ctx, cpuctx_binblock_fill_regs_cb, &a);
+  return ERR_OK;
 }
-
 typedef struct cpuctx_print_reg_arg {
   cpuctx_print_regs_cb print;
   void *print_priv;

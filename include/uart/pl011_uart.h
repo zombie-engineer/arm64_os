@@ -6,7 +6,7 @@ void pl011_uart_init(int baudrate, int _not_used);
 
 void pl011_uart_send(unsigned int c);
 
-void pl011_uart_send_buf(const char *c, int n);
+int pl011_uart_send_buf(const void *buf, size_t n);
 
 void pl011_uart_set_interrupt_mode();
 

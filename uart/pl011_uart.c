@@ -301,13 +301,15 @@ void pl011_uart_send(unsigned int c)
   pl011_uart_putchar(c & 0xff);
 }
 
-void pl011_uart_send_buf(const char *buf, int n)
+int pl011_uart_send_buf(const void *buf, size_t n)
 {
   int i;
+  const char *b = (const char *)buf;
   for (i = 0; i < n; ++i) {
     while(read_reg(UART0_FR) & UART0_FR_TXFF);
-    write_reg(UART0_DR, buf[i]);
+    write_reg(UART0_DR, b[i]);
   }
+  return n;
 }
 
 char pl011_uart_getc()

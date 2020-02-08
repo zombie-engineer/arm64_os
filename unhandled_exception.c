@@ -106,11 +106,6 @@ static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
 
 static void unhandled_exception_print_cpu_ctx_uart(exception_info_t *e)
 {
-  char buf[64];
-  snprintf(buf, sizeof(buf), "esr: %x\n", get_synchr_exception_class(e->esr));
-  uart_puts(buf);
-  uart_putc('\n');
-  uart_putc('\r');
   print_cpuctx_ctx_t print_ctx = { 0 };
   if (cpuctx_print_regs(e->cpu_ctx, print_reg_cb, &print_ctx))
   /* Nothing we can do but ignore error */;
@@ -122,7 +117,19 @@ static void unhandled_exception_print_cpu_ctx_uart(exception_info_t *e)
 
 void unhandled_exception_dump_cpu_ctx_uart(exception_info_t *e)
 {
-//  char regs[2048];
+  int n;
+  char binblock[2048];
+  n = binblock_fill_exception(binblock, sizeof(binblock), e);
+  if (n < 0) {
+    uart_puts("Failed to generate exception binblock.\n");
+    return;
+  }
+
+  if (binblock_send(binblock, n, BINBLOCK_ID_EXCEPTION, uart_send_buf) < 0) {
+    uart_puts("Failed to send exception binblock.\n");
+    return;
+  }
+
 //  bin_data_header_t h = { 0 };
 //  bin_stack_header_t sh = { 0 };
 //  bin_regs_hdr_t rh = { 0 };
