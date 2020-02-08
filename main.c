@@ -72,7 +72,7 @@ void check_printf()
 }
 #endif
 
-extern char __arm_initial_reg_value_address_hcr_el2;
+extern uint64_t __aarch64_hcr_el2_init_value;
 
 void print_cpu_info()
 {
@@ -87,9 +87,8 @@ void print_current_ex_level()
   asm volatile("mrs %0, CurrentEL; lsr %0, %0, #2" : "=r"(el));
   printf("Executing at EL%d\n", el);
   printf("HCR_EL2: %016lx (stored at %016lx)\n", 
-    *(uint64_t*)(&__arm_initial_reg_value_address_hcr_el2), 
-    &__arm_initial_reg_value_address_hcr_el2
-  );
+    __aarch64_hcr_el2_init_value, 
+    &__aarch64_hcr_el2_init_value);
 }
 
 void print_mbox_props()
@@ -354,7 +353,7 @@ void main()
   // enable_irq();
   // while(1);
   add_unhandled_exception_hook(report_unhandled_exception);
-  //kernel_panic("hello");
+  kernel_panic("hello");
   // *(int *)0xfffffffffff = 0;
   scheduler_init();
   while(1);

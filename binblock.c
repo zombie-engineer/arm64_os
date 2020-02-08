@@ -10,7 +10,8 @@ int binblock_send(const void *data, size_t data_sz, const char *binblock_id, sen
   binblock_header_t header = { 0 };
   header.checksum = checksum_basic(data, data_sz, 0);
   header.len = data_sz;
-  memcpy(header.magic, MAGIC_BINBLOCK, sizeof(MAGIC_BINBLOCK));
+  memcpy(&header.magic[0], MAGIC_BINBLOCK, sizeof(header.magic));
+  memcpy(&header.binblock_id[0], binblock_id, sizeof(header.binblock_id));
 
   ret = send((const char *)&header, sizeof(header));
   ret = send(data, data_sz);

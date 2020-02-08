@@ -129,47 +129,6 @@ void unhandled_exception_dump_cpu_ctx_uart(exception_info_t *e)
     uart_puts("Failed to send exception binblock.\n");
     return;
   }
-
-//  bin_data_header_t h = { 0 };
-//  bin_stack_header_t sh = { 0 };
-//  bin_regs_hdr_t rh = { 0 };
-//  bin_exc_hdr_t eh = { 0 };
-//
-//  memcpy(eh.magic, MAGIC_EXCEPTION, sizeof(MAGIC_EXCEPTION));
-//  eh.len = sizeof(eh.e);
-//  eh.e.esr  = e->esr;
-//  eh.e.spsr = e->spsr;
-//  eh.e.far  = e->far;
-//  eh.e.type = e->type;
-//  eh.crc = checksum_basic((const char *)&eh.e, sizeof(eh.e), 0);
-//
-//  memcpy(sh.magic, MAGIC_STACK, sizeof(MAGIC_STACK));
-//  sh.len = sizeof(uint64_t) * (e->stack_base - e->stack);
-//  sh.stack_addr = (uint64_t)e->stack;
-//  sh.crc = checksum_basic((const char *)e->stack, sh.len, 0);
-//
-//  memcpy(rh.magic, MAGIC_REGS, sizeof(MAGIC_REGS));
-//  if (cpuctx_serialize(e->cpu_ctx, &rh, regs, sizeof(regs)) > sizeof(regs))
-//    kernel_panic("dump_cpu_context: regs too small.\n");
-//
-//  rh.crc = checksum_basic(regs, rh.len, 0); 
-//
-//  memcpy(h.magic, MAGIC_BINBLOCK, sizeof(MAGIC_BINBLOCK));
-//  h.len += sizeof(eh);
-//  h.len += sizeof(sh) + sh.len;
-//  h.len += sizeof(rh) + rh.len;
-//
-//  h.crc = checksum_basic((const char *)&eh.e, sizeof(eh.e), 0);
-//  h.crc = checksum_basic((const char *)&sh, sizeof(sh.crc), h.crc);
-//  h.crc = checksum_basic((const char *)e->stack, sh.len, h.crc);
-//  h.crc = checksum_basic((const char *)regs, rh.len, h.crc);
-//
-//  uart_send_buf(&h, sizeof(h));
-//  uart_send_buf(&eh, sizeof(eh));
-//  uart_send_buf(&rh, sizeof(rh));
-//  uart_send_buf(&regs, rh.len);
-//  uart_send_buf(&sh, sizeof(sh));
-//  uart_send_buf(e->stack, sh.len);
 }
 
 void unhandled_exception_print_cpu_ctx_vcanvas(exception_info_t *e)

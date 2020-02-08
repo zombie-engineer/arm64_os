@@ -32,7 +32,7 @@ _start:
 
   // Store arm_init_regvalue
   mrs   x1, hcr_el2
-  ldr   x2, =__arm_initial_reg_value_address_hcr_el2
+  ldr   x2, =__aarch64_hcr_el2_init_value
   str   x1, [x2]
   
 // wake up other cores from swe
@@ -259,6 +259,9 @@ GLOBAL_VAR(__exception_info):
 // pointer to current cpu context
 .align 3
 GLOBAL_VAR(__current_cpuctx):
+.quad 0
+
+GLOBAL_VAR(__aarch64_hcr_el2_init_value):
 .quad 0
 
 LFUNC(__prep_exception_info):
