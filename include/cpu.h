@@ -45,6 +45,7 @@ int cpuctx_print_regs(void *ctx, cpuctx_print_regs_cb cb, void *cb_priv);
 
 typedef struct binblock_cpuctx binblock_cpuctx_t;
 int cpuctx_binblock_fill_regs(const void *ctx, binblock_cpuctx_t *h);
+uint64_t cpuctx_get_sp(const void *ctx);
 
 void enable_irq(void);
 void disable_irq(void);

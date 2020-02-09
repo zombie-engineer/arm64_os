@@ -119,6 +119,8 @@ void unhandled_exception_dump_cpu_ctx_uart(exception_info_t *e)
 {
   int n;
   char binblock[2048];
+  uint64_t sp_value;
+  uart_puts("*EXCEPTION_CONTEXT_DUMP***********************");
   n = binblock_fill_exception(binblock, sizeof(binblock), e);
   if (n < 0) {
     uart_puts("Failed to generate exception binblock.\n");
@@ -129,6 +131,13 @@ void unhandled_exception_dump_cpu_ctx_uart(exception_info_t *e)
     uart_puts("Failed to send exception binblock.\n");
     return;
   }
+
+  sp_value = cpuctx_get_sp(e->cpu_ctx);
+  if (binblock_send((const void *)sp_value, 0x100, BINBLOCK_ID_STACK, uart_send_buf) < 0) {
+    uart_puts("Failed to dump stack.");
+  }
+
+  uart_puts("*EXCEPTION_CONTEXT_DUMP_END*******************");
 }
 
 void unhandled_exception_print_cpu_ctx_vcanvas(exception_info_t *e)

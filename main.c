@@ -353,7 +353,7 @@ void main()
   // enable_irq();
   // while(1);
   add_unhandled_exception_hook(report_unhandled_exception);
-  kernel_panic("hello");
+  // kernel_panic("hello");
   // *(int *)0xfffffffffff = 0;
   scheduler_init();
   while(1);

@@ -5,13 +5,14 @@
 
 #define MAGIC_BINBLOCK        "BINBLOCK"
 #define BINBLOCK_ID_EXCEPTION "__EXCPTN"
+#define BINBLOCK_ID_STACK     "___STACK"
 
 #define REG_NAME_MAX_LEN 8
 typedef struct binblock_header {
   char magic[8];
   char binblock_id[8];
-  uint32_t checksum;
-  uint32_t len;
+  char checksum[8];
+  char len[16];
 } PACKED binblock_header_t;
 
 typedef struct binblock_cpu_reg {

@@ -30,6 +30,12 @@ int cpuctx_enum_registers(const void *ctx, cpuctx_enum_regs_cb cb, void *cb_priv
   return ERR_OK;
 }
 
+uint64_t cpuctx_get_sp(const void *ctx)
+{
+  const aarch64_cpuctx_t *c = (const aarch64_cpuctx_t*)ctx;
+  return c->u.n.sp;
+}
+
 int cpuctx_init(cpuctx_init_opts_t *o)
 {
   memset(o->cpuctx, 0, o->cpuctx_sz);

@@ -61,11 +61,16 @@ class SymbolMap:
                 return 0, 0, 0
 
 
-class StackHdr:
-    def __init__(self, stack_base_addr, bytelen, crc):
-        self.stk_base_addr = stack_base_addr
-        self.bytelen = bytelen
-        self.crc = crc
+class CoreStack:
+    def __init__(self, stack_values):
+        self.stack_values = stack_values
+
+    def print_self(self, stack_addr, symbols):
+        print('Stack:')
+        for value in self.stack_values:
+            stack_addr += 8
+            symbol = get_symbol_from_addr(value, symbols, '')
+            print('{:016x}: {:016x}: {}'.format(stack_addr, value, symbol))
 
 
 def get_symbol_from_addr(addr, symbols, prefix):
@@ -74,20 +79,11 @@ def get_symbol_from_addr(addr, symbols, prefix):
         return '{}<{} +0x{:x}>'.format(prefix, sname, addr - saddr)
     return ''
 
-def print_stack(buf, offset, stk_hdr, symbols):
-    print('stack:')
-    stack_depth = stk_hdr.bytelen >> 3
-    for i in range(stack_depth):
-        stk_addr = stk_hdr.stk_base_addr + i * 8
-        stk_value = struct.unpack_from('<Q', buf, offset + i * 8)[0]
-        symbol = get_symbol_from_addr(stk_value, symbols, '')
-        print('{:016x}: {:016x}: {}'.format(stk_addr, stk_value, symbol))
-
 class RegsHdr:
-    def __init__(self, numregs, bytelen, crc):
+    def __init__(self, numregs, bytelen, checksum):
         self.numregs = numregs
         self.bytelen = bytelen
-        self.crc = crc
+        self.checksum = checksum
 
 
 def exc_type_str(t):
@@ -105,6 +101,12 @@ class CoreException:
         self.far = far
         self.type = typ
         self.regs = regs
+
+    def get_reg(self, name):
+        for reg in self.regs:
+            if reg.name == name:
+                return reg
+        return None
 
     def print_self(self, symbols):
         print('exception: type: {}, esr: {:016x}, spsr: {:016x}, far: {:016x}'.format(
@@ -126,7 +128,7 @@ def print_regs(buf, offset, regs_hdr, symbols):
                 name = name[:i]
                 break
         symbol = get_symbol_from_addr(value, symbols, ' <-- ')
-        print('reg: {:>4}: {:016x}{}'.format(name.decode('ascii'), value, symbol))
+        print('{:>4}: {:016x}{}'.format(name.decode('ascii'), value, symbol))
     
 def hex_be_to_uint32_t(be32):
     return struct.unpack('I', binascii.unhexlify(be32))[0]
@@ -134,15 +136,24 @@ def hex_be_to_uint32_t(be32):
 def hex_be_to_uint64_t(be64):
     return struct.unpack('Q', binascii.unhexlify(be64))[0]
 
-def unpack_be64(buf, offset):
-    # print('Unpack be64 at {}'.format(offset))
+def unpack_be32(buf, offset):
+    x = struct.unpack_from('<8s', buf, offset)[0].decode('ascii')
+    return offset + 8, hex_be_to_uint32_t(x)
+
+def ascii_unpack_be64(buf, offset):
     x = struct.unpack_from('<16s', buf, offset)[0].decode('ascii')
-    # print(x)
     return offset + 16, hex_be_to_uint64_t(x)
 
-def unpack_name(buf, offset, maxlen):
+
+def fetch_ascii_string(buf, offset, namelen):
+    bytename =  struct.unpack_from('{}s'.format(namelen), buf, offset)
+    name = bytename[0].decode('ascii')
+    return offset + namelen, name
+
+def ascii_unpack_string(buf, offset, maxlen):
     # print('Unpack name at {}'.format(offset))
     name = struct.unpack_from('16s', buf, offset)[0].decode('ascii')
+    # print(name)
     name = binascii.unhexlify(name)
     name = struct.unpack('8s', name)[0]
     if name.find(0) != -1:
@@ -151,7 +162,7 @@ def unpack_name(buf, offset, maxlen):
     # print('Name :' + name)
     return offset + maxlen * 2, name
 
-class Reg:
+class CoreReg:
     def __init__(self, name, value):
         self.name = name
         self.value = value
@@ -160,12 +171,14 @@ class Reg:
         print('reg: {:>4}: {:016x}'.format(self.name, self.value))
 
 def parse_reg(buf, offset):
-    offset, name = unpack_name(buf, offset, 8)
-    offset, value = unpack_be64(buf, offset)
-    return offset, Reg(name, value)
+    # print('parse_reg: offset: {}'.format(offset))
+    # print(buf[offset:offset+10])
+    offset, name = ascii_unpack_string(buf, offset, 8)
+    offset, value = ascii_unpack_be64(buf, offset)
+    return offset, CoreReg(name, value)
 
 def parse_regs(buf, offset):
-    # print("Parsing regs at {}".format(offset))
+    print("Parsing regs at {}".format(offset))
     regs = []
     while True:
         offset, reg = parse_reg(buf, offset)
@@ -175,49 +188,74 @@ def parse_regs(buf, offset):
         regs.append(reg)
     return offset, regs
 
-def parse_binblock(buf, offset, symbols):
+def parse_binblock_exception(buf, offset, size):
+    # exception info
+    offset, exception_type = ascii_unpack_be64(buf, offset) 
+    offset, esr            = ascii_unpack_be64(buf, offset) 
+    offset, spsr           = ascii_unpack_be64(buf, offset) 
+    offset, far            = ascii_unpack_be64(buf, offset) 
+    # regs
+    offset, regs = parse_regs(buf, offset)
+    return offset, CoreException(esr, spsr, far, exception_type, regs)
+
+def parse_binblock_stack(buf, offset, size):
+    assert size % 8 == 0
+    stack_values = []
+    while size:
+        offset, value = ascii_unpack_be64(buf, offset)
+        stack_values.append(value)
+        size -= 8
+    return offset, CoreStack(stack_values)
+
+
+BINBLOCK_ID_EXCEPTION = '__EXCPTN'
+BINBLOCK_ID_STACK     = '___STACK'
+
+binblock_parser = {
+        BINBLOCK_ID_EXCEPTION : parse_binblock_exception,
+        BINBLOCK_ID_STACK     : parse_binblock_stack
+}
+
+def parse_binblock(buf, offset):
     print("-----------------")
     print("Exception block")
     # BINBLOCK
-    h_magic, h_id, h_crc, h_len = struct.unpack_from('<8s8s8s16s', buf, offset)
-    h_crc = hex_be_to_uint32_t(h_crc.decode('ascii'))
-    h_len = hex_be_to_uint64_t(h_len.decode('ascii'))
-    print(h_magic, h_id, h_crc, h_len)
-    offset += 40
+    offset, binblock_magic    = fetch_ascii_string(buf, offset, 8)
+    offset, binblock_id       = fetch_ascii_string(buf, offset, 8)
+    offset, binblock_checksum = unpack_be32(buf, offset)
+    offset, binblock_len      = ascii_unpack_be64(buf, offset)
 
-    # exception info
-    offset, exception_type = unpack_be64(buf, offset) 
-    offset, esr            = unpack_be64(buf, offset) 
-    offset, spsr           = unpack_be64(buf, offset) 
-    offset, far            = unpack_be64(buf, offset) 
+    print('Binblock: magic1: "{}", magic2: "{}", checksum: {}, len: {}'.format(
+        binblock_magic, 
+        binblock_id, 
+        binblock_checksum, 
+        binblock_len))
 
-    # regs
-    offset, regs = parse_regs(buf, offset)
-
-    ex_hdr = CoreException(esr, spsr, far, exception_type, regs)
-    ex_hdr.print_self(symbols)
-
-    offset += stack_hdr_sz
-
-    # stk_hdr = StackHdr(stk_base_addr, sh_len, sh_crc) 
-    # print(binstartpos, h_magic, h_crc, h_len, sh_magic, sh_crc, sh_len, hex(stk_base_addr))
-    # print_stack(buf, offset, stk_hdr, symbols)
-    print("---------------")
-    binstart = 'BINBLOCK'.encode('ascii')
-    binstartpos = buf.find(binstart, offset)
-    return binstartpos
+    offset, block = binblock_parser[binblock_id](buf, offset, binblock_len)
+    return offset, binblock_id, block
+    
 
 def main(filename):
     symbols = SymbolMap(kernel_map_filename)
     binstart = 'BINBLOCK'.encode('ascii')
+    blocks = {}
+
     f = open(filename, 'rb')
     buf = f.read()
-    binstartpos = buf.find(binstart)
-    print(binstartpos)
-    while (binstartpos != -1):
-        binstartpos = parse_binblock(buf, binstartpos, symbols)
+    offset = buf.find(binstart)
+    while (offset != -1):
+        offset, block_id, block = parse_binblock(buf, offset)
+        print(offset, block_id, block)
+        blocks[block_id] = block
+        offset = buf.find(binstart, offset)
 
+    exception_block = blocks[BINBLOCK_ID_EXCEPTION]
+    stack_block = blocks[BINBLOCK_ID_STACK]
 
+    exception_block.print_self(symbols)
+    sp = exception_block.get_reg('sp').value
+    stack_block.print_self(sp, symbols)
+        
 
 if __name__ == '__main__':
     filename = sys.argv[1]
