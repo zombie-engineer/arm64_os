@@ -118,7 +118,7 @@ static ALIGNED(64) font_glyph_metrics_t font_glyph_metrics_myfont[] = {
   DECL_GLYPH(  8, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // Q
   DECL_GLYPH( 16, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // R
   DECL_GLYPH( 24, 31, /* bnd box */ 5, 7, /* bearing */  1,  0, /* adv */ 1, 0), // S
-  DECL_GLYPH( 32, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // T
+  DECL_GLYPH( 32, 31, /* bnd box */ 5, 7, /* bearing */  1,  0, /* adv */ 1, 0), // T
   DECL_GLYPH( 40, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // U
   DECL_GLYPH( 48, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // V
   DECL_GLYPH( 56, 31, /* bnd box */ 7, 7, /* bearing */  1,  0, /* adv */ 1, 0), // W
