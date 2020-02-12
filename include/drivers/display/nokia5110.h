@@ -58,6 +58,11 @@ int nokia5110_set_cursor(int x, int y);
 // Draw a dot
 int nokia5110_draw_dot(int x, int y);
 
+// Draw char at given coordinates
+// x = -1; y = -1 - Use current cursor position instead.
+// Updates current cursor position
+int nokia5110_draw_char(int x, int y, char c);
+
 // Draw a line 
 int nokia5110_draw_line(int x0, int y0, int x1, int y1);
 

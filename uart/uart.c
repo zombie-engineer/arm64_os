@@ -2,6 +2,7 @@
 #include <uart/uart.h>
 #include <uart/pl011_uart.h>
 #include <uart/mini_uart.h>
+#include <error.h>
 
 #if defined UART_PL011 && defined UART_MINI
 #error only one implementation of UART is possible.
@@ -28,9 +29,10 @@ void uart_init(int baudrate, int system_clock)
   _uart_init(baudrate, system_clock);
 }
 
-void uart_putc(char c)
+int uart_putc(char c)
 {
   uart_send(c);
+  return ERR_OK;
 }
 
 char uart_getc()
@@ -40,7 +42,7 @@ char uart_getc()
   return r == '\r' ? '\n' : r;
 }
 
-void uart_puts(const char *s)
+int uart_puts(const char *s)
 {
   while(*s)
   {
@@ -48,6 +50,7 @@ void uart_puts(const char *s)
       uart_send('\r');
     uart_send(*s++);
   }
+  return ERR_OK;
 }
 
 void uart_hex(unsigned int d)

@@ -1,2 +1,2 @@
-OBJS_NOKIA5110 = drivers/nokia5110/nokia5110.o
+OBJS_NOKIA5110 = drivers/nokia5110/nokia5110.o drivers/nokia5110/nokia5110_console.o
 

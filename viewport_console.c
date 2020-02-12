@@ -112,15 +112,20 @@ static void textviewport_backspace(textviewport_t *tv)
   }
 }
 
-void viewport_console_puts(const char *str)
+int viewport_console_puts(const char *str)
 {
+  int ret;
   const char *ptr;
   ptr = str;
-  while(*ptr)
-    viewport_console_putc(*ptr++);
+  while(*ptr) {
+    ret = viewport_console_putc(*ptr++);
+    if (ret)
+      return ret;
+  }
+  return ERR_OK;
 }
 
-void viewport_console_putc(char c)
+int viewport_console_putc(char c)
 {
   int i;
   switch (c) {
@@ -149,4 +154,5 @@ void viewport_console_putc(char c)
       textviewport_print_char(&tv, c);
       break;
   }
+  return ERR_OK;
 }

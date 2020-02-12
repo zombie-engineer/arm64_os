@@ -6,6 +6,7 @@
 #include <font.h>
 #include <spinlock.h>
 #include <cpu.h>
+#include <debug.h>
 
 #define NOKIA_5110_FUNCTION_SET(PD, V, H) (0b00100000 | (PD << 2) | (V << 1) | (H << 0))
 #define PD_BIT_SET 1
@@ -33,12 +34,13 @@
 
 #define NOKIA_5110_WIDTH  84
 #define NOKIA_5110_HEIGHT 48 
-#define NOKIA_5110_PIXELS_PER_BYTE 8
+#define NOKIA_5110_PIXELS_PER_BYTE_LOG 3
+#define NOKIA_5110_PIXELS_PER_BYTE (1<<NOKIA_5110_PIXELS_PER_BYTE_LOG)
 
 /* Number of bytes that totally fill screen space 
  * in fact it's 504 bytes
  */
-#define NOKIA_5110_CANVAS_SIZE (NOKIA_5110_WIDTH * NOKIA_5110_HEIGHT / NOKIA_5110_PIXELS_PER_BYTE)
+#define NOKIA_5110_CANVAS_SIZE ((NOKIA_5110_WIDTH * NOKIA_5110_HEIGHT) >> NOKIA_5110_PIXELS_PER_BYTE_LOG)
 
 extern const char _binary_to_raspi_nokia5110_start;
 extern const char _binary_to_raspi_nokia5110_end;
@@ -49,6 +51,11 @@ typedef struct nokia5110_dev {
   uint32_t rst;
 } nokia5110_dev_t;
 
+typedef struct nokia5110_canvas_control {
+  uint8_t *canvas;
+  uint8_t *cursor;
+  const font_desc_t *font;
+} nokia5110_canvas_control_t;
 
 static const font_desc_t *nokia5110_font;
 static nokia5110_dev_t nokia5110_device;
@@ -81,7 +88,7 @@ static uint8_t nokia5110_canvas[NOKIA_5110_CANVAS_SIZE];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
-static int nokia_5110_send_data(const void *data, int sz) 
+static int nokia5110_send_data(const void *data, int sz) 
 {
   int ret;
   gpio_set_on(nokia5110_dev->dc);
@@ -360,15 +367,57 @@ void nokia5110_print_info()
 }
 
 #define draw_char_debug() \
-  printf("draw_char: %c: i:%d, x:%d, y:%d, first_pixel_idx:%d\n", ch, glyph_idx, gm->pos_x, gm->pos_y, src_off);\
+  printf("draw_char: %c: i:%d, x:%d, y:%d, first_pixel_idx:%d\n", c, glyph_idx, gm->pos_x, gm->pos_y, src_off);\
   printf("---------: bearing: %d:%d, bbox: %d:%d, adv: %d:%d\n",\
       gm->bearing_x, gm->bearing_y,\
       gm->bound_x, gm->bound_y,\
       gm->advance_x, gm->advance_y);\
   printf("bitmap: %08llx, glyph: %08llx, off: %08x\n",\
-      (long long)f->bitmap, (long long)glyph, (char *)glyph - (char *)f->bitmap)
+      (long long)ctl->font->bitmap, (long long)glyph, (char *)glyph - (char *)ctl->font->bitmap);\
+  printf("ctl: %08llx, orig:%08llx\n", ctl->canvas, nokia5110_canvas)
 
-uint8_t *nokia_5110_draw_char(const font_desc_t *f, char ch, uint8_t *dst)
+
+static void nokia5110_canvas_set_font(nokia5110_canvas_control_t *ctl, const font_desc_t *f)
+{
+  ctl->font = f;
+}
+
+static inline void nokia5110_canvas_set_cursor(nokia5110_canvas_control_t *ctl, int x, int y)
+{
+  ctl->cursor = ctl->canvas + NOKIA_5110_WIDTH * (y >> NOKIA_5110_PIXELS_PER_BYTE_LOG) + x;
+  printf("nokia5110_canvas_set_cursor: %d:%d, canvas:%08llx, cursor:%08llx\n", x, y, ctl->canvas, ctl->cursor);
+}
+
+static inline int nokia5110_canvas_get_x(nokia5110_canvas_control_t *ctl)
+{
+  return (ctl->cursor - ctl->canvas) % NOKIA_5110_WIDTH;
+}
+
+static inline int nokia5110_canvas_get_y(nokia5110_canvas_control_t *ctl)
+{
+  return (ctl->cursor - ctl->canvas) / NOKIA_5110_WIDTH;
+}
+
+static inline void nokia5110_canvas_to_newline(nokia5110_canvas_control_t *ctl)
+{
+  int y;
+
+  y = nokia5110_canvas_get_y(ctl);
+  if (++y == NOKIA_5110_HEIGHT)
+    y = 0;
+
+  nokia5110_canvas_set_cursor(ctl, 0, y + 1);
+}
+
+static inline void nokia5110_canvas_cursor_set(nokia5110_canvas_control_t *ctl, uint8_t value)
+{
+  *(ctl->cursor++) = value;
+  if (nokia5110_canvas_get_x(ctl) == NOKIA_5110_WIDTH && nokia5110_canvas_get_y(ctl) == NOKIA_5110_HEIGHT) {
+    ctl->cursor = ctl->canvas;
+  }
+}
+
+int nokia5110_canvas_draw_char(nokia5110_canvas_control_t *ctl, int x, int y, char c)
 {
   int gx, gy;
   int glyph_idx;
@@ -377,41 +426,65 @@ uint8_t *nokia_5110_draw_char(const font_desc_t *f, char ch, uint8_t *dst)
   int glyph_y;
   font_glyph_metrics_t *gm;
   const uint8_t *glyph;
-  memset(dst, 0, 8);
-  glyph_idx = ch - 0x20;
+
+  glyph_idx = c - 0x20;
   if (glyph_idx < 0)
     glyph_idx = '.' - 0x20;
 
-  gm = &f->glyph_metrics[glyph_idx];
+  // if (x != -1 && y != -1)
+  //  nokia5110_canvas_set_cursor(ctl, x, y);
+
+  gm = &ctl->font->glyph_metrics[glyph_idx];
   glyph_y = gm->pos_y - gm->bound_y + 1;
-  src_off = glyph_y * f->glyph_stride + (gm->pos_x >> 3);
-  glyph = (const uint8_t *)f->bitmap + src_off;
+  src_off = glyph_y * ctl->font->glyph_stride + (gm->pos_x >> 3);
+  glyph = (const uint8_t *)ctl->font->bitmap + src_off;
 
   // draw_char_debug();
   /* Skip space of width 'bearing_x' before actual symbol */
   for (gx = 0; gx < gm->bearing_x; ++gx)
-    *(dst++) = 0;
+    nokia5110_canvas_cursor_set(ctl, 0);
 
   for (gx = 0; gx < gm->bound_x; ++gx) {
     tmp = 0;
     for (gy = 0; gy < gm->bound_y; ++gy) {
-      char line = glyph[gy * f->glyph_stride];
+      char line = glyph[gy * ctl->font->glyph_stride];
       char is_set = (line & (1 << gx)) ? 1 : 0;
       int v = gy + 8 - gm->bound_y - gm->bearing_y;
       tmp |= is_set << v;
     }
-    *(dst++) = tmp;
+    nokia5110_canvas_cursor_set(ctl, tmp);
   }
 
   /* Advance cursor now */
-  return dst;
+  return ERR_OK;
 }
+
+static int nokia5110_canvas_redraw_locked()
+{
+  int err;
+  err = nokia5110_set_cursor(0, 0);
+  if (err) {
+    blink_led(6, 200);
+  }
+  printf("redraw canvas: size:%d\n", NOKIA_5110_CANVAS_SIZE);
+  if (!err)
+    err = nokia5110_send_data(nokia5110_canvas, NOKIA_5110_CANVAS_SIZE);
+  return err;
+}
+
+static nokia5110_canvas_control_t nokia5110_canvas_control = {
+  .canvas = nokia5110_canvas,
+  .cursor = nokia5110_canvas,
+  .font = 0
+};
 
 int nokia5110_draw_text(const char *text, int x, int y)
 {
   int err;
   int under_lock;
-  uint8_t *dst = nokia5110_canvas;
+  nokia5110_canvas_control_t *ctl;
+
+  ctl = &nokia5110_canvas_control;
 
   if (should_lock()) {
     spinlock_lock(&nokia5110_lock);
@@ -423,17 +496,27 @@ int nokia5110_draw_text(const char *text, int x, int y)
     goto out;
   }
 
-  err = nokia5110_set_cursor(x, y);
-  if (err)
-    goto out;
-  
   while(*text)
-    dst = nokia_5110_draw_char(nokia5110_font, *text++, dst);
+    nokia5110_canvas_draw_char(ctl, x, y, *text++);
 
-  err = nokia_5110_send_data(nokia5110_canvas, NOKIA_5110_CANVAS_SIZE);
+  err = nokia5110_canvas_redraw_locked();
 out:
   if (under_lock)
     spinlock_unlock(&nokia5110_lock);
+  return err;
+}
+
+int nokia5110_draw_char(int x, int y, char c)
+{
+  int err;
+  err = nokia5110_canvas_draw_char(&nokia5110_canvas_control, x, y, c);
+  // memset(nokia5110_canvas, 0xff, 1);
+  if (!err)
+    err = nokia5110_canvas_redraw_locked();
+  //  blink_led(6, 500);
+  // else 
+  if (err)
+    blink_led(12, 500);
   return err;
 }
 
@@ -449,5 +532,7 @@ void nokia5110_set_font(const font_desc_t *f)
 
   if (under_lock)
     spinlock_unlock(&nokia5110_lock);
+
+  nokia5110_canvas_set_font(&nokia5110_canvas_control, f);
 }
 

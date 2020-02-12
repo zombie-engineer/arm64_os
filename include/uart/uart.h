@@ -11,9 +11,9 @@ void uart_set_interrupt_mode();
 
 char uart_getc();
 
-void uart_puts(const char *s);
+int uart_puts(const char *s);
 
-void uart_putc(char c);
+int uart_putc(char c);
 
 // TODO remove that
 void uart_hex(unsigned int d);

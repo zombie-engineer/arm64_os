@@ -5,6 +5,7 @@
 #include <video_console.h>
 #include <viewport_console.h>
 #include <kernel_panic.h>
+#include <error.h>
 
 #define MAX_CONSOLE_DEVICES 4
 #define MAX_DEVNAME_SIZE 14
@@ -61,7 +62,7 @@ void console_disable_device(const char* devname)
   // TODO
 }
 
-void console_putc(char ch)
+int console_putc(char ch)
 {
   int i = 0;
   console_dev_ent_t *con;
@@ -71,9 +72,10 @@ void console_putc(char ch)
     if (con->enabled)
       con->dev.putc(ch);
   }
+  return ERR_OK;
 }
 
-void console_puts(const char* str)
+int console_puts(const char* str)
 {
   int i = 0;
   console_dev_ent_t *con;
@@ -83,6 +85,7 @@ void console_puts(const char* str)
     if (con->enabled)
       con->dev.puts(str);
   }
+  return ERR_OK;
 }
 
 void init_consoles()

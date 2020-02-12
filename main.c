@@ -22,6 +22,7 @@
 #include <cmdrunner.h>
 #include <max7219.h>
 #include <drivers/display/nokia5110.h>
+#include <drivers/display/nokia5110_console.h>
 #include <debug.h>
 #include <unhandled_exception.h>
 
@@ -269,6 +270,24 @@ void nokia5110_test()
   nokia5110_run_test_loop_2(30, 10);
 }
 
+void nokia5110_test_text()
+{
+  console_dev_t *d = nokia5110_get_console_device();
+  if (!d)
+    kernel_panic("Failed to get nokia5110 console device.\n");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  d->puts("This is a test.");
+  // while(1);
+}
+
+
 void init_nokia5110_display(int report_exceptions, int run_test)
 {
   spi_dev_t *spidev;
@@ -280,14 +299,18 @@ void init_nokia5110_display(int report_exceptions, int run_test)
 
   nokia5110_init(spidev, 23, 18, 1, 1);
   nokia5110_set_font(font);
+  if (nokia5110_console_init())
+    uart_puts("Failed to init nokia5110 console device.\n");
 
   if (report_exceptions) {
     if (enable_unhandled_exception_reporter(REPORTER_ID_NOKIA5110))
       uart_puts("Failed to init exception reporter for nokia5110.\n");
   }
 
-  if (run_test)
-    nokia5110_test();
+  if (run_test) {
+    nokia5110_test_text();
+    // nokia5110_test();
+  }
 }
 #endif
 
@@ -316,12 +339,12 @@ void main()
   vcanvas_set_bg_color(0x00000010);
 
   init_uart(1);
+  init_consoles();
 
 #ifndef CONFIG_QEMU
-  init_nokia5110_display(1, 0);
+  init_nokia5110_display(1, 1);
 #endif
 
-  init_consoles();
 
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
