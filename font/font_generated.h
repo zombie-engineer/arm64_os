@@ -63,7 +63,7 @@ static ALIGNED(64) char font_bitmap_raw_myfont[] = {
 }
 
 static ALIGNED(64) font_glyph_metrics_t font_glyph_metrics_myfont[] = {
-  DECL_GLYPH(  0,  7, /* bnd box */ 5, 8, /* bearing */  1,  0, /* adv */ 1, 0), // ' '
+  DECL_GLYPH(  0,  7, /* bnd box */ 4, 8, /* bearing */  0,  0, /* adv */ 0, 0), // ' '
   DECL_GLYPH(  8,  7, /* bnd box */ 1, 7, /* bearing */  2,  0, /* adv */ 2, 0), // !
   DECL_GLYPH( 16,  7, /* bnd box */ 3, 2, /* bearing */  2,  3, /* adv */ 1, 0), // "
   DECL_GLYPH( 24,  7, /* bnd box */ 5, 5, /* bearing */  1,  2, /* adv */ 2, 0), // #
