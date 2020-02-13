@@ -373,7 +373,7 @@ void nokia5110_print_info()
 }
 
 #define draw_char_debug() \
-  printf("draw_char: %c: i:%d, x:%d, y:%d, first_pixel_idx:%d\n", c, glyph_idx, gm->pos_x, gm->pos_y, src_off);\
+  printf("draw_char: %c: i:%d, x:%d, y:%d, first_pixel_idx:%d\n", c, glyph_idx, gm->pos_x, gm->pos_y, glyph_offset);\
   printf("---------: bearing: %d:%d, bbox: %d:%d, adv: %d:%d\n",\
       gm->bearing_x, gm->bearing_y,\
       gm->bound_x, gm->bound_y,\
@@ -390,6 +390,9 @@ static void nokia5110_canvas_set_font(nokia5110_canvas_control_t *ctl, const fon
 
 static inline void nokia5110_canvas_set_cursor(nokia5110_canvas_control_t *ctl, int x, int y)
 {
+  if (x == -1 && y == -1)
+    return;
+
   ctl->cursor_x = x;
   if (ctl->cursor_x >= NOKIA_5110_WIDTH)
     ctl->cursor_x = NOKIA_5110_WIDTH - 1;
@@ -417,24 +420,14 @@ static inline void nokia5110_canvas_cursor_set(nokia5110_canvas_control_t *ctl, 
 int nokia5110_canvas_draw_char(nokia5110_canvas_control_t *ctl, int x, int y, char c)
 {
   int gx, gy;
-  int glyph_idx;
-  int src_off;
   uint8_t tmp;
-  int glyph_y;
-  font_glyph_metrics_t *gm;
   const uint8_t *glyph;
+  const font_glyph_metrics_t *gm = font_get_glyph_metrics(ctl->font, c);
+  int glyph_offset = glyph_metrics_get_offset(ctl->font, gm);
 
-  glyph_idx = c - 0x20;
-  if (glyph_idx < 0)
-    glyph_idx = '.' - 0x20;
+  nokia5110_canvas_set_cursor(ctl, x, y);
 
-  // if (x != -1 && y != -1)
-  //  nokia5110_canvas_set_cursor(ctl, x, y);
-
-  gm = &ctl->font->glyph_metrics[glyph_idx];
-  glyph_y = gm->pos_y - gm->bound_y + 1;
-  src_off = glyph_y * ctl->font->glyph_stride + (gm->pos_x >> 3);
-  glyph = (const uint8_t *)ctl->font->bitmap + src_off;
+  glyph = (const uint8_t *)ctl->font->bitmap + glyph_offset;
 
   // draw_char_debug();
   /* Skip space of width 'bearing_x' before actual symbol */

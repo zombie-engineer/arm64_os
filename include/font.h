@@ -1,5 +1,7 @@
 #pragma once
 
+typedef struct font_desc font_desc_t;
+
 typedef struct glyph_metrics {
   /* x, y coordinates of a glyph on a bitmap plate */
   int pos_x;
@@ -65,5 +67,21 @@ typedef struct font_canvas_desc {
 int font_init_lib();
 
 int font_get_font(const char *name, const font_desc_t **f);
+
+static inline const font_glyph_metrics_t *font_get_glyph_metrics(const font_desc_t *f, char c)
+{
+  int idx;
+  idx = c - 0x20;
+  if (idx < 0)
+    idx = '.' - 0x20;
+
+  return &f->glyph_metrics[idx];
+}
+
+static inline int glyph_metrics_get_offset(const font_desc_t *f, const font_glyph_metrics_t *gm)
+{
+  int glyph_y = gm->pos_y - gm->bound_y + 1;
+  return glyph_y * f->glyph_stride + (gm->pos_x >> 3);
+}
 
 // int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p);

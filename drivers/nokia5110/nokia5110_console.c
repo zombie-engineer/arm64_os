@@ -26,7 +26,6 @@ int nokia5110_term_draw_char(char c)
   CONSOLE_CTL();
   ctl->cursor_x = ctl->cursor_y = -1; 
   nokia5110_draw_char(ctl->cursor_x, ctl->cursor_y, c);
-  // ctl->cursor_x++;
   return ERR_OK;
 }
 
