@@ -13,19 +13,25 @@ static nokia5110_console_control_t nokia5110_console_control = {
 
 int nokia5110_term_new_line()
 {
+  int err;
+  int x, y;
+  err = nokia5110_canvas_get_cursor(&x, &y);
+  if (err)
+    return err;
+
+  nokia5110_canvas_set_cursor(x, y + 1);
   return ERR_OK;
 }
 
 int nokia5110_term_carriage_return()
 {
-  return ERR_OK;
-}
+  int err;
+  int x, y;
+  err = nokia5110_canvas_get_cursor(&x, &y);
+  if (err)
+    return err;
 
-int nokia5110_term_draw_char(char c)
-{
-  CONSOLE_CTL();
-  ctl->cursor_x = ctl->cursor_y = -1; 
-  nokia5110_draw_char(ctl->cursor_x, ctl->cursor_y, c);
+  nokia5110_canvas_set_cursor(0, y);
   return ERR_OK;
 }
 
@@ -34,7 +40,7 @@ int nokia5110_putc(char c)
   switch(c) {
     case '\n': return nokia5110_term_new_line();
     case '\r': return nokia5110_term_carriage_return();
-    default  : return nokia5110_term_draw_char(c);
+    default  : return nokia5110_draw_char(c);
   }
 }
 

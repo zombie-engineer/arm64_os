@@ -55,13 +55,17 @@ int nokia5110_reset(void);
 // Start drawing from this address in LCD RAM
 int nokia5110_set_cursor(int x, int y);
 
+int nokia5110_canvas_set_cursor(int x, int y);
+
+int nokia5110_canvas_get_cursor(int *x, int *y);
+
 // Draw a dot
 int nokia5110_draw_dot(int x, int y);
 
 // Draw char at given coordinates
 // x = -1; y = -1 - Use current cursor position instead.
 // Updates current cursor position
-int nokia5110_draw_char(int x, int y, char c);
+int nokia5110_draw_char(char c);
 
 // Draw a line 
 int nokia5110_draw_line(int x0, int y0, int x1, int y1);
@@ -84,4 +88,3 @@ int nokia5110_run_test_loop_1(int interations, int wait_interval);
 int nokia5110_run_test_loop_2(int interations, int wait_interval);
 
 int nokia5110_run_test_loop_3(int interations, int wait_interval);
-

@@ -84,4 +84,10 @@ static inline int glyph_metrics_get_offset(const font_desc_t *f, const font_glyp
   return glyph_y * f->glyph_stride + (gm->pos_x >> 3);
 }
 
+static inline int glyph_metrics_get_cursor_step_x(const font_glyph_metrics_t *gm)
+{
+  return gm->bearing_x + gm->bound_x + gm->advance_x;
+}
+
+
 // int font_draw_char(const font_desc_t *f, font_canvas_desc_t *c, font_draw_char_param_t *p);
