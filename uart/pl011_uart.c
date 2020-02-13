@@ -366,6 +366,8 @@ int pl011_io_thread(void)
 {
   char c;
   int i;
+  rx_subscriber_t *subscriber;
+
   rx_subscribers_init();
   pl011_uart_initialized = 1;
   pl011_uart_set_interrupt_mode();
@@ -374,7 +376,8 @@ int pl011_io_thread(void)
     c = pl011_rx_buf_getchar();
     for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
       if (rx_subscriber_is_valid(i)) {
-        rx_subscribers[i].cb(rx_subscribers[i].cb_arg, c);
+        subscriber = &rx_subscribers[i];
+        subscriber->cb(subscriber->cb_arg, c);
         debug_event_1();
       }
     }
