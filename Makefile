@@ -67,12 +67,18 @@ LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font.o to_raspi.nokia5110.o font/font.o lib/checksum.o
+OBJS += $(LIBS) font_bin.o to_raspi.nokia5110.o font/font.o lib/checksum.o
+
+font_bin.o: font.psf
+	$(LD) -r -b binary $< -o $@
+
+to_raspi.nokia5110.d font_bin.d: font.psf
+	echo $@
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
+%.o: %.c %.d
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: main_qemu.o
@@ -80,8 +86,6 @@ main_qemu.o: main.c
 	echo $<
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
-font.o: font.psf
-	$(LD) -r -b binary -o font.o font.psf
 
 .PHONY: to_raspi.nokia5110.o
 to_raspi.nokia5110.o: 
@@ -137,5 +141,19 @@ serial:
 .PHONY: clean
 clean:
 	find -name '*.o' -exec rm -v {} \;
+	find -name '*.d' -exec rm -v {} \;
 
+DEPS := $(OBJS:.o=.d)
 
+$(info $(DEPS))
+
+%.d: %.c
+	cpp -M -I$(INCLUDES) $< > $@
+
+%.d: %.S
+	cpp -M -I$(INCLUDES) $< > $@
+
+-include $(DEPS)
+
+.PHONY: all
+all: $(DEPS) kernel8.img 
