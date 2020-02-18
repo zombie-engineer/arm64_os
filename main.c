@@ -254,40 +254,6 @@ void vibration_sensor_test(int gpio_num_dout, int poll)
 }
 
 #ifndef CONFIG_QEMU
-void nokia5110_test()
-{
-  nokia5110_run_test_loop_1(5, 200);
-  nokia5110_draw_text("Good evening, sir!", 0, 0);
-  nokia5110_run_test_loop_3(30, 10);
-  nokia5110_run_test_loop_1(8, 100);
-  nokia5110_run_test_loop_1(8, 50);
-  nokia5110_run_test_loop_1(8, 30);
-  nokia5110_run_test_loop_1(8, 15);
-  nokia5110_run_test_loop_2(10, 50);
-  nokia5110_run_test_loop_2(10, 40);
-  nokia5110_run_test_loop_2(10, 30);
-  nokia5110_run_test_loop_2(20, 20);
-  nokia5110_run_test_loop_2(30, 10);
-}
-
-void nokia5110_test_text()
-{
-  console_dev_t *d = nokia5110_get_console_device();
-  if (!d)
-    kernel_panic("Failed to get nokia5110 console device.\n");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  d->puts("This is a test.");
-  // while(1);
-}
-
-
 void init_nokia5110_display(int report_exceptions, int run_test)
 {
   spi_dev_t *spidev;
@@ -309,7 +275,7 @@ void init_nokia5110_display(int report_exceptions, int run_test)
 
   if (run_test) {
     nokia5110_test_text();
-    // nokia5110_test();
+    nokia5110_test();
   }
 }
 #endif
@@ -342,7 +308,7 @@ void main()
   init_consoles();
 
 #ifndef CONFIG_QEMU
-  init_nokia5110_display(1, 1);
+  init_nokia5110_display(1, 0);
 #endif
 
 

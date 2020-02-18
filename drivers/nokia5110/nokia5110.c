@@ -7,8 +7,9 @@
 #include <spinlock.h>
 #include <cpu.h>
 #include <debug.h>
+#include "nokia5110_internal.h"
 
-#define NOKIA_5110_FUNCTION_SET(PD, V, H) (0b00100000 | (PD << 2) | (V << 1) | (H << 0))
+#define NOKIA5110_FUNCTION_SET(PD, V, H) (0b00100000 | (PD << 2) | (V << 1) | (H << 0))
 #define PD_BIT_SET 1
 #define PD_BIT_CLEAR 0
 
@@ -18,41 +19,28 @@
 #define H_BIT_SET 1
 #define H_BIT_CLEAR 0
 
-#define NOKIA_5110_DISPLAY_CONTROL(D, E) (0b00001000 | (D << 2) | (E << 0))
+#define NOKIA5110_DISPLAY_CONTROL(D, E) (0b00001000 | (D << 2) | (E << 0))
 
-#define NOKIA_5110_DISPLAY_CONTROL_BLANK      NOKIA_5110_DISPLAY_CONTROL(0, 0)
-#define NOKIA_5110_DISPLAY_CONTROL_NORMAL     NOKIA_5110_DISPLAY_CONTROL(1, 0)
-#define NOKIA_5110_DISPLAY_CONTROL_ALL_SEG_ON NOKIA_5110_DISPLAY_CONTROL(0, 1)
-#define NOKIA_5110_DISPLAY_CONTROL_INVERTED   NOKIA_5110_DISPLAY_CONTROL(1, 1)
+#define NOKIA5110_DISPLAY_CONTROL_BLANK      NOKIA5110_DISPLAY_CONTROL(0, 0)
+#define NOKIA5110_DISPLAY_CONTROL_NORMAL     NOKIA5110_DISPLAY_CONTROL(1, 0)
+#define NOKIA5110_DISPLAY_CONTROL_ALL_SEG_ON NOKIA5110_DISPLAY_CONTROL(0, 1)
+#define NOKIA5110_DISPLAY_CONTROL_INVERTED   NOKIA5110_DISPLAY_CONTROL(1, 1)
 
 // Temperature control 0 - 3 0 is more contrast, 3 - is less contrast
-#define NOKIA_5110_TEMP_CONTROL(value) (0b00000100 | (value & 3))
-#define NOKIA_5110_BIAS_SYSTEM(value)  (0b00010000 | (value & 7))
-#define NOKIA_5110_SET_VOP(value)      (0b10000000 | (value & 0x7f))
+#define NOKIA5110_TEMP_CONTROL(value) (0b00000100 | (value & 3))
+#define NOKIA5110_BIAS_SYSTEM(value)  (0b00010000 | (value & 7))
+#define NOKIA5110_SET_VOP(value)      (0b10000000 | (value & 0x7f))
 
 #define DISPLAY_MODE_MAX 3
 
-#define NOKIA_5110_WIDTH  84
-#define NOKIA_5110_HEIGHT 48 
-#define NOKIA_5110_PIXELS_PER_BYTE_LOG 3
-#define NOKIA_5110_PIXELS_PER_BYTE (1<<NOKIA_5110_PIXELS_PER_BYTE_LOG)
+#define NOKIA5110_CANVAS_OFFSET(x, y) (x + NOKIA5110_WIDTH * (y >> NOKIA5110_PIXELS_PER_BYTE_LOG))
 
-#define NOKIA_5110_CANVAS_OFFSET(x, y) (x + NOKIA_5110_WIDTH * (y >> NOKIA_5110_PIXELS_PER_BYTE_LOG))
+#define NOKIA5110_CANVAS_SET_XY(c, x, y, v) \
+  *(uint8_t*)(c->canvas + NOKIA5110_CANVAS_OFFSET(x, y)) = v
 
-#define NOKIA_5110_CANVAS_SET_XY(c, x, y, v) \
-  *(uint8_t*)(c->canvas + NOKIA_5110_CANVAS_OFFSET(x, y)) = v
+#define NOKIA5110_CANVAS_SET(c, v) \
+  NOKIA5110_CANVAS_SET_XY(c, c->cursor_x, c->cursor_y, v)
 
-#define NOKIA_5110_CANVAS_SET(c, v) \
-  NOKIA_5110_CANVAS_SET_XY(c, c->cursor_x, c->cursor_y, v)
-
-
-/* Number of bytes that totally fill screen space 
- * in fact it's 504 bytes
- */
-#define NOKIA_5110_CANVAS_SIZE ((NOKIA_5110_WIDTH * NOKIA_5110_HEIGHT) >> NOKIA_5110_PIXELS_PER_BYTE_LOG)
-
-extern const char _binary_to_raspi_nokia5110_start;
-extern const char _binary_to_raspi_nokia5110_end;
 
 typedef struct nokia5110_dev {
   spi_dev_t *spi;
@@ -72,15 +60,8 @@ static nokia5110_dev_t nokia5110_device;
 static nokia5110_dev_t *nokia5110_dev = 0;
 static DECL_SPINLOCK(nokia5110_lock);
 
-static char frame_1[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_2[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_3[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_4[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_5[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_6[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_7[NOKIA_5110_CANVAS_SIZE + 4];
-static char frame_8[NOKIA_5110_CANVAS_SIZE + 4];
-static uint8_t nokia5110_canvas[NOKIA_5110_CANVAS_SIZE];
+static uint8_t nokia5110_canvas[NOKIA5110_CANVAS_SIZE];
+
 #define CHECKED_FUNC(fn, ...) DECL_FUNC_CHECK_INIT(fn, nokia5110_dev, __VA_ARGS__)
 
 // sets DC pin to DATA, tells display that this byte should be written to display RAM
@@ -98,7 +79,7 @@ static uint8_t nokia5110_canvas[NOKIA_5110_CANVAS_SIZE];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
-static int nokia5110_send_data(const void *data, int sz) 
+int nokia5110_send_data(const void *data, size_t sz) 
 {
   int ret;
   gpio_set_on(nokia5110_dev->dc);
@@ -106,7 +87,15 @@ static int nokia5110_send_data(const void *data, int sz)
   return ret;
 }
 
-#define SEND_DATA_DMA(data, len) SET_DATA(); SPI_SEND_DMA(data, len)
+int nokia5110_send_data_dma(const void *data, size_t sz)
+{
+  int ret;
+  gpio_set_on(nokia5110_dev->dc);
+  ret = nokia5110_dev->spi->xmit_dma(data, 0, sz);
+  return ret;
+}
+
+#define SEND_DATA_DMA(data, len) 
 
 
 
@@ -122,134 +111,6 @@ static int nokia5110_send_data(const void *data, int sz)
 //  }
 //  return ERR_OK;
 //}
-
-int nokia5110_run_test_loop_1(int iterations, int wait_interval)
-{
-  int i, err;
-  char *ptr;
-  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  memset(frame_1, 0xff, 4);
-  memset(frame_2, 0xff, 4);
-  memset(frame_3, 0xff, 4);
-  memset(frame_4, 0xff, 4);
-
-  ptr = frame_1 + 4;
-  for (i = 0; i < 504 / 8; ++i) {
-    *ptr++ = 0b10000000;
-    *ptr++ = 0b01000000;
-    *ptr++ = 0b00100000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00001000;
-    *ptr++ = 0b00000100;
-    *ptr++ = 0b00000010;
-    *ptr++ = 0b00000001;
-  }
-
-  ptr = frame_2 + 4;
-  for (i = 0; i < 504 / 8; ++i) {
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00010000;
-  }
-
-  ptr = frame_3 + 4;
-  for (i = 0; i < 504 / 8; ++i) {
-    *ptr++ = 0b00000001;
-    *ptr++ = 0b00000010;
-    *ptr++ = 0b00000100;
-    *ptr++ = 0b00001000;
-    *ptr++ = 0b00010000;
-    *ptr++ = 0b00100000;
-    *ptr++ = 0b01000000;
-    *ptr++ = 0b10000000;
-  }
-
-  ptr = frame_4 + 4;
-  for (i = 0; i < 504 / 8; ++i) {
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b11111111;
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b00000000;
-    *ptr++ = 0b00000000;
-  }
-
-  for (i = 0; i < iterations; ++i) {
-    SEND_DATA_DMA(frame_1, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_2, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_3, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_4, 504);
-    wait_msec(wait_interval);
-  }
-
-  return 0;
-}
-
-int nokia5110_run_test_loop_2(int iterations, int wait_interval)
-{
-  int i;
-  int err;
-  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  memset(frame_1, 0b10000000, 508);
-  memset(frame_2, 0b01000000, 508);
-  memset(frame_3, 0b00100000, 508);
-  memset(frame_4, 0b00010000, 508);
-  memset(frame_5, 0b00001000, 508);
-  memset(frame_6, 0b00000100, 508);
-  memset(frame_7, 0b00000010, 508);
-  memset(frame_8, 0b00000001, 508);
-
-  for (i = 0; i < iterations; ++i) {
-    SEND_DATA_DMA(frame_1, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_2, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_3, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_4, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_5, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_6, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_7, 504);
-    wait_msec(wait_interval);
-    SEND_DATA_DMA(frame_8, 504);
-    wait_msec(wait_interval);
-  }
-
-  return ERR_OK;
-}
-
-int nokia5110_run_test_loop_3(int iterations, int wait_interval)
-{
-  int err, i, numframes;
-  const char *video_0;
-  uint64_t bufsize;
-  wait_msec(5000);
-
-  video_0 = &_binary_to_raspi_nokia5110_start;
-  bufsize = (uint64_t)(&_binary_to_raspi_nokia5110_end) - (uint64_t)&_binary_to_raspi_nokia5110_start;
-  numframes = bufsize / 508;
-  printf("showing video_0 from address: %08x, num frames: %d\n", &_binary_to_raspi_nokia5110_start, numframes);
-  RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-  for (i = 0; i < numframes; ++i) {
-    RET_IF_ERR(nokia5110_set_cursor, 0, 0);
-    SEND_DATA_DMA(video_0 + (504 + 4) * i, 504);
-    wait_msec(20);
-  }
-  return ERR_OK;
-}
 
 int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int function_flags, int display_mode)
 { 
@@ -269,12 +130,12 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   RET_IF_ERR(gpio_set_off, nokia5110_device.dc);
   RET_IF_ERR(nokia5110_reset);
 
-  SEND_CMD(NOKIA_5110_FUNCTION_SET(PD_BIT_CLEAR, V_BIT_CLEAR, H_BIT_SET));
-  SEND_CMD(NOKIA_5110_SET_VOP(0x39));
-  SEND_CMD(NOKIA_5110_TEMP_CONTROL(0));
-  SEND_CMD(NOKIA_5110_BIAS_SYSTEM(4));
-  SEND_CMD(NOKIA_5110_FUNCTION_SET(PD_BIT_CLEAR, V_BIT_CLEAR, H_BIT_CLEAR));
-  SEND_CMD(NOKIA_5110_DISPLAY_CONTROL_NORMAL);
+  SEND_CMD(NOKIA5110_FUNCTION_SET(PD_BIT_CLEAR, V_BIT_CLEAR, H_BIT_SET));
+  SEND_CMD(NOKIA5110_SET_VOP(0x39));
+  SEND_CMD(NOKIA5110_TEMP_CONTROL(0));
+  SEND_CMD(NOKIA5110_BIAS_SYSTEM(4));
+  SEND_CMD(NOKIA5110_FUNCTION_SET(PD_BIT_CLEAR, V_BIT_CLEAR, H_BIT_CLEAR));
+  SEND_CMD(NOKIA5110_DISPLAY_CONTROL_NORMAL);
 
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   nokia5110_font = 0;
@@ -398,18 +259,18 @@ static inline void __nokia5110_canvas_set_cursor(nokia5110_canvas_control_t *ctl
     return;
 
   ctl->cursor_x = x;
-  if (ctl->cursor_x >= NOKIA_5110_WIDTH)
-    ctl->cursor_x = NOKIA_5110_WIDTH - 1;
+  if (ctl->cursor_x >= NOKIA5110_WIDTH)
+    ctl->cursor_x = NOKIA5110_WIDTH - 1;
   ctl->cursor_y = y;
 
   /* Wrap to start */
-  if (ctl->cursor_y >= NOKIA_5110_HEIGHT)
+  if (ctl->cursor_y >= NOKIA5110_HEIGHT)
     ctl->cursor_y = 0;
 }
 
 static inline void nokia5110_canvas_set_newline(nokia5110_canvas_control_t *ctl)
 {
-  __nokia5110_canvas_set_cursor(ctl, ctl->cursor_x, ctl->cursor_y + (1<<NOKIA_5110_PIXELS_PER_BYTE_LOG));
+  __nokia5110_canvas_set_cursor(ctl, ctl->cursor_x, ctl->cursor_y + (1<<NOKIA5110_PIXELS_PER_BYTE_LOG));
 }
 
 static inline void nokia5110_canvas_set_carr_return(nokia5110_canvas_control_t *ctl)
@@ -419,8 +280,8 @@ static inline void nokia5110_canvas_set_carr_return(nokia5110_canvas_control_t *
 
 static inline void nokia5110_canvas_cursor_set(nokia5110_canvas_control_t *ctl, uint8_t value)
 {
-  NOKIA_5110_CANVAS_SET(ctl, value);
-  if (ctl->cursor_x++ == NOKIA_5110_WIDTH) {
+  NOKIA5110_CANVAS_SET(ctl, value);
+  if (ctl->cursor_x++ == NOKIA5110_WIDTH) {
     ctl->cursor_x = 0;
     nokia5110_canvas_set_newline(ctl);
   }
@@ -432,7 +293,7 @@ static inline void nokia5110_canvas_blank_char(nokia5110_canvas_control_t *ctl, 
   int glyph_width = glyph_metrics_get_cursor_step_x(gm);
 
   for (i = 0; i < glyph_width; ++i)
-    NOKIA_5110_CANVAS_SET_XY(ctl, ctl->cursor_x + i, ctl->cursor_y, 0);
+    NOKIA5110_CANVAS_SET_XY(ctl, ctl->cursor_x + i, ctl->cursor_y, 0);
 }
 
 int nokia5110_canvas_draw_char(nokia5110_canvas_control_t *ctl, char c)
@@ -444,7 +305,7 @@ int nokia5110_canvas_draw_char(nokia5110_canvas_control_t *ctl, char c)
   int glyph_offset = glyph_metrics_get_offset(ctl->font, gm);
   int glyph_step_x = glyph_metrics_get_cursor_step_x(gm);
 
-  if (ctl->cursor_x + glyph_step_x >= NOKIA_5110_WIDTH) {
+  if (ctl->cursor_x + glyph_step_x >= NOKIA5110_WIDTH) {
     nokia5110_canvas_set_carr_return(ctl);
     nokia5110_canvas_set_newline(ctl);
   }
@@ -481,7 +342,7 @@ static int nokia5110_canvas_redraw_locked()
     blink_led(6, 200);
   }
   if (!err)
-    err = nokia5110_send_data(nokia5110_canvas, NOKIA_5110_CANVAS_SIZE);
+    err = nokia5110_send_data(nokia5110_canvas, NOKIA5110_CANVAS_SIZE);
   return err;
 }
 

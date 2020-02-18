@@ -2,6 +2,7 @@
 #include <drivers/display/nokia5110.h>
 #include <error.h>
 #include <debug.h>
+#include <console.h>
 
 static nokia5110_console_control_t nokia5110_console_control = {
   .initialized = 0,

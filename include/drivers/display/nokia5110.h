@@ -83,8 +83,14 @@ int nokia5110_draw_text(const char *text, int x, int y);
 // Prints debug information about the display
 void nokia5110_print_info();
 
-int nokia5110_run_test_loop_1(int interations, int wait_interval);
+// General test for nokia5110 screen
+void nokia5110_test();
 
-int nokia5110_run_test_loop_2(int interations, int wait_interval);
+// Tests text mode on nokia5110 screen
+void nokia5110_test_text();
 
-int nokia5110_run_test_loop_3(int interations, int wait_interval);
+// Sends data to nokia5110 display framebuffer via raw SPI
+int nokia5110_send_data(const void *data, size_t sz);
+
+// Sends data to nokia5110 display framebuffer via DMA.
+int nokia5110_send_data_dma(const void *data, size_t sz);
