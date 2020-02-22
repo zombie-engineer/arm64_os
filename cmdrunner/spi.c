@@ -101,7 +101,7 @@ static int command_spi_send(const string_tokens_t *args)
 
   printf("spi0->xmit %d bytes %02x %02x.\n", numbytes, bytes[0], bytes[1]);
 
-  st = spidev->xmit(bytes, numbytes);
+  st = spidev->xmit(bytes, 0, numbytes);
   if (st) {
     printf("command_pwd_enable error: spidev xmit completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;

@@ -2,23 +2,18 @@
 #include <common.h>
 #include <compiler.h>
 
-
 #define GPIO_CHECK_GPIO_NUM(gpio_num) \
   if (gpio_num > GPIO_MAX_PIN_IDX) \
     return -1
-
 
 #define GPIO_32PIN_SET_CHEKCED(gpio_num, reg0) \
   GPIO_CHECK_GPIO_NUM(gpio_num); \
   *((reg32_t)reg0 + (gpio_num / 32)) = (1 << (gpio_num % 32)); \
   return 0;
 
-
 #define GPIO_PIN_SELECT_REG(gpio_num) ((reg32_t)(GPIO_REG_GPFSEL0 + 4 * (gpio_num / 10)))
 
-
 #define GPIO_PIN_SELECT_BIT(gpio_num) ((gpio_num % 10) * 3)
-
 
 int OPTIMIZED gpio_set_function(uint32_t gpio_num, int func)
 {
@@ -36,7 +31,6 @@ int OPTIMIZED gpio_set_function(uint32_t gpio_num, int func)
   return 0;
 }
 
-
 int OPTIMIZED gpio_is_set(uint32_t gpio_num)
 {
   GPIO_CHECK_GPIO_NUM(gpio_num);
@@ -48,54 +42,45 @@ int OPTIMIZED gpio_set_on(uint32_t gpio_num)
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPSET0);
 }
 
-
 int OPTIMIZED gpio_set_off(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPCLR0);
 }
-
 
 int OPTIMIZED gpio_set_detect_high(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPHEN0);
 }
 
-
 int OPTIMIZED gpio_set_detect_low(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPLEN0);
 }
-
 
 int OPTIMIZED gpio_set_detect_rising_edge(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPREN0);
 }
 
-
 int OPTIMIZED gpio_set_detect_falling_edge(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPFEN0);
 }
-
 
 int OPTIMIZED gpio_set_detect_async_rising_edge(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPAREN0);
 }
 
-
 int OPTIMIZED gpio_set_detect_async_falling_edge(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPAFEN0);
 }
 
-
 int OPTIMIZED gpio_set_gppudclk(uint32_t gpio_num)
 {
   GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPPUDCLK0);
 }
-
 
 int OPTIMIZED gpio_set_pullupdown(uint32_t gpio_num, int pullupdown)
 {
@@ -111,7 +96,6 @@ int OPTIMIZED gpio_set_pullupdown(uint32_t gpio_num, int pullupdown)
   return 0;
 }
 
-
 void gpio_dump_select_regs(const char* tag)
 {
   printf("GPFSEL regs: tag: %s\n", tag);
@@ -123,7 +107,6 @@ void gpio_dump_select_regs(const char* tag)
   print_reg32_at(GPIO_REG_GPFSEL5);
   printf("---------\n");
 }
-
 
 void gpio_power_off(void)
 {

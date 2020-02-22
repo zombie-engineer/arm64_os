@@ -48,19 +48,21 @@ DECL_ASSERTED_FN(spi_emulated_ce0_clear)
   return ERR_OK;
 }
 
-DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t b)
+DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t bit_in, uint8_t *bit_out)
   if (spi_emulated_verbose_output)
-    printf("%d-", b);
+    printf("%d-", bit_in);
 
-  if (b)
+  if (bit_in)
     gpio_set_on(spi_emulated.mosi_gpio_pin);
   else
     gpio_set_off(spi_emulated.mosi_gpio_pin);
 
   gpio_set_on(spi_emulated.sclk_gpio_pin);
   wait_msec(10);
+  *bit_out = gpio_is_set(spi_emulated.miso_gpio_pin);
   gpio_set_off(spi_emulated.sclk_gpio_pin);
   wait_msec(10);
+
   return ERR_OK;
 }
 
@@ -70,35 +72,49 @@ DECL_ASSERTED_FN(spi_emulated_xmit_dma, const void *data_out, void *data_in, uin
 }
 
 
-DECL_ASSERTED_FN(spi_emulated_xmit_byte, char data)
+DECL_ASSERTED_FN(spi_emulated_xmit_byte, char byte_in, char *byte_out)
   int i, err;
+  char out;
 
   if (spi_emulated_verbose_output)
-    printf("spi_emulated_xmit_byte: 0x%02x\n", data);
+    printf("spi_emulated_xmit_byte: 0x%02x\n", byte_in);
 
+  out = 0;
   for (i = 0; i < 8; ++i) {
-    RET_IF_ERR(spi_emulated_push_bit, (data >> (7 - i)) & 1);
+    uint8_t c;
+    RET_IF_ERR(spi_emulated_push_bit, (byte_in >> (7 - i)) & 1, &c);
+    out = (out << 1) | c;
   }
+
   spi_emulated_ce0_set();
   wait_msec(10);
   spi_emulated_ce0_clear();
+  if (byte_out)
+    *byte_out = out;
+
   return ERR_OK;
 }
 
-DECL_ASSERTED_FN(spi_emulated_xmit, char* bytes, uint32_t len)
+DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint32_t len)
   int i, j, st;
+  char out;
 
   if (spi_emulated_verbose_output)
-    printf("spi_emulated_xmit: %02x, %02x\n", bytes[0], bytes[1]);
+    printf("spi_emulated_xmit: %02x, %02x\n", bytes_in[0], bytes_in[1]);
 
   for (j = 0; j < len; ++j) {
     for (i = 0; i < 8; ++i) {
-      st = spi_emulated_push_bit((bytes[j] >> (7 - i)) & 1);
+      uint8_t c;
+      st = spi_emulated_push_bit((bytes_in[j] >> (7 - i)) & 1, &c);
       if (st) {
         printf("spidev->push_bit error: %d\n", st);
         return st;
       }
+      out = (out << 1) | c;
     }
+
+    if (bytes_out)
+      *bytes_out++ = out;
   }
   spi_emulated_ce0_set();
   wait_msec(10);
@@ -121,15 +137,19 @@ int spi_emulated_init(
 
   gpio_set_function(sclk_pin, GPIO_FUNC_OUT);
   gpio_set_function(mosi_pin, GPIO_FUNC_OUT);
-  // gpio_set_function(miso_pin, GPIO_FUNC_IN);
-  gpio_set_function(ce0_pin, GPIO_FUNC_OUT);
-  // gpio_set_function(ce1_pin, GPIO_FUNC_OUT);
+  gpio_set_function(miso_pin, GPIO_FUNC_IN);
+
+  if (ce0_pin != -1) {
+    gpio_set_function(ce0_pin, GPIO_FUNC_OUT);
+    gpio_set_off(ce0_pin);
+  }
+  if (ce1_pin != -1) {
+    gpio_set_function(ce1_pin, GPIO_FUNC_OUT);
+    gpio_set_off(ce1_pin);
+  }
 
   gpio_set_off(sclk_pin);
   gpio_set_off(mosi_pin);
-  // gpio_set_off(miso_pin, GPIO_FUNC_IN);
-  gpio_set_off(ce0_pin);
-  // gpio_set_off(ce1_pin);
 
   spi_emulated.spidev.xmit      = spi_emulated_xmit;
   spi_emulated.spidev.xmit_byte = spi_emulated_xmit_byte;

@@ -5,6 +5,7 @@
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
 #include <spinlock.h>
+#include <i2c.h>
 #include <font.h>
 #include <vcanvas.h>
 #include <rand.h>
@@ -21,6 +22,7 @@
 #include <timer.h>
 #include <cmdrunner.h>
 #include <max7219.h>
+#include <drivers/atmega8a.h>
 #include <drivers/display/nokia5110.h>
 #include <drivers/display/nokia5110_console.h>
 #include <debug.h>
@@ -293,6 +295,15 @@ void init_uart(int report_exceptions)
   }
 }
 
+void init_atmega8a()
+{
+  int ret;
+  ret = atmega8a_init(19 /* miso */, 26 /* mosi */, 13 /* sclk */, 6 /* reset */);
+
+  if (ret != ERR_OK)
+    printf("Failed to init atmega8a. Error_code: %d\n", ret);
+}
+
 void main()
 {
   debug_init();
@@ -303,13 +314,25 @@ void main()
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
+  i2c_init();
 
   init_uart(1);
   init_consoles();
+  init_atmega8a();
+  while(1);
+//#ifndef CONFIG_QEMU
+//  init_nokia5110_display(1, 0);
+//#endif
 
-#ifndef CONFIG_QEMU
-  init_nokia5110_display(1, 0);
-#endif
+  
+//  gpio_set_function(22, GPIO_FUNC_OUT);
+//  gpio_set_on(22);
+//  wait_msec(2000);
+//  gpio_set_off(22);
+//  wait_msec(2000);
+//  gpio_set_on(22);
+//  wait_msec(2000);
+//  gpio_set_off(22);
 
 
   print_mbox_props();

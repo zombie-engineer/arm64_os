@@ -38,8 +38,8 @@
 #define SPI_TYPE_UNKNOWN   0xff
 
 typedef struct spi_dev {
-  int (*xmit)(char* bytes, uint32_t len);
-  int (*xmit_byte)(char data);
+  int (*xmit)(const char* bytes_in, char *bytes_out, uint32_t len);
+  int (*xmit_byte)(char byte_in, char *byte_out);
   int (*xmit_dma)(const void *data_out, void *data_in, uint32_t len);
 } spi_dev_t;
 

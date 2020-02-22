@@ -52,7 +52,7 @@ static int max7219_store(uint8_t addr, uint8_t data)
 
   bytes[0] = addr;
   bytes[1] = data;
-  return spidev->xmit(bytes, 2);
+  return spidev->xmit(bytes, 0, 2);
 }
 
 int max7219_print_info()

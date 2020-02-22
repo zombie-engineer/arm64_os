@@ -238,7 +238,7 @@ static int spi0_xmit_dma(const void *data_out, void *data_in, uint32_t bytelen)
 }
 
 
-static int spi0_xmit_byte(char data)
+static int spi0_xmit_byte(char byte_in, char *byte_out)
 {
   int rx;
   *SPI_CS = SPI_CS_CLEAR;
@@ -246,13 +246,13 @@ static int spi0_xmit_byte(char data)
   while(!(*SPI_CS & SPI_CS_TXD));
   while(*SPI_CS & SPI_CS_RXD) rx = *SPI_FIFO;
   if (rx);
-  *SPI_FIFO = data;
+  *SPI_FIFO = byte_in;
   while(!(*SPI_CS & SPI_CS_DONE));
   *SPI_CS = 0;
   return ERR_OK;
 }
 
-static int spi0_xmit(char* bytes, uint32_t len)
+static int spi0_xmit(const char* bytes_in, char *bytes_out, uint32_t len)
 {
   int i, rx_data;
 
@@ -273,7 +273,7 @@ static int spi0_xmit(char* bytes, uint32_t len)
     }
 
     // printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
-    *SPI_FIFO = bytes[i];
+    *SPI_FIFO = bytes_in[i];
     while((*SPI_CS & SPI_CS_DONE) == 0);
     //  puts("SPI_CS->DONE not yet\n");
   } 
