@@ -8,3 +8,4 @@
 #define ERR_MEMALLOC        -5
 #define ERR_NO_RESOURCE     -6
 #define ERR_NOT_FOUND       -7
+#define ERR_BUSY            -8

@@ -46,3 +46,16 @@ static inline int should_lock()
 {
   return spinlocks_enabled && is_irq_enabled();
 }
+
+#define spinlock_cond_lock(lock) \
+  do {                           \
+  if (should_lock())             \
+    spinlock_lock(lock);         \
+  } while(0)
+
+#define spinlock_cond_unlock(lock) \
+  do {                             \
+    if (should_lock())             \
+      spinlock_unlock(lock);       \
+  } while(0)
+
