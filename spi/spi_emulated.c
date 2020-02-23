@@ -13,6 +13,7 @@ typedef struct spi_emulated_dev {
   int miso_gpio_pin;
   int ce0_gpio_pin;
   int ce1_gpio_pin;
+  int period;
 } spi_emulated_dev_t;
 
 
@@ -33,18 +34,20 @@ static int fn(__VA_ARGS__) \
 { \
   ASSERT_INITIALIZED(#fn);
 
-
 DECL_ASSERTED_FN(spi_emulated_ce0_set)
   ASSERT_INITIALIZED();
-  gpio_set_on(spi_emulated.ce0_gpio_pin);
-  wait_msec(100);
+  if (spi_emulated.ce0_gpio_pin != -1) {
+    gpio_set_on(spi_emulated.ce0_gpio_pin);
+    wait_msec(100);
+  }
   return ERR_OK;
 }
 
-
 DECL_ASSERTED_FN(spi_emulated_ce0_clear)
-  gpio_set_off(spi_emulated.ce0_gpio_pin);
-  wait_msec(100);
+  if (spi_emulated.ce0_gpio_pin != -1) {
+    gpio_set_off(spi_emulated.ce0_gpio_pin);
+    wait_msec(100);
+  }
   return ERR_OK;
 }
 
