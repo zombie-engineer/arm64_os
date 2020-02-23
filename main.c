@@ -1,6 +1,7 @@
 #include <config.h>
 #include <uart/uart.h>
 #include <gpio.h>
+#include <gpio_set.h>
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
@@ -298,15 +299,20 @@ void init_uart(int report_exceptions)
 void init_atmega8a()
 {
   int ret;
+  char membuf[2048];
   ret = atmega8a_init(19 /* miso */, 26 /* mosi */, 13 /* sclk */, 6 /* reset */);
 
   if (ret != ERR_OK)
     printf("Failed to init atmega8a. Error_code: %d\n", ret);
+
+  if (atmega8a_read_program_memory(membuf, 0, 512) != ERR_OK)
+    printf("Failed to read program memory\n");
 }
 
 void main()
 {
   debug_init();
+  gpio_set_init();
   init_unhandled_exception_reporters();
 
   font_init_lib();

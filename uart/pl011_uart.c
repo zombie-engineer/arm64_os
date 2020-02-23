@@ -1,6 +1,7 @@
 #include <uart/pl011_uart.h>
 #include <spinlock.h>
 #include <gpio.h>
+#include <gpio_set.h>
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <types.h>
@@ -57,6 +58,7 @@
 /* Transmit FIFO full*/
 #define UART0_FR_TXFF (1<<5)
 
+DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_\0");
 
 static char pl011_rx_buf[2048];
 static int pl011_rx_data_sz = 0;
@@ -67,13 +69,24 @@ static void pl011_uart_disable()
   write_reg(UART0_CR, 0);
 }
 
-static void pl011_uart_gpio_enable(int tx_pin, int rx_pin)
+
+static int pl011_uart_gpio_init()
 {
+  const int tx_pin = 14;
+  const int rx_pin = 15;
+  gpio_set_handle_t gpio_set_handle; 
+  gpio_set_handle = gpio_set_request_2_pins(tx_pin, rx_pin, pl011_gpio_set_key);
+  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
+    printf("Failed to request gpio pins 14, 15 for pl011_uart.\n");
+    return ERR_BUSY;  
+  }
+
   /* map UART0 to GPIO pins */
   gpio_set_function(tx_pin, GPIO_FUNC_ALT_0);
   gpio_set_function(rx_pin, GPIO_FUNC_ALT_0);
 
   gpio_set_pullupdown(rx_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  return ERR_OK;
 }
 
 
@@ -116,7 +129,7 @@ void pl011_uart_init(int baudrate, int _not_used)
   uint32_t hz, idiv, fdiv;
   pl011_uart_disable();
   while(read_reg(UART0_FR) & (UART0_FR_BUSY | UART0_FR_TXFF));
-  pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
+  pl011_uart_gpio_init();
 
   /* set up clock for consistent divisor values */
   mbox_get_clock_rate(MBOX_CLOCK_ID_UART, &hz);
@@ -257,13 +270,6 @@ void pl011_uart_print_regs()
       );
 }
 
-static void pl011_uart_reprogram_cr_prep()
-{
-  pl011_uart_disable();
-  while(read_reg(UART0_FR) & (UART0_FR_BUSY | UART0_FR_TXFF));
-  write_reg(UART0_LCRH, read_reg(UART0_LCRH) & ~(1<<4));
-}
-
 void pl011_uart_set_interrupt_mode()
 {
   int interrupt_mask;
@@ -271,8 +277,6 @@ void pl011_uart_set_interrupt_mode()
 
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
       pl011_uart_handle_interrupt);
-
-  // pl011_uart_reprogram_cr_prep();
 
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
 
@@ -378,7 +382,7 @@ int pl011_io_thread(void)
       if (rx_subscriber_is_valid(i)) {
         subscriber = &rx_subscribers[i];
         subscriber->cb(subscriber->cb_arg, c);
-        debug_event_1();
+        // debug_event_1();
       }
     }
   }
