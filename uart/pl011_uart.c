@@ -58,7 +58,7 @@
 /* Transmit FIFO full*/
 #define UART0_FR_TXFF (1<<5)
 
-DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_\0");
+DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
 static char pl011_rx_buf[2048];
 static int pl011_rx_data_sz = 0;

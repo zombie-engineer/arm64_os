@@ -1,19 +1,24 @@
 #include <drivers/atmega8a.h>
 #include <gpio.h>
+#include <gpio_set.h>
 #include <spi.h>
 #include <error.h>
 #include <common.h>
 #include <delays.h>
 
-typedef struct atmel8a_dev {
+typedef struct atmega8a_dev {
   spi_dev_t *spi;
   int gpio_pin_reset;
-} atmel8a_dev_t;
+  gpio_set_handle_t gpio_set_handle;
+} atmega8a_dev_t;
 
-static atmel8a_dev_t atmel8a_dev = {
+static atmega8a_dev_t atmega8a_dev = {
   .spi = 0,
-  .gpio_pin_reset = -1
+  .gpio_pin_reset = -1,
+  .gpio_set_handle = GPIO_SET_INVALID_HANDLE
 };
+
+DECL_GPIO_SET_KEY(atmega8a_reset_key, "ATMEGA8_GPIO_RS");
 
 #define CMD_PROGRAMMIG_ENABLE    0x000053ac
 
@@ -64,16 +69,18 @@ static inline int atmega8a_read_signature(spi_dev_t *spidev, uint32_t *signature
   return ERR_OK;
 }
 
-int atmega8a_init(int gpio_pin_miso, int gpio_pin_mosi, int gpio_pin_sclk, int gpio_pin_reset)
+int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset)
 {
   int ret;
   uint32_t res;
+  gpio_set_handle_t gpio_set_handle;
 
   uint32_t signature;
 
-  spi_dev_t *spidev;
-  spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
-  spidev = spi_get_dev(SPI_TYPE_EMULATED);
+  gpio_set_handle = gpio_set_request_1_pins(gpio_pin_reset, atmega8a_reset_key);
+  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE)
+    return ERR_BUSY;
+
   gpio_set_function(gpio_pin_reset, GPIO_FUNC_OUT);
   gpio_set_off(gpio_pin_reset);
 
@@ -99,8 +106,9 @@ int atmega8a_init(int gpio_pin_miso, int gpio_pin_mosi, int gpio_pin_sclk, int g
       return ERR_FATAL;
 
   printf("Signature bytes: %08x\n", signature);
-  atmel8a_dev.spi = spidev;
-  atmel8a_dev.gpio_pin_reset = gpio_pin_reset;
+  atmega8a_dev.spi = spidev;
+  atmega8a_dev.gpio_pin_reset = gpio_pin_reset;
+  atmega8a_dev.gpio_set_handle = gpio_set_handle;
   return ERR_OK;
 }
 
@@ -111,7 +119,7 @@ int atmega8a_read_program_memory(void *buf, uint32_t addr, size_t sz)
   size_t i;
   for (i = 0; i < sz; ++i) {
     cmd = get_read_program_memory_cmd(addr + i);
-    if (atmega8a_cmd(atmel8a_dev.spi, cmd, &res) != ERR_OK)
+    if (atmega8a_cmd(atmega8a_dev.spi, cmd, &res) != ERR_OK)
       return ERR_FATAL;
     *ptr++ = EXTRACT_BYTE(res, 3);
   }

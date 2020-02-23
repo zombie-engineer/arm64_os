@@ -10,7 +10,7 @@ typedef int gpio_set_handle_t;
 #define GPIO_SET_OWNER_KEY_BUF_SZ 16
 #define GPIO_SET_OWNER_KEY_LEN (GPIO_SET_OWNER_KEY_BUF_SZ - 1)
 
-#define DECL_GPIO_SET_KEY(name, key) static const char name[16] = key
+#define DECL_GPIO_SET_KEY(name, key) static const char name[16] = key "\0"
 
 typedef struct gpio_set {
   int active;
@@ -42,7 +42,7 @@ static inline gpio_set_handle_t gpio_set_checked_request(gpio_set_mask_t pins, c
 {
   gpio_set_handle_t handle;
   if (gpio_set_request(pins, owner_key, &handle) != ERR_OK) {
-    printf("Failed to claim ownership for gpio pin set: %x\n", pins);
+    printf("Failed to claim ownership for gpio pin set: %x, owner:%s\n", pins, owner_key);
     return GPIO_SET_INVALID_HANDLE;
   }
   return handle;
@@ -65,12 +65,12 @@ static inline gpio_set_handle_t gpio_set_request_2_pins(int gpio_pin_1, int gpio
   return gpio_set_checked_request(pins, owner_key);
 }
 
-static inline gpio_set_handle_t gpio_set_request_3_pins(int gpio_pin_1, int gpio_pin_2, int gpio_pin_3, const char *owner_key)
+static inline gpio_set_handle_t gpio_set_request_n_pins(int* pins, int num_pins, const char *owner_key)
 {
-  gpio_set_mask_t pins;
-  gpio_set_mask_clear(&pins);
-  gpio_set_mask_add(&pins, gpio_pin_1);
-  gpio_set_mask_add(&pins, gpio_pin_2);
-  gpio_set_mask_add(&pins, gpio_pin_3);
-  return gpio_set_checked_request(pins, owner_key);
+  int i;
+  gpio_set_mask_t pin_mask;
+  gpio_set_mask_clear(&pin_mask);
+  for (i = 0; i < num_pins; ++i)
+    gpio_set_mask_add(&pin_mask, pins[i]);
+  return gpio_set_checked_request(pin_mask, owner_key);
 }

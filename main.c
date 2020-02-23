@@ -298,9 +298,23 @@ void init_uart(int report_exceptions)
 
 void init_atmega8a()
 {
+  const int gpio_pin_miso = 19;
+  const int gpio_pin_mosi = 26;
+  const int gpio_pin_sclk = 13;
+  const int gpio_pin_reset = 6;
+
   int ret;
+
   char membuf[2048];
-  ret = atmega8a_init(19 /* miso */, 26 /* mosi */, 13 /* sclk */, 6 /* reset */);
+
+  spi_dev_t *spidev;
+  if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1)) != ERR_OK) {
+    printf("Failed to initialize emulated spi. Error code: %d\n", ret);
+    return;
+  }
+
+  spidev = spi_get_dev(SPI_TYPE_EMULATED);
+  ret = atmega8a_init(spidev, gpio_pin_reset);
 
   if (ret != ERR_OK)
     printf("Failed to init atmega8a. Error_code: %d\n", ret);
