@@ -118,7 +118,7 @@ void * _memcpy(void *dst, const void *src, size_t n)
     // copy 4 bytes aligned
     else {
       imax = (n / 4) * 4;
-      for (i = 0; i < imax; ++i)
+      for (i = 0; i < imax / 4; ++i)
         CPY_INT_EL(dst, src, i);
       for (i = (n / 4) * 4; i < n; ++i)
         CPY_CHAR_EL(dst, src, i);
