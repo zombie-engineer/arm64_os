@@ -110,8 +110,8 @@ void init_consoles()
   if (viewport_console_init())
     kernel_panic("Failed to init viewport console device.");
 
-  dev.puts = viewport_console_puts;
-  dev.putc = viewport_console_putc;
-  if (console_add_device(&dev, VIEWPORT_CONSOLE_NAME))
-    kernel_panic("Failed to add viewport console device.");
+//  dev.puts = viewport_console_puts;
+//  dev.putc = viewport_console_putc;
+//  if (console_add_device(&dev, VIEWPORT_CONSOLE_NAME))
+//    kernel_panic("Failed to add viewport console device.");
 }
