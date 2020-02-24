@@ -42,4 +42,28 @@ void hexdump_addr(unsigned int *addr)
   }
 }
 
+static inline void __hexdump_line(void *addr, int sz)
+{
+  int i;
+  const unsigned char *ptr = addr;
+  printf("%08llx:", (unsigned long long)addr);
+  for (i = 0; i < sz; ++i)
+    printf(" %02x", *ptr++);
+  putc('\r');
+  putc('\n');
+}
+
+void hexdump_memory(void *addr, size_t sz)
+{
+  const int line_width = 16;
+  int last_sz;
+  unsigned char *ptr = addr;
+  while(sz) {
+    last_sz = min(line_width, sz);
+    __hexdump_line(ptr, last_sz);
+    ptr += last_sz;
+    sz -= last_sz;
+  }
+}
+
 
