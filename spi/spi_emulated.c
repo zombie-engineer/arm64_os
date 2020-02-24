@@ -64,10 +64,10 @@ DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t bit_in, uint8_t *bit_out)
     gpio_set_off(spi_emulated.mosi_gpio_pin);
 
   gpio_set_on(spi_emulated.sclk_gpio_pin);
-  wait_msec(10);
+  wait_usec(100);
   *bit_out = gpio_is_set(spi_emulated.miso_gpio_pin);
   gpio_set_off(spi_emulated.sclk_gpio_pin);
-  wait_msec(10);
+  wait_usec(100);
 
   return ERR_OK;
 }
@@ -109,6 +109,8 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
     printf("spi_emulated_xmit: %02x, %02x\n", bytes_in[0], bytes_in[1]);
 
   for (j = 0; j < len; ++j) {
+    if (spi_emulated_verbose_output)
+      printf("spi_emulated_xmit byte: %02x\r\n", bytes_in[j]);
     for (i = 0; i < 8; ++i) {
       uint8_t c;
       st = spi_emulated_push_bit((bytes_in[j] >> (7 - i)) & 1, &c);
@@ -123,7 +125,7 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
       *bytes_out++ = out;
   }
   spi_emulated_ce0_set();
-  wait_msec(10);
+  wait_usec(100);
   spi_emulated_ce0_clear();
   return ERR_OK;
 }
