@@ -304,6 +304,10 @@ void init_atmega8a()
   const int gpio_pin_reset = 6;
 
   int ret;
+  char fuse_high;
+  char fuse_low;
+  int flash_size;
+  int eeprom_size;
 
   char membuf[2048];
 
@@ -319,8 +323,72 @@ void init_atmega8a()
   if (ret != ERR_OK)
     printf("Failed to init atmega8a. Error_code: %d\n", ret);
 
-  if (atmega8a_read_program_memory(membuf, 0, 512) != ERR_OK)
+  if (atmega8a_read_fuse_bits(&fuse_low, &fuse_high) != ERR_OK)
     printf("Failed to read program memory\n");
+
+  flash_size = atmega8a_get_flash_size();
+  eeprom_size = atmega8a_get_eeprom_size();
+  
+ // if (atmega8a_chip_erase() != ERR_OK) {
+ //   printf("Failed to erase chip\n");
+ //   while(1);
+ // }
+
+//  printf("Writing:\r\n");
+//  memset(membuf +  0, 0xaa, 16);
+//  memset(membuf + 16, 0xbb, 16);
+//  memset(membuf + 32, 0xcc, 16);
+//  memset(membuf + 48, 0xdd, 16);
+//  hexdump_memory(membuf, 64);
+//  if (atmega8a_write_flash(membuf, 64, 4) != ERR_OK) {
+//    printf("Failed to read program memory\n");
+//    while(1);
+//  }
+//  printf("Write complete.\r\n");
+  memset(membuf, 0x00, 64);
+  // wait_msec(2000);
+
+  printf("Reading.\r\n");
+  if (atmega8a_read_flash_memory(membuf, 64, 0 * 64) != ERR_OK)
+    printf("Failed to read program memory\n");
+  printf("Read complete.\r\n");
+  hexdump_memory(membuf, 64);
+
+  printf("Reading.\r\n");
+  if (atmega8a_read_flash_memory(membuf, 64, 1 * 64) != ERR_OK)
+    printf("Failed to read program memory\n");
+  printf("Read complete.\r\n");
+  hexdump_memory(membuf, 64);
+
+  printf("Reading.\r\n");
+  if (atmega8a_read_flash_memory(membuf, 64, 2 * 64) != ERR_OK)
+    printf("Failed to read program memory\n");
+  printf("Read complete.\r\n");
+  hexdump_memory(membuf, 64);
+
+  printf("Reading.\r\n");
+  if (atmega8a_read_flash_memory(membuf, 64, 3 * 64) != ERR_OK)
+    printf("Failed to read program memory\n");
+  printf("Read complete.\r\n");
+  hexdump_memory(membuf, 64);
+
+  printf("Reading.\r\n");
+  if (atmega8a_read_flash_memory(membuf, 64, 4 * 64) != ERR_OK)
+    printf("Failed to read program memory\n");
+  printf("Read complete.\r\n");
+  hexdump_memory(membuf, 64);
+  while(1);
+
+
+  if (atmega8a_read_flash_memory(membuf, flash_size, 0) != ERR_OK)
+    printf("Failed to read program memory\n");
+
+  hexdump_memory(membuf, flash_size);
+
+  if (atmega8a_read_eeprom_memory(membuf, eeprom_size, 0) != ERR_OK)
+    printf("Failed to read program memory\n");
+
+  hexdump_memory(membuf, eeprom_size);
 }
 
 void main()
