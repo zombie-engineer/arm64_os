@@ -4,6 +4,7 @@
 *.img
 *.swp
 *.map
+*.sym
 test/test
 sdcard
 uart_capture_*.bin

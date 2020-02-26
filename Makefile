@@ -38,6 +38,7 @@ OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
 CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
+LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
@@ -70,12 +71,12 @@ LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font_bin.o to_raspi.nokia5110.o font/font.o lib/checksum.o
+OBJS += $(LIBS) font_bin.o to_raspi.nokia5110.o font/font.o lib/checksum.o atmega8a.bin.o
 
 font_bin.o: font.psf
 	$(LD) -r -b binary $< -o $@
 
-to_raspi.nokia5110.d font_bin.d: font.psf
+atmega8a.bin.d to_raspi.nokia5110.d font_bin.d: font.psf
 	echo $@
 
 %.o: %.S
@@ -89,21 +90,27 @@ main_qemu.o: main.c
 	echo $<
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
-
 .PHONY: to_raspi.nokia5110.o
 to_raspi.nokia5110.o: 
 	$(LD) -r -b binary to_raspi.nokia5110 -o $@
 
-kernel8.img: $(OBJS) main.o
-	$(LD) -nostdlib -nostartfiles $^ -T arch/armv8/link.ld -o $(@:.img=.elf) -Map $(@:.img=.map)
-	$(NM) --numeric-sort kernel8.elf > $@.sym
-	$(OBJCOPY) -O binary kernel8.elf $@
+TARGET_PREFIX_REAL := kernel8
+TARGET_PREFIX_QEMU := kernel8_qemu
 
-qemubin.img: $(OBJS) main_qemu.o
-	$(LD) -nostdlib -nostartfiles $^ -T arch/armv8/link.ld -o $@.elf -Map $@.map
-	$(NM) --numeric-sort $@.elf > $@.sym
-	$(OBJCOPY) -O binary $@.elf $@
+.PHONY: atmega8a.bin.o
+atmega8a.bin.o:
+	$(LD) -r -b binary atmega8a.bin -o $@
 
+%.elf: $(OBJS) %.o
+	$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^ 
+
+TARGET_QEMU_IMG := $(TARGET_PREFIX_QEMU).img
+
+%.sym: %.elf
+	$(NM) --numeric-sort $< > $@
+
+%.img: %.elf
+	$(OBJCOPY) -O binary $< $@
 
 QEMU_FLAGS := -M raspi3 -accel tcg -nographic
 QEMU_TRACE_ARGS := -trace enable=*bcm2835*
@@ -115,12 +122,12 @@ endif
 
 # Run in qemu
 .PHONY: qemu
-qemu: qemubin.img
+qemu: $(TARGET_QEMU_IMG)
 	$(QEMU) $(QEMU_FLAGS) -kernel $<
 
 # Run in qemu, wait until debugger attached
 .PHONY: qemud
-qemud: qemubin.img
+qemud: $(TARGET_QEMU_IMG)
 	$(QEMU) $(QEMU_FLAGS) -kernel $< -s -S
 
 # Run in qemu, with qemu also debugged AND wait until debugger attached
@@ -128,7 +135,7 @@ qemud: qemubin.img
 # qemu process. Other gdb also needed to be attached externally via
 # -s -S flags for a normal debug session.
 .PHONY: qemuds
-qemuds: qemubin.img
+qemuds: $(TARGET_QEMU_IMG)
 	gdb -x qemu.gdb\
 		--args $(QEMU) $(QEMU_FLAGS) -kernel $< -s -S
 
@@ -143,8 +150,12 @@ serial:
 
 .PHONY: clean
 clean:
+	# Recursively find all objects and depends through
+	# all directories
 	find -name '*.o' -exec rm -v {} \;
 	find -name '*.d' -exec rm -v {} \;
+	# Only destroy what's seen in this dir
+	find -maxdepth 1 -regex '.*.\(elf\|map\|sym\|img\)' -exec rm -v {} \;
 
 DEPS := $(OBJS:.o=.d)
 
@@ -158,5 +169,11 @@ $(info $(DEPS))
 
 -include $(DEPS)
 
+TARGETS := $(DEPS)\
+	$(addprefix $(TARGET_PREFIX_REAL)., img sym elf)\
+	$(addprefix $(TARGET_PREFIX_QEMU)., img sym elf)
+
+$(info TARGETS: $(TARGETS))
+   
 .PHONY: all
-all: $(DEPS) kernel8.img 
+all: $(TARGETS)
