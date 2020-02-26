@@ -22,7 +22,7 @@ void _putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
 
-void hexdump_memory(void *addr, size_t sz);
+void hexdump_memory(const void *addr, size_t sz);
 
 #define print_reg32(regname) printf(#regname " %08x\n",  *regname)
 
