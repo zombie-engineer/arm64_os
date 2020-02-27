@@ -9,6 +9,7 @@
 #include <cpu.h>
 #include <debug.h>
 #include <drivers/display/nokia5110_console.h>
+#include <console.h>
 
 static char ringbuf_buf[256];
 static ringbuf_t char_pipe;
