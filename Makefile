@@ -1,9 +1,17 @@
-GDB := 
-
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
+
+INCLUDES := include
+
+OPTIMIZATION_FLAGS = -O2
+OPTIMIZATION_FLAGS = -g
+
+CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
+LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
+CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
 	binblock.o\
@@ -31,16 +39,6 @@ OBJS := \
 	sched.o\
 	timer.o\
 	video_console.o
-
-INCLUDES := include
-
-OPTIMIZATION_FLAGS = -O2
-OPTIMIZATION_FLAGS = -g
-
-CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
-LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
-CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 all: kernel8.img
 
@@ -87,29 +85,27 @@ firmware/atmega8a/atmega8a.bin.o: firmware/atmega8a/atmega8a.bin
 firware/atmega8a/atmega8a.bin.d nokia5110_animation.d font.bin.d: font.bin
 	echo $@
 
+TARGET_PREFIX_REAL := kernel8
+TARGET_PREFIX_QEMU := kernel8_qemu
+
 .PHONY: firmware
 firmware: firmware/atmega8a/atmega8a.bin
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c %.d
-	$(CC) $(CFLAGS) -c $< -o $@
-
-.PHONY: main_qemu.o
-main_qemu.o: main.c
+.PHONY: $(TARGET_PREFIX_QEMU).o
+$(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
 	echo $<
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
+%.o: %.c %.d
+	$(CC) $(CFLAGS) -c $< -o $@
 
-TARGET_PREFIX_REAL := kernel8
-TARGET_PREFIX_QEMU := kernel8_qemu
 
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
 %.elf: $(OBJS) $(BINOBJS) %.o
-	echo $@ Depends: $^
-	echo "$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^" > $@.cmd
 	$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^ 
 
 TARGET_QEMU_IMG := $(TARGET_PREFIX_QEMU).img
@@ -163,7 +159,7 @@ clean:
 	find -name '*.o' -exec rm -v {} \;
 	find -name '*.d' -exec rm -v {} \;
 	# Only destroy what's seen in this dir
-	find -maxdepth 1 -regex '.*.\(elf\|map\|sym\|img\)$' -exec rm -v {} \;
+	find -maxdepth 1 -regex '.*.\(elf\|map\|sym\|img\)$$' -exec rm -v {} \;
 
 DEPS := $(OBJS:.o=.d)
 
