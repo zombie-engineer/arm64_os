@@ -364,13 +364,13 @@ void atmega8a_download(const void *bin, int bin_size)
   while(1);
 }
 
-extern const char _binary_to_raspi_nokia5110_start;
-extern const char _binary_to_raspi_nokia5110_end;
+extern const char _binary_firmware_atmega8a_atmega8a_bin_start;
+extern const char _binary_firmware_atmega8a_atmega8a_bin_end;
 
 void main()
 {
-  const char *atmega8a_bin = &_binary_to_raspi_nokia5110_start;
-  int atmega8a_bin_size = &_binary_to_raspi_nokia5110_end - &_binary_to_raspi_nokia5110_start;
+  const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
+  int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end - &_binary_firmware_atmega8a_atmega8a_bin_start;
   char bin[] = { 0x04, 0xe0, 0x02, 0xbb, 0x01, 0xbb, 0x00, 0xc0 };
 
   debug_init();
@@ -388,6 +388,7 @@ void main()
   init_consoles();
   init_atmega8a();
   atmega8a_download(bin, 64);
+  atmega8a_download(atmega8a_bin, 64);
   while(1);
 //#ifndef CONFIG_QEMU
 //  init_nokia5110_display(1, 0);

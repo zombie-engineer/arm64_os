@@ -6,8 +6,8 @@
 #include <console.h>
 #include <delays.h>
 
-extern const char _binary_to_raspi_nokia5110_start;
-extern const char _binary_to_raspi_nokia5110_end;
+extern const char _binary_nokia5110_animation_bin_start;
+extern const char _binary_nokia5110_animation_bin_end;
 
 static char frame_1[NOKIA5110_CANVAS_SIZE + 4];
 static char frame_2[NOKIA5110_CANVAS_SIZE + 4];
@@ -133,10 +133,10 @@ static int nokia5110_run_test_loop_3(int iterations, int wait_interval)
   uint64_t bufsize;
   wait_msec(5000);
 
-  video_0 = &_binary_to_raspi_nokia5110_start;
-  bufsize = (uint64_t)(&_binary_to_raspi_nokia5110_end) - (uint64_t)&_binary_to_raspi_nokia5110_start;
+  video_0 = &_binary_nokia5110_animation_bin_start;
+  bufsize = (uint64_t)(&_binary_nokia5110_animation_bin_end) - (uint64_t)&_binary_nokia5110_animation_bin_start;
   numframes = bufsize / 508;
-  printf("showing video_0 from address: %08x, num frames: %d\n", &_binary_to_raspi_nokia5110_start, numframes);
+  printf("showing video_0 from address: %08x, num frames: %d\n", &_binary_nokia5110_animation_bin_start, numframes);
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   for (i = 0; i < numframes; ++i) {
     RET_IF_ERR(nokia5110_set_cursor, 0, 0);

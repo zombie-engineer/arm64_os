@@ -71,13 +71,24 @@ LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) font_bin.o to_raspi.nokia5110.o font/font.o lib/checksum.o atmega8a.bin.o
+OBJS += $(LIBS) lib/checksum.o font/font.o
 
-font_bin.o: font.psf
+BINOBJS := nokia5110_animation.o firmware/atmega8a/atmega8a.o font.o
+.SECONDARY: $(BINOBJS)
+
+firmware/atmega8a/atmega8a.bin:
+	make -C firmware/atmega8a
+
+firmware/atmega8a/atmega8a.bin.o: firmware/atmega8a/atmega8a.bin
+
+%.o: %.bin
 	$(LD) -r -b binary $< -o $@
 
-atmega8a.bin.d to_raspi.nokia5110.d font_bin.d: font.psf
+firware/atmega8a/atmega8a.bin.d nokia5110_animation.d font.bin.d: font.bin
 	echo $@
+
+.PHONY: firmware
+firmware: firmware/atmega8a/atmega8a.bin
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -90,18 +101,15 @@ main_qemu.o: main.c
 	echo $<
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
-.PHONY: to_raspi.nokia5110.o
-to_raspi.nokia5110.o: 
-	$(LD) -r -b binary to_raspi.nokia5110 -o $@
 
 TARGET_PREFIX_REAL := kernel8
 TARGET_PREFIX_QEMU := kernel8_qemu
 
-.PHONY: atmega8a.bin.o
-atmega8a.bin.o:
-	$(LD) -r -b binary atmega8a.bin -o $@
+.SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
-%.elf: $(OBJS) %.o
+%.elf: $(OBJS) $(BINOBJS) %.o
+	echo $@ Depends: $^
+	echo "$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^" > $@.cmd
 	$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^ 
 
 TARGET_QEMU_IMG := $(TARGET_PREFIX_QEMU).img
@@ -155,7 +163,7 @@ clean:
 	find -name '*.o' -exec rm -v {} \;
 	find -name '*.d' -exec rm -v {} \;
 	# Only destroy what's seen in this dir
-	find -maxdepth 1 -regex '.*.\(elf\|map\|sym\|img\)' -exec rm -v {} \;
+	find -maxdepth 1 -regex '.*.\(elf\|map\|sym\|img\)$' -exec rm -v {} \;
 
 DEPS := $(OBJS:.o=.d)
 
