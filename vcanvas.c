@@ -45,7 +45,7 @@ typedef struct {
   unsigned char glyphs;
 } PACKED psf_t;
 
-extern volatile unsigned char _binary_font_psf_start;
+extern volatile unsigned char _binary_font_bin_start;
 
 int vcanvas_is_initialized()
 {
@@ -174,7 +174,7 @@ unsigned char * font_get_glyph(psf_t *font, char c)
 void vcanvas_putc(int* x, int* y, char chr)
 {
   unsigned char *glyph;
-  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  psf_t *font = (psf_t*)&_binary_font_bin_start;
   glyph = font_get_glyph(font, chr);
 
   switch(chr) {
@@ -205,7 +205,7 @@ void vcanvas_putc(int* x, int* y, char chr)
 
 void vcanvas_puts(int *x, int *y, const char *s)
 {
-  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  psf_t *font = (psf_t*)&_binary_font_bin_start;
   uint32_t width_limit, height_limit;
 
   if (x == 0 || y == 0 || s == 0)
@@ -282,7 +282,7 @@ void viewport_fill(viewport_t *v, int color)
 
 void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color, char c)
 {
-  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  psf_t *font = (psf_t*)&_binary_font_bin_start;
   unsigned char *glyph;
 
   // ax, ay - absolute x and y positions
@@ -305,7 +305,7 @@ void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color,
 
 void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color, const char* text, int textlen)
 {
-  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  psf_t *font = (psf_t*)&_binary_font_bin_start;
   const char *c;
   unsigned int char_idx;
 
@@ -334,7 +334,7 @@ void viewport_draw_text(viewport_t *v, int x, int y, int fg_color, int bg_color,
 
 int vcanvas_get_fontsize(int *size_x, int *size_y)
 {
-  psf_t *font = (psf_t*)&_binary_font_psf_start;
+  psf_t *font = (psf_t*)&_binary_font_bin_start;
   if (!font)
     return -1;
 
