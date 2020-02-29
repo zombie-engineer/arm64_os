@@ -296,6 +296,55 @@ void init_uart(int report_exceptions)
   }
 }
 
+void use_max7219()
+{
+  // Set spi device
+  int ret;
+  const int gpio_pin_sclk = 21;
+  const int gpio_pin_mosi = 16;
+  const int gpio_pin_miso = -1;
+  const int gpio_pin_cs0  = 20;
+  spi_dev_t *spidev;
+
+  if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1)) != ERR_OK) {
+    printf("Failed to initialize emulated spi. Error code: %d\n", ret);
+    return;
+  }
+
+  spidev = spi_get_dev(SPI_TYPE_EMULATED);
+//  char buf[] = { 0x00, 0xff, 0, 0xff };
+//  while(1) {
+//    if (spidev->xmit(buf, 0, 4) != ERR_OK) {
+//      printf("Failed to transmit spi\n");
+//      return;
+//    }
+//    wait_msec(500);
+//  }
+
+  if ((ret = max7219_set_spi_dev(spidev)) != ERR_OK) {
+    printf("Failed to initialize max7219 driver. Error code: %d\n", ret);
+    return;
+  }
+  printf("max7219_set_shutdown_mode_off\n");
+  // max7219_set_scan_limit(MAX7219_SCAN_LIMIT_FULL);
+  // max7219_set_intensity(0xff);
+  // max7219_set_raw(0xc0c0);
+  max7219_set_raw(0x00c0);
+  while(1) {
+    printf("a");
+    wait_msec(100);
+    max7219_set_raw(0x00f1);
+    wait_msec(100);
+    max7219_set_raw(0x00f0);
+  }
+  max7219_set_raw(0x00c1);
+  max7219_set_digit(0, 0xff);
+  printf("max7219_set_digit(0, 0xff)\n");
+  while(1);
+  printf("max7219_set_test_mode_on\n");
+  max7219_set_test_mode_on();
+}
+
 void init_atmega8a()
 {
   const int gpio_pin_miso = 19;
@@ -325,13 +374,29 @@ void init_atmega8a()
 
   flash_size = atmega8a_get_flash_size();
   eeprom_size = atmega8a_get_eeprom_size();
-  
+  printf("atmega8 downloader initialization:\r\n");
+  printf("  flash size: %d bytes\r\n", flash_size);
+  printf("  eeprom size: %d bytes\r\n", eeprom_size);
 }
 
 void atmega8a_download(const void *bin, int bin_size)
 {
-  hexdump_memory(bin, bin_size);
-  char membuf[2048];
+  char membuf[8192];
+  const char *binary = bin;
+  int binary_size = bin_size;
+  if (bin_size > 8192) {
+    printf("Not writing binary of size %d to flash memory. Too big.\r\n",
+        bin_size);
+    return;
+  }
+
+  if (bin_size % 64) {
+    binary = membuf;
+    binary_size = ((bin_size / 64) + 1) * 64;
+    printf("Binary size %d not page-aligned (64 bytes), padding up to %d bytes\r\n", 
+        bin_size, binary_size);
+    memcpy(membuf, bin, bin_size);
+  }
 
   printf("Erasing chip flash memory..\r\n");
   if (atmega8a_chip_erase() != ERR_OK) {
@@ -339,8 +404,9 @@ void atmega8a_download(const void *bin, int bin_size)
     while(1);
   }
   printf("Chip flash erased.\r\n");
+  hexdump_memory(binary, binary_size);
   printf("Writing %d bytes of binary to flash memory..\r\n");
-  if (atmega8a_write_flash(bin, bin_size, 0) != ERR_OK) {
+  if (atmega8a_write_flash(binary, binary_size, 0) != ERR_OK) {
     printf("Failed to read program memory\n");
     while(1);
   }
@@ -370,8 +436,8 @@ extern const char _binary_firmware_atmega8a_atmega8a_bin_end;
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
-  int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end - &_binary_firmware_atmega8a_atmega8a_bin_start;
-  char bin[] = { 0x04, 0xe0, 0x02, 0xbb, 0x01, 0xbb, 0x00, 0xc0 };
+  int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end 
+      - &_binary_firmware_atmega8a_atmega8a_bin_start;
 
   debug_init();
   gpio_set_init();
@@ -386,9 +452,10 @@ void main()
 
   init_uart(1);
   init_consoles();
+  use_max7219();
+  while(1);
   init_atmega8a();
-  atmega8a_download(bin, 64);
-  atmega8a_download(atmega8a_bin, 64);
+  atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
 //#ifndef CONFIG_QEMU
 //  init_nokia5110_display(1, 0);

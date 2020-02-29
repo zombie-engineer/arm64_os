@@ -74,6 +74,7 @@ OBJS += $(LIBS) lib/checksum.o font/font.o
 BINOBJS := nokia5110_animation.o firmware/atmega8a/atmega8a.o font.o
 .SECONDARY: $(BINOBJS)
 
+.PHONY: firmware/atmega8a/atmega8a.bin
 firmware/atmega8a/atmega8a.bin:
 	make -C firmware/atmega8a
 
