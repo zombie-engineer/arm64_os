@@ -5,6 +5,7 @@
 #include <error.h>
 #include <common.h>
 #include <delays.h>
+#include <stringlib.h>
 
 #define atlog(fmt, ...) printf(fmt "\r\n", ## __VA_ARGS__)
 
@@ -429,7 +430,7 @@ int atmega8a_read_fuse_bits(char *out_fuse_low, char *out_fuse_high)
 
 int atmega8a_get_flash_size()
 {
-  return 8192;
+  return ATMEGA8A_FLASH_BYTES_TOTAL;
 }
 
 int atmega8a_get_eeprom_size()
@@ -451,4 +452,59 @@ int atmega8a_chip_erase()
     return ERR_FATAL;
 
   return ERR_OK;
+}
+
+int atmega8a_read_lock_bits(char *out_lock_bits)
+{
+  char cmd[4] = { 0x58, 0x00, 0x00, 0x00 };
+  char res[4];
+
+  if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
+    return ERR_FATAL;
+
+  *out_lock_bits = res[3];
+
+  return ERR_OK;
+}
+
+
+int atmega8a_write_lock_bits(char lock_bits)
+{
+  char cmd[4] = { 0x5c, 0x00, 0x00, 0x00 };
+  char res[4];
+
+  if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
+    return ERR_FATAL;
+
+  return ERR_OK;
+}
+
+#define BLB12 "BLB12"
+#define BLB11 "BLB11"
+#define BLB02 "BLB02"
+#define BLB01 "BLB01"
+#define LB2 "LB02"
+#define LB1 "LB01"
+
+int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
+{
+  const char *descs[] = { LB1, LB2, BLB01, BLB02, BLB11, BLB12 };
+  int i, n, is_before;
+
+  n = 0;
+  is_before = 0;
+  
+  for (i = 0; i < ARRAY_SIZE(descs) - 1; ++i) {
+    n += snprintf(buf + n, bufsz - n, 
+        "%s%s:%c", 
+        is_before ? "," : "", 
+        descs[i],
+        // lock bit is programmed when it is "0"
+        // "1" for unprogrammed
+        lock_bits & (1<<i) ? 'n' : 'y'
+    );
+    is_before = 1;
+  }
+
+  return n;
 }

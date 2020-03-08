@@ -20,3 +20,15 @@ int atmega8a_write_eeprom(const void *buf, int sz, int addr);
 int atmega8a_write_flash(const void *buf, int sz, int from_page);
 
 int atmega8a_chip_erase();
+
+int atmega8a_read_lock_bits(char *out_lock_bits);
+
+int atmega8a_write_lock_bits(char lock_bits);
+
+/*
+ * Give string description to lock bits
+ * buf: write string to this buffer.
+ * bufsz: do not exceed this size of buffer.
+ * lock_bits: lock bits to describe
+ */
+int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits);

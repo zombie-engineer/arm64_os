@@ -398,10 +398,11 @@ void init_atmega8a()
   int ret;
   char fuse_high;
   char fuse_low;
+  char lock_bits;
   int flash_size;
   int eeprom_size;
   spi_dev_t *spidev;
-  puts("Something\n\r");
+  char lock_bits_desc[128];
   if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1)) != ERR_OK) {
     printf("Failed to initialize emulated spi. Error code: %d\n", ret);
     return;
@@ -416,11 +417,28 @@ void init_atmega8a()
   if (atmega8a_read_fuse_bits(&fuse_low, &fuse_high) != ERR_OK)
     printf("Failed to read program memory\n");
 
+  if (atmega8a_read_lock_bits(&lock_bits) != ERR_OK)
+    printf("Failed to read program memory\n");
+
+  atmega8a_lock_bits_describe(lock_bits_desc, sizeof(lock_bits_desc), lock_bits);
+
   flash_size = atmega8a_get_flash_size();
   eeprom_size = atmega8a_get_eeprom_size();
   printf("atmega8 downloader initialization:\r\n");
   printf("  flash size: %d bytes\r\n", flash_size);
   printf("  eeprom size: %d bytes\r\n", eeprom_size);
+  printf("  lock bits: %x: %s\r\n", lock_bits, lock_bits_desc);
+}
+
+void atmega8a_read_firmware()
+{
+  char membuf[8192];
+  int num_read;
+  num_read = min(atmega8a_get_flash_size(), sizeof(membuf));
+  printf("atmega8a_read_firmware: reading %d bytes of atmega8a flash memory\r\n.", num_read);
+  atmega8a_read_flash_memory(membuf, num_read, 0);
+  hexdump_memory(membuf, num_read);
+  puts("atmega8a_read_firmware: Success.\r\n");
 }
 
 void atmega8a_download(const void *bin, int bin_size)
@@ -497,6 +515,7 @@ void main()
   init_uart(1);
   init_consoles();
   init_atmega8a();
+  // atmega8a_read_firmware();
   while(1);
   atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
