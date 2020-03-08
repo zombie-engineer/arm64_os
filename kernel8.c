@@ -296,40 +296,83 @@ void init_uart(int report_exceptions)
   }
 }
 
-void use_max7219()
+void spi_work() 
+{
+  int i, old_i;
+  int sclk, cs, mosi;
+
+  sclk = 21;
+  cs   = 20;
+  mosi = 16;
+  spi_emulated_init(sclk, mosi, -1, cs, -1);
+  max7219_set_spi_dev(spi_emulated_get_dev());
+
+  while(1)
+  {
+    max7219_set_raw(0xf00);
+  }
+    // wait_msec(100000);
+    max7219_set_raw(0xf01);
+    // wait_msec(100000);
+  //}
+  max7219_set_raw(0xf01);
+  // max7219_set_test_mode_on();
+  wait_msec(300000);
+  max7219_set_raw(0xf00);
+  // max7219_set_raw(0xb07);
+  max7219_set_scan_limit(7);
+  wait_msec(300000);
+  max7219_set_shutdown_mode_off();
+  wait_msec(30000);
+
+  for (i = 0; i < 8; i++) {
+    max7219_set_raw(((i+1) << 8));
+    //max7219_set_digit(i, 0x00);
+  }
+
+  old_i = 0;
+  while(1) {
+    for (i = 0; i < 8; ++i) {
+      max7219_set_raw(((i+1) << 8) | 0xff);
+      max7219_set_raw((old_i+1) << 8);
+      old_i = i;
+      wait_msec(30000);
+    }
+  }
+}
+
+void max7219_work()
 {
   // Set spi device
   int ret;
-  const int gpio_pin_sclk = 21;
-  const int gpio_pin_mosi = 16;
-  const int gpio_pin_miso = -1;
+  const int gpio_pin_mosi = 21;
   const int gpio_pin_cs0  = 20;
-  spi_dev_t *spidev;
+  const int gpio_pin_sclk = 16;
+  const int gpio_pin_miso = -1;
 
   if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1)) != ERR_OK) {
     printf("Failed to initialize emulated spi. Error code: %d\n", ret);
     return;
   }
 
-  spidev = spi_get_dev(SPI_TYPE_EMULATED);
-//  char buf[] = { 0x00, 0xff, 0, 0xff };
-//  while(1) {
-//    if (spidev->xmit(buf, 0, 4) != ERR_OK) {
-//      printf("Failed to transmit spi\n");
-//      return;
-//    }
-//    wait_msec(500);
-//  }
-
-  if ((ret = max7219_set_spi_dev(spidev)) != ERR_OK) {
+  if ((ret = max7219_set_spi_dev(spi_get_dev(SPI_TYPE_EMULATED))) != ERR_OK) {
     printf("Failed to initialize max7219 driver. Error code: %d\n", ret);
     return;
   }
-  printf("max7219_set_shutdown_mode_off\n");
-  // max7219_set_scan_limit(MAX7219_SCAN_LIMIT_FULL);
-  // max7219_set_intensity(0xff);
-  // max7219_set_raw(0xc0c0);
-  max7219_set_raw(0x00c0);
+  wait_msec(500);
+  max7219_set_shutdown_mode_off();
+  printf("max7219_set_shutdown_mode_off()\n");
+  wait_msec(500);
+  max7219_set_scan_limit(MAX7219_SCAN_LIMIT_FULL);
+  printf("max7219_set_scan_limit(MAX7219_SCAN_LIMIT_FULL)\n");
+  wait_msec(500);
+  max7219_set_intensity(0xff);
+  printf("max7219_set_intensity(0xff)\n");
+  wait_msec(500);
+  max7219_set_test_mode_on();
+  printf("max7219_set_test_mode_on()\n");
+  wait_msec(500);
+  while(1);
   while(1) {
     printf("a");
     wait_msec(100);
@@ -358,6 +401,7 @@ void init_atmega8a()
   int flash_size;
   int eeprom_size;
   spi_dev_t *spidev;
+  puts("Something\n\r");
   if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1)) != ERR_OK) {
     printf("Failed to initialize emulated spi. Error code: %d\n", ret);
     return;
@@ -452,9 +496,8 @@ void main()
 
   init_uart(1);
   init_consoles();
-  use_max7219();
-  while(1);
   init_atmega8a();
+  while(1);
   atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
 //#ifndef CONFIG_QEMU

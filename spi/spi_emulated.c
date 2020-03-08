@@ -15,7 +15,7 @@ typedef struct spi_emulated_dev {
   int miso_gpio_pin;
   int ce0_gpio_pin;
   int ce1_gpio_pin;
-  int period;
+  int clk_half_period;
   gpio_set_handle_t gpio_set_handle;
 } spi_emulated_dev_t;
 
@@ -39,13 +39,9 @@ static int fn(__VA_ARGS__) \
 
 DECL_ASSERTED_FN(spi_emulated_ce0_set)
   ASSERT_INITIALIZED();
-
-  printf("spi_emulated_ce0_set: %d\n", spi_emulated.ce0_gpio_pin);
-
   if (spi_emulated.ce0_gpio_pin != -1) {
     gpio_set_on(spi_emulated.ce0_gpio_pin);
-    printf("ce0 pin on: %d\n", spi_emulated.ce0_gpio_pin);
-    wait_msec(100);
+    putc('+');
   }
   return ERR_OK;
 }
@@ -53,33 +49,33 @@ DECL_ASSERTED_FN(spi_emulated_ce0_set)
 DECL_ASSERTED_FN(spi_emulated_ce0_clear)
   if (spi_emulated.ce0_gpio_pin != -1) {
     gpio_set_off(spi_emulated.ce0_gpio_pin);
-    wait_msec(100);
+    putc('-');
   }
   return ERR_OK;
 }
 
-DECL_ASSERTED_FN(spi_emulated_push_bit, uint8_t bit_in, uint8_t *bit_out)
+#define PULSE_SCLK() \
+  gpio_set_on(spi_emulated.sclk_gpio_pin);              \
+  wait_usec(spi_emulated.clk_half_period);              \
+  if (spi_emulated.miso_gpio_pin != -1)                 \
+    *bit_out = gpio_is_set(spi_emulated.miso_gpio_pin); \
+  gpio_set_off(spi_emulated.sclk_gpio_pin);             \
+  wait_usec(spi_emulated.clk_half_period);
+
+DECL_ASSERTED_FN(spi_emulated_xmit_bit, uint8_t bit_in, uint8_t *bit_out)
   if (spi_emulated_verbose_output)
     printf("%d-", bit_in);
 
   if (spi_emulated.mosi_gpio_pin != -1) {
-    if (bit_in)
+    if (bit_in) {
       gpio_set_on(spi_emulated.mosi_gpio_pin);
-    else
+      putc('1');
+    } else {
       gpio_set_off(spi_emulated.mosi_gpio_pin);
+      putc('0');
+    }
   }
-
-  gpio_set_on(spi_emulated.sclk_gpio_pin);
-  wait_usec(100);
-  if (spi_emulated.miso_gpio_pin != -1)
-    *bit_out = gpio_is_set(spi_emulated.miso_gpio_pin);
-
-  // wait_msec(100); // debug
-  gpio_set_off(spi_emulated.sclk_gpio_pin);
-
-  // wait_msec(100); // debug
-  wait_usec(100);
-
+  PULSE_SCLK();
   return ERR_OK;
 }
 
@@ -101,7 +97,7 @@ DECL_ASSERTED_FN(spi_emulated_xmit_byte, char byte_in, char *byte_out)
   out = 0;
   for (i = 0; i < 8; ++i) {
     uint8_t c;
-    RET_IF_ERR(spi_emulated_push_bit, (byte_in >> (7 - i)) & 1, &c);
+    RET_IF_ERR(spi_emulated_xmit_bit, (byte_in >> (7 - i)) & 1, &c);
     out = (out << 1) | c;
   }
 
@@ -128,18 +124,22 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
 
     for (i = 0; i < 8; ++i) {
       uint8_t c;
-      if ((st = spi_emulated_push_bit((bytes_in[j] >> (7 - i)) & 1, &c))) {
+      if ((st = spi_emulated_xmit_bit((bytes_in[j] >> (7 - i)) & 1, &c))) {
         printf("spidev->push_bit error: %d\n", st);
         return st;
       }
 
       out = (out << 1) | c;
     }
+    putc(':');
+
 
     if (bytes_out)
       *bytes_out++ = out;
   }
   spi_emulated_ce0_set();
+  putc('\r');
+  putc('\n');
   return ERR_OK;
 }
 
@@ -205,6 +205,7 @@ int spi_emulated_init(
   spi_emulated.ce0_gpio_pin = ce0_pin;
   spi_emulated.ce1_gpio_pin = ce1_pin;
   spi_emulated.gpio_set_handle = gpio_set_handle;
+  spi_emulated.clk_half_period = 50;
 
   spi_emulated_initialized = 1;
   return SPI_ERR_OK;
