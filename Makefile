@@ -81,7 +81,13 @@ firmware/atmega8a/atmega8a.bin:
 firmware/atmega8a/atmega8a.bin.o: firmware/atmega8a/atmega8a.bin
 
 %.o: %.bin
-	$(LD) -r -b binary $< -o $@
+	$(OBJCOPY) \
+		-B aarch64 \
+		-I binary \
+		-O elf64-littleaarch64 \
+		--section-alignment=128 \
+		--rename-section .data=.data.$(notdir $<) $< $@
+#	$(LD) -r -b binary $< -o $@
 
 firware/atmega8a/atmega8a.bin.d nokia5110_animation.d font.bin.d: font.bin
 	echo $@
@@ -107,7 +113,7 @@ $(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
 %.elf: $(OBJS) $(BINOBJS) %.o
-	$(LD) $(LDFLAGS) -o $@ -Map $(@:.elf=.map) $^ 
+	$(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
 
 TARGET_QEMU_IMG := $(TARGET_PREFIX_QEMU).img
 

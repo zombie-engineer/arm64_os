@@ -16,7 +16,9 @@ SECTIONS
 
   . = ALIGN(4096);
   PROVIDE(_data = .);
-  .data : {*(.data .data.* .gnu.linkonce.d*) }
+  .data : {*(.data .gnu.linkonce.d*) }
+  .data.bin ALIGN(4): SUBALIGN(4) { *(.data.*) }
+
   .mybss (NOLOAD) : 
   {
     . = ALIGN(16);
