@@ -5,6 +5,7 @@
 *.swp
 *.map
 *.sym
+firmware/*/*.bin
 test/test
 sdcard
 uart_capture_*.bin
