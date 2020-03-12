@@ -5,6 +5,7 @@ OBJCOPY := avr-objcopy
 
 OBJS := \
 	uart_routines.o\
+	timer.o\
 	start.o
 
 $(info $(OBJS))

@@ -22,7 +22,6 @@ rjmp __int_ana_comp     // ANA_COMP Analog Comparator
 rjmp __int_twi          // TWI Two-wire Serial Interface
 rjmp __int_spm_rdy      // SPM_RDY Store Program Memory Ready
 
-
 .section ".text"
 timer0_enable_overflow_interrupt:
 ldi   r16, TCCR0_PRESCALE_1024
@@ -39,33 +38,7 @@ out   SPH, r16
 
 .globl main
 main:
-// Set PB1 mode to output 
-sbi DDRB, PB1
-cbi PORTB, PB1
-// Set TCCNT to 0000
-ldi r16, 0
-out TCNT1H, r16
-out TCNT1L, r16
-// Set normal mode, prescaler 1/8, this will enable count
-ldi r16, 0
-out TCCR1A, r16
-ldi r16, (1<<TCCR1B_CS11)
-out TCCR1B, r16
-// Set interrupt capture to timer1 overflow
-ldi r16, (1<<TIMSK_TOIE1)
-out TIMSK, r16
-sei
-1: rjmp 1b
-
-//rcall usart_initialize
-//uart_loop:
-//rcall usart_recieve
-//rcall usart_transmit
-//ldi   r16, '-'
-//rcall usart_transmit
-//ldi   r16, '$'
-//rcall usart_transmit
-//rjmp  uart_loop
+rjmp timer_sample_fast_pwm
 
 # Set PD0 as output pin with logical 0
 // sbi   DDRD, PD0

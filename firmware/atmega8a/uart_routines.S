@@ -37,3 +37,15 @@ rjmp  usart_recieve
 in    r16, UDR
 ret
 
+.globl usart_sample_transmission
+usart_sample_transmission:
+rcall usart_initialize
+1:
+rcall usart_recieve
+rcall usart_transmit
+ldi   r16, '-'
+rcall usart_transmit
+ldi   r16, '$'
+rcall usart_transmit
+rjmp  1b
+
