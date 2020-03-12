@@ -19,6 +19,8 @@ int atmega8a_write_eeprom(const void *buf, int sz, int addr);
 
 int atmega8a_write_flash(const void *buf, int sz, int from_page);
 
+int atmega8a_write_fuse_bits_low(char fuse_low);
+
 int atmega8a_chip_erase();
 
 int atmega8a_read_lock_bits(char *out_lock_bits);

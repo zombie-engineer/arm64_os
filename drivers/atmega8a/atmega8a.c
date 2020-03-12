@@ -410,6 +410,18 @@ int atmega8a_read_eeprom_memory(void *buf, int sz, int addr)
   return ERR_OK;
 }
 
+int atmega8a_write_fuse_bits_low(char fuse_low)
+{
+  char res[4];
+  char cmd_low[4]  = {0xac, 0xa0, 0x00, 0x00}; // CMD_WRITE_FUSE_BITS_LOW
+  cmd_low[3] = fuse_low;
+
+  if (atmega8a_cmd(atmega8a_dev.spi, cmd_low, res) != ERR_OK)
+    return ERR_FATAL;
+
+  return ERR_OK;
+}
+
 int atmega8a_read_fuse_bits(char *out_fuse_low, char *out_fuse_high)
 {
   char res[4];

@@ -428,6 +428,16 @@ void init_atmega8a()
   printf("  flash size: %d bytes\r\n", flash_size);
   printf("  eeprom size: %d bytes\r\n", eeprom_size);
   printf("  lock bits: %x: %s\r\n", lock_bits, lock_bits_desc);
+  printf("  fuse bits: low:%02x high:%02x\r\n", fuse_low, fuse_high);
+}
+
+void atmega8a_program()
+{
+  char fuse_bits_low = 0xe4;
+  printf("programming atmega8a: \r\n");
+  printf("writing low fuse bits to %x\r\n", fuse_bits_low);
+  atmega8a_write_fuse_bits_low(fuse_bits_low);
+  printf("programming atmega8a complete\r\n");
 }
 
 void atmega8a_read_firmware()
@@ -515,8 +525,9 @@ void main()
   init_uart(1);
   init_consoles();
   init_atmega8a();
+  // atmega8a_program();
   // atmega8a_read_firmware();
-  while(1);
+  // while(1);
   atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
 //#ifndef CONFIG_QEMU
