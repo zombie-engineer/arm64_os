@@ -11,6 +11,18 @@
 .equ PORTB , 0x18
 .equ UBRRH , 0x20
 .equ UCSRC , 0x20
+.equ OCR1BL, 0x26
+.equ OCR1BH, 0x27
+.equ OCR1BL, 0x28
+.equ OCR1BH, 0x29
+.equ OCR1AL, 0x2a
+.equ OCR1AH, 0x2b
+.equ TCNT1L, 0x2c
+.equ TCNT1H, 0x2d
+.equ TCCR1B, 0x2e
+.equ TCCR1A, 0x2f
+.equ SFIOR , 0x30
+.equ OSCCAL, 0x31
 .equ TCNT0 , 0x32
 .equ TCCR0 , 0x33
 .equ MCUCR , 0x35
@@ -49,6 +61,14 @@
 .equ TCCR0_CS00 , 0
 .equ TCCR0_CS01 , 1
 .equ TCCR0_CS02 , 2
+
+.equ TCCR1B_CS10 , 0
+.equ TCCR1B_CS11 , 1
+.equ TCCR1B_CS12 , 2
+.equ TCCR1B_WGM12, 3
+.equ TCCR1B_WGM13, 4
+.equ TCCR1B_ICES1, 6
+.equ TCCR1B_ICES2, 7
 
 .equ TCCR0_NO_CLOCK     , 0
 .equ TCCR0_NO_PRESCALE  , 1
@@ -105,3 +125,11 @@
 .equ ISC10, 2
 .equ ISC11, 3
 
+.equ TCCR1A_COM1A1, 7
+.equ TCCR1A_COM1A0, 6
+.equ TCCR1A_COM1B1, 5
+.equ TCCR1A_COM1B0, 4
+.equ TCCR1A_FOC1A , 3
+.equ TCCR1A_FOC1B , 2
+.equ TCCR1A_WGM11 , 1
+.equ TCCR1A_WGM10 , 0

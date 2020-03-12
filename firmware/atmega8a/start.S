@@ -1,4 +1,5 @@
 .include "atmega8.inc"
+.section ".text"
 
 // INTERRUPTS VECTOR
 rjmp __int_reset        // RESET
@@ -22,6 +23,7 @@ rjmp __int_twi          // TWI Two-wire Serial Interface
 rjmp __int_spm_rdy      // SPM_RDY Store Program Memory Ready
 
 
+.section ".text"
 timer0_enable_overflow_interrupt:
 ldi   r16, TCCR0_PRESCALE_1024
 out   TCCR0, r16
@@ -35,67 +37,75 @@ out   SPL, r16
 ldi   r16, (RAMEND >> 8) & 0xff
 out   SPH, r16
 
+.globl main
 main:
+// Set PB1 mode to output 
+sbi DDRB, PB1
+cbi PORTB, PB1
+// Set TCCNT to 0000
+ldi r16, 0
+out TCNT1H, r16
+out TCNT1L, r16
+// Set normal mode, prescaler 1/8, this will enable count
+ldi r16, 0
+out TCCR1A, r16
+ldi r16, (1<<TCCR1B_CS11)
+out TCCR1B, r16
+// Set interrupt capture to timer1 overflow
+ldi r16, (1<<TIMSK_TOIE1)
+out TIMSK, r16
+sei
+1: rjmp 1b
 
-rcall usart_initialize
-uart_loop:
-rcall usart_recieve
-rcall usart_transmit
-ldi   r16, '-'
-rcall usart_transmit
-ldi   r16, '$'
-rcall usart_transmit
-rjmp  uart_loop
+//rcall usart_initialize
+//uart_loop:
+//rcall usart_recieve
+//rcall usart_transmit
+//ldi   r16, '-'
+//rcall usart_transmit
+//ldi   r16, '$'
+//rcall usart_transmit
+//rjmp  uart_loop
 
 # Set PD0 as output pin with logical 0
-sbi   DDRD, PD0
-sbi   PORTD, PD0
+// sbi   DDRD, PD0
+// sbi   PORTD, PD0
+// sbi   PORTD, PD1
 # Set PD2 to recieve logic 0 signal
-cbi   DDRD, PD2
-cbi   PORTD, PD2
-ldi   r16, (1<<ISC00) + (1<<ISC01)
-out   MCUCR, r16
-ldi   r16, 1<<INT0
-out   GICR, r16
+// cbi   DDRD, PD2
+// cbi   PORTD, PD2
+// ldi   r16, (1<<ISC00) + (1<<ISC01)
+// out   MCUCR, r16
+// ldi   r16, 1<<INT0
+// out   GICR, r16
+
+# Set PWM
+ldi   r16, 0xff
+ldi   r17, 0x1f
+out   OCR1AH, r17
+out   OCR1AL, r16
+
+sbi   DDRB, PB1
+ldi   r16, 0b10000001
+// ldi   r16, (1<<TCCR1A_COM1A0) | (1<<TCCR1A_WGM10)
+out   TCCR1A, r16
+
+// ldi   r16, (1<<TCCR1B_WGM13) | (1<<TCCR1B_CS10) | (1<<TCCR1B_CS12)
+ldi   r16, 0b00010001
+out   TCCR1B, r16
+
 
 # Put toggle var
 ldi   r16, 1
 ldi   r27, 0
-ldi   r26, 0x60
+ldi   r26, 0xf0
 st    X, r16
 
-rcall timer0_enable_overflow_interrupt
-sei
+// rcall timer0_enable_overflow_interrupt
+// sei
 # Set PD1 as output pin with logical 0
 sbi   DDRD, PD1
 sbi   PORTD, PD1
-1:
-rjmp 1b
-
-
-cbi   PORTD, 0
-cbi   PORTD, 1
-cbi   PORTD, 2
-cbi   PORTD, 3
-cbi   PORTD, 4
-cbi   PORTD, 5
-cbi   PORTD, 6
-cbi   PORTD, 7
-
-sbi   PORTD, 1
-
-# mov   r16, 0
-# out   PORTD, r16
-
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-
 1:
 rjmp 1b
 
@@ -108,16 +118,16 @@ __handle_interrupt:
   push r16
 
   ldi   r27, 0
-  ldi   r26, 0x60
+  ldi   r26, 0xf0
   ld    r16, X
   sbrs  r16, 0
   rjmp  1f
   ldi   r16, 0
-  cbi   PORTD, PD0
+  cbi   PORTB, PB1
   rjmp 2f
 1:
   ldi   r16, 1
-  sbi   PORTD, PD0
+  sbi   PORTB, PB1
 2:
   st   X, r16
   pop  r16
@@ -132,8 +142,9 @@ __int_timer2_ovf:
 __int_timer1_capt:
 __int_timer1_compa:
 __int_timer1_compb:
-__int_timer1_ovf:
 rjmp __halt_on_interrupt
+__int_timer1_ovf:
+rjmp __handle_interrupt
 __int_timer0_ovf:
 rjmp __handle_interrupt
 __int_spi_stc:
