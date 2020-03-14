@@ -2,11 +2,17 @@ CFLAGS := -c -O2
 CC := avr-gcc
 LD := avr-ld
 OBJCOPY := avr-objcopy
+OBJDUMP := avr-objdump
+
+dump_listing = $(OBJDUMP) -d $(1) > $(1:.o=.text)
+# dump_text = echo $(1) $(1:.o=.text)
 
 OBJS := \
 	uart_routines.o\
 	timer.o\
-	start.o
+	start.o\
+	ext_int.o\
+	adc.o
 
 $(info $(OBJS))
 
@@ -15,13 +21,15 @@ atmega8a.bin: atmega8a.o
 
 atmega8a.o: $(OBJS)
 	$(LD) -T link.lds -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
+	$(call dump_listing,$@)
 
 %.o: %.S
 	$(CC) $(CFLAGS) $^ -o $@
+	$(call dump_listing,$@)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 .PHONY: clean
 clean:
-	rm -fv start.o atmega8a.o
+	rm -fv armega8a.o $(OBJS) $(OBJS:.o=.text)

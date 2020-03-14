@@ -38,34 +38,8 @@ out   SPH, r16
 
 .globl main
 main:
-rjmp timer_sample_fast_pwm
+rjmp sample_ext_int0
 
-# Set PD0 as output pin with logical 0
-// sbi   DDRD, PD0
-// sbi   PORTD, PD0
-// sbi   PORTD, PD1
-# Set PD2 to recieve logic 0 signal
-// cbi   DDRD, PD2
-// cbi   PORTD, PD2
-// ldi   r16, (1<<ISC00) + (1<<ISC01)
-// out   MCUCR, r16
-// ldi   r16, 1<<INT0
-// out   GICR, r16
-
-# Set PWM
-ldi   r16, 0xff
-ldi   r17, 0x1f
-out   OCR1AH, r17
-out   OCR1AL, r16
-
-sbi   DDRB, PB1
-ldi   r16, 0b10000001
-// ldi   r16, (1<<TCCR1A_COM1A0) | (1<<TCCR1A_WGM10)
-out   TCCR1A, r16
-
-// ldi   r16, (1<<TCCR1B_WGM13) | (1<<TCCR1B_CS10) | (1<<TCCR1B_CS12)
-ldi   r16, 0b00010001
-out   TCCR1B, r16
 
 
 # Put toggle var
@@ -96,11 +70,11 @@ __handle_interrupt:
   sbrs  r16, 0
   rjmp  1f
   ldi   r16, 0
-  cbi   PORTB, PB1
+  cbi   PORTD, PD1
   rjmp 2f
 1:
   ldi   r16, 1
-  sbi   PORTB, PB1
+  sbi   PORTD, PD1
 2:
   st   X, r16
   pop  r16
@@ -109,6 +83,8 @@ __handle_interrupt:
   reti
 
 __int_int0:
+rjmp __handle_interrupt
+
 __int_int1:
 __int_timer2_comp:
 __int_timer2_ovf:

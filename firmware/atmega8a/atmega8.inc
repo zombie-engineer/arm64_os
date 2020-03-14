@@ -6,13 +6,16 @@
 .equ PIND  , 0x10
 .equ DDRD  , 0x11
 .equ PORTD , 0x12
+.equ PINC  , 0x13
+.equ DDRC  , 0x14
+.equ PORTC , 0x15
 .equ PINB  , 0x16
 .equ DDRB  , 0x17
 .equ PORTB , 0x18
 .equ UBRRH , 0x20
 .equ UCSRC , 0x20
-.equ OCR1BL, 0x26
-.equ OCR1BH, 0x27
+.equ ICR1L , 0x26
+.equ ICR1H , 0x27
 .equ OCR1BL, 0x28
 .equ OCR1BH, 0x29
 .equ OCR1AL, 0x2a
@@ -28,6 +31,7 @@
 .equ MCUCR , 0x35
 .equ TIFR  , 0x38
 .equ TIMSK , 0x39
+.equ GIFR  , 0x3a
 .equ GICR  , 0x3b
 .equ SPL   , 0x3d
 .equ SPH   , 0x3e
@@ -69,6 +73,7 @@
 .equ TCCR1B_WGM13, 4
 .equ TCCR1B_ICES1, 6
 .equ TCCR1B_ICES2, 7
+.equ TCCR1B_PRESCALE_1024, 0b00000101
 
 .equ TCCR0_NO_CLOCK     , 0
 .equ TCCR0_NO_PRESCALE  , 1
