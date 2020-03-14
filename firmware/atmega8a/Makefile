@@ -30,6 +30,12 @@ atmega8a.o: $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) $^ -o $@
 
-.PHONY: clean
+.PHONY: clean at emu
 clean:
-	rm -fv armega8a.o $(OBJS) $(OBJS:.o=.text)
+	rm -fv atmega8a.o $(OBJS) $(OBJS:.o=.text)
+
+at:
+	avr-gdb atmega8a.o -x rungdb.gdb
+
+emu:
+	simulavr -D -g -d atmega8 atmega8a.bin

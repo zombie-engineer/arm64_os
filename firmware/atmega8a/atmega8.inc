@@ -1,4 +1,13 @@
 .equ RAMEND, 0x045f
+.equ TWBR  , 0x00
+.equ TWSR  , 0x01
+.equ TWAR  , 0x02
+.equ TWDR  , 0x03
+.equ ADCL  , 0x04
+.equ ADCH  , 0x05
+.equ ADCSRA, 0x06
+.equ ADMUX , 0x07
+.equ ACSR  , 0x08
 .equ UBRRL , 0x09
 .equ UCSRB , 0x0a
 .equ UCSRA , 0x0b
@@ -138,3 +147,12 @@
 .equ TCCR1A_FOC1B , 2
 .equ TCCR1A_WGM11 , 1
 .equ TCCR1A_WGM10 , 0
+
+.equ ADCSRA_ADPS0 , 0
+.equ ADCSRA_ADPS1 , 1
+.equ ADCSRA_ADPS2 , 2
+.equ ADCSRA_ADIE  , 3
+.equ ADCSRA_ADIF  , 4
+.equ ADCSRA_ADFR  , 5
+.equ ADCSRA_ADSC  , 6
+.equ ADCSRA_ADEN  , 7

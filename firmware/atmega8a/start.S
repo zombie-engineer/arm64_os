@@ -38,8 +38,7 @@ out   SPH, r16
 
 .globl main
 main:
-rjmp sample_ext_int0
-
+rjmp sample_adc_0
 
 
 # Put toggle var
