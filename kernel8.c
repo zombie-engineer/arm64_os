@@ -390,10 +390,10 @@ void max7219_work()
 
 void init_atmega8a()
 {
-  const int gpio_pin_miso = 19;
-  const int gpio_pin_mosi = 26;
-  const int gpio_pin_sclk = 13;
-  const int gpio_pin_reset = 6;
+  const int gpio_pin_sclk  = 6;
+  const int gpio_pin_mosi  = 19;
+  const int gpio_pin_miso  = 13;
+  const int gpio_pin_reset = 26;
 
   int ret;
   char fuse_high;
