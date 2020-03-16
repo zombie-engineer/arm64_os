@@ -12,7 +12,8 @@ OBJS := \
 	timer.o\
 	start.o\
 	ext_int.o\
-	adc.o
+	adc.o\
+	twi.o
 
 $(info $(OBJS))
 
