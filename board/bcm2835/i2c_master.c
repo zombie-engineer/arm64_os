@@ -1,11 +1,7 @@
-#include <memory.h>
 #include <error.h>
 #include <common.h>
 #include <gpio.h>
-
-#define BSC0_BASE ((uint64_t)PERIPHERAL_BASE_PHY + 0x00205000)
-#define BSC1_BASE ((uint64_t)PERIPHERAL_BASE_PHY + 0x00804000)
-#define BSC2_BASE ((uint64_t)PERIPHERAL_BASE_PHY + 0x00805000)
+#include "board_map.h"
 
 /* Control */
 #define BSC_MASTER_REG_C(master_id)    BSC ## master_id ## _BASE + 0x00

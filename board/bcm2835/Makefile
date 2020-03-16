@@ -1,6 +1,7 @@
 OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	bcm2835_systimer \
-	i2c/i2c
+	i2c_master \
+	bsc_slave
 
 DIRPATH := board/bcm2835
 
