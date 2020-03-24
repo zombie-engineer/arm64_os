@@ -25,10 +25,10 @@ delay_ns:
   pop yh
   ret
 
-; void delay_cycles(uint16_t num_cycles)
+; void delay_cycles_16(uint16_t num_cycles)
 ; r24:r25 - num_cycles
-.globl delay_cycles
-delay_cycles:
+.globl delay_cycles_16
+delay_cycles_16:
   lsr  r25
   ror  r24
   lsr  r25
@@ -41,3 +41,24 @@ delay_cycles:
   nop        ; 1 cycles
 2:
 ret          ; 1 cycles
+
+; void countdown_32(uint16_t count_hi, uint16_t count_lo)
+; Will decrement 32 bit counter until it reaches 0.
+; cycles = count * 5
+; 1 second with 1Mhz fCPU = 1000000 = (200000) 
+; r24:r25 - cmp_hi 
+; r22:r23 - cmp_lo 
+.globl countdown_32 
+countdown_32:
+; 32bit word = r25:r24:r23:r22
+1:
+  subi  r22, 1
+  sbci  r23, 0
+  sbci  r24, 0
+  sbci  r25, 0
+  brne  1b
+ret
+
+.globl wait_usec
+wait_usec:
+
