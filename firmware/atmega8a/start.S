@@ -22,23 +22,27 @@ rjmp __int_ana_comp     // ANA_COMP Analog Comparator
 rjmp __int_twi          // TWI Two-wire Serial Interface
 rjmp __int_spm_rdy      // SPM_RDY Store Program Memory Ready
 
-.section ".text"
+; .section ".text"
+
+.globl __int_reset
+__int_reset:
+ldi   r16, RAMEND & 0xff
+out   SPL, r16
+ldi   r16, (RAMEND >> 8) & 0xff
+out   SPH, r16
+rjmp  main
+
+; .globl main
+; main:
+; rjmp sample_twi_1
+
+
 timer0_enable_overflow_interrupt:
 ldi   r16, TCCR0_PRESCALE_1024
 out   TCCR0, r16
 ldi   r16, 1<<TIMSK_TOIE0
 out   TIMSK, r16
 ret
-
-__int_reset:
-ldi   r16, RAMEND & 0xff
-out   SPL, r16
-ldi   r16, (RAMEND >> 8) & 0xff
-out   SPH, r16
-
-.globl main
-main:
-rjmp sample_adc_0
 
 
 # Put toggle var

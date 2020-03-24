@@ -38,6 +38,7 @@
 .equ TCNT0 , 0x32
 .equ TCCR0 , 0x33
 .equ MCUCR , 0x35
+.equ TWCR  , 0x36
 .equ TIFR  , 0x38
 .equ TIMSK , 0x39
 .equ GIFR  , 0x3a
@@ -156,3 +157,18 @@
 .equ ADCSRA_ADFR  , 5
 .equ ADCSRA_ADSC  , 6
 .equ ADCSRA_ADEN  , 7
+
+.equ TWCR_TWIE  , 0
+.equ TWCR_TWEN  , 2
+.equ TWCR_TWWC  , 3
+.equ TWCR_TWSTO , 4
+.equ TWCR_TWSTA , 5
+.equ TWCR_TWEA  , 6
+.equ TWCR_TWINT , 7
+
+.equ xh, r27
+.equ xl, r26
+.equ yh, r29
+.equ yl, r28
+.equ zh, r31
+.equ zl, r30

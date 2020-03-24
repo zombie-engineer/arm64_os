@@ -1,4 +1,4 @@
-CFLAGS := -c -O2
+CFLAGS := -c
 CC := avr-gcc
 LD := avr-ld
 OBJCOPY := avr-objcopy
@@ -13,7 +13,9 @@ OBJS := \
 	start.o\
 	ext_int.o\
 	adc.o\
-	twi.o
+	twi.o\
+	delay.o\
+	main.o
 
 $(info $(OBJS))
 
@@ -30,6 +32,7 @@ atmega8a.o: $(OBJS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $^ -o $@
+	$(call dump_listing,$@)
 
 .PHONY: clean at emu
 clean:
