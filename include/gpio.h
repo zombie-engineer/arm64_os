@@ -3,6 +3,10 @@
 #include <reg_access.h>
 #include <types.h>
 
+/* 
+ * GPIO OUT outputs 3.3 volts
+ */
+
 #define GPIO_BASE       (uint64_t)(PERIPHERAL_BASE_PHY + 0x200000)
 
 #define GPIO_REG_GPFSEL0   (GPIO_BASE + 0x00)
@@ -80,6 +84,10 @@ int gpio_set_detect_falling_edge(uint32_t gpio_num);
 int gpio_set_detect_async_rising_edge(uint32_t gpio_num);
 
 int gpio_set_detect_async_falling_edge(uint32_t gpio_num);
+
+int gpio_pin_status_triggered(uint32_t gpio_num);
+
+int gpio_pin_status_clear(uint32_t gpio_num);
 
 int gpio_set_gppudclk(uint32_t gpio_num);
 

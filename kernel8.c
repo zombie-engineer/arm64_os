@@ -28,6 +28,7 @@
 #include <drivers/display/nokia5110_console.h>
 #include <debug.h>
 #include <unhandled_exception.h>
+#include <board/bcm2835/bcm2835.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -141,18 +142,11 @@ void print_mbox_props()
   }
 }
 
-void* my_timer_callback_periodic(void* arg)
-{
-  puts("periodic tick\n");
-  return 0;
-}
-
 void wait_gpio()
 {
-  intr_ctl_dump_regs("before set\n");
-  intr_ctl_enable_gpio_irq(20);
+  intr_ctl_enable_gpio_irq(18);
   enable_irq();
-  // gpio_set_function(20, GPIO_FUNC_IN);
+  gpio_set_function(20, GPIO_FUNC_IN);
   // gpio_set_detect_high(20);
   // GPLEN0 |= 1 << 2;
   gpio_set_detect_falling_edge(2);
@@ -231,29 +225,48 @@ void print_arm_features()
   printf("id_aa64mmfr0_el1 is: %08x\n", el);
 }
 
-void vibration_sensor_test(int gpio_num_dout, int poll)
+static int current_pin;
+static int cont;
+void gpio_handle_irq()
 {
-  // gpio_num_dout - digital output
-  // poll          - poll for gpio values instead of interrupts
-  printf("virbration sensor test\n");
-  gpio_set_function(gpio_num_dout, GPIO_FUNC_IN);
+  if (gpio_pin_status_triggered(current_pin)) {
+    puts("+");
+    gpio_pin_status_clear(current_pin);
+  }
+  puts("1\n");
+}
+
+/*
+ * gpio_num_dout - digital output
+ * poll          - poll for gpio values instead of interrupts
+ */
+void gpio_irq_test(int pin, int poll)
+{
+  printf("gpio_irq_test: pin:%d, poll:%d\n",
+      pin, poll);
+  current_pin = pin;
+  cont = 1;
+
+  gpio_set_function(pin, GPIO_FUNC_IN);
   if (poll) {
     while(1) {
-      if (gpio_is_set(gpio_num_dout)) {
+      if (gpio_is_set(pin)) {
         printf("-");
       }
     }
   }
 
-  intr_ctl_enable_gpio_irq(gpio_num_dout);
-  gpio_set_detect_rising_edge(gpio_num_dout);
-  gpio_set_detect_falling_edge(gpio_num_dout);
+  set_irq_cb(gpio_handle_irq);
+  intr_ctl_enable_gpio_irq(pin);
+  gpio_set_detect_rising_edge(pin);
+  gpio_set_detect_falling_edge(pin);
   enable_irq();
   
-  intr_ctl_dump_regs("after set\n");
-  while(1) {
-    wait_cycles(0x300000);
-  }
+  do {
+    // intr_ctl_dump_regs("waiting...\r\n");
+    wait_msec(1000);
+    blink_led(2, 200);
+  } while(cont);
 }
 
 #ifndef CONFIG_QEMU
@@ -433,7 +446,7 @@ void init_atmega8a()
 
 void atmega8a_program()
 {
-  char fuse_bits_low = 0xe4;
+  char fuse_bits_low = 0xe0 | (ATMEGA8A_FUSE_CPU_FREQ_1MHZ & ATMEGA8A_FUSE_CPU_FREQ_MASK);
   printf("programming atmega8a: \r\n");
   printf("writing low fuse bits to %x\r\n", fuse_bits_low);
   atmega8a_write_fuse_bits_low(fuse_bits_low);
@@ -505,6 +518,169 @@ void atmega8a_download(const void *bin, int bin_size)
 extern const char _binary_firmware_atmega8a_atmega8a_bin_start;
 extern const char _binary_firmware_atmega8a_atmega8a_bin_end;
 
+#define PIN_SDA 18
+#define PIN_SCL 23
+
+#define PRINT_SDA puts(scl ? "CLK_ON-" : "CLK_OFF-")
+#define PRINT_SCL puts(sda ? "T-" : ".-")
+#define GET_SDA sda = gpio_is_set(PIN_SDA) ? 0 : 1
+#define GET_SCL scl = gpio_is_set(PIN_SCL) ? 0 : 1
+
+void i2c_bitbang_check_line()
+{
+  int i = 0;
+  int sda = 0;
+  int scl = 0;
+  while(1) {
+    sda = 0;
+    scl = 0;
+    printf("Starting i2c negotiation\r\n");
+    while(!(sda && scl)) {
+      GET_SDA;
+      GET_SCL;
+    }
+    printf("SDA/SCL up.\r\n");
+  
+    // WAIT START
+    while(!(!sda && scl)) {
+      GET_SDA;
+      GET_SCL;
+    }
+    // puts("Start arrived\n");
+    while(scl) GET_SCL;
+
+    char byte = 0;
+    for (i = 0; i < 8; ++i) {
+      while(!scl) GET_SCL;
+      GET_SDA;
+      byte |= (sda<<(7-i));
+      while(scl) GET_SCL;
+    }
+    gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_EN_PULLDOWN);
+    wait_cycles(500);
+    gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+    wait_cycles(500);
+    printf("%02x \r\n", byte);
+  }
+
+  PRINT_SCL;
+  PRINT_SDA;
+  GET_SDA;
+  GET_SCL;
+
+  // for (i = 0; i < 16; ++i) {
+  while(1) {
+    while(1) {
+      if (gpio_is_set(PIN_SDA)) {
+        if (!sda) {
+          sda= 1;
+          PRINT_SDA;
+          break;
+        }
+      } else {
+        if (sda) {
+          sda= 0;
+          PRINT_SDA;
+          break;
+        }
+      }
+      if (gpio_is_set(PIN_SCL)) {
+        if (!scl) {
+          scl= 1;
+          PRINT_SCL;
+          break;
+        }
+      } else {
+        if (scl) {
+          scl= 0;
+          PRINT_SCL;
+          break;
+        }
+      }
+    }
+ //   wait_cycles(100);
+  }
+    if (!gpio_is_set(PIN_SDA) || !gpio_is_set(PIN_SCL)) {
+      printf("i2c line not pulled-up. Hanging...\r\n");
+      while(1);
+    }
+ // }
+}
+
+void i2c_bitbang_initialize()
+{
+  gpio_set_function(PIN_SDA, GPIO_FUNC_IN);
+  gpio_set_function(PIN_SCL, GPIO_FUNC_IN);
+
+  gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(PIN_SCL, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  i2c_bitbang_check_line();
+  printf("Init complete\r\n");
+}
+
+void i2c_bitbang_wait_start() 
+{
+  while(gpio_is_set(PIN_SDA));
+  printf("start recieved\r\n");
+}
+
+void i2c_bitbang_send_ack()
+{
+  
+}
+
+void i2c_bitbang()
+{
+  i2c_bitbang_initialize();
+  while(1) {
+    i2c_bitbang_wait_start();
+    i2c_bitbang_send_ack();
+
+    if (gpio_is_set(PIN_SDA)) {
+      putc('+');
+    }
+    if (gpio_is_set(PIN_SCL)) {
+      putc('-');
+    }
+
+  }
+}
+
+void pullup_down_test()
+{
+  gpio_set_function(18, GPIO_FUNC_IN);
+  while(1) {
+    puts("PULLUPDOWN:OFF\r\n");
+    gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+    int i;
+    for (i = 0; i < 16; ++i) {
+      wait_msec(500);
+      if (gpio_is_set(18))
+        puts("on\r\n");
+      else
+        puts("off\r\n");
+    }
+    puts("PULLUPDOWN:UP\r\n");
+    gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_EN_PULLUP);
+    for (i = 0; i < 16; ++i) {
+      wait_msec(500);
+      if (gpio_is_set(18))
+        puts("on\r\n");
+      else
+        puts("off\r\n");
+    }
+    puts("PULLUPDOWN:DOWN\r\n");
+    gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_EN_PULLDOWN);
+    for (i = 0; i < 16; ++i) {
+      wait_msec(500);
+      if (gpio_is_set(18))
+        puts("on\r\n");
+      else
+        puts("off\r\n");
+    }
+  }
+}
+
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
@@ -520,54 +696,36 @@ void main()
   vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
-  i2c_init();
-
   init_uart(1);
   init_consoles();
+
+  gpio_irq_test(21, 0 /* no poll, use interrupts */);
+  wait_gpio();
+  // i2c_init();
+  // i2c_bitbang();
+//  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
+//    
+//    puts("Failed to init bsc_slave in I2C mode\n");
+//  } else
+//    bsc_slave_debug();
+//  while(1);
   init_atmega8a();
-  // atmega8a_program();
+ // atmega8a_program();
   // atmega8a_read_firmware();
-  // while(1);
   atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
 //#ifndef CONFIG_QEMU
 //  init_nokia5110_display(1, 0);
 //#endif
-
   
-//  gpio_set_function(22, GPIO_FUNC_OUT);
-//  gpio_set_on(22);
-//  wait_msec(2000);
-//  gpio_set_off(22);
-//  wait_msec(2000);
-//  gpio_set_on(22);
-//  wait_msec(2000);
-//  gpio_set_off(22);
-
-
   print_mbox_props();
   set_irq_cb(intr_ctl_handle_irq);
   nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
   nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
-  // uint64_t mair;
-  // asm volatile ("mrs %0, mair_el1\n" : "=r"(mair));
-  // printf("mair: %016llx\n", mair);
   pl011_uart_print_regs();
   printf("__shared_mem_start: %016llx\n", *(uint64_t *)__shared_mem_start);
-  // asm volatile("AT S1E0R, %0"::"r"(&pl011_rx_buf_lock));
-  // asm volatile("at s1e1r, %0"::"r"(__shared_mem_start));
-  // __shared_mem_start = 0x80000;
-  // asm volatile("ldxr w1, [%0]"::"r"(__shared_mem_start));
-  // asm volatile("at s1e1r, %0"::"r"(__shared_mem_start));
-  // puts("1\n");
-  // asm volatile("svc #0");
-  // puts("2\n");
-  // asm volatile("svc #1");
-  // puts("3\n");
-  // asm volatile("svc #2");
-  // puts("4\n");
   print_cpu_info();
   systimer_init();
   print_current_ex_level();
@@ -588,12 +746,10 @@ void main()
   rand_init();
 
   vcanvas_showpicture();
-  // vibration_sensor_test(19, 0 /* no poll, use interrupts */);
   // generate exception here
   // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
 
-  // gpio_set_function(21, GPIO_FUNC_OUT);
   print_mmu_stats();
   // run_task();
 
@@ -611,6 +767,4 @@ void main()
   // vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
   cmdrunner_init();
   cmdrunner_run_interactive_loop();
-
-  wait_gpio();
 }

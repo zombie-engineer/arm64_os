@@ -36,6 +36,8 @@ void intr_ctl_dump_regs(const char* tag);
 
 void intr_ctl_enable_gpio_irq(int gpio_num);
 
+void intr_ctl_disable_gpio_irq(int gpio_num);
+
 int intr_ctl_arm_irq_enable(int irq_num);
 
 int intr_ctl_arm_irq_disable(int irq_num);
