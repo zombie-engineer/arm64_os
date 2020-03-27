@@ -51,14 +51,5 @@ ret          ; 1 cycles
 .globl countdown_32 
 countdown_32:
 ; 32bit word = r25:r24:r23:r22
-1:
-  subi  r22, 1
-  sbci  r23, 0
-  sbci  r24, 0
-  sbci  r25, 0
-  brne  1b
+do_countdown_32 r22 r23 r24 r25
 ret
-
-.globl wait_usec
-wait_usec:
-

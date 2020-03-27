@@ -11,6 +11,8 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 #define HIGH16(v) ((v >> 16) & 0xffff)
 #define ARG_SPLIT_32(v) HIGH16(v), LOW16(v)
 
+#define wait_usec(v) countdown_32()
+
 #define PIN_MODE_OUT(port, pin) \
   asm volatile("sbi %0, %1\n"::"i"(DDR ## port), "i"(pin))
 
@@ -21,6 +23,12 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
   asm volatile("sbi %0, %1\n"::"i"(PORT ## port), "i"(pin))
 
 #define PIN_OFF(port, pin) \
+  asm volatile("cbi %0, %1\n"::"i"(PORT ## port), "i"(pin))
+
+#define PIN_PULL_UP(port, pin) \
+  asm volatile("sbi %0, %1\n"::"i"(PORT ## port), "i"(pin))
+
+#define PIN_PULL_OFF(port, pin) \
   asm volatile("cbi %0, %1\n"::"i"(PORT ## port), "i"(pin))
 
 void __attribute__((optimize("O2"))) blink() 
@@ -37,13 +45,55 @@ void __attribute__((optimize("O2"))) blink()
 //  delay_cycles_16(1000);
 }
 
+#define MSEC_PER_SEC 1000
+#define FCPU 1000000
+#define COUNT_PER_SEC (FCPU / 5)
+#define COUNT_PER_MSEC (COUNT_PER_SEC / MSEC_PER_SEC)
+
+// 1 second  = 200 000
+// 1 milli   = 200 000 / 1000 = 200
+// 100 milli = (200 000 / 1000) * 100 = 200 * 100 = 20000
+#define MSEC_TO_COUNT(v) (v * COUNT_PER_MSEC)
+#define SEC_TO_COUNT(v) (v * COUNT_PER_SEC)
+
+void wait_1_sec()
+{
+  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
+}
+
+void wait_3_sec()
+{
+  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(3)));
+}
+
+void wait_100_msec()
+{
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
+}
+
+void wait_1_msec()
+{
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
+}
+
 void main() 
 {
   *(char*)0x100 = 0;
   PIN_MODE_OUT(B, 0);
+  PIN_MODE_OUT(C, 5);
+  PIN_OFF(C, 5);
   while(1) {
-    countdown_32(ARG_SPLIT_32(200000));
-    blink();
+    PIN_ON(B, 0);
+    twi_master_init();
+    wait_3_sec();
+    twi_master_start();
+    wait_3_sec();
+    // twi_master_start();
+    // countdown_32(ARG_SPLIT_32(200000));
+    PIN_OFF(B, 0);
+    twi_master_deinit();
+    wait_3_sec();
+    // wait_1_sec();
   }
 }
 

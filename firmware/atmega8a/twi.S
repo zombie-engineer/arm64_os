@@ -103,6 +103,12 @@ cpi  r16, \status_value
 brne TWI_ERROR
 .endm
 
+.globl twi_master_start
+twi_master_start:
+ldi   r16, (1<<TWCR_TWINT) | (1<<TWCR_TWSTA) | (1<<TWCR_TWEN)
+out   TWCR, r16
+ret
+
 .globl twi_master_send
 ; r16 - byte to send
 twi_master_send:
@@ -144,8 +150,17 @@ TWI_SEND_STOP
 1: rjmp 1b
 ret
 
+.globl twi_master_init
 twi_master_init:
+ldi  r16, 1<<TWCR_TWEN
+out  TWCR, r16
 rcall twi_set_bit_rate
+ret
+
+.globl twi_master_deinit
+twi_master_deinit:
+clr r16
+out TWCR, r16
 ret
 
 ; I2C Master
