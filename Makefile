@@ -38,6 +38,7 @@ OBJS := \
 	rand.o\
 	sched.o\
 	timer.o\
+	irq.o\
 	video_console.o
 
 all: kernel8.img

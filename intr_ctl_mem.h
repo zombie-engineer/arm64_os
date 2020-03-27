@@ -1,0 +1,23 @@
+#include <memory.h>
+
+#define BCM2835_IC_BASE          (PERIPHERAL_BASE_PHY  + 0xb200)
+#define BCM2835_IC_PENDING_BASIC (reg32_t)(BCM2835_IC_BASE + 0x00)
+#define BCM2835_IC_PENDING_GPU_1 (reg32_t)(BCM2835_IC_BASE + 0x04)
+#define BCM2835_IC_PENDING_GPU_2 (reg32_t)(BCM2835_IC_BASE + 0x08)
+#define BCM2835_IC_FIQ_CONTROL   (reg32_t)(BCM2835_IC_BASE + 0x0c)
+#define BCM2835_IC_ENABLE_GPU_1  (reg32_t)(BCM2835_IC_BASE + 0x10)
+#define BCM2835_IC_ENABLE_GPU_2  (reg32_t)(BCM2835_IC_BASE + 0x14)
+#define BCM2835_IC_ENABLE_BASIC  (reg32_t)(BCM2835_IC_BASE + 0x18)
+#define BCM2835_IC_DISABLE_GPU_1 (reg32_t)(BCM2835_IC_BASE + 0x1c)
+#define BCM2835_IC_DISABLE_GPU_2 (reg32_t)(BCM2835_IC_BASE + 0x20)
+#define BCM2835_IC_DISABLE_BASIC (reg32_t)(BCM2835_IC_BASE + 0x24)
+
+#define BASIC_IRQ_TIMER             (1 << 0)
+#define BASIC_IRQ_MAILBOX           (1 << 1)
+#define BASIC_IRQ_DOORBELL_0        (1 << 2)
+#define BASIC_IRQ_DOORBELL_1        (1 << 3)
+#define BASIC_IRQ_GPU_0_HALTED      (1 << 4)
+#define BASIC_IRQ_GPU_1_HALTED      (1 << 5)
+#define BASIC_IRQ_ACCESS_ERR_TYPE_0 (1 << 6)
+#define BASIC_IRQ_ACCESS_ERR_TYPE_1 (1 << 7)
+

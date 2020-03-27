@@ -3,27 +3,7 @@
 #include <arch/armv8/armv8.h>
 #include <bits_api.h>
 #include <reg_access.h>
-
-#define BCM2835_IC_BASE          (PERIPHERAL_BASE_PHY  + 0xb200)
-#define BCM2835_IC_PENDING_BASIC (reg32_t)(BCM2835_IC_BASE + 0x00)
-#define BCM2835_IC_PENDING_GPU_1 (reg32_t)(BCM2835_IC_BASE + 0x04)
-#define BCM2835_IC_PENDING_GPU_2 (reg32_t)(BCM2835_IC_BASE + 0x08)
-#define BCM2835_IC_FIQ_CONTROL   (reg32_t)(BCM2835_IC_BASE + 0x0c)
-#define BCM2835_IC_ENABLE_GPU_1  (reg32_t)(BCM2835_IC_BASE + 0x10)
-#define BCM2835_IC_ENABLE_GPU_2  (reg32_t)(BCM2835_IC_BASE + 0x14)
-#define BCM2835_IC_ENABLE_BASIC  (reg32_t)(BCM2835_IC_BASE + 0x18)
-#define BCM2835_IC_DISABLE_GPU_1 (reg32_t)(BCM2835_IC_BASE + 0x1c)
-#define BCM2835_IC_DISABLE_GPU_2 (reg32_t)(BCM2835_IC_BASE + 0x20)
-#define BCM2835_IC_DISABLE_BASIC (reg32_t)(BCM2835_IC_BASE + 0x24)
-
-#define BASIC_IRQ_TIMER             (1 << 0)
-#define BASIC_IRQ_MAILBOX           (1 << 1)
-#define BASIC_IRQ_DOORBELL_0        (1 << 2)
-#define BASIC_IRQ_DOORBELL_1        (1 << 3)
-#define BASIC_IRQ_GPU_0_HALTED      (1 << 4)
-#define BASIC_IRQ_GPU_1_HALTED      (1 << 5)
-#define BASIC_IRQ_ACCESS_ERR_TYPE_0 (1 << 6)
-#define BASIC_IRQ_ACCESS_ERR_TYPE_1 (1 << 7)
+#include "intr_ctl_mem.h"
 
 static intr_ctl_irq_cb irq_callbacks[64 + 8];
 
@@ -104,17 +84,27 @@ int intr_ctl_gpu_irq_disable(int irq_num)
 }
 
 
+/*
+ * For details see BCM2835 ARM Peripherals, page 113
+ * there is an ARM Peripherals interrupts table, that
+ * shows 64 possible IRQs, for gpio looks like we only 
+ * need gpio_int[0], which is bit 49 IRQ#49.
+ * To access bits 32-64, we need to go to 
+ * IRQ_PENDING_2/ENABLE_IRQS_2/DISABLE_IRQS_2 (second
+ * half of this table) so IRQ 49 will be bit number 
+ * 49-32=17
+ */
+#define IRQ_BIT_GPIO1 17
+
+
 void intr_ctl_enable_gpio_irq(int gpio_num)
 {
-  uint32_t irq_enable_reg;
+  write_reg(BCM2835_IC_ENABLE_GPU_2, 1 << IRQ_BIT_GPIO1);
+}
 
-  irq_enable_reg = 0;
-  irq_enable_reg |= 1 << (49 - 32);
-  irq_enable_reg |= 1 << (50 - 32);
-  irq_enable_reg |= 1 << (51 - 32);
-  irq_enable_reg |= 1 << (52 - 32);
-  write_reg(BCM2835_IC_ENABLE_GPU_2, irq_enable_reg);
-  write_reg(BCM2835_IC_ENABLE_BASIC, 1 << gpio_num);
+void intr_ctl_disable_gpio_irq(int gpio_num)
+{
+  write_reg(BCM2835_IC_DISABLE_GPU_2, 1 << IRQ_BIT_GPIO1);
 }
 
 #define CHECK_PENDING_GPU(i, gpu_i) \
