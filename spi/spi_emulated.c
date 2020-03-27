@@ -69,10 +69,12 @@ DECL_ASSERTED_FN(spi_emulated_xmit_bit, uint8_t bit_in, uint8_t *bit_out)
   if (spi_emulated.mosi_gpio_pin != -1) {
     if (bit_in) {
       gpio_set_on(spi_emulated.mosi_gpio_pin);
-      putc('1');
+      if (spi_emulated_verbose_output)
+        putc('1');
     } else {
       gpio_set_off(spi_emulated.mosi_gpio_pin);
-      putc('0');
+      if (spi_emulated_verbose_output)
+        putc('0');
     }
   }
   PULSE_SCLK();
@@ -131,15 +133,16 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
 
       out = (out << 1) | c;
     }
-    putc(':');
+    if (spi_emulated_verbose_output)
+      putc(':');
 
 
     if (bytes_out)
       *bytes_out++ = out;
   }
   spi_emulated_ce0_set();
-  putc('\r');
-  putc('\n');
+  if (spi_emulated_verbose_output)
+    puts("\r\n");
   return ERR_OK;
 }
 

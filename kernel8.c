@@ -230,10 +230,13 @@ static int cont;
 void gpio_handle_irq()
 {
   if (gpio_pin_status_triggered(current_pin)) {
-    puts("+");
     gpio_pin_status_clear(current_pin);
+    if (gpio_is_set(current_pin))
+      putc('+');
+    else
+      putc('-');
   }
-  puts("1\n");
+  putc('\n');
 }
 
 /*
@@ -497,14 +500,6 @@ void atmega8a_download(const void *bin, int bin_size)
   }
   printf("Write complete.\r\n");
 
-//  printf("Writing:\r\n");
-//  memset(membuf +  0, 0xaa, 16);
-//  memset(membuf + 16, 0xbb, 16);
-//  memset(membuf + 32, 0xcc, 16);
-//  memset(membuf + 48, 0xdd, 16);
-//  hexdump_memory(membuf, 64);
-//  printf("Write complete.\r\n");
-
   memset(membuf, 0x00, 64);
 
   printf("Reading.\r\n");
@@ -681,6 +676,11 @@ void pullup_down_test()
   }
 }
 
+static inline void interrupts_init()
+{
+  set_irq_cb(intr_ctl_handle_irq);
+}
+
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
@@ -699,8 +699,8 @@ void main()
   init_uart(1);
   init_consoles();
 
-  gpio_irq_test(21, 0 /* no poll, use interrupts */);
-  wait_gpio();
+  // gpio_irq_test(21, 0 /* no poll, use interrupts */);
+  // wait_gpio();
   // i2c_init();
   // i2c_bitbang();
 //  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
@@ -709,32 +709,27 @@ void main()
 //  } else
 //    bsc_slave_debug();
 //  while(1);
-  init_atmega8a();
+  // init_atmega8a();
  // atmega8a_program();
   // atmega8a_read_firmware();
-  atmega8a_download(atmega8a_bin, atmega8a_bin_size);
-  while(1);
+  // atmega8a_download(atmega8a_bin, atmega8a_bin_size);
+  // while(1);
 //#ifndef CONFIG_QEMU
 //  init_nokia5110_display(1, 0);
 //#endif
   
   print_mbox_props();
-  set_irq_cb(intr_ctl_handle_irq);
   nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
   nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
-  pl011_uart_print_regs();
-  printf("__shared_mem_start: %016llx\n", *(uint64_t *)__shared_mem_start);
+  
   print_cpu_info();
-  systimer_init();
   print_current_ex_level();
+  systimer_init();
 
-  // enable_irq();
-  // while(1);
   add_unhandled_exception_hook(report_unhandled_exception);
-  // kernel_panic("hello");
-  // *(int *)0xfffffffffff = 0;
+  interrupts_init();
   scheduler_init();
   while(1);
 

@@ -39,8 +39,55 @@
 #define BSC_MASTER_S_ERR   (1<<8)
 #define BSC_MASTER_S_CLKT  (1<<9)
 
+#define SLAVE_ADDR 0x1e
+
+#define PIN_SDA 2
+#define PIN_SCL 3
 int i2c_init()
 {
   printf("i2c_init\n");
+  gpio_set_function(PIN_SDA, GPIO_FUNC_ALT_0);
+  gpio_set_function(PIN_SCL, GPIO_FUNC_ALT_0);
+
+  gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(PIN_SCL, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+
+  // Clear status register
+  int s_reg;
+  s_reg = read_reg(BSC_MASTER_REG_S(1));
+  s_reg |= BSC_MASTER_S_DONE;
+  s_reg |= BSC_MASTER_S_CLKT;
+  s_reg |= BSC_MASTER_S_ERR;
+  write_reg(BSC_MASTER_REG_S(1), s_reg);
+
+
+  // Clear FIFO
+  write_reg(BSC_MASTER_REG_C(1), BSC_MASTER_C_CLEAR);
+  while(!(read_reg(BSC_MASTER_REG_S(1)) & BSC_MASTER_S_TXD));
+  printf("clear FIFO completed.\n");
+
+  // ready the data 1 byte with value 0x66
+  // will be sent to slave
+  write_reg(BSC_MASTER_REG_DLEN(1), 1);
+  write_reg(BSC_MASTER_REG_FIFO(1), 0x66);
+  write_reg(BSC_MASTER_REG_A(1), SLAVE_ADDR);
+
+  write_reg(BSC_MASTER_REG_C(1), 
+      BSC_MASTER_C_I2CEN       | 
+      BSC_MASTER_C_ST          | 
+      BSC_MASTER_C_CLEAR);
+
+  while(read_reg(BSC_MASTER_REG_S(1)) & BSC_MASTER_S_TA);
+  s_reg = read_reg(BSC_MASTER_REG_S(1));
+  if (s_reg & BSC_MASTER_S_DONE)
+    puts("done:1\r\n");
+  if (s_reg & BSC_MASTER_S_ERR)
+    puts("err:1\r\n");
+  if (s_reg & BSC_MASTER_S_CLKT)
+    puts("CLKT:1\r\n");
+
+  printf("Transfer completed.\n");
+
+  while(1);
   return ERR_OK;
 }

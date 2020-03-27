@@ -21,12 +21,14 @@ typedef struct atmega8a_dev {
   spi_dev_t *spi;
   int gpio_pin_reset;
   gpio_set_handle_t gpio_set_handle;
+  int debug_level;
 } atmega8a_dev_t;
 
 static atmega8a_dev_t atmega8a_dev = {
   .spi = 0,
   .gpio_pin_reset = -1,
-  .gpio_set_handle = GPIO_SET_INVALID_HANDLE
+  .gpio_set_handle = GPIO_SET_INVALID_HANDLE,
+  .debug_level = 0
 };
 
 DECL_GPIO_SET_KEY(atmega8a_reset_key, "ATMEGA8_GPIO_RS");
@@ -108,10 +110,12 @@ int atmega8a_cmd(spi_dev_t *spidev, const char *cmd, char *res)
     return ret;
   }
 
-  atlog("cmd:%02x:%02x:%02x:%02x -> res:%02x:%02x:%02x:%02x",
-      cmd[0], cmd[1], cmd[2], cmd[3],
-      res[0], res[1], res[2], res[3]
-  );
+  if (atmega8a_dev.debug_level > 2) {
+    atlog("cmd:%02x:%02x:%02x:%02x -> res:%02x:%02x:%02x:%02x",
+        cmd[0], cmd[1], cmd[2], cmd[3],
+        res[0], res[1], res[2], res[3]
+    );
+  }
   return ERR_OK;
 }
 
@@ -125,7 +129,6 @@ static inline int atmega8a_read_signature(spi_dev_t *spidev, uint32_t *signature
 
   tmp = 0;
   for (i = 0; i < 3; ++i) {
-    // cmd = get_read_signature_bytes_cmd(i);
     cmd[0] = 0x30;
     cmd[1] = 0x00;
     cmd[2] = i & 0x3;
@@ -201,7 +204,6 @@ static int atmega8a_flash_page_fill(const uint8_t *src)
     cmd[2] = wordaddr & 0x1f;
     cmd[3] = *(src++);
 
-    // cmd = CMD_FLASH_LOAD_BYTE(wordaddr, 0, b);
     if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
       return ERR_FATAL;
 
@@ -209,7 +211,6 @@ static int atmega8a_flash_page_fill(const uint8_t *src)
     cmd[1] = 0x00;
     cmd[2] = wordaddr & 0x1f;
     cmd[3] = *(src++);
-    // cmd = CMD_FLASH_LOAD_BYTE(wordaddr, 1, b);
     if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
       return ERR_FATAL;
   }
@@ -234,7 +235,6 @@ static int atmega8a_flash_page_write(int page, int check_value, int check_addr)
     return ERR_FATAL;
   }
 
-  // cmd = CMD_FLASH_WRITE_PAGE(page);
   cmd[0] = 0x4c;
   cmd[1] = (page >> 3) & 0xf;
   cmd[2] = (page & 7) << 5;
@@ -254,8 +254,6 @@ static int atmega8a_flash_page_write(int page, int check_value, int check_addr)
     cmd[1] = (check_addr >> 8) & 0xf;
     cmd[2] = check_addr & 0xff;
     cmd[3] = 0x00;
-
-    // cmd = CMD_FLASH_READ_BYTE(check_addr, high);
 
     for (i = 0; i < 64; ++i) {
       if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
@@ -360,7 +358,6 @@ int atmega8a_read_flash_memory(void *buf, int sz, int byte_addr)
     cmd[1] = (wordaddr >> 8) & 0xf;
     cmd[2] = wordaddr & 0xff;
     cmd[3] = 0x00;
-    // cmd = CMD_FLASH_READ_BYTE(wordaddr, high);
     if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
       return ERR_FATAL;
 
@@ -381,7 +378,6 @@ int atmega8a_write_eeprom(const void *buf, int sz, int byte_addr)
   char *src = (char *)buf; 
   int i;
   for (i = 0; i < sz; ++i) {
-    // cmd = CMD_WRITE_EEPROM_BYTE(byte_addr, src);
     cmd[1] = (byte_addr >> 8) & 1;
     cmd[2] = byte_addr & 0xff;
     cmd[3] = *src;
@@ -400,7 +396,6 @@ int atmega8a_read_eeprom_memory(void *buf, int sz, int addr)
   char *ptr = (char *)buf; 
   size_t i;
   for (i = 0; i < sz; ++i) {
-    // cmd = CMD_READ_EEPROM_BYTE(addr + i);
     cmd[1] = ((addr + i) >> 8) & 1;
     cmd[2] = (addr + i) & 0xff;
     if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)

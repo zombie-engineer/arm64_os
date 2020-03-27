@@ -1,6 +1,13 @@
 #pragma once
 #include <types.h>
 
+#define ATMEGA8A_FUSE_CPU_FREQ_MASK 0xf
+#define ATMEGA8A_FUSE_CPU_FREQ_1MHZ 0x1
+#define ATMEGA8A_FUSE_CPU_FREQ_2MHZ 0x2
+#define ATMEGA8A_FUSE_CPU_FREQ_4MHZ 0x3
+#define ATMEGA8A_FUSE_CPU_FREQ_8MHZ 0x4
+
+
 typedef struct spi_dev spi_dev_t;
 
 int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset);

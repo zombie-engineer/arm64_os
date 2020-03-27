@@ -154,6 +154,7 @@ void scheduler_init()
   scheduler_job(0);
 
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
+  enable_irq();
 
   asm volatile (
       "mov x0, #1\n"

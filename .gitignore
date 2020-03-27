@@ -5,6 +5,7 @@
 *.swp
 *.map
 *.sym
+*.cmd
 firmware/*/*.bin
 test/test
 sdcard
