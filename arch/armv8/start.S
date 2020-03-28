@@ -1,4 +1,5 @@
 #include <asm_macros.h>
+#include "irq_macros.h"
 
 // @ instructions at 0x00
 // @ d2a80000 @ b900001f @ 52b00001 @ b9000801
@@ -284,6 +285,70 @@ LFUNC(__prep_exception_info):
   mov   x0, x7
   ret
 
+.macro __interrupt_store_ctx
+  str   x30, [sp, #-8]!
+  bl    __armv8_cpuctx_store
+  add   sp, sp, 8
+.endm
+
+.macro __interrupt_start
+  __interrupt_store_ctx
+.endm
+
+.macro __interrupt_end
+  b     __armv8_cpuctx_eret
+.endm
+
+.macro __irq_handler type
+.align 7
+.globl __irq_handler_\()\type 
+__irq_handler_\()\type:
+  __interrupt_start
+/*
+ * x19 to x29 are callee-saved registers, so
+ * we can safely use them across subroutine calls.
+ */
+
+/*
+ * base_reg is the only one that needs 64 bit register
+ * for load operations.
+ */
+base_reg .req x19
+
+/*
+ * temporary registers don't need to be saved after
+ * subroutine call, obviously
+ */
+
+/*
+ * irqstat is a temp register with name)
+ */
+irqstat_reg .req w3
+
+/*
+ * temp registers
+ */
+tmp_1_reg .req w1
+tmp_2_reg .req w2
+
+/*
+ * irqnr will be passed to handler, so it is 
+ * also corruptable. It's used as first argument,
+ * so it has to be w0
+ */
+
+irqnr_reg .req w0
+
+  get_irqrn_preamble base_reg
+1:
+  get_irqnr_and_base irqnr_reg, irqstat_reg, base_reg, tmp_1_reg, tmp_2_reg
+  beq  1f
+  bl   __handle_irq
+  b    1b
+1:
+  __interrupt_end
+.unreq base_reg
+.endm
 
 .macro __vector_entry symbol handler type
   .align 7
@@ -306,29 +371,28 @@ LFUNC(__prep_exception_info):
   __vector_entry \symbol __handle_interrupt \type
 .endm
 
-
 // important, code has to be properly aligned
 // VBAR_EL1
 .align 11
 _vectors:
 // 
 vector_entry __interrupt_cur_el_sp0_synchronous   0
-vector_entry __interrupt_cur_el_sp0_irq           1
+__irq_handler cur_el_sp0
 vector_entry __interrupt_cur_el_sp0_fiq           2
 vector_entry __interrupt_cur_el_sp0_serror        3
 
 vector_entry __interrupt_cur_el_spx_synchronous   0
-vector_entry __interrupt_cur_el_spx_irq           1
+__irq_handler cur_el_spx
 vector_entry __interrupt_cur_el_spx_fiq           2
 vector_entry __interrupt_cur_el_spx_serror        3
 
 vector_entry __interrupt_low_el_sp0_synchronous 0
-vector_entry __interrupt_low_el_sp0_irq         1
+__irq_handler low_el_sp0
 vector_entry __interrupt_low_el_sp0_fiq         2
 vector_entry __interrupt_low_el_sp0_serror      3
 
 vector_entry __interrupt_low_el_spx_synchronous 0
-vector_entry __interrupt_low_el_spx_irq         1
+__irq_handler low_el_spx
 vector_entry __interrupt_low_el_spx_fiq         2
 vector_entry __interrupt_low_el_spx_serror      3
 
@@ -355,4 +419,3 @@ _disable_coproc_traps:
   mov   x0, #(3 << 20)
   msr   cpacr_el1, x0
   ret
-

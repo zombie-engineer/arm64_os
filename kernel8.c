@@ -1,4 +1,5 @@
 #include <config.h>
+#include <irq.h>
 #include <uart/uart.h>
 #include <gpio.h>
 #include <gpio_set.h>
@@ -29,6 +30,7 @@
 #include <debug.h>
 #include <unhandled_exception.h>
 #include <board/bcm2835/bcm2835.h>
+#include <board/bcm2835/bcm2835_irq.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -225,13 +227,21 @@ void print_arm_features()
   printf("id_aa64mmfr0_el1 is: %08x\n", el);
 }
 
-static int current_pin;
+static int current_pin1;
+static int current_pin2;
 static int cont;
 void gpio_handle_irq()
 {
-  if (gpio_pin_status_triggered(current_pin)) {
-    gpio_pin_status_clear(current_pin);
-    if (gpio_is_set(current_pin))
+  if (gpio_pin_status_triggered(current_pin1)) {
+    gpio_pin_status_clear(current_pin1);
+    if (gpio_is_set(current_pin1))
+      putc('+');
+    else
+      putc('-');
+  }
+  if (gpio_pin_status_triggered(current_pin2)) {
+    gpio_pin_status_clear(current_pin2);
+    if (gpio_is_set(current_pin2))
       putc('+');
     else
       putc('-');
@@ -243,33 +253,41 @@ void gpio_handle_irq()
  * gpio_num_dout - digital output
  * poll          - poll for gpio values instead of interrupts
  */
-void gpio_irq_test(int pin, int poll)
+void gpio_irq_test(int pin1, int pin2, int poll)
 {
-  printf("gpio_irq_test: pin:%d, poll:%d\n",
-      pin, poll);
-  current_pin = pin;
+  printf("gpio_irq_test: pin1:%d, pin2:%d, poll:%d\n",
+      pin1, pin2, poll);
+  current_pin1 = pin1;
+  current_pin2 = pin2;
   cont = 1;
 
-  gpio_set_function(pin, GPIO_FUNC_IN);
+  gpio_set_function(pin1, GPIO_FUNC_IN);
+  gpio_set_function(pin2, GPIO_FUNC_IN);
   if (poll) {
     while(1) {
-      if (gpio_is_set(pin)) {
+      if (gpio_is_set(pin1)) {
         printf("-");
       }
     }
   }
 
-  set_irq_cb(gpio_handle_irq);
-  intr_ctl_enable_gpio_irq(pin);
-  gpio_set_detect_rising_edge(pin);
-  gpio_set_detect_falling_edge(pin);
+  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
+  gpio_set_detect_rising_edge(pin1);
+  gpio_set_detect_rising_edge(pin2);
+
+  gpio_set_detect_falling_edge(pin1);
+  gpio_set_detect_falling_edge(pin2);
+
+  intr_ctl_enable_gpio_irq(pin1);
+  intr_ctl_enable_gpio_irq(pin2);
+
   enable_irq();
   
   do {
-    // intr_ctl_dump_regs("waiting...\r\n");
+    intr_ctl_dump_regs("waiting...\r\n");
     wait_msec(1000);
     blink_led(2, 200);
-  } while(cont);
+  } while(1);
 }
 
 #ifndef CONFIG_QEMU
@@ -681,12 +699,14 @@ static inline void interrupts_init()
   set_irq_cb(intr_ctl_handle_irq);
 }
 
+extern void __irq_handler_test();
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
   int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end 
       - &_binary_firmware_atmega8a_atmega8a_bin_start;
 
+  // __irq_handler_test();
   debug_init();
   gpio_set_init();
   init_unhandled_exception_reporters();
@@ -698,8 +718,10 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  irq_init();
+  gpio_irq_test(20, 21, 0 /* no poll, use interrupts */);
+  while(1);
 
-  // gpio_irq_test(21, 0 /* no poll, use interrupts */);
   // wait_gpio();
   // i2c_init();
   // i2c_bitbang();

@@ -3,7 +3,7 @@
 #include <arch/armv8/armv8.h>
 #include <bits_api.h>
 #include <reg_access.h>
-#include "intr_ctl_mem.h"
+#include <board/bcm2835/bcm2835_irq_ctrl.h>
 
 static intr_ctl_irq_cb irq_callbacks[64 + 8];
 
