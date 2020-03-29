@@ -1,6 +1,25 @@
 #include <asm_macros.h>
 #include "irq_macros.h"
 
+/*
+ * PER_CORE_STARTUP_ADDRESSES_BASE - address for array of
+ * function pointers, monitored by each core to jump to.
+ *
+ * Pseudocode:
+ *
+ * typedef void (func_ptr*)(void);
+ * static func_ptr per_cpu_core_functions[NUMBER_OF_CORES];
+ *
+ * void wait_to_branch(int cpu_core_id)
+ * {
+ *   volatile func_ptr f = 0;
+ *   while(!f)
+ *     f = per_cpu_core_functions[cpu_core_id];
+ *   f();
+ *
+ */
+.equ PER_CORE_STARTUP_ADDRESSES_BASE, 0xd8
+
 // @ instructions at 0x00
 // @ d2a80000 @ b900001f @ 52b00001 @ b9000801
 // @ 58000400 @ d51be000 @ d51ce07f @ d2867fe0
@@ -28,74 +47,97 @@
 // - ERETs from EL3 to EL2/SP_EL2
 // - Branches to _start
 _start:
-  // Start in EL2/SP_EL2, exceptions masked, non-MMU
-  // read cpu id, stop slave cores
+  /*
+   * Starting in EL2/SP_EL2, exceptions masked, non-MMU
+   */
 
-  // Store arm_init_regvalue
-  mrs   x1, hcr_el2
-  ldr   x2, =__aarch64_hcr_el2_init_value
-  str   x1, [x2]
-  
-// wake up other cores from swe
-// at 0xd8 an array of pointers is located, that is
-// checked by each of the remaining 3 cores by their
-// index (1,2,3) to see if there is a non zero memory
-// address there and if there is they jump to that place
-// We set same address for each core and wake them up
-// by setting event (sev instruction)
-  mov   x1, #0xd8
-  ldr   x2, =_cores_checkin
-  str   x2, [x1, #8]
-  str   x2, [x1, #16]
-  str   x2, [x1, #24]
+  /*
+   * Store HCR_EL2 value that was present at the time of entering
+   * _start.
+   */
+  mrs   x0, hcr_el2
+  ldr   x1, =__aarch64_hcr_el2_init_value
+  str   x0, [x1]
+
+  /*
+   * Wake up other cores from SWE, all cores except this
+   * are waiting to branch, monitoring the PER_CORE_STARTUP_ADDRESSES_BASE
+   * location (read comments on it). Remaining cores will jump to any
+   * location we write there. We set same address for each core and
+   * wake them up by SEV (set event)
+   * instruction.
+   */
+  mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
+  ldr   x1, =_cores_checkin
+  str   x1, [x0, #8]
+  str   x1, [x0, #16]
+  str   x1, [x0, #24]
   sev
 
 _cores_checkin:
-  mrs   x1, mpidr_el1
-  // get CPU core number
-  and   x2, x1, #3        
-  // mpidr_el1 & 3 = Aff1 for 4-core systems holds 
-  // the core number
-  // jump if core number is 0
-  ldr   x3, =__armv8_per_cor_mpidr_el1
-  add   x3, x3, x2, lsl #3
-  str   x1, [x3]
-  cbz   x2, _core0_exec
+  /*
+   * We need to read CPU ID for each core and stop non-0
+   * cores for now.
+   */
+
+  /*
+   * Get CPU core number
+   * mpidr_el1 & 3 = Aff1 for 4-core systems holds
+   * the core number
+   */
+  mrs   x0, mpidr_el1
+  and   x1, x0, #3
+
+  /*
+   * Store mpidr_el1 to per-core data array, for debug.
+   */
+  ldr   x2, =__percore_data
+  str   x0, [x2, x1, lsl #3]
+
+  /* Jump next if core number is 0 */
+  cbz   x1, _core0_exec
 _core_wait:
   b _cpu_wait_for_event
-  // cpu id > 0, stop
 
 
 _core0_exec:
-  // cpu id == 0
-  // set stack 
-  ldr   x1, =_start
+  /* CPU ID == 0 */
+  /*
+   * Set stack early for subroutine operations.
+   */
+  ldr   x0, =__el2_stack_base
+  mov   sp, x0
 
-  // set up EL1
-  // Get current exception level
+  /*
+   * Get current exception level
+   * bits [3:2] are exception level
+   */
+.equ CURRENT_EL_EL0, 0b00
+.equ CURRENT_EL_EL1, 0b01
+.equ CURRENT_EL_EL2, 0b10
+.equ CURRENT_EL_EL3, 0b11
+
   mrs   x0, CurrentEl
-  // bits [3:2] are exception level
+  lsr   x0, x0, #2
+  and   x0, x0, #3
 
-  // 0b00 - EL0, 0b01 - EL1, 0b10 - EL2, 0b11 - EL3
-  and   x0, x0, #(3 << 2)  
-  cmp   x0, #(3 << 2)
-  // check if EL3
-  bne   _check_el1
-  mov   sp, x1
+//  /*
+//   * Check if we are at EL3 now. If we are, goto error.
+//   * not sure if i need this code.
+//   */
+//  cmp   x0, #(3 << 2)
+//  bne   _check_el1
 
+  /*
+   * Check if we are in EL1 execution state. If not set it.
+   * x0 = current el.
+   */
+  cmp   x0, #CURRENT_EL_EL1
+  beq   _start_el1
 
-// ******************************************************************************
-// Check if we are in EL1 execution state and set it if not
-// ******************************************************************************
-.local _check_el1
-_check_el1: 
-  // check if EL1
-  cmp   x0, #(1 << 2)
-  beq   _in_el1
-  // on not EL3 and not EL1
-  // Set EL1 stack to _start
-  msr   sp_el1, x1
-
+  /*
+   * Set up EL1.
+   */
   // ***************************************************************** // 
   // enable CNTP for EL1
   // mrs   x0, cnthctl_el2
@@ -103,95 +145,122 @@ _check_el1:
   // msr   cnthctl_el2, x0   // Hypervisor Configuration Register Enables second stage translation for execution in Non-secure EL1 and EL0.
   // ***************************************************************** // 
 
-  msr   cntvoff_el2, xzr  // 
+  msr   cntvoff_el2, xzr
 
   bl    _disable_coproc_traps
 
-  // enable AArch64 in EL1
-
-
-  // HCR_EL2.RW bit - Execution state for EL1 is AArch64,
-  //                - Execution state for EL0 is taken from PSTATE.nRW when at EL0
-  mov   x0, #(1 << 31)    // AArch64
+  /*
+   * Enable AArch64 in EL1 execution state for EL1.
+   * HCR_EL2.RW bit - Execution state for EL1 is AArch64,
+   *                - Execution state for EL0 is taken from PSTATE.nRW when at EL0
+   */
+  mov   x0, #(1 << 31)
 
   // HCW_EL2.SWIO   - 1 
   // SWIO hardwired on Pi3 Set/Way Invalidation Override 
   orr   x0, x0, #(1 << 1) 
   msr   hcr_el2, x0
 
-  // ***************************************************************** // 
-  // mrs   x0, hcr_el2
-  // ***************************************************************** // 
+  /*
+   * Setup SCTLR access x2 = 0x30d00800
+   * SCTLR.EOS    = 1 Exeption exit is context synchronizing
+   * SCTLR.TSCTX  = 1 Trap EL0 access to SCTXNUM_EL0 reg when EL0 in AArch64
+   * SCTLR.EIS    = 1 Exception entry is synchronizing
+   * SCTLR.SPAN   = 1 PSTATE.PAN is unchanged on taking an exception to EL1
+   *                  (Set Privelidged Access Never = false)
+   * SCTLR.TLSMD  = 1 All EL0 A32/T32 accesses to stage 1 marked as
+   *                  Device-nGRE/Device-nGnRE/Device-nGnRnE are not trapped
+   * SCTLR.LSMAOE = 1 Load multiple/Store multiple Atomicity and Ordering Enable
+   */
+  mov   x0, #0x0800
+  movk  x0, #0x30d0, lsl #16
+  msr   sctlr_el1, x0
 
+  /*
+   * Setup exception handlers
+   */
+  ldr   x0, =_vectors
+  msr   vbar_el1, x0
 
-  // Setup SCTLR access x2 = 0x30d00800
-  // SCTLR.EOS    = 1 Exeption exit is context synchronizing
-  // SCTLR.TSCTX  = 1 Trap EL0 access to SCTXNUM_EL0 reg when EL0 in AArch64
-  // SCTLR.EIS    = 1 Exception entry is synchronizing
-  // SCTLR.SPAN   = 1 PSTATE.PAN is unchanged on taking an exception to EL1
-  //                  (Set Privelidged Access Never = false)
-  // SCTLR.TLSMD  = 1 All EL0 A32/T32 accesses to stage 1 marked as 
-  //                  Device-nGRE/Device-nGnRE/Device-nGnRnE are not trapped
-  // SCTLR.LSMAOE = 1 Load multiple/Store multiple Atomicity and Ordering Enable
+  /*
+   * Change execution level to EL1.
+   * Set SPSR_EL2 to simulate exception context to which to return
+   * spsr_el2 = 0x3c4
+   * SPSR_EL2.M = EL1 (0b0100) - exception came from EL1
+   * SPSR_EL2.F = 1 - FIQ interrupts will be masked upon returning to EL1
+   * SPSR_EL2.I = 1 - IRQ interrupts will be masked upon returning to EL1
+   * SPSR_EL2.A = 1 - SError interrupts will be masked upon returning to EL1
+   * SPSR_EL2.D = 1 - Debug interrupts will be masked upon returning to EL1
+   */
+  mov   x0, #0x3c4
+  msr   spsr_el2, x0
 
-  mov   x2, #0x0800
-  movk  x2, #0x30d0, lsl #16
-  msr   sctlr_el1, x2
+  /*
+   * Set ELR_EL2 to point to _start_el1 from where it proceeds execution
+   */
+  adr   x0, _start_el1
+  msr   elr_el2, x0
 
+  /*
+   * Set EL1 stack to _start
+   */
 
-  // Setup exception handlers
-  ldr   x2, =_vectors
-  msr   vbar_el1, x2
+  /*
+   * This is something we are not allowed to do if we are not at EL3,
+   * so we have to setup stack at el1
+   * ldr   x0, =_start
+   * msr   sp_el2, x0
+   */
 
-
-  // Set initial cpu context
-  ldr   x2, =__current_cpuctx
-  ldr   x3, =__armv8_cpuctx_e
-  str   x3, [x2]
-
-  // Change execution level to EL1
-
-  // Set SPSR_EL2 to simulate exception context to which to return
-  // SPSR_EL2.M = EL1 (0b0100) - exception came from EL1
-  // SPSR_EL2.F = 1 - FIQ interrupts will be masked upon returning to EL1
-  // SPSR_EL2.I = 1 - IRQ interrupts will be masked upon returning to EL1
-  // SPSR_EL2.A = 1 - SError interrupts will be masked upon returning to EL1
-  // SPSR_EL2.D = 1 - Debug interrupts will be masked upon returning to EL1
-  mov   x2, #0x3c4
-  msr   spsr_el2, x2
-
-  // Set ELR_EL2 to point to _in_el1 from where it proceeds execution
-  adr   x2, _in_el1
-  msr   elr_el2, x2
-  // Jump out of exception
+  /*
+   * Return from fake exception.
+   */
   eret
 
+__clear_bss:
+  ldr   x0, =__bss_start
+  ldr   w1, =__bss_size
+1:
+  cbz   w1, 1f
+  str   xzr, [x0], #8
+  sub   w1, w1, #8
+  cbnz  w1, 1b
+1:
+  ret
 
+_start_el1:
 
-// ******************************************************************************
-// In EL1
-// ******************************************************************************
-LFUNC(_in_el1):
+  /*
+   * Zero out .bss section
+   */
+  bl __clear_bss
+
+  /*
+   * Set initial value for __current_cpuctx.
+   * We need special memory region, that will hold cpu context during
+   * save/restore cpu context operations when exceptions are taken.
+   * After scheduling is enabled __current_cpuctx will point to this zone
+   * in struct task. Before scheduling is enabled we need some initial
+   * place to store cpu context.
+   */
+  ldr   x0, =__current_cpuctx
+  ldr   x1, =__initial_cpuctx
+  str   x1, [x0]
+
   // Use sp_el0
   // While catching exception from el1 to el1
   // use sp_el0 to store stack pointer to 
   // restore to after eret
   // sp_el1 is not convenient to write/read
-  // mov   x2, #0
-  // msr   SPSel, x2
-
-  // Set stack
-  mov   sp, x1
-
-  // clear bss
-  ldr   x1, =__bss_start 
-  ldr   w2, =__bss_size
-1:
-  cbz   w2, 2f
-  str   xzr, [x1], #8
-  sub   w2, w2, #1
-  cbnz  w2, 1b
-
+_set_stack:
+  mov   x0, #1
+  msr   SPSel, x0
+  ldr   x0, =__el1_stack_base
+  mov   sp, x0
+  mov   x0, #0
+  msr   SPSel, x0
+  ldr   x0, =_start
+  mov   sp, x0
 
 2:
   // clear GP registers
@@ -238,23 +307,25 @@ LFUNC(_cpu_wait_for_event):
   wfe
   b _cpu_wait_for_event
 
+.pushsection ".data"
 .align 3
-GLOBAL_VAR(__armv8_per_cor_mpidr_el1):
+GLOBAL_VAR(__percore_data):
 .rept 4
-.quad 0x6666666666666666
+.quad 0x00
 .endr
 
 // 8 byte aligned cpu context
 .align 3
-GLOBAL_VAR(__armv8_cpuctx_e):
-.rept 34
-.quad 0x6666666666666666
+.globl __initial_cpuctx
+__initial_cpuctx:
+.rept 80
+.quad 0x00
 .endr
 
 .align 3
 GLOBAL_VAR(__exception_info):
 .rept 8
-.quad 0x6666666666666666
+.quad 0x00
 .endr
 
 // pointer to current cpu context
@@ -264,6 +335,30 @@ GLOBAL_VAR(__current_cpuctx):
 
 GLOBAL_VAR(__aarch64_hcr_el2_init_value):
 .quad 0
+
+.pushsection ".el1_stack", "a"
+.align 12
+/* 4Kb aligned address of EL1 exception stack area */
+.globl __el1_stack_top
+__el1_stack_top:
+
+.org  . + 0x4000
+.globl __el1_stack_base
+__el1_stack_base:
+.popsection
+
+.pushsection ".el2_stack", "a"
+.align 12
+/* 4Kb aligned address of EL1 exception stack area */
+.globl __el2_stack_top
+__el2_stack_top:
+
+.org  . + 0x4000
+.globl __el2_stack_base
+__el2_stack_base:
+.popsection
+
+.popsection
 
 LFUNC(__prep_exception_info):
   // x0 - exception type
@@ -285,25 +380,10 @@ LFUNC(__prep_exception_info):
   mov   x0, x7
   ret
 
-.macro __interrupt_store_ctx
-  str   x30, [sp, #-8]!
-  bl    __armv8_cpuctx_store
-  add   sp, sp, 8
-.endm
-
-.macro __interrupt_start
-  __interrupt_store_ctx
-.endm
-
-.macro __interrupt_end
-  b     __armv8_cpuctx_eret
-.endm
-
 .macro __irq_handler type
 .align 7
 .globl __irq_handler_\()\type 
 __irq_handler_\()\type:
-  __interrupt_start
 /*
  * x19 to x29 are callee-saved registers, so
  * we can safely use them across subroutine calls.
@@ -326,18 +406,21 @@ base_reg .req x19
 irqstat_reg .req w3
 
 /*
- * temp registers
- */
-tmp_1_reg .req w1
-tmp_2_reg .req w2
-
-/*
  * irqnr will be passed to handler, so it is 
  * also corruptable. It's used as first argument,
  * so it has to be w0
  */
 
 irqnr_reg .req w0
+
+/*
+ * temp registers
+ */
+tmp_1_reg .req w4
+tmp_2_reg .req w5
+  str   x30, [sp, #-8]!
+  bl    __armv8_cpuctx_store
+  add   sp, sp, 8
 
   get_irqrn_preamble base_reg
 1:
@@ -346,7 +429,7 @@ irqnr_reg .req w0
   bl   __handle_irq
   b    1b
 1:
-  __interrupt_end
+  b     __armv8_cpuctx_eret
 .unreq base_reg
 .endm
 
@@ -354,10 +437,24 @@ irqnr_reg .req w0
   .align 7
   .globl \symbol
 \symbol:
-# Entry can only occupy 0x80 bytes
-  # x30 is lr (link register)
-  # it should be saved in a correct order
+  /*
+   * Entry can only occupy 0x80 bytes. So most of the
+   * cpu context save/restore code has to be done via
+   * subroutine calls. With branching instructions we
+   * immediately loose link register ("x30" or "lr").
+   * We have to allocate stack now and put it there.
+   * "Save context" subroutine will have to take it
+   * from stack.
+   */
+
+  /*
+   * Allocate 8 bytes on stack.
+   * Put link-register (x30 / lr) to this allocated space
+   * on stack.
+   * sp -= 8; *sp = x30;
+   */
   str   x30, [sp, #-8]!
+
   bl    __armv8_cpuctx_store
   add   sp, sp, 8
   mov   x0, #\type
@@ -371,11 +468,8 @@ irqnr_reg .req w0
   __vector_entry \symbol __handle_interrupt \type
 .endm
 
-// important, code has to be properly aligned
-// VBAR_EL1
 .align 11
 _vectors:
-// 
 vector_entry __interrupt_cur_el_sp0_synchronous   0
 __irq_handler cur_el_sp0
 vector_entry __interrupt_cur_el_sp0_fiq           2

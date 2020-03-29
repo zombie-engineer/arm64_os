@@ -39,4 +39,4 @@ SECTIONS
   . = ALIGN(16384);
   __mmu_table_base = .;
 }
-__bss_size = (__bss_end - __bss_start)>>3;
+__bss_size = __bss_end - __bss_start;

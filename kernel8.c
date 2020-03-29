@@ -230,8 +230,43 @@ void print_arm_features()
 static int current_pin1;
 static int current_pin2;
 static int cont;
+
+typedef struct print_cpuctx_ctx {
+  int nr;
+} print_cpuctx_ctx_t;
+
+static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
+{
+  print_cpuctx_ctx_t *print_ctx = (print_cpuctx_ctx_t *)cb_priv;
+  if (print_ctx->nr) {
+    if (print_ctx->nr % 4 == 0) {
+      uart_putc('\n');
+      uart_putc('\r');
+    } else {
+      uart_putc(',');
+      uart_putc(' ');
+    }
+  }
+  uart_puts(reg_str);
+  print_ctx->nr++;
+  return 0;
+}
+
+extern void *__current_cpuctx;
 void gpio_handle_irq()
 {
+  uint64_t elr;
+  asm volatile ("mrs   %0, elr_el1": "=r"(elr));
+  print_cpuctx_ctx_t print_ctx = { 0 };
+  printf("basic: %08x, gpu1: %08x, gpu2: %08x, elr: %016llx\n",
+      read_reg(0x3f00b200), 
+      read_reg(0x3f00b204), 
+      read_reg(0x3f00b208), elr);
+
+  printf("__current_cpuctx at %016llx pointing at %016llx\n" , &__current_cpuctx, __current_cpuctx);
+
+  cpuctx_print_regs(__current_cpuctx, print_reg_cb, &print_ctx);
+
   if (gpio_pin_status_triggered(current_pin1)) {
     gpio_pin_status_clear(current_pin1);
     if (gpio_is_set(current_pin1))
@@ -247,6 +282,65 @@ void gpio_handle_irq()
       putc('-');
   }
   putc('\n');
+}
+
+static int sda_pin = 0;
+static int scl_pin = 0;
+
+void gpio_handle_i2c_irq()
+{
+  printf("basic: %08x, gpu1: %08x, gpu2: %08x\n",
+      read_reg(0x3f00b200), 
+      read_reg(0x3f00b204), 
+      read_reg(0x3f00b208));
+  if (gpio_pin_status_triggered(sda_pin)) {
+    gpio_pin_status_clear(sda_pin);
+    puts(gpio_is_set(sda_pin) ? "SDAh" : "SDAl");
+  }
+  if (gpio_pin_status_triggered(scl_pin)) {
+    gpio_pin_status_clear(scl_pin);
+    puts(gpio_is_set(scl_pin) ? "SCLh" : "SCLl");
+  }
+  putc('\n');
+}
+
+void gpio_i2c_test(int scl, int sda, int poll)
+{
+  int poll_counter = 0;
+  printf("gpio_i2c_test: scl:%d, sda:%d, poll:%d\n",
+      scl, sda, poll);
+  scl_pin = scl;
+  sda_pin = sda;
+
+  gpio_set_function(scl_pin, GPIO_FUNC_IN);
+  gpio_set_function(sda_pin, GPIO_FUNC_IN);
+  if (poll) {
+    while(1) {
+      putc(gpio_is_set(scl_pin) ? 'C' : '-');
+      putc(gpio_is_set(sda_pin) ? 'D' : '-');
+      poll_counter++;
+      if (!(poll_counter % 32))
+        puts("\r\n");
+    }
+  }
+
+  gpio_set_detect_rising_edge(sda_pin);
+  gpio_set_detect_rising_edge(scl_pin);
+
+  gpio_set_detect_falling_edge(sda_pin);
+  gpio_set_detect_falling_edge(scl_pin);
+
+  intr_ctl_enable_gpio_irq(sda_pin);
+  intr_ctl_enable_gpio_irq(scl_pin);
+
+  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_i2c_irq);
+  enable_irq();
+  
+  do {
+//    intr_ctl_dump_regs("waiting...\r\n");
+    wait_msec(1000);
+    blink_led(2, 200);
+  } while(1);
 }
 
 /*
@@ -265,13 +359,17 @@ void gpio_irq_test(int pin1, int pin2, int poll)
   gpio_set_function(pin2, GPIO_FUNC_IN);
   if (poll) {
     while(1) {
-      if (gpio_is_set(pin1)) {
-        printf("-");
-      }
+      if (gpio_is_set(pin1))
+        putc('1');
+      else
+        putc('-');
+      if (gpio_is_set(pin2))
+        putc('2');
+      else
+        putc('-');
     }
   }
 
-  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
   gpio_set_detect_rising_edge(pin1);
   gpio_set_detect_rising_edge(pin2);
 
@@ -281,11 +379,15 @@ void gpio_irq_test(int pin1, int pin2, int poll)
   intr_ctl_enable_gpio_irq(pin1);
   intr_ctl_enable_gpio_irq(pin2);
 
+  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
+  // set_irq_cb(gpio_handle_irq);
+  // intr_ctl_enable_gpio_irq(pin1);
   enable_irq();
   
   do {
-    intr_ctl_dump_regs("waiting...\r\n");
+   // intr_ctl_dump_regs("waiting...\r\n");
     wait_msec(1000);
+    asm volatile ("svc 0x1001\n");
     blink_led(2, 200);
   } while(1);
 }
@@ -699,14 +801,12 @@ static inline void interrupts_init()
   set_irq_cb(intr_ctl_handle_irq);
 }
 
-extern void __irq_handler_test();
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
   int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end 
       - &_binary_firmware_atmega8a_atmega8a_bin_start;
 
-  // __irq_handler_test();
   debug_init();
   gpio_set_init();
   init_unhandled_exception_reporters();
@@ -718,9 +818,11 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  irq_init();
-  gpio_irq_test(20, 21, 0 /* no poll, use interrupts */);
+  // irq_init(0 /*loglevel*/);
+  // add_unhandled_exception_hook(report_unhandled_exception);
+  gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   while(1);
+  // gpio_i2c_test(16, 21, 0);
 
   // wait_gpio();
   // i2c_init();
@@ -741,9 +843,9 @@ void main()
 //#endif
   
   print_mbox_props();
-  nokia5110_draw_text("Start MMU", 0, 0);
+  // nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
-  nokia5110_draw_text("MMU OK!", 0, 0);
+  // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
   
   print_cpu_info();
@@ -751,7 +853,10 @@ void main()
   systimer_init();
 
   add_unhandled_exception_hook(report_unhandled_exception);
-  interrupts_init();
+  // interrupts_init();
+
+  gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
+  while(1);
   scheduler_init();
   while(1);
 
