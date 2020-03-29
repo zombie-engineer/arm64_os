@@ -1,0 +1,4 @@
+
+https://courses.cs.washington.edu/courses/cse469/18wi/Materials/arm64.pdf
+https://static.docs.arm.com/ddi0596/a/DDI_0596_ARM_a64_instruction_set_architecture.pdf
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
