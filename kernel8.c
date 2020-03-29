@@ -380,14 +380,12 @@ void gpio_irq_test(int pin1, int pin2, int poll)
   intr_ctl_enable_gpio_irq(pin2);
 
   irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
-  // set_irq_cb(gpio_handle_irq);
-  // intr_ctl_enable_gpio_irq(pin1);
   enable_irq();
   
   do {
    // intr_ctl_dump_regs("waiting...\r\n");
     wait_msec(1000);
-    asm volatile ("svc 0x1001\n");
+    // asm volatile ("svc 0x1001\n");
     blink_led(2, 200);
   } while(1);
 }
@@ -796,11 +794,6 @@ void pullup_down_test()
   }
 }
 
-static inline void interrupts_init()
-{
-  set_irq_cb(intr_ctl_handle_irq);
-}
-
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
@@ -853,7 +846,6 @@ void main()
   systimer_init();
 
   add_unhandled_exception_hook(report_unhandled_exception);
-  // interrupts_init();
 
   gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   while(1);
