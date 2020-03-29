@@ -10,6 +10,6 @@ typedef struct irq_desc {
 
 void __handle_irq(int irqnr);
 
-void irq_init();
+void irq_init(int log_level);
 
 int irq_set(int irqnr, irq_func func);
