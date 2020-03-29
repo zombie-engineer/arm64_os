@@ -96,3 +96,6 @@ int gpio_set_pullupdown(uint32_t gpio_num, int pullupdown);
 void gpio_dump_select_regs(const char* tag);
 
 void gpio_power_off(void);
+
+void gpio_read_and_set_64(uint32_t *addr, uint32_t gpio_num);
+void gpio_read_and_set_3(uint32_t *addr, uint32_t gpio_num, uint32_t mode);

@@ -15,19 +15,30 @@
 
 #define GPIO_PIN_SELECT_BIT(gpio_num) ((gpio_num % 10) * 3)
 
+uint32_t __attribute__((noinline,optimize("O3"))) div_by_10(uint32_t v)
+{
+  return v / 10;
+}
+
+uint32_t __attribute__((noinline,optimize("O3"))) mul_by_10(uint32_t v)
+{
+  return v * 10;
+}
+
 int OPTIMIZED gpio_set_function(uint32_t gpio_num, int func)
 {
-  unsigned int regval, bitpos;
-  reg32_t gpio_sel_reg;
+  uint32_t regval, bitpos;
+  reg32_t gpio_sel_reg = (reg32_t)(GPIO_REG_GPFSEL0 + div_by_10(gpio_num));
   GPIO_CHECK_GPIO_NUM(gpio_num);
+  gpio_read_and_set_3(GPIO_REG_GPFSEL0, gpio_num, func);
 
-  gpio_sel_reg = GPIO_PIN_SELECT_REG(gpio_num);
-  bitpos = GPIO_PIN_SELECT_BIT(gpio_num);
-  regval = *gpio_sel_reg;
-  regval &= ~(7 << bitpos);
-  regval |= (func & 7) << bitpos;
-  *gpio_sel_reg = regval;
-
+//  // gpio_sel_reg = GPIO_PIN_SELECT_REG(gpio_num);
+//  bitpos = GPIO_PIN_SELECT_BIT(gpio_num);
+//  regval = *gpio_sel_reg;
+//  regval &= ~(7 << bitpos);
+//  regval |= (func & 7) << bitpos;
+//  *gpio_sel_reg = regval;
+//
   return 0;
 }
 
@@ -59,22 +70,30 @@ int OPTIMIZED gpio_set_detect_low(uint32_t gpio_num)
 
 int OPTIMIZED gpio_set_detect_rising_edge(uint32_t gpio_num)
 {
-  GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPREN0);
+  GPIO_CHECK_GPIO_NUM(gpio_num);
+  gpio_read_and_set_64(GPIO_REG_GPREN0, gpio_num);
+  return 0;
 }
 
 int OPTIMIZED gpio_set_detect_falling_edge(uint32_t gpio_num)
 {
-  GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPFEN0);
+  GPIO_CHECK_GPIO_NUM(gpio_num);
+  gpio_read_and_set_64(GPIO_REG_GPFEN0, gpio_num);
+  return 0;
 }
 
 int OPTIMIZED gpio_set_detect_async_rising_edge(uint32_t gpio_num)
 {
-  GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPAREN0);
+  GPIO_CHECK_GPIO_NUM(gpio_num);
+  gpio_read_and_set_64(GPIO_REG_GPAREN0, gpio_num);
+  return 0;
 }
 
 int OPTIMIZED gpio_set_detect_async_falling_edge(uint32_t gpio_num)
 {
-  GPIO_32PIN_SET_CHEKCED(gpio_num, GPIO_REG_GPAFEN0);
+  GPIO_CHECK_GPIO_NUM(gpio_num);
+  gpio_read_and_set_64(GPIO_REG_GPAFEN0, gpio_num);
+  return 0;
 }
 
 #define GPIO_REG_ADDR(reg, pin) ((reg32_t)(((const char*)reg) + pin / 32))
