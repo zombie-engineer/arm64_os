@@ -96,13 +96,12 @@ int intr_ctl_gpu_irq_disable(int irq_num)
  */
 #define IRQ_BIT_GPIO1 17
 
-
-void intr_ctl_enable_gpio_irq(int gpio_num)
+void intr_ctl_enable_gpio_irq(void)
 {
   write_reg(BCM2835_IC_ENABLE_GPU_2, 1 << IRQ_BIT_GPIO1);
 }
 
-void intr_ctl_disable_gpio_irq(int gpio_num)
+void intr_ctl_disable_gpio_irq(void)
 {
   write_reg(BCM2835_IC_DISABLE_GPU_2, 1 << IRQ_BIT_GPIO1);
 }

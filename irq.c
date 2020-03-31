@@ -8,7 +8,7 @@ static int irq_log_level = 0;
 
 void __handle_irq(int irqnr)
 {
-  // if (irq_log_level > 1)
+  if (irq_log_level > 1)
     printf("__handle_irq: %d %x\n\r", irqnr, irqnr);
 
   if (irqnr >= NUM_IRQS)

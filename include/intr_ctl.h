@@ -34,9 +34,9 @@ uint32_t intr_ctl_read_pending_gpu_1();
 
 void intr_ctl_dump_regs(const char* tag);
 
-void intr_ctl_enable_gpio_irq(int gpio_num);
+void intr_ctl_enable_gpio_irq(void);
 
-void intr_ctl_disable_gpio_irq(int gpio_num);
+void intr_ctl_disable_gpio_irq(void);
 
 int intr_ctl_arm_irq_enable(int irq_num);
 
