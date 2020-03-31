@@ -328,7 +328,6 @@ spi_dev_t *spi_get_dev(int type)
     case SPI_TYPE_SPI0:     return spi0_get_dev();
     case SPI_TYPE_SPI1:     return spi1_get_dev();
     case SPI_TYPE_SPI2:     return spi2_get_dev();
-    case SPI_TYPE_EMULATED: return spi_emulated_get_dev();
   }
 
   return 0;

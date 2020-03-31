@@ -146,7 +146,7 @@ void print_mbox_props()
 
 void wait_gpio()
 {
-  intr_ctl_enable_gpio_irq(18);
+  intr_ctl_enable_gpio_irq();
   enable_irq();
   gpio_set_function(20, GPIO_FUNC_IN);
   // gpio_set_detect_high(20);
@@ -289,24 +289,36 @@ static int scl_pin = 0;
 
 void gpio_handle_i2c_irq()
 {
-  printf("basic: %08x, gpu1: %08x, gpu2: %08x\n",
-      read_reg(0x3f00b200), 
-      read_reg(0x3f00b204), 
-      read_reg(0x3f00b208));
-  if (gpio_pin_status_triggered(sda_pin)) {
-    gpio_pin_status_clear(sda_pin);
-    puts(gpio_is_set(sda_pin) ? "SDAh" : "SDAl");
-  }
-  if (gpio_pin_status_triggered(scl_pin)) {
-    gpio_pin_status_clear(scl_pin);
-    puts(gpio_is_set(scl_pin) ? "SCLh" : "SCLl");
-  }
+  int gpio_val = read_reg(0x3f200034) & ((1<<sda_pin)|(1<<scl_pin));
+  int gpio_trig = read_reg(0x3f200040) & ((1<<sda_pin)|(1<<scl_pin));
+  int sda = (gpio_val & (1<< sda_pin)) ? 1: 0;
+  int scl = (gpio_val & (1<< scl_pin)) ? 1: 0;
+  int sda_trig = (gpio_trig & (1<< sda_pin)) ? 1: 0;
+  int scl_trig = (gpio_trig & (1<< scl_pin)) ? 1: 0;
+  write_reg(0x3f200040, (sda_trig << sda_pin)|(scl_trig << scl_pin));
+
+  printf("%08x,%08x,%08x,%08x:", gpio_val, gpio_trig,
+      read_reg(0x3f20004c),
+      read_reg(0x3f200058)
+  );
+  if (sda_trig)
+    putc(sda ? 'D' : 'd');
+  if (scl_trig)
+    putc(scl ? 'C' : 'c');
   putc('\n');
+  putc('\r');
 }
 
 void gpio_i2c_test(int scl, int sda, int poll)
 {
+  uint32_t *i2c_base = 0x3f214000;
+  uint32_t *dr  = i2c_base + 0;
+  uint32_t *rsr = i2c_base + 1;
+  uint32_t *slv = i2c_base + 2;
+  uint32_t *cr  = i2c_base + 3;
   int poll_counter = 0;
+
+  *slv = 0xcc;
   printf("gpio_i2c_test: scl:%d, sda:%d, poll:%d\n",
       scl, sda, poll);
   scl_pin = scl;
@@ -316,6 +328,8 @@ void gpio_i2c_test(int scl, int sda, int poll)
   gpio_set_function(sda_pin, GPIO_FUNC_IN);
   if (poll) {
     while(1) {
+      
+
       putc(gpio_is_set(scl_pin) ? 'C' : '-');
       putc(gpio_is_set(sda_pin) ? 'D' : '-');
       poll_counter++;
@@ -330,8 +344,7 @@ void gpio_i2c_test(int scl, int sda, int poll)
   gpio_set_detect_falling_edge(sda_pin);
   gpio_set_detect_falling_edge(scl_pin);
 
-  intr_ctl_enable_gpio_irq(sda_pin);
-  intr_ctl_enable_gpio_irq(scl_pin);
+  intr_ctl_enable_gpio_irq();
 
   irq_set(ARM_IRQ2_GPIO_1, gpio_handle_i2c_irq);
   enable_irq();
@@ -376,10 +389,8 @@ void gpio_irq_test(int pin1, int pin2, int poll)
   gpio_set_detect_falling_edge(pin1);
   gpio_set_detect_falling_edge(pin2);
 
-  intr_ctl_enable_gpio_irq(pin1);
-  intr_ctl_enable_gpio_irq(pin2);
-
   irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
+  intr_ctl_enable_gpio_irq();
   enable_irq();
   
   do {
@@ -438,8 +449,7 @@ void spi_work()
   sclk = 21;
   cs   = 20;
   mosi = 16;
-  spi_emulated_init(sclk, mosi, -1, cs, -1);
-  max7219_set_spi_dev(spi_emulated_get_dev());
+  max7219_set_spi_dev(spi_allocate_emulated(sclk, mosi, -1, cs, -1));
 
   while(1)
   {
@@ -483,13 +493,16 @@ void max7219_work()
   const int gpio_pin_cs0  = 20;
   const int gpio_pin_sclk = 16;
   const int gpio_pin_miso = -1;
+  spi_dev_t *spidev;
 
-  if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1)) != ERR_OK) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", ret);
+  spidev = spi_allocate_emulated(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
+  if (IS_ERR(spidev)) {
+    printf("Failed to initialize emulated spi. Error code: %d\n", 
+       (int)PTR_ERR(spidev));
     return;
   }
-
-  if ((ret = max7219_set_spi_dev(spi_get_dev(SPI_TYPE_EMULATED))) != ERR_OK) {
+  ret = max7219_set_spi_dev(spidev);
+  if (ret != ERR_OK) {
     printf("Failed to initialize max7219 driver. Error code: %d\n", ret);
     return;
   }
@@ -524,9 +537,9 @@ void max7219_work()
 
 void init_atmega8a()
 {
-  const int gpio_pin_sclk  = 6;
-  const int gpio_pin_mosi  = 19;
+  const int gpio_pin_mosi  = 6;
   const int gpio_pin_miso  = 13;
+  const int gpio_pin_sclk  = 19;
   const int gpio_pin_reset = 26;
 
   int ret;
@@ -537,8 +550,10 @@ void init_atmega8a()
   int eeprom_size;
   spi_dev_t *spidev;
   char lock_bits_desc[128];
-  if ((ret = spi_emulated_init(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1)) != ERR_OK) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", ret);
+  spidev = spi_allocate_emulated(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
+  if (IS_ERR(spidev)) {
+    printf("Failed to initialize emulated spi. Error code: %d\n", 
+       (int)PTR_ERR(spidev));
     return;
   }
 
@@ -794,6 +809,11 @@ void pullup_down_test()
   }
 }
 
+void i2c_test()
+{
+  
+}
+
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
@@ -802,6 +822,7 @@ void main()
 
   debug_init();
   gpio_set_init();
+  spi_emulated_init();
   init_unhandled_exception_reporters();
 
   font_init_lib();
@@ -811,11 +832,12 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  // irq_init(0 /*loglevel*/);
+  irq_init(0 /*loglevel*/);
   // add_unhandled_exception_hook(report_unhandled_exception);
-  gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
-  while(1);
-  // gpio_i2c_test(16, 21, 0);
+  i2c_test();
+  gpio_i2c_test(16, 21, 0 /* no poll */);
+  // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
+  // while(1);
 
   // wait_gpio();
   // i2c_init();
@@ -826,14 +848,14 @@ void main()
 //  } else
 //    bsc_slave_debug();
 //  while(1);
-  // init_atmega8a();
+  init_atmega8a();
  // atmega8a_program();
   // atmega8a_read_firmware();
-  // atmega8a_download(atmega8a_bin, atmega8a_bin_size);
-  // while(1);
-//#ifndef CONFIG_QEMU
-//  init_nokia5110_display(1, 0);
-//#endif
+  atmega8a_download(atmega8a_bin, atmega8a_bin_size);
+  while(1);
+#ifndef CONFIG_QEMU
+  init_nokia5110_display(1, 0);
+#endif
   
   print_mbox_props();
   // nokia5110_draw_text("Start MMU", 0, 0);

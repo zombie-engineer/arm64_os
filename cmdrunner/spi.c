@@ -4,6 +4,7 @@
 #include <spi.h>
 #include <common.h>
 
+static spi_dev_t *spi_emulated_dev = NULL;
 
 static int command_spi_print_help()
 {
@@ -67,9 +68,10 @@ static int command_spi_init_emulated(const string_tokens_t *args)
   GET_NUMERIC_PARAM(miso, int, 2, "miso");
   GET_NUMERIC_PARAM(ce0 , int, 3, "ce0");
   GET_NUMERIC_PARAM(ce1 , int, 4, "ce1");
-  st = spi_emulated_init(sclk, mosi, miso, ce0, ce1);
-  if (st) {
-    printf("spi_emulated_init failed with error %d\n", st);
+  spi_emulated_dev = spi_allocate_emulated(sclk, mosi, miso, ce0, ce1);
+  if (IS_ERR(spi_emulated_dev)) {
+    printf("spi_emulated_init failed with error %d\n", (int)PTR_ERR(spi_emulated_dev));
+    spi_emulated_dev = NULL;
     return CMD_ERR_EXECUTION_ERR;
   }
   return CMD_ERR_NO_ERROR;
@@ -101,7 +103,7 @@ static int command_spi_send(const string_tokens_t *args)
 
   printf("spi0->xmit %d bytes %02x %02x.\n", numbytes, bytes[0], bytes[1]);
 
-  st = spidev->xmit(bytes, 0, numbytes);
+  st = spidev->xmit(spidev, bytes, 0, numbytes);
   if (st) {
     printf("command_pwd_enable error: spidev xmit completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;
@@ -132,7 +134,7 @@ static int command_spi_dmasend(const string_tokens_t *args)
   GET_NUMERIC_PARAM(srclen,   int, 2, "source len");
 
   printf("spi0->xmit_dma %d bytes from %p.\n", srclen, src);
-  st = spidev->xmit_dma(src, 0, srclen);
+  st = spidev->xmit_dma(spidev, src, 0, srclen);
   if (st) {
     printf("command_pwd_enable error: spidev xmit completed with error %d\n");
     return CMD_ERR_EXECUTION_ERR;

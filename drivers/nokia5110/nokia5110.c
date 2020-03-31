@@ -69,11 +69,11 @@ static uint8_t nokia5110_canvas[NOKIA5110_CANVAS_SIZE];
 // sets DC pint to CMD, tells display that this byte is a command
 #define SET_CMD()  RET_IF_ERR(gpio_set_off, nokia5110_dev->dc)
 
-#define SPI_SEND(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit, data, 0, len)
+#define SPI_SEND(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit, nokia5110_dev->spi, data, 0, len)
 
-#define SPI_SEND_DMA(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit_dma, data, 0, len)
+#define SPI_SEND_DMA(data, len)  RET_IF_ERR(nokia5110_dev->spi->xmit_dma, nokia5110_dev->spi, data, 0, len)
 
-#define SPI_SEND_BYTE(data)  RET_IF_ERR(nokia5110_dev->spi->xmit_byte, data, 0)
+#define SPI_SEND_BYTE(data)  RET_IF_ERR(nokia5110_dev->spi->xmit_byte, nokia5110_dev->spi, data, 0)
 
 #define SEND_CMD(cmd)        SET_CMD(); SPI_SEND_BYTE((cmd));
 
@@ -83,7 +83,7 @@ int nokia5110_send_data(const void *data, size_t sz)
 {
   int ret;
   gpio_set_on(nokia5110_dev->dc);
-  ret = nokia5110_dev->spi->xmit(data, 0, sz);
+  ret = nokia5110_dev->spi->xmit(nokia5110_dev->spi, data, 0, sz);
   return ret;
 }
 
@@ -91,7 +91,7 @@ int nokia5110_send_data_dma(const void *data, size_t sz)
 {
   int ret;
   gpio_set_on(nokia5110_dev->dc);
-  ret = nokia5110_dev->spi->xmit_dma(data, 0, sz);
+  ret = nokia5110_dev->spi->xmit_dma(nokia5110_dev->spi, data, 0, sz);
   return ret;
 }
 

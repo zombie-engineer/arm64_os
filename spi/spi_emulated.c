@@ -1,12 +1,34 @@
 #include <spi.h>
 #include <gpio.h>
+#include <list.h>
 #include <gpio_set.h>
 #include <types.h>
 #include <common.h>
 #include <delays.h>
 #include <error.h>
+#include <stringlib.h>
 
-DECL_GPIO_SET_KEY(spie_gpio_set_key, "SPI_EMU_GPIO_KE");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_0, "SPI_EMU_GPIO_K0");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_1, "SPI_EMU_GPIO_K1");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_2, "SPI_EMU_GPIO_K2");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_3, "SPI_EMU_GPIO_K3");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_4, "SPI_EMU_GPIO_K4");
+DECL_GPIO_SET_KEY(spie_gpio_set_key_5, "SPI_EMU_GPIO_K5");
+
+static int init_counter = 0;
+
+static const char *spi_emulated_get_gpioset_key(void)
+{
+  switch(init_counter++) {
+    case 0: return spie_gpio_set_key_0;
+    case 1: return spie_gpio_set_key_1;
+    case 2: return spie_gpio_set_key_2;
+    case 3: return spie_gpio_set_key_3;
+    case 4: return spie_gpio_set_key_4;
+    case 5: return spie_gpio_set_key_5;
+    default: return NULL;
+  }
+}
 
 typedef struct spi_emulated_dev {
   spi_dev_t spidev;
@@ -17,11 +39,31 @@ typedef struct spi_emulated_dev {
   int ce1_gpio_pin;
   int clk_half_period;
   gpio_set_handle_t gpio_set_handle;
+  struct list_head spi_emulated_list;
 } spi_emulated_dev_t;
 
+static struct spi_emulated_dev __spi_emulated_array[4];
 
+LIST_HEAD(spi_emulated_free);
+LIST_HEAD(spi_emulated_active);
 
-static spi_emulated_dev_t spi_emulated;
+spi_emulated_dev_t *__spi_emulated_alloc()
+{
+  struct spi_emulated_dev *dev;
+  dev = list_next_entry_or_null(&spi_emulated_free,
+    struct spi_emulated_dev, spi_emulated_list);
+
+  if (dev)
+    list_move(&dev->spi_emulated_list, &spi_emulated_active);
+
+  return dev;
+}
+
+void __spi_emulated_release(struct spi_emulated_dev *dev)
+{
+  list_move(&dev->spi_emulated_list, &spi_emulated_free);  
+}
+
 static int spi_emulated_verbose_output = 0;
 static int spi_emulated_initialized = 0;
 
@@ -37,87 +79,99 @@ static int fn(__VA_ARGS__) \
 { \
   ASSERT_INITIALIZED(#fn);
 
-DECL_ASSERTED_FN(spi_emulated_ce0_set)
-  ASSERT_INITIALIZED();
-  if (spi_emulated.ce0_gpio_pin != -1) {
-    gpio_set_on(spi_emulated.ce0_gpio_pin);
-    putc('+');
-  }
+static inline int spi_emulated_ce0_set(struct spi_emulated_dev *d)
+{
+  if (d->ce0_gpio_pin != -1)
+    gpio_set_on(d->ce0_gpio_pin);
   return ERR_OK;
 }
 
-DECL_ASSERTED_FN(spi_emulated_ce0_clear)
-  if (spi_emulated.ce0_gpio_pin != -1) {
-    gpio_set_off(spi_emulated.ce0_gpio_pin);
-    putc('-');
-  }
+static inline int spi_emulated_ce0_clear(struct spi_emulated_dev *d)
+{
+  if (d->ce0_gpio_pin != -1)
+    gpio_set_off(d->ce0_gpio_pin);
   return ERR_OK;
 }
 
-#define PULSE_SCLK() \
-  gpio_set_on(spi_emulated.sclk_gpio_pin);              \
-  wait_usec(spi_emulated.clk_half_period);              \
-  if (spi_emulated.miso_gpio_pin != -1)                 \
-    *bit_out = gpio_is_set(spi_emulated.miso_gpio_pin); \
-  gpio_set_off(spi_emulated.sclk_gpio_pin);             \
-  wait_usec(spi_emulated.clk_half_period);
+#define PULSE_SCLK(d) \
+  gpio_set_on(d->sclk_gpio_pin);              \
+  wait_usec(d->clk_half_period);              \
+  if (d->miso_gpio_pin != -1)                 \
+    *bit_out = gpio_is_set(d->miso_gpio_pin); \
+  gpio_set_off(d->sclk_gpio_pin);             \
+  wait_usec(d->clk_half_period);
 
-DECL_ASSERTED_FN(spi_emulated_xmit_bit, uint8_t bit_in, uint8_t *bit_out)
+static int spi_emulated_xmit_bit(spi_dev_t *spidev, 
+    uint8_t bit_in, uint8_t *bit_out)
+{
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
+
   if (spi_emulated_verbose_output)
     printf("%d-", bit_in);
 
-  if (spi_emulated.mosi_gpio_pin != -1) {
+  if (d->mosi_gpio_pin != -1) {
     if (bit_in) {
-      gpio_set_on(spi_emulated.mosi_gpio_pin);
+      gpio_set_on(d->mosi_gpio_pin);
       if (spi_emulated_verbose_output)
         putc('1');
     } else {
-      gpio_set_off(spi_emulated.mosi_gpio_pin);
+      gpio_set_off(d->mosi_gpio_pin);
       if (spi_emulated_verbose_output)
         putc('0');
     }
   }
-  PULSE_SCLK();
+  PULSE_SCLK(d);
   return ERR_OK;
 }
 
 
-DECL_ASSERTED_FN(spi_emulated_xmit_dma, const void *data_out, void *data_in, uint32_t len)
+static int spi_emulated_xmit_dma(spi_dev_t *spidev, const void *data_out, void *data_in, uint32_t len)
+{
   return ERR_OK;
 }
 
 
-DECL_ASSERTED_FN(spi_emulated_xmit_byte, char byte_in, char *byte_out)
+static int spi_emulated_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_out)
+{
   int i, err;
   char out;
+
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
 
   if (spi_emulated_verbose_output)
     printf("spi_emulated_xmit_byte: 0x%02x\n", byte_in);
 
-  spi_emulated_ce0_clear();
+  spi_emulated_ce0_clear(d);
 
   out = 0;
   for (i = 0; i < 8; ++i) {
     uint8_t c;
-    RET_IF_ERR(spi_emulated_xmit_bit, (byte_in >> (7 - i)) & 1, &c);
+    err = spi_emulated_xmit_bit(&d->spidev, (byte_in >> (7 - i)) & 1, &c);
+    if (err)
+      return err;
     out = (out << 1) | c;
   }
 
-  spi_emulated_ce0_set();
+  spi_emulated_ce0_set(d);
   if (byte_out)
     *byte_out = out;
 
   return ERR_OK;
 }
 
-DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint32_t len)
+static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *bytes_out, uint32_t len)
+{
   int i, j, st;
   char out;
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
 
   if (spi_emulated_verbose_output)
     printf("spi_emulated_xmit: %02x, %02x\n", bytes_in[0], bytes_in[1]);
 
-  spi_emulated_ce0_clear();
+  spi_emulated_ce0_clear(d);
 
   for (j = 0; j < len; ++j) {
 
@@ -126,7 +180,8 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
 
     for (i = 0; i < 8; ++i) {
       uint8_t c;
-      if ((st = spi_emulated_xmit_bit((bytes_in[j] >> (7 - i)) & 1, &c))) {
+      st = spi_emulated_xmit_bit(&d->spidev, (bytes_in[j] >> (7 - i)) & 1, &c);
+      if (st) {
         printf("spidev->push_bit error: %d\n", st);
         return st;
       }
@@ -140,23 +195,31 @@ DECL_ASSERTED_FN(spi_emulated_xmit, const char* bytes_in, char *bytes_out, uint3
     if (bytes_out)
       *bytes_out++ = out;
   }
-  spi_emulated_ce0_set();
+  spi_emulated_ce0_set(d);
   if (spi_emulated_verbose_output)
     puts("\r\n");
   return ERR_OK;
 }
 
-
-int spi_emulated_init(
+spi_dev_t *spi_allocate_emulated(
   int sclk_pin, 
   int mosi_pin, 
   int miso_pin, 
   int ce0_pin,
   int ce1_pin)
 {
+  int err;
+  struct spi_emulated_dev *spidev = NULL;
   int pins[5];
   int numpins = 0;
+  const char *gpioset_key = NULL;
   gpio_set_handle_t gpio_set_handle;
+  spidev = __spi_emulated_alloc();
+
+  if (!spidev) {
+    printf("spi_emulated_init: no avaliable spi emulated slots.\n");
+    return ERR_PTR(ERR_NO_RESOURCE);
+  }
 
   if (spi_emulated_verbose_output) {
     printf("spi_emulated_init: sclk: %d, mosi: %d, miso: %d, ce0: %d, ce1: %d\n",
@@ -173,11 +236,24 @@ int spi_emulated_init(
   if (ce1_pin != -1)
     pins[numpins++] = ce1_pin;
 
-  gpio_set_handle = gpio_set_request_n_pins(pins, numpins, spie_gpio_set_key);
+  gpioset_key = spi_emulated_get_gpioset_key();
+  if (!gpioset_key) {
+    printf("spi_emulated_init: out of gpioset keys.\n");
+    err = ERR_NO_RESOURCE;
+    goto error;
+  }
 
-  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE)
-    return ERR_BUSY;
-  
+  gpio_set_handle = gpio_set_request_n_pins(pins, numpins, gpioset_key);
+
+  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
+    err = ERR_BUSY;
+    goto error;
+  }
+
+  printf("created emulated spi device:%p,SCLK:%d,MOSI:%d,MISO:%d,CE0:%d,CE1:%d,key:%s\n", 
+      spidev, sclk_pin, mosi_pin,
+      miso_pin, ce0_pin, ce1_pin, gpioset_key);
+
   gpio_set_function(sclk_pin, GPIO_FUNC_OUT);
 
   if (mosi_pin != -1)
@@ -198,25 +274,35 @@ int spi_emulated_init(
   gpio_set_off(sclk_pin);
   gpio_set_off(mosi_pin);
 
-  spi_emulated.spidev.xmit      = spi_emulated_xmit;
-  spi_emulated.spidev.xmit_byte = spi_emulated_xmit_byte;
-  spi_emulated.spidev.xmit_dma  = spi_emulated_xmit_dma;
+  spidev->spidev.xmit      = spi_emulated_xmit;
+  spidev->spidev.xmit_byte = spi_emulated_xmit_byte;
+  spidev->spidev.xmit_dma  = spi_emulated_xmit_dma;
 
-  spi_emulated.sclk_gpio_pin = sclk_pin;
-  spi_emulated.mosi_gpio_pin = mosi_pin;
-  spi_emulated.miso_gpio_pin = miso_pin;
-  spi_emulated.ce0_gpio_pin = ce0_pin;
-  spi_emulated.ce1_gpio_pin = ce1_pin;
-  spi_emulated.gpio_set_handle = gpio_set_handle;
-  spi_emulated.clk_half_period = 50;
+  spidev->sclk_gpio_pin = sclk_pin;
+  spidev->mosi_gpio_pin = mosi_pin;
+  spidev->miso_gpio_pin = miso_pin;
+  spidev->ce0_gpio_pin = ce0_pin;
+  spidev->ce1_gpio_pin = ce1_pin;
+  spidev->gpio_set_handle = gpio_set_handle;
+  spidev->clk_half_period = 50;
+  return &spidev->spidev;
 
-  spi_emulated_initialized = 1;
-  return SPI_ERR_OK;
+error:
+  if (spidev)
+    __spi_emulated_release(spidev);
+  return ERR_PTR(err);
 }
 
-spi_dev_t *spi_emulated_get_dev()
+void spi_emulated_init()
 {
-  return &spi_emulated.spidev;
+  int i;
+  init_counter = 0;
+  memset(__spi_emulated_array, 0, sizeof(__spi_emulated_array));
+  for (i = 0; i < ARRAY_SIZE(__spi_emulated_array); ++i) {
+    struct spi_emulated_dev *d = &__spi_emulated_array[i];
+    list_add(&d->spi_emulated_list, &spi_emulated_free);
+  }
+  spi_emulated_initialized = 1;
 }
 
 void spi_emulated_print_info()

@@ -38,25 +38,24 @@
 #define SPI_TYPE_UNKNOWN   0xff
 
 typedef struct spi_dev {
-  int (*xmit)(const char* bytes_in, char *bytes_out, uint32_t len);
-  int (*xmit_byte)(char byte_in, char *byte_out);
-  int (*xmit_dma)(const void *data_out, void *data_in, uint32_t len);
+  int (*xmit)(struct spi_dev *d, const char* bytes_in, char *bytes_out, uint32_t len);
+  int (*xmit_byte)(struct spi_dev *d, char byte_in, char *byte_out);
+  int (*xmit_dma)(struct spi_dev *d, const void *data_out, void *data_in, uint32_t len);
 } spi_dev_t;
 
 int spi0_init();
 
-int spi_emulated_init(
+spi_dev_t *spi_allocate_emulated(
   int sclk_pin, 
   int mosi_pin, 
   int miso_pin, 
   int ce0_pin,
   int ce1_pin);
 
+void spi_emulated_init(void);
 
 void spi_emulated_print_info();
 
-spi_dev_t *spi_emulated_get_dev();
+int spi_type_from_string(const char *string, int len);
 
 spi_dev_t *spi_get_dev(int type);
-
-int spi_type_from_string(const char *string, int len);

@@ -104,7 +104,7 @@ int atmega8a_cmd(spi_dev_t *spidev, const char *cmd, char *res)
 {
   int ret;
 
-  ret = spidev->xmit(cmd, res, 4);
+  ret = spidev->xmit(spidev, cmd, res, 4);
   if (ret != ERR_OK) {
     atlog("spidev->xmit failed: %d", ret);
     return ret;
