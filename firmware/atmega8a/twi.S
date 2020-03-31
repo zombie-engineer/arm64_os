@@ -105,9 +105,20 @@ brne TWI_ERROR
 
 .globl twi_master_start
 twi_master_start:
-ldi   r16, (1<<TWCR_TWINT) | (1<<TWCR_TWSTA) | (1<<TWCR_TWEN)
-out   TWCR, r16
-ret
+  ldi   r16, (1<<TWCR_TWINT) | (1<<TWCR_TWSTA) | (1<<TWCR_TWEN)
+  out   TWCR, r16
+1:
+  in    r16, TWCR
+  sbrs  r16, TWCR_TWINT
+  rjmp  1b
+  ret
+
+.globl twi_get_status
+twi_get_status:
+  in    r24, TWSR
+  andi  r24, 0xf8
+  ret
+
 
 .globl twi_master_send
 ; r16 - byte to send

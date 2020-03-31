@@ -41,8 +41,6 @@ void __attribute__((optimize("O2"))) blink()
     *blinker = 1;
     PIN_OFF(B, 0);
   }
-//  delay_cycles_16(1000);
-//  delay_cycles_16(1000);
 }
 
 #define MSEC_PER_SEC 1000
@@ -76,24 +74,34 @@ void wait_1_msec()
   countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
 }
 
+int __attribute__((noinline)) get_int(int x)
+{
+  return x+2;
+}
+
 void main() 
 {
+  char status;
   *(char*)0x100 = 0;
   PIN_MODE_OUT(B, 0);
   PIN_MODE_OUT(C, 5);
+  PIN_MODE_OUT(D, 7);
   PIN_OFF(C, 5);
+  PIN_ON(D, 7);
   while(1) {
     PIN_ON(B, 0);
     twi_master_init();
     wait_3_sec();
     twi_master_start();
+    status = twi_get_status();
+    if (status != 8) {
+      PIN_OFF(D, 7);
+      while(1);
+    }
     wait_3_sec();
-    // twi_master_start();
-    // countdown_32(ARG_SPLIT_32(200000));
     PIN_OFF(B, 0);
     twi_master_deinit();
     wait_3_sec();
-    // wait_1_sec();
   }
 }
 
