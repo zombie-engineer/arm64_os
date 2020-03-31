@@ -103,7 +103,7 @@ out:
 
 task_t *scheduler_pick_next_task(task_t *ct)
 {
-  return ct->run_queue.next;
+  return container_of(ct->run_queue.next, task_t, run_queue);
 }
 
 static int sched_num_switches = 0;
