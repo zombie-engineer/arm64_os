@@ -3,6 +3,7 @@
 #include <kernel_panic.h>
 #include <cpu.h>
 #include <spinlock.h>
+#include <defs.h>
 
 #define min(a, b) (a < b ? a : b)
 

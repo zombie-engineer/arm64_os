@@ -5,7 +5,7 @@
 typedef int (*task_fn)(void);
 
 typedef struct task {
-  list_t run_queue;
+  struct list_head run_queue;
   char name[64];
   char cpuctx[8 * 40];
   task_fn fn;
