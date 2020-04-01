@@ -61,14 +61,23 @@ char * _strcpy(char *dst, const char *src)
   char *res = dst;
   while(*src)
     *dst++ = *src++;
+  *dst = 0;
   return res;
 }
 
 char * _strncpy(char *dst, const char *src, size_t n)
 {
   char *res = dst;
-  while(*src && n--)
-    *dst++ = *src++;
+  char tmp;
+  while(n) {
+    tmp = *src++; 
+    *dst++ = tmp;
+    n--;
+    if (!tmp)
+      break;
+  }
+  while(n--)
+    *dst++ = 0;
   return res;
 }
 
