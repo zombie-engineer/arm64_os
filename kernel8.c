@@ -309,6 +309,7 @@ void gpio_handle_i2c_irq()
   putc('\r');
 }
 
+DECL_GPIO_SET_KEY(gpio_i2c_test_gpiokey, "I2CTESTGPIO_KE0");
 void gpio_i2c_test(int scl, int sda, int poll)
 {
   uint32_t *i2c_base = 0x3f214000;
@@ -317,6 +318,15 @@ void gpio_i2c_test(int scl, int sda, int poll)
   uint32_t *slv = i2c_base + 2;
   uint32_t *cr  = i2c_base + 3;
   int poll_counter = 0;
+
+  int pins[2] = { scl, sda };
+  gpio_set_handle_t gpio_set_handle;
+  gpio_set_handle = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), gpio_i2c_test_gpiokey);
+
+  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
+    puts("Failed to request gpio pins for SDA,SCL pins.\n");
+    while(1);
+  }
 
   *slv = 0xcc;
   printf("gpio_i2c_test: scl:%d, sda:%d, poll:%d\n",
@@ -821,11 +831,6 @@ void pullup_down_test()
   }
 }
 
-void i2c_test()
-{
-  
-}
-
 void main()
 {
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
@@ -844,7 +849,6 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  printf("hello\n");
   irq_init(0 /*loglevel*/);
   init_atmega8a();
 #ifndef CONFIG_QEMU
@@ -852,9 +856,8 @@ void main()
   nokia5110_draw_text("Display ready", 0, 0);
 #endif
   add_unhandled_exception_hook(report_unhandled_exception);
+  gpio_i2c_test(8, 25, 0 /* no poll */);
   while(1);
-  i2c_test();
-  gpio_i2c_test(16, 21, 0 /* no poll */);
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);
 

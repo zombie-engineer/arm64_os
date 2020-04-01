@@ -2,6 +2,7 @@
 #include <common.h>
 #include <delays.h>
 #include <gpio.h>
+#include <gpio_set.h>
 #include <stringlib.h>
 #include <font.h>
 #include <spinlock.h>
@@ -41,11 +42,13 @@
 #define NOKIA5110_CANVAS_SET(c, v) \
   NOKIA5110_CANVAS_SET_XY(c, c->cursor_x, c->cursor_y, v)
 
+DECL_GPIO_SET_KEY(nokia5110_gpio_set_key, "NOKIA5110_GPIO0");
 
 typedef struct nokia5110_dev {
   spi_dev_t *spi;
   uint32_t dc;
   uint32_t rst;
+  gpio_set_handle_t gpioset;
 } nokia5110_dev_t;
 
 typedef struct nokia5110_canvas_control {
@@ -118,12 +121,23 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   if (!spidev)
     return ERR_INVAL_ARG;
 
+  int pins[2] = { rst_pin, dc_pin };
+
+  gpio_set_handle_t gpio_set_handle;
+  gpio_set_handle = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), nokia5110_gpio_set_key);
+
+  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
+    puts("Failed to request gpio pins for RST,DC pins.\n");
+    return ERR_BUSY;
+  }
+
   RET_IF_ERR(gpio_set_function, rst_pin, GPIO_FUNC_OUT);
   RET_IF_ERR(gpio_set_function, dc_pin, GPIO_FUNC_OUT);
 
   nokia5110_device.spi = spidev;
   nokia5110_device.dc = dc_pin;
   nokia5110_device.rst = rst_pin;
+  nokia5110_device.gpioset = gpio_set_handle;
   nokia5110_dev = &nokia5110_device;
 
   RET_IF_ERR(gpio_set_on, nokia5110_device.rst);
