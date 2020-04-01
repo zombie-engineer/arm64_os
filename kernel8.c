@@ -406,12 +406,24 @@ void init_nokia5110_display(int report_exceptions, int run_test)
 {
   spi_dev_t *spidev;
   const font_desc_t *font;
-  spi0_init();
-  spidev = spi_get_dev(SPI_TYPE_SPI0);
+  const int gpio_pin_mosi  = 12;
+  const int gpio_pin_sclk  = 7;
+  const int gpio_pin_dc    = 16;
+  const int gpio_pin_ce    = 20;
+  const int gpio_pin_reset = 21;
+
+  spidev = spi_allocate_emulated(
+      "spi_nokia5110",
+      gpio_pin_sclk, 
+      gpio_pin_mosi, 
+      -1, 
+      gpio_pin_ce, 
+      -1
+  );
 
   font_get_font("myfont", &font);
 
-  nokia5110_init(spidev, 23, 18, 1, 1);
+  nokia5110_init(spidev, gpio_pin_reset, gpio_pin_dc, 1, 1);
   nokia5110_set_font(font);
   if (nokia5110_console_init())
     uart_puts("Failed to init nokia5110 console device.\n");
@@ -449,7 +461,7 @@ void spi_work()
   sclk = 21;
   cs   = 20;
   mosi = 16;
-  max7219_set_spi_dev(spi_allocate_emulated(sclk, mosi, -1, cs, -1));
+  max7219_set_spi_dev(spi_allocate_emulated("spi_test", sclk, mosi, -1, cs, -1));
 
   while(1)
   {
@@ -495,7 +507,7 @@ void max7219_work()
   const int gpio_pin_miso = -1;
   spi_dev_t *spidev;
 
-  spidev = spi_allocate_emulated(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
+  spidev = spi_allocate_emulated("spi_max7219", gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
   if (IS_ERR(spidev)) {
     printf("Failed to initialize emulated spi. Error code: %d\n", 
        (int)PTR_ERR(spidev));
@@ -550,14 +562,14 @@ void init_atmega8a()
   int eeprom_size;
   spi_dev_t *spidev;
   char lock_bits_desc[128];
-  spidev = spi_allocate_emulated(gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
+  spidev = spi_allocate_emulated("spi_avr_isp", 
+      gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
   if (IS_ERR(spidev)) {
     printf("Failed to initialize emulated spi. Error code: %d\n", 
        (int)PTR_ERR(spidev));
     return;
   }
 
-  spidev = spi_get_dev(SPI_TYPE_EMULATED);
   ret = atmega8a_init(spidev, gpio_pin_reset);
 
   if (ret != ERR_OK)
@@ -832,8 +844,15 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  printf("hello\n");
   irq_init(0 /*loglevel*/);
-  // add_unhandled_exception_hook(report_unhandled_exception);
+  init_atmega8a();
+#ifndef CONFIG_QEMU
+  init_nokia5110_display(1, 0);
+  nokia5110_draw_text("Display ready", 0, 0);
+#endif
+  add_unhandled_exception_hook(report_unhandled_exception);
+  while(1);
   i2c_test();
   gpio_i2c_test(16, 21, 0 /* no poll */);
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
@@ -848,17 +867,12 @@ void main()
 //  } else
 //    bsc_slave_debug();
 //  while(1);
-  init_atmega8a();
- // atmega8a_program();
+  // atmega8a_program();
   // atmega8a_read_firmware();
   atmega8a_download(atmega8a_bin, atmega8a_bin_size);
   while(1);
-#ifndef CONFIG_QEMU
-  init_nokia5110_display(1, 0);
-#endif
   
   print_mbox_props();
-  // nokia5110_draw_text("Start MMU", 0, 0);
   mmu_init();
   // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;

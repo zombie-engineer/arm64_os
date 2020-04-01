@@ -37,15 +37,18 @@
 // for error signalling
 #define SPI_TYPE_UNKNOWN   0xff
 
+#define SPIDEV_MAXNAMELEN 15
 typedef struct spi_dev {
   int (*xmit)(struct spi_dev *d, const char* bytes_in, char *bytes_out, uint32_t len);
   int (*xmit_byte)(struct spi_dev *d, char byte_in, char *byte_out);
   int (*xmit_dma)(struct spi_dev *d, const void *data_out, void *data_in, uint32_t len);
+  char name[SPIDEV_MAXNAMELEN + 1];
 } spi_dev_t;
 
 int spi0_init();
 
 spi_dev_t *spi_allocate_emulated(
+  const char *name,
   int sclk_pin, 
   int mosi_pin, 
   int miso_pin, 

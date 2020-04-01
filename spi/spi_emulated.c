@@ -202,6 +202,7 @@ static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *byte
 }
 
 spi_dev_t *spi_allocate_emulated(
+  const char *name,
   int sclk_pin, 
   int mosi_pin, 
   int miso_pin, 
@@ -250,10 +251,6 @@ spi_dev_t *spi_allocate_emulated(
     goto error;
   }
 
-  printf("created emulated spi device:%p,SCLK:%d,MOSI:%d,MISO:%d,CE0:%d,CE1:%d,key:%s\n", 
-      spidev, sclk_pin, mosi_pin,
-      miso_pin, ce0_pin, ce1_pin, gpioset_key);
-
   gpio_set_function(sclk_pin, GPIO_FUNC_OUT);
 
   if (mosi_pin != -1)
@@ -277,6 +274,8 @@ spi_dev_t *spi_allocate_emulated(
   spidev->spidev.xmit      = spi_emulated_xmit;
   spidev->spidev.xmit_byte = spi_emulated_xmit_byte;
   spidev->spidev.xmit_dma  = spi_emulated_xmit_dma;
+  strncpy(spidev->spidev.name, name, SPIDEV_MAXNAMELEN);
+  spidev->spidev.name[SPIDEV_MAXNAMELEN] = 0;
 
   spidev->sclk_gpio_pin = sclk_pin;
   spidev->mosi_gpio_pin = mosi_pin;
@@ -285,6 +284,13 @@ spi_dev_t *spi_allocate_emulated(
   spidev->ce1_gpio_pin = ce1_pin;
   spidev->gpio_set_handle = gpio_set_handle;
   spidev->clk_half_period = 50;
+
+  printf("SPIemu: allocated at %p with name: '%s'\n"
+         "SPIemu: SCLK:%d,MOSI:%d,MISO:%d,CE0:%d,CE1:%d\n"
+         "SPIemu: key:%s\n", 
+      spidev, spidev->spidev.name, sclk_pin, mosi_pin,
+      miso_pin, ce0_pin, ce1_pin, gpioset_key);
+
   return &spidev->spidev;
 
 error:

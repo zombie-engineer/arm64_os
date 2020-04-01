@@ -141,7 +141,7 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
   nokia5110_font = 0;
   spinlock_init(&nokia5110_lock);
 
-  puts("nokia5110 init is complete\n");
+  puts("NOKIA5110: init is complete\n");
   return ERR_OK;
 }
 
@@ -184,8 +184,7 @@ CHECKED_FUNC(nokia5110_set_bias, int bias)
 CHECKED_FUNC(nokia5110_reset)
   int err;
   RET_IF_ERR(gpio_set_off, nokia5110_dev->rst);
-  puts("R\r\n");
-  wait_usec(1000);
+  wait_usec(200);
   RET_IF_ERR(gpio_set_on, nokia5110_dev->rst);
   return ERR_OK;
 }
