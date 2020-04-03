@@ -59,4 +59,3 @@ int _isdigit(char c);
 #define SKIP_WHITESPACES(ptr) for (;*ptr && _isspace(*ptr);++ptr)
 #define SKIP_WHITESPACES_BOUND(ptr, end) for (;ptr < end && *ptr && _isspace(*ptr);++ptr)
 #define SKIP_NONWHITESPACES_BOUND(ptr, end) for (;ptr < end && *ptr && !_isspace(*ptr); ++ptr)
-
