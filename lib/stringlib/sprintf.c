@@ -723,14 +723,14 @@ int /*optimized*/ __vsnprintf(char *dst, size_t dst_len, const char *fmt, __buil
   return c->dst_virt - dst;
 }
 
-int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list args)
+int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list *args)
 {
-  return __vsnprintf(dst, dst_len, fmt, &args);
+  return __vsnprintf(dst, dst_len, fmt, args);
 }
 
-int /*optimized*/ _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
+int /*optimized*/ _vsprintf(char *dst, const char *fmt, __builtin_va_list *args)
 {
-  return __vsnprintf(dst, 4096, fmt, &args);
+  return __vsnprintf(dst, 4096, fmt, args);
 }
 
 int _sprintf(char *dst, const char *fmt, ...)

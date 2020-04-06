@@ -42,9 +42,9 @@ void * _memcpy(void *dst, const void *src, size_t n);
 
 long long int _strtoll(const char *str, char **endptr, int basis);
 
-int _vsprintf(char *dst, const char *fmt, __builtin_va_list args);
+int _vsprintf(char *dst, const char *fmt, __builtin_va_list *args);
 
-int _vsnprintf(char *dst, size_t n, const char *fmt, __builtin_va_list args);
+int _vsnprintf(char *dst, size_t n, const char *fmt, __builtin_va_list *args);
 
 int _sprintf(char *dst, const char *fmt, ...);
 
