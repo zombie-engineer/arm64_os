@@ -16,16 +16,18 @@
 #define DIV_LLD(a, b) (LLD(a) / LLD(b))
 #define DIV_LLU(a, b) (LLU(a) / LLU(b))
 
-#define SIZE_no  0
-#define SIZE_l   1
-#define SIZE_hh  2
-#define SIZE_h   3
-#define SIZE_ll  4
-#define SIZE_j   5
-#define SIZE_z   6
-#define SIZE_t   7
-#define SIZE_L   8
-
+enum {
+  FMT_SIZE_NO      = 0x00,
+  FMT_SIZE_LONG    = 0x01,
+  FMT_SIZE_LLONG   = 0x02,
+  FMT_SIZE_INTMAX  = 0x04,
+  FMT_SIZE_SIZE_T  = 0x08,
+  FMT_SIZE_T       = 0x10,
+  FMT_SIZE_INT64   = 0x20,
+  FMT_SIZE_HALF    = 0x40,
+  FMT_SIZE_HHALF   = 0x80,
+  FMT_SIZE_PTRDIFF = 0x100
+};
 
 struct printf_ctx {
   const char *fmt;
@@ -44,22 +46,6 @@ struct printf_ctx {
 
   unsigned long long arg;
 };
-
-static inline void fmt_appendc(struct printf_ctx *c, char ch)
-{
-  if (c->dst < c->dst_end)
-    *c->dst++ = ch;
-  c->dst_virt++;
-}
-
-static inline void fmt_appends(struct printf_ctx *c, const char *str)
-{
-  char ch = *str++;
-  while(ch) {
-    fmt_appendc(c, ch);
-    ch = *str++;
-  }
-}
 
 
 static inline char to_char_16(int i, int uppercase) {
@@ -80,11 +66,38 @@ static inline char to_char_8_10(int i, int base) {
 #include <string.h>
 #endif
 
-#define MEMSET(val, len) \
+#define DST_FREE_BYTES() (c->dst_end - c->dst)
+
+#define DST_APPEND_C(ch)\
+  do {\
+    if (c->dst < c->dst_end)\
+      *c->dst++ = ch;\
+    c->dst_virt++;\
+  } while(0)
+
+#define DST_APPEND_S(s)\
+  do {\
+    const char *__s = s;\
+    char ch = *__s++;\
+    while(ch) {\
+      DST_APPEND_C(ch);\
+      ch = *__s++;\
+    }\
+  } while(0)
+
+#define DST_MEMCPY(src, len) \
   {\
-    int memset_len = min(len, c->dst_end - c->dst);\
-    memset(c->dst, val, memset_len);\
-    c->dst += memset_len;\
+    int op_len = min(len, DST_FREE_BYTES());\
+    memcpy(c->dst, src, op_len);\
+    c->dst += op_len;\
+    c->dst_virt += op_len;\
+  }
+
+#define DST_MEMSET(val, len) \
+  {\
+    int op_len = min(len, DST_FREE_BYTES());\
+    memset(c->dst, val, op_len);\
+    c->dst += op_len;\
     c->dst_virt += len;\
   }
 
@@ -118,7 +131,7 @@ static inline const char *__find_special_or_null(const char *pos, const char *en
   return pos;
 }
 
-#define fmt_fetch_special() special = *(c->fmt++)
+#define fmt_fetch_special() special = *(++c->fmt)
   
 #define fmt_handle_flag(fname, fchar) \
     c->flag_ ## fname = 0;\
@@ -138,39 +151,40 @@ static inline const char *__find_special_or_null(const char *pos, const char *en
       digit_var = 0;\
       do {\
         digit_var = digit_var * 10 + (special - '0');\
-      fmt_fetch_special();\
+        fmt_fetch_special();\
       } while(is_digit(special));\
     }
+
 
 #define fmt_handle_size() \
     switch(special) {\
       case 'c': c->fmt--;\
-      case 'l': c->size = SIZE_l; break;\
-      case 'h': c->size = SIZE_h; break;\
-      case 'j': c->size = SIZE_j; break;\
-      case 'z': c->size = SIZE_z; break;\
-      case 't': c->size = SIZE_t; break;\
-      case 'L': c->size = SIZE_L; break;\
-      default:  c->size = SIZE_no; c->fmt--; break;\
+      case 'l': c->size = FMT_SIZE_LONG; break;\
+      case 'h': c->size = FMT_SIZE_HALF; break;\
+      case 'j': c->size = FMT_SIZE_INTMAX; break;\
+      case 'z': c->size = FMT_SIZE_SIZE_T; break;\
+      case 't': c->size = FMT_SIZE_PTRDIFF; break;\
+      case 'L': c->size = FMT_SIZE_INT64; break;\
+      default:  c->size = FMT_SIZE_NO; c->fmt--; break;\
     }\
     fmt_fetch_special();\
-    if (c->size == SIZE_l && special == 'l') {\
-      c->size = SIZE_ll;\
+    if (c->size == FMT_SIZE_LONG && special == 'l') {\
+      c->size = FMT_SIZE_LLONG;\
       fmt_fetch_special();\
     }\
-    else if (c->size == SIZE_h && special == 'h') {\
-      c->size = SIZE_hh;\
+    else if (c->size == FMT_SIZE_HALF && special == 'h') {\
+      c->size = FMT_SIZE_HHALF;\
       fmt_fetch_special();\
     }\
     else if (special == 'p' || special == 's') \
-      c->size = SIZE_ll
+      c->size = FMT_SIZE_LLONG
 
 #define arg_fetch(args)\
     switch(c->size) {\
-      case SIZE_z:   c->arg = __builtin_va_arg(args, size_t)   ; break;\
-      case SIZE_l:   c->arg = __builtin_va_arg(args, long)     ; break;\
-      case SIZE_ll:  c->arg = __builtin_va_arg(args, long long); break;\
-      default:       c->arg = __builtin_va_arg(args, int)      ; break;\
+      case FMT_SIZE_SIZE_T:   c->arg = __builtin_va_arg(*args, size_t)   ; break;\
+      case FMT_SIZE_LONG:   c->arg = __builtin_va_arg(*args, long)     ; break;\
+      case FMT_SIZE_LLONG:  c->arg = __builtin_va_arg(*args, long long); break;\
+      default:       c->arg = __builtin_va_arg(*args, int)      ; break;\
     }
 
 static inline void print_number_8(struct printf_ctx *c)
@@ -178,16 +192,16 @@ static inline void print_number_8(struct printf_ctx *c)
 //  unsigned long long divider = 1;
 //  int space_padding, padding;
 //
-//  if (size == SIZE_ll && (long long)arg == MAX_NEG_LLD) {
+//  if (size == FMT_SIZE_LLONG && (long long)arg == MAX_NEG_LLD) {
 //    arg = LLU(MAX_NEG_LLD_STR);
 //    return;
-//  } else if (size == SIZE_ll && (long long)arg < 0ll) {
+//  } else if (size == FMT_SIZE_LLONG && (long long)arg < 0ll) {
 //    is_neg_sign = 1;
 //    arg = ((long long)arg) * -1ll;
-//  } else if (size == SIZE_l && (long)arg < 0l) {
+//  } else if (size == FMT_SIZE_LONG && (long)arg < 0l) {
 //    is_neg_sign = 1;
 //    arg = ((long)arg) * -1l;
-//  } else if (size == SIZE_no && (int)arg < 0) {
+//  } else if (size == FMT_SIZE_NO && (int)arg < 0) {
 //    is_neg_sign = 1;
 //    arg = (unsigned int)(arg * -1);
 //  }
@@ -206,7 +220,7 @@ static inline void print_number_8(struct printf_ctx *c)
 //  if (flags_zero && precision == -1)
 //    space_padding = 0;
 //
-//  MEMSET(' ', space_padding);
+//  DST_MEMSET(' ', space_padding);
 //  padding -= space_padding;
 //
 //  if (is_neg_sign) {
@@ -219,7 +233,7 @@ static inline void print_number_8(struct printf_ctx *c)
 //    APPEND(' ');
 //  }
 //
-//  MEMSET('0', padding);
+//  DST_MEMSET('0', padding);
 //
 //  while(divider) {
 //    APPEND(to_char_8_10(DIV_LLD(arg, divider), base));
@@ -228,26 +242,33 @@ static inline void print_number_8(struct printf_ctx *c)
 //  }
 }
 
+#define POT_0 1
+#define POT_1 10
+#define POT_2 100
+#define POT_3 1000
+#define POT_4 10000
+#define POT_5 100000
+#define POT_6 1000000
+#define POT_7 10000000
+#define POT_8 100000000
+#define POT_9 1000000000
+
 static unsigned long long pot[] = {
   1,
   10,
   100,
   1000,
   10000,
-
   100000,
   1000000,
   10000000,
   100000000,
   1000000000,
-
-
   10000000000,
   100000000000,
   1000000000000,
   10000000000000,
   100000000000000,
-
   1000000000000000,
   10000000000000000,
   100000000000000000,
@@ -255,38 +276,92 @@ static unsigned long long pot[] = {
   10000000000000000000ull
 };
 
-static OPTIMIZED int closest_round_base10_number(unsigned long long val)
+int OPTIMIZED closest_round_base10_div(uint64_t val)
 {
-  int x;
-
-  if (val >= pot[5]) {
-    if (val >= pot[8])
-      x = (val >= pot[9]) ? 9 : 8;
-    else {
-      if (val >= pot[6])
-        x = (val >= pot[7]) ? 7 : 6;
-      else
-        x = 5;
-    }
+  int wordlen = 0;
+  uint64_t divider = 1;
+  uint64_t next_divider;
+  for (;;) {
+    if (divider == MAX_DIV_LLD)
+      break;
+    next_divider = divider * 10;
+    if (!DIV_LLD(val, next_divider))
+      break;
+    divider = next_divider;
+    wordlen++;
   }
-  else {
-    if (val >= pot[3])
-      x = (val >= pot[4]) ? 4 : 3;
-    else {
-      if (val >= pot[1])
-        x = (val >= pot[2]) ? 2 : 1;
-      else
-        x = 0;
-    }
-  }
-  return x;
+  return wordlen;
 }
 
+int OPTIMIZED closest_round_base10_number(uint64_t val)
+{
+  const int max_idx = ARRAY_SIZE(pot); /* 20 */
+  int base = 0;
+  int delta = max_idx / 2;
+  int pivot;
+
+  do {
+    pivot = base + delta;
+    delta /= 2;
+    if (val >= pot[pivot])
+      base = pivot;
+  } while(base != pivot || delta);
+
+  if (pivot == 0)
+    return 0;
+
+  if (val >= pot[pivot]) {
+    if (pivot <= ARRAY_SIZE(pot) - 2 && val >= pot[pivot + 1])
+        return pivot + 1;
+    return pivot;
+  }
+
+  return pivot - 1;
+}
+
+// 0: 
+// d = 10->5, b = 0, p = 10, >= false
+// d = 5 ->2, b = 0, p = 5 , >= false
+// d = 2 ->1, b = 0, p = 2 , >= false
+// d = 1 ->0, b = 0, p = 1 , >= false
+// d = 0    , b = 1, p = 1 , >= false, p[0] = 1 -> 0
+
+// 10: 
+// d = 10->5, b = 0, p = 10, >= false
+// d = 5 ->2, b = 0, p = 5 , >= false
+// d = 2 ->1, b = 0, p = 2 , >= false
+// d = 1 ->0, b = 0, p = 1 , >= true , p[1] = 10
+// d = 0    , b = 1, p = 1,  >= true , p[1] = 10 -> 1
+
+
+// 101: 
+// d = 10->5, b = 0, p = 10, >= false
+// d = 5 ->2, b = 0, p = 5 , >= false
+// d = 2 ->1, b = 0, p = 2 , >= true , p[2] = 100
+// d = 1 ->0, b = 2, p = 3 , >= false, p[3] = 1000
+// d = 0,     b = 3, p = 3 , >= false, p[3] = 1000 -> 3
+
+// 101: 
+// d = 10->5, b = 0, p = 10, >= false
+// d = 5 ->2, b = 0, p = 5 , >= false
+// d = 2 ->1, b = 0, p = 2 , >= true , p[2] = 100
+// d = 1 ->0, b = 2, p = 3 , >= false, p[3] = 1000
+// d = 0
+// 0 or 1 - 100% definately 0
+
+// big:
+// d = 10, b = 0 , p = 10, >= true
+// d = 5 , b = 10, p = 15, >= true
+// d = 2 , b = 15, p = 17, >= true
+// d = 1 , b = 15, p = 18, >= true
+// d = 1 , b = 15, p = 18, >= true
+// d = 0 , b = 18, p = 18, >= true
+// 18 or 19 ?
 static OPTIMIZED int get_digit(unsigned long long num, unsigned long long powered_base, unsigned long long *out_round)
 {
   int i;
   unsigned long long cmp = powered_base;
-  for (i = 1; i < 10; ++i) {
+  for (i = 1; i < 11; ++i) {
     if (num < cmp) {
       *out_round = cmp - powered_base;
       return (i - 1);
@@ -306,26 +381,26 @@ struct print_num_spec {
 
 static NOINLINE void __print_fn_number_10_u(struct printf_ctx *c)
 {
-  unsigned long long divider = 1;
   unsigned long long subtract_round;
   unsigned long long tmp_arg;
   struct print_num_spec s = { 0 };
   int tmp_num;
   char tmp;
 
-  if (sizeof(long) == sizeof(int) && c->size == SIZE_l)
+  if (sizeof(long) == sizeof(int) && c->size == FMT_SIZE_LONG)
     c->arg &= 0xffffffff;
-  else if (c->size == SIZE_no)
+  else if (c->size == FMT_SIZE_NO)
     c->arg &= 0xffffffff;
 
   s.wordlen = 1;
-  while(divider != MAX_DIV_LLD && DIV_LLD(c->arg, divider * 10)) {
-    divider *= 10;
-    s.wordlen++;
-  }
 
-  s.wordlen = closest_round_base10_number(c->arg);
-  s.wordlen += (c->flag_plus || c->flag_space) & 1;
+#ifdef NODIV
+  s.wordlen = closest_round_base10_nodiv(c->arg);
+#else
+  s.wordlen = closest_round_base10_div(c->arg);
+#endif
+
+  s.wordlen += c->flag_plus | c->flag_space;
 
   s.padding = max(c->width - s.wordlen, 0);
   s.space_padding = max(s.padding - max(max(c->precision, 0) - s.wordlen, 0), 0);
@@ -333,45 +408,61 @@ static NOINLINE void __print_fn_number_10_u(struct printf_ctx *c)
   if (c->flag_zero && c->precision == -1)
     s.space_padding = 0;
 
-  MEMSET(' ', s.space_padding);
+  DST_MEMSET(' ', s.space_padding);
   s.padding -= s.space_padding;
 
   if (s.is_neg_sign)
-    fmt_appendc(c, '-');
+    DST_APPEND_C('-');
   else if (c->flag_plus)
-    fmt_appendc(c, '+');
+    DST_APPEND_C('+');
   else if (c->flag_space)
-    fmt_appendc(c, ' ');
+    DST_APPEND_C(' ');
 
-  MEMSET('0', s.padding);
+  DST_MEMSET('0', s.padding);
 
   tmp_arg = c->arg;
   for (;s.wordlen >= 0; s.wordlen--) {
     tmp_num = get_digit(tmp_arg, pot[s.wordlen], &subtract_round);
     tmp = to_char_8_10(tmp_num, 10);
-    fmt_appendc(c, tmp);
+    DST_APPEND_C(tmp);
     tmp_arg -= subtract_round;
   }
 }
 
 static NOINLINE void __print_fn_number_10_d(struct printf_ctx *c)
 {
+  unsigned long long subtract_round;
+  unsigned long long tmp_arg;
   unsigned long long divider = 1;
+  int tmp_num;
+  char tmp;
   struct print_num_spec s = { 0 };
   char ch;
+  int max_bit_pos = 31;
+  uint64_t type_mask;
+  // TODO: Support more types 
+  if (c->size & (FMT_SIZE_LLONG |
+#if (__LP64__ == 1)
+        FMT_SIZE_LONG |
+#endif
+        FMT_SIZE_INT64)) {
+     max_bit_pos = 63;
+  }
 
-  if (c->size == SIZE_ll && (long long)c->arg == MAX_NEG_LLD) {
-    c->arg = LLU(MAX_NEG_LLD_STR);
-    return;
-  } else if (c->size == SIZE_ll && (long long)c->arg < 0ll) {
+  /* zero-out top part of arg for smaller types */
+  // type_mask = (1<<(max_bit_pos + 1)) - 1; does not work for 64
+  switch(max_bit_pos) {
+    case  7: type_mask = 0xff;               break;
+    case 15: type_mask = 0xffff;             break;
+    case 31: type_mask = 0xffffffff;         break;
+    default: type_mask = 0xffffffffffffffff; break;
+  }
+
+  c->arg &= type_mask;
+
+  if (c->arg & (1ll << max_bit_pos)) {
+    c->arg = (~c->arg + 1) & type_mask;
     s.is_neg_sign = 1;
-    c->arg = ((long long)c->arg) * -1ll;
-  } else if (c->size == SIZE_l && (long)c->arg < 0l) {
-    s.is_neg_sign = 1;
-    c->arg = ((long)c->arg) * -1l;
-  } else if (c->size == SIZE_no && (int)c->arg < 0) {
-    s.is_neg_sign = 1;
-    c->arg = (unsigned int)(c->arg * -1);
   }
 
   s.wordlen = 1;
@@ -380,31 +471,44 @@ static NOINLINE void __print_fn_number_10_d(struct printf_ctx *c)
     s.wordlen++;
   }
 
-  s.wordlen += (s.is_neg_sign | c->flag_plus | c->flag_space) & 1;
+  s.wordlen += s.is_neg_sign | c->flag_plus | c->flag_space;
 
   s.padding = max(c->width - s.wordlen, 0);
   s.space_padding = max(s.padding - max(max(c->precision, 0) - s.wordlen, 0), 0);
   if (c->flag_zero && c->precision == -1)
     s.space_padding = 0;
 
-  MEMSET(' ', s.space_padding);
+  DST_MEMSET(' ', s.space_padding);
   s.padding -= s.space_padding;
 
-  if (s.is_neg_sign)
-    fmt_appendc(c, '-');
-  else if (c->flag_plus)
-    fmt_appendc(c, '+');
-  else if (c->flag_space)
-    fmt_appendc(c, ' ');
-
-  MEMSET('0', s.padding);
-
-  while(divider) {
-    ch = to_char_8_10(DIV_LLD(c->arg, divider), 10);
-    fmt_appendc(c, ch);
-    c->arg = c->arg % divider;
-    divider /= 10;
+  if (s.is_neg_sign) {
+    DST_APPEND_C('-');
+    s.wordlen--;
   }
+  else if (c->flag_plus) {
+    DST_APPEND_C('+');
+    s.wordlen--;
+  }
+  else if (c->flag_space) {
+    DST_APPEND_C(' ');
+    s.wordlen--;
+  }
+
+  DST_MEMSET('0', s.padding);
+
+  tmp_arg = c->arg;
+  for (;s.wordlen > 0; s.wordlen--) {
+    tmp_num = get_digit(tmp_arg, pot[s.wordlen - 1], &subtract_round);
+    tmp = to_char_8_10(tmp_num, 10);
+    DST_APPEND_C(tmp);
+    tmp_arg -= subtract_round;
+  }
+//  while(divider) {
+//    ch = to_char_8_10(DIV_LLD(c->arg, divider), 10);
+//    DST_APPEND_C(ch);
+//    c->arg = c->arg % divider;
+//    divider /= 10;
+//  }
 }
 
 static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
@@ -417,10 +521,10 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
   char tmp;
 
   switch(c->size) {
-  case SIZE_ll: leading_zeroes = __builtin_clzll(c->arg)     ; maxbits = sizeof(long long) * 8; break;
-  case SIZE_l : leading_zeroes = __builtin_clzl((long)c->arg); maxbits = sizeof(long)      * 8; break;
-  case SIZE_no: leading_zeroes = __builtin_clz((int)c->arg)  ; maxbits = sizeof(int)       * 8; break;
-  default: fmt_appends(c, "<>")                                                               ; break;
+  case FMT_SIZE_LLONG: leading_zeroes = __builtin_clzll(c->arg)     ; maxbits = sizeof(long long) * 8; break;
+  case FMT_SIZE_LONG : leading_zeroes = __builtin_clzl((long)c->arg); maxbits = sizeof(long)      * 8; break;
+  case FMT_SIZE_NO   : leading_zeroes = __builtin_clz((int)c->arg)  ; maxbits = sizeof(int)       * 8; break;
+  default: DST_APPEND_S("<>")                                                               ; break;
   }
 
   // padding
@@ -434,24 +538,23 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
   else if (c->flag_zero)
     space_padding = 0;
 
-  MEMSET(' ', space_padding);
+  DST_MEMSET(' ', space_padding);
   padding -= space_padding;
 
-  MEMSET('0', padding);
+  DST_MEMSET('0', padding);
 
   for (;rightmost_nibble >= 0; rightmost_nibble--) {
     nibble = (int)((LLU(c->arg) >> (rightmost_nibble * 4)) & 0xf);
     tmp = to_char_16(nibble, /* uppercase */ c->type < 'a');
-    fmt_appendc(c, tmp);
+    DST_APPEND_C(tmp);
   }
 }
 
-static inline char *__printf_strlcpy(char *dst, const char **src, int n)
+static inline char *__printf_strlcpy(char *dst, const char *src, int n)
 {
-  while(**src && n) {
-    *(dst++) = *((*src)++);
-    n++;
-  }
+  const char *src_end = src + n;
+  while(*src && src != src_end)
+    *dst++ = *src++;
   return dst;
 }
 
@@ -459,7 +562,7 @@ static void NOINLINE __print_fn_string(struct printf_ctx *c)
 {
   int n;
   const char *src = (const char *)c->arg;
-  c->dst = __printf_strlcpy(c->dst, &src, c->dst_end - c->dst);
+  c->dst = __printf_strlcpy(c->dst, src, c->dst_end - c->dst);
 
   while(*src) {
     c->dst_virt++;
@@ -535,9 +638,10 @@ static inline char fmt_skip_to_special(struct printf_ctx *c)
 {
   char special = 0;
   const char *fmt_pos;
-  fmt_pos = __find_special_or_null(c->fmt, c->fmt + (c->dst_end - c->dst));
-  memcpy(c->dst, c->fmt, fmt_pos - c->fmt);
-  c->dst += fmt_pos - c->fmt;
+
+  fmt_pos = __find_special_or_null(c->fmt, c->fmt + 512);
+
+  DST_MEMCPY(c->fmt, fmt_pos - c->fmt);
   c->fmt = fmt_pos;
   
   special = *c->fmt;
@@ -547,7 +651,7 @@ static inline char fmt_skip_to_special(struct printf_ctx *c)
   return special;
 }
 
-static inline int fmt_parse_token(struct printf_ctx *c, __builtin_va_list args)
+static inline int fmt_parse_token(struct printf_ctx *c, __builtin_va_list *args)
 {
   char special;
   special = fmt_skip_to_special(c);
@@ -564,53 +668,81 @@ static inline int fmt_parse_token(struct printf_ctx *c, __builtin_va_list args)
   // This is to disable compiler warning
   if (c->flag_left_align);
 
-  fmt_handle_star_or_digit(c->width, args);
-  fmt_handle_star_or_digit(c->precision, args);
+  fmt_handle_star_or_digit(c->width, *args);
+  fmt_handle_star_or_digit(c->precision, *args);
   fmt_handle_size();
-  arg_fetch(args);
 
-  fmt_fetch_special();
+  // arg_fetch(args);
+    switch(c->size) {
+      case FMT_SIZE_SIZE_T: c->arg = __builtin_va_arg(*args, size_t)   ; break;
+      case FMT_SIZE_LONG:   c->arg = __builtin_va_arg(*args, long)     ; break;
+      case FMT_SIZE_LLONG:  c->arg = __builtin_va_arg(*args, long long); break;
+      default:              c->arg = __builtin_va_arg(*args, int)      ; break;
+    }
   c->type = special;
+  c->fmt++;
   return 0;
 }
 
-int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list args)
+int /*optimized*/ __vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list *args)
 {
   struct printf_ctx ctx = { 0 };
   struct printf_ctx *c = &ctx;
   c->fmt = fmt;
   c->dst = dst;
+
+  /*
+   * dst_len is harder than you think. If dst_len is 0 - we don't write
+   * anything, just calculate resulting string length.
+   * if dst_len is greater than 0, 1 byte from this length is for
+   * zero-termination. if dst_len == 1, the first byte in dst
+   * will be written 0. So the actual string length decays to dst_len - 1.
+   */
   c->dst_end = c->dst + dst_len;
   c->dst_virt = c->dst;
 
-  while(*c->fmt && (c->dst < c->dst_end)) {
-    if (fmt_parse_token(c, args))
-      break;
+  while(*c->fmt && !fmt_parse_token(c, args))
     fmt_print_type(c);
+
+  /*
+   * Two possible outcomes are possible. 
+   * - c->dst has reached end.
+   * - c->dst haven't readed end.
+   * In first - we still need to write zero-termination somewhere.
+   * So we overwrite the end of the resulting string.
+   * In second - we safely put zero-termination after the text,
+   * because there is still space to do that.
+   */
+  if (dst_len) {
+    if (c->dst == c->dst_end)
+      *(c->dst - 1) = 0;
+    else
+      *c->dst = 0; 
   }
 
-  if (c->dst < c->dst_end)
-    *c->dst = 0; 
+  return c->dst_virt - dst;
+}
 
-  return c->dst - dst;
+int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list args)
+{
+  return __vsnprintf(dst, dst_len, fmt, &args);
 }
 
 int /*optimized*/ _vsprintf(char *dst, const char *fmt, __builtin_va_list args)
 {
-  return _vsnprintf(dst, 4096, fmt, args);
+  return __vsnprintf(dst, 4096, fmt, &args);
 }
-
 
 int _sprintf(char *dst, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
-  return _vsprintf(dst, fmt, args);
+  return __vsnprintf(dst, 4096, fmt, &args);
 }
 
 int _snprintf(char *dst, size_t dst_size, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
-  return _vsnprintf(dst, dst_size, fmt, args);
+  return __vsnprintf(dst, dst_size, fmt, &args);
 }
