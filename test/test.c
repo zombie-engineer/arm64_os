@@ -179,7 +179,7 @@ void test_sprintf(const char *fmt, ...)
   __builtin_va_start(args, fmt);
   vsprintf(buf2, fmt, args);
   if (strcmp(buf1, buf2)) {
-    printf("assertion! strings not equal: expected: '%s', got '%s'\n", buf1, buf2);
+    printf("assertion! strings not equal: expected: '%s', got '%s'\n", buf2, buf1);
     exit(1);
   }
   printf("success: '%s'\n", buf1);
