@@ -156,7 +156,8 @@ qemuds: $(TARGET_QEMU_IMG)
 # Attach to started qemu process with gdb
 .PHONY: qemuat
 qemuat:
-	/home/zombie/binutils-gdb/gdb/gdb -x rungdb.gdb
+	/mnt/sdb1/binutils-gdb/gdb/gdb -x rungdb.gdb
+#	/home/zombie/binutils-gdb/gdb/gdb -x rungdb.gdb
 
 .PHONY: serial
 serial:

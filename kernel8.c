@@ -303,6 +303,7 @@ void gpio_handle_i2c_irq()
   );
   if (sda_trig)
     putc(sda ? 'D' : 'd');
+
   if (scl_trig)
     putc(scl ? 'C' : 'c');
   putc('\n');
@@ -312,6 +313,7 @@ void gpio_handle_i2c_irq()
 DECL_GPIO_SET_KEY(gpio_i2c_test_gpiokey, "I2CTESTGPIO_KE0");
 void gpio_i2c_test(int scl, int sda, int poll)
 {
+  int x = 0;
   uint32_t *i2c_base = 0x3f214000;
   uint32_t *dr  = i2c_base + 0;
   uint32_t *rsr = i2c_base + 1;
@@ -338,13 +340,17 @@ void gpio_i2c_test(int scl, int sda, int poll)
   gpio_set_function(sda_pin, GPIO_FUNC_IN);
   if (poll) {
     while(1) {
-      
-
-      putc(gpio_is_set(scl_pin) ? 'C' : '-');
-      putc(gpio_is_set(sda_pin) ? 'D' : '-');
+      int scl_set = gpio_is_set(scl_pin);
+      int sda_set = gpio_is_set(sda_pin);
+      putc(scl_set ? 'C' : '-');
+      putc(sda_set ? 'D' : '-');
+      nokia5110_draw_dot(x, scl_set ? 8 : 7);
+      nokia5110_draw_dot(x, sda_set ? 14 : 13);
       poll_counter++;
       if (!(poll_counter % 32))
         puts("\r\n");
+      if (++x > NOKIA5110_PIXEL_SIZE_X)
+        x = 0;
     }
   }
 
@@ -582,8 +588,10 @@ void init_atmega8a()
 
   ret = atmega8a_init(spidev, gpio_pin_reset);
 
-  if (ret != ERR_OK)
+  if (ret != ERR_OK) {
     printf("Failed to init atmega8a. Error_code: %d\n", ret);
+    return;
+  }
 
   if (atmega8a_read_fuse_bits(&fuse_low, &fuse_high) != ERR_OK)
     printf("Failed to read program memory\n");
@@ -849,14 +857,20 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  printf("%lu-%s\n", 100000023131232, "hello");
+  printf("%d", 0);
+  printf("%lu\n", 6623131232);
+  printf("%llu\n", 6623131232);
   irq_init(0 /*loglevel*/);
+  // printf("%d\n", 12345);
+  printf("%u\n", 12345);
+  add_unhandled_exception_hook(report_unhandled_exception);
   init_atmega8a();
 #ifndef CONFIG_QEMU
   init_nokia5110_display(1, 0);
   nokia5110_draw_text("Display ready", 0, 0);
 #endif
-  add_unhandled_exception_hook(report_unhandled_exception);
-  gpio_i2c_test(8, 25, 0 /* no poll */);
+  gpio_i2c_test(8, 25, 1 /* yes poll */);
   while(1);
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);
@@ -883,8 +897,6 @@ void main()
   print_cpu_info();
   print_current_ex_level();
   systimer_init();
-
-  add_unhandled_exception_hook(report_unhandled_exception);
 
   gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   while(1);
