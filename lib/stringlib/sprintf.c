@@ -47,6 +47,12 @@ struct printf_ctx {
   unsigned long long arg;
 };
 
+struct print_num_spec {
+  int space_padding;
+  int padding;
+  int wordlen;
+  int is_neg_sign;
+};
 
 static inline char to_char_16(int i, int uppercase) {
   if (i >= 10)
@@ -278,16 +284,10 @@ static unsigned long long pot[] = {
 
 int OPTIMIZED closest_round_base10_div(uint64_t val)
 {
-  int wordlen = 0;
-  uint64_t divider = 1;
-  uint64_t next_divider;
-  for (;;) {
-    if (divider == MAX_DIV_LLD)
-      break;
-    next_divider = divider * 10;
-    if (!DIV_LLD(val, next_divider))
-      break;
-    divider = next_divider;
+  int wordlen = 1;
+  uint64_t divider = 10;
+  while(val / divider) {
+    divider *= 10;
     wordlen++;
   }
   return wordlen;
@@ -319,6 +319,16 @@ int OPTIMIZED closest_round_base10_number(uint64_t val)
   return pivot - 1;
 }
 
+int OPTIMIZED closest_round_base10_nodiv(struct printf_ctx *c)
+{
+  uint64_t divider = 1;
+  int wordlen = 1;
+  while(divider != MAX_DIV_LLD && DIV_LLD(c->arg, divider * 10)) {
+    divider *= 10;
+    wordlen++;
+  }
+  return wordlen;
+}
 // 0: 
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
@@ -372,72 +382,90 @@ static OPTIMIZED int get_digit(unsigned long long num, unsigned long long powere
   return 0;
 }
 
-struct print_num_spec {
-  int space_padding;
-  int padding;
-  int wordlen;
-  int is_neg_sign;
-};
 
-static NOINLINE void __print_fn_number_10_u(struct printf_ctx *c)
+static inline void __print_fn_prep_spec(struct printf_ctx *c, struct print_num_spec *s)
 {
-  unsigned long long subtract_round;
-  unsigned long long tmp_arg;
-  struct print_num_spec s = { 0 };
-  int tmp_num;
-  char tmp;
-
-  if (sizeof(long) == sizeof(int) && c->size == FMT_SIZE_LONG)
-    c->arg &= 0xffffffff;
-  else if (c->size == FMT_SIZE_NO)
-    c->arg &= 0xffffffff;
-
-  s.wordlen = 1;
-
 #ifdef NODIV
-  s.wordlen = closest_round_base10_nodiv(c->arg);
+  s->wordlen = closest_round_base10_nodiv(c, s);
 #else
-  s.wordlen = closest_round_base10_div(c->arg);
+  s->wordlen = closest_round_base10_div(c->arg);
 #endif
-
-  s.wordlen += c->flag_plus | c->flag_space;
-
-  s.padding = max(c->width - s.wordlen, 0);
-  s.space_padding = max(s.padding - max(max(c->precision, 0) - s.wordlen, 0), 0);
-
+  s->wordlen += s->is_neg_sign | c->flag_plus | c->flag_space;
+  s->padding = max(c->width - s->wordlen, 0);
+  s->space_padding = max(s->padding - max(max(c->precision, 0) - s->wordlen, 0), 0);
   if (c->flag_zero && c->precision == -1)
-    s.space_padding = 0;
+    s->space_padding = 0;
+}
 
-  DST_MEMSET(' ', s.space_padding);
-  s.padding -= s.space_padding;
+static inline void __print_fn_number_10_div(struct printf_ctx *c, int wordlen)
+{
+  uint64_t divider = pot[wordlen - 1];
+  char tmp;
+  while(divider) {
+    tmp = to_char_8_10(DIV_LLD(c->arg, divider), 10);
+    DST_APPEND_C(tmp);
+    c->arg = c->arg % divider;
+    divider /= 10;
+  }
+}
 
-  if (s.is_neg_sign)
-    DST_APPEND_C('-');
-  else if (c->flag_plus)
-    DST_APPEND_C('+');
-  else if (c->flag_space)
-    DST_APPEND_C(' ');
-
-  DST_MEMSET('0', s.padding);
+static inline void __print_fn_number_10_nodiv(struct printf_ctx *c, int wordlen)
+{
+  char tmp;
+  uint64_t tmp_arg, subtract_round;
+  int tmp_num;
 
   tmp_arg = c->arg;
-  for (;s.wordlen >= 0; s.wordlen--) {
-    tmp_num = get_digit(tmp_arg, pot[s.wordlen], &subtract_round);
+  for (;wordlen > 0; wordlen--) {
+    tmp_num = get_digit(tmp_arg, pot[wordlen - 1], &subtract_round);
     tmp = to_char_8_10(tmp_num, 10);
     DST_APPEND_C(tmp);
     tmp_arg -= subtract_round;
   }
 }
 
+static inline void __print_fn_number_10(struct printf_ctx *c, struct print_num_spec *s)
+{
+  DST_MEMSET(' ', s->space_padding);
+  s->padding -= s->space_padding;
+  
+  if (s->is_neg_sign) {
+    DST_APPEND_C('-');
+    s->wordlen--;
+  }
+  else if (c->flag_plus) {
+    DST_APPEND_C('+');
+    s->wordlen--;
+  }
+  else if (c->flag_space) {
+    DST_APPEND_C(' ');
+    s->wordlen--;
+  }
+
+  DST_MEMSET('0', s->padding);
+#ifdef NODIV
+  __print_fn_number_10_nodiv(c, s->wordlen);
+#else
+  __print_fn_number_10_div(c, s->wordlen);
+#endif
+}
+
+static NOINLINE void __print_fn_number_10_u(struct printf_ctx *c)
+{
+  struct print_num_spec s = { 0 };
+
+  if (sizeof(long) == sizeof(int) && c->size == FMT_SIZE_LONG)
+    c->arg &= 0xffffffff;
+  else if (c->size == FMT_SIZE_NO)
+    c->arg &= 0xffffffff;
+
+  __print_fn_prep_spec(c, &s);
+  __print_fn_number_10(c, &s);
+}
+
 static NOINLINE void __print_fn_number_10_d(struct printf_ctx *c)
 {
-  unsigned long long subtract_round;
-  unsigned long long tmp_arg;
-  unsigned long long divider = 1;
-  int tmp_num;
-  char tmp;
   struct print_num_spec s = { 0 };
-  char ch;
   int max_bit_pos = 31;
   uint64_t type_mask;
   // TODO: Support more types 
@@ -465,50 +493,8 @@ static NOINLINE void __print_fn_number_10_d(struct printf_ctx *c)
     s.is_neg_sign = 1;
   }
 
-  s.wordlen = 1;
-  while(divider != MAX_DIV_LLD && DIV_LLD(c->arg, divider * 10)) {
-    divider *= 10;
-    s.wordlen++;
-  }
-
-  s.wordlen += s.is_neg_sign | c->flag_plus | c->flag_space;
-
-  s.padding = max(c->width - s.wordlen, 0);
-  s.space_padding = max(s.padding - max(max(c->precision, 0) - s.wordlen, 0), 0);
-  if (c->flag_zero && c->precision == -1)
-    s.space_padding = 0;
-
-  DST_MEMSET(' ', s.space_padding);
-  s.padding -= s.space_padding;
-
-  if (s.is_neg_sign) {
-    DST_APPEND_C('-');
-    s.wordlen--;
-  }
-  else if (c->flag_plus) {
-    DST_APPEND_C('+');
-    s.wordlen--;
-  }
-  else if (c->flag_space) {
-    DST_APPEND_C(' ');
-    s.wordlen--;
-  }
-
-  DST_MEMSET('0', s.padding);
-
-  tmp_arg = c->arg;
-  for (;s.wordlen > 0; s.wordlen--) {
-    tmp_num = get_digit(tmp_arg, pot[s.wordlen - 1], &subtract_round);
-    tmp = to_char_8_10(tmp_num, 10);
-    DST_APPEND_C(tmp);
-    tmp_arg -= subtract_round;
-  }
-//  while(divider) {
-//    ch = to_char_8_10(DIV_LLD(c->arg, divider), 10);
-//    DST_APPEND_C(ch);
-//    c->arg = c->arg % divider;
-//    divider /= 10;
-//  }
+  __print_fn_prep_spec(c, &s);
+  __print_fn_number_10(c, &s);
 }
 
 static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
@@ -524,7 +510,7 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
   case FMT_SIZE_LLONG: leading_zeroes = __builtin_clzll(c->arg)     ; maxbits = sizeof(long long) * 8; break;
   case FMT_SIZE_LONG : leading_zeroes = __builtin_clzl((long)c->arg); maxbits = sizeof(long)      * 8; break;
   case FMT_SIZE_NO   : leading_zeroes = __builtin_clz((int)c->arg)  ; maxbits = sizeof(int)       * 8; break;
-  default: DST_APPEND_S("<>")                                                               ; break;
+  default: DST_APPEND_S("<>")                                                                        ; break;
   }
 
   // padding
@@ -584,7 +570,12 @@ static void NOINLINE __print_fn_float_hex(struct printf_ctx *c) { }
 static void NOINLINE __print_fn_float_exp(struct printf_ctx *c) { }
 static void NOINLINE __print_fn_float(struct printf_ctx *c) { }
 static void NOINLINE __print_fn_number_8(struct printf_ctx *c) { }
-static void NOINLINE __print_fn_address(struct printf_ctx *c) { }
+static void NOINLINE __print_fn_address(struct printf_ctx *c)
+{
+  DST_APPEND_C('0');
+  DST_APPEND_C('x');
+  __print_fn_number_16(c);
+}
 
 typedef void (*__print_fn_t)(struct printf_ctx *);
 ALIGNED(64) __print_fn_t __printf_fn_map[] = {
