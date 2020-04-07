@@ -38,6 +38,7 @@ struct printf_ctx {
   int flag_space;
   int flag_zero;
   int flag_left_align;
+  int flag_hex_prefix;
 
   int width;
   int precision;
@@ -259,7 +260,7 @@ static inline void print_number_8(struct printf_ctx *c)
 #define POT_8 100000000
 #define POT_9 1000000000
 
-static unsigned long long pot[] = {
+static unsigned long long __decimal_table[] = {
   1,
   10,
   100,
@@ -293,25 +294,25 @@ int OPTIMIZED closest_round_base10_div(uint64_t val)
   return wordlen;
 }
 
-int OPTIMIZED closest_round_base10_number(uint64_t val)
+int OPTIMIZED closest_round_base10_nodiv(uint64_t val)
 {
-  const int max_idx = ARRAY_SIZE(pot); /* 20 */
+  const int max_idx = ARRAY_SIZE(__decimal_table); /* 20 */
   int base = 0;
   int delta = max_idx / 2;
   int pivot;
 
   do {
     pivot = base + delta;
-    delta /= 2;
-    if (val >= pot[pivot])
+    delta >>= 1;
+    if (val >= __decimal_table[pivot])
       base = pivot;
   } while(base != pivot || delta);
 
   if (pivot == 0)
     return 0;
 
-  if (val >= pot[pivot]) {
-    if (pivot <= ARRAY_SIZE(pot) - 2 && val >= pot[pivot + 1])
+  if (val >= __decimal_table[pivot]) {
+    if (pivot <= ARRAY_SIZE(__decimal_table) - 2 && val >= __decimal_table[pivot + 1])
         return pivot + 1;
     return pivot;
   }
@@ -319,16 +320,6 @@ int OPTIMIZED closest_round_base10_number(uint64_t val)
   return pivot - 1;
 }
 
-int OPTIMIZED closest_round_base10_nodiv(struct printf_ctx *c)
-{
-  uint64_t divider = 1;
-  int wordlen = 1;
-  while(divider != MAX_DIV_LLD && DIV_LLD(c->arg, divider * 10)) {
-    divider *= 10;
-    wordlen++;
-  }
-  return wordlen;
-}
 // 0: 
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
@@ -399,7 +390,7 @@ static inline void __print_fn_prep_spec(struct printf_ctx *c, struct print_num_s
 
 static inline void __print_fn_number_10_div(struct printf_ctx *c, int wordlen)
 {
-  uint64_t divider = pot[wordlen - 1];
+  uint64_t divider = __decimal_table[wordlen - 1];
   char tmp;
   while(divider) {
     tmp = to_char_8_10(DIV_LLD(c->arg, divider), 10);
@@ -417,7 +408,7 @@ static inline void __print_fn_number_10_nodiv(struct printf_ctx *c, int wordlen)
 
   tmp_arg = c->arg;
   for (;wordlen > 0; wordlen--) {
-    tmp_num = get_digit(tmp_arg, pot[wordlen - 1], &subtract_round);
+    tmp_num = get_digit(tmp_arg, __decimal_table[wordlen - 1], &subtract_round);
     tmp = to_char_8_10(tmp_num, 10);
     DST_APPEND_C(tmp);
     tmp_arg -= subtract_round;
@@ -516,6 +507,8 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
   // padding
   rightmost_nibble = (maxbits - leading_zeroes - 1) / 4;
   padding = max(max(c->width, c->precision) - (rightmost_nibble + 1), 0);
+  if (c->flag_hex_prefix)
+    padding = max(padding - 2, 0);
   space_padding = padding;
   if (c->precision != -1) {
     c->precision = max(c->precision - (rightmost_nibble + 1), 0);
@@ -526,6 +519,10 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
 
   DST_MEMSET(' ', space_padding);
   padding -= space_padding;
+  if (c->flag_hex_prefix) {
+    DST_APPEND_C('0');
+    DST_APPEND_C('x');
+  }
 
   DST_MEMSET('0', padding);
 
@@ -572,8 +569,7 @@ static void NOINLINE __print_fn_float(struct printf_ctx *c) { }
 static void NOINLINE __print_fn_number_8(struct printf_ctx *c) { }
 static void NOINLINE __print_fn_address(struct printf_ctx *c)
 {
-  DST_APPEND_C('0');
-  DST_APPEND_C('x');
+  c->flag_hex_prefix = 1;
   __print_fn_number_16(c);
 }
 

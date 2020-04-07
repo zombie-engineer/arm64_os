@@ -171,18 +171,18 @@ void run_cases_strtol()
 void test_sprintf(const char *fmt, ...)
 {
   int status;
-  char buf1[256];
-  char buf2[256];
+  char actual[256];
+  char expected[256];
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
-  _vsprintf(buf1, fmt, args);
+  _vsprintf(actual, fmt, args);
   __builtin_va_start(args, fmt);
-  vsprintf(buf2, fmt, args);
-  if (strcmp(buf1, buf2)) {
-    printf("assertion! strings not equal: expected: '%s', got '%s'\n", buf2, buf1);
+  vsprintf(expected, fmt, args);
+  if (strcmp(actual, expected)) {
+    printf("assertion! strings not equal: expected: '%s', got '%s'\n", expected, actual);
     exit(1);
   }
-  printf("success: '%s'\n", buf1);
+  printf("success: '%s'\n", actual);
 }
 
 void test_snprintf(int n, const char *fmt, ...)
@@ -209,6 +209,9 @@ void test_snprintf(int n, const char *fmt, ...)
 
 void run_cases_sprintf()
 {
+  test_sprintf("%p", 1234);
+  test_sprintf("%16p", 1234);
+  test_sprintf("%016p", 1234);
   test_sprintf("%d", 0);
   test_sprintf("%d", 1234);
   test_sprintf("%d", -1234);
