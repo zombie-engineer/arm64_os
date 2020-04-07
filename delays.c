@@ -19,12 +19,12 @@ void wait_usec(uint32_t n)
   register uint64_t counter, counter_target;
   register uint32_t counter_freq, wait_counts;
 
-  counter = get_system_timer();
-  counter_freq = get_system_timer_freq();
+  counter = read_cpu_counter_64();
+  counter_freq = get_cpu_counter_64_freq();
   wait_counts = (counter_freq / 1000000) * n;
 
   counter_target = counter + wait_counts;
-  while(get_system_timer() < counter_target);
+  while(read_cpu_counter_64() < counter_target);
 }
 
 void wait_msec(uint32_t n)
@@ -33,10 +33,10 @@ void wait_msec(uint32_t n)
   register uint64_t counter, counter_target;
   register uint32_t counter_freq, wait_counts;
 
-  counter = get_system_timer();
-  counter_freq = get_system_timer_freq();
+  counter = read_cpu_counter_64();
+  counter_freq = get_cpu_counter_64_freq();
   wait_counts = (counter_freq / 1000) * n;
 
   counter_target = counter + wait_counts;
-  while(get_system_timer() < counter_target);
+  while(read_cpu_counter_64() < counter_target);
 }

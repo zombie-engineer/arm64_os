@@ -845,7 +845,6 @@ void main()
   const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
   int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end 
       - &_binary_firmware_atmega8a_atmega8a_bin_start;
-
   debug_init();
   gpio_set_init();
   spi_emulated_init();

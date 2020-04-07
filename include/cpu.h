@@ -53,3 +53,12 @@ int is_irq_enabled(void);
 
 #define WAIT_FOR_EVENT asm volatile("wfe" ::: "memory")
 
+/* 
+ * Returns system clock frequency in Hz
+ */
+uint64_t get_cpu_counter_64_freq(void);
+
+/*
+ *  reads cpu-specific generic 64 bit counter
+ */
+uint64_t read_cpu_counter_64(void);

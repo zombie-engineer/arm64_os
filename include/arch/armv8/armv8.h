@@ -40,10 +40,4 @@ void armv8_set_mair_el1(uint64_t);
 
 uint64_t armv8_get_mair_el1();
 
-// Returns system clock frequency in Hz
-uint32_t get_system_timer_freq(void);
-
-// Returns system clock counter value
-uint64_t get_system_timer(void);
-
 uint64_t armv8_get_mpidr_el1(int core_num);
