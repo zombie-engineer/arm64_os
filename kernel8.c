@@ -34,6 +34,7 @@
 
 #include <cpu.h>
 #include <list.h>
+#include <self_test.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -857,13 +858,8 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  printf("%lu-%s\n", 100000023131232, "hello");
-  printf("%d", 0);
-  printf("%lu\n", 6623131232);
-  printf("%llu\n", 6623131232);
+  self_test();
   irq_init(0 /*loglevel*/);
-  // printf("%d\n", 12345);
-  printf("%u\n", 12345);
   add_unhandled_exception_hook(report_unhandled_exception);
   init_atmega8a();
 #ifndef CONFIG_QEMU

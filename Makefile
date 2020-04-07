@@ -23,6 +23,7 @@ OBJS := \
 	power.o\
 	rectangle.o\
 	shiftreg.o\
+	self_test.o\
 	unhandled_exception.o\
 	viewport_console.o\
 	clock_manager.o\
