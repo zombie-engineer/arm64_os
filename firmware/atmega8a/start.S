@@ -22,7 +22,19 @@ rjmp __int_ana_comp     // ANA_COMP Analog Comparator
 rjmp __int_twi          // TWI Two-wire Serial Interface
 rjmp __int_spm_rdy      // SPM_RDY Store Program Memory Ready
 
-; .section ".text"
+.align 3
+.globl header
+header:
+.ascii "ATMGBIN8"
+.globl checksum
+checksum:
+.byte 0x66
+.byte 0x66
+.byte 0x66
+.byte 0x66
+.globl header
+header_end:
+.ascii "ATMGEND0"
 
 .globl __int_reset
 __int_reset:

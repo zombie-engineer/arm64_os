@@ -19,8 +19,11 @@ OBJS := \
 
 $(info $(OBJS))
 
+get_checksum = cat $(1:.bin=.map) | grep checksum | awk '{print $$1}'
+
 atmega8a.bin: atmega8a.o
 	$(OBJCOPY) --only-section .text -O binary $^ $@
+	python patch_checksum.py $@ $$($(call get_checksum, $@))
 
 atmega8a.o: $(OBJS)
 	$(LD) -T link.lds -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
