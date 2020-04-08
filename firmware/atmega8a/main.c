@@ -33,7 +33,7 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 
 void __attribute__((optimize("O2"))) blink() 
 {
-  char *blinker = 0x100;
+  char *blinker = (char *)0x100;
   if (*blinker == 1) {
     *blinker = 0;
     PIN_ON(B, 0);
@@ -78,6 +78,11 @@ int __attribute__((noinline)) get_int(int x)
 {
   return x+2;
 }
+
+extern int twi_get_status(void);
+extern void twi_master_init(void);
+extern void twi_master_deinit(void);
+extern void twi_master_start(void);
 
 void main() 
 {

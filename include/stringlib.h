@@ -13,6 +13,7 @@
 #define strncpy    _strncpy
 #define memset     _memset
 #define memcpy     _memcpy
+#define memcmp     _memcmp
 #define strtoll    _strtoll
 #define sprintf    _sprintf
 #define snprintf   _snprintf
@@ -39,6 +40,8 @@ char * _strncpy(char *, const char *, size_t n);
 void * _memset(void *dst, char value, size_t n);
 
 void * _memcpy(void *dst, const void *src, size_t n);
+
+int _memcmp(const void *a, const void *b, size_t n);
 
 long long int _strtoll(const char *str, char **endptr, int basis);
 

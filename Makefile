@@ -14,6 +14,7 @@ CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
+	avr_update.o\
 	binblock.o\
 	console.o\
 	delays.o\

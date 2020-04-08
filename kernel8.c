@@ -6,6 +6,7 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
+#include <avr_update.h>
 #include <spinlock.h>
 #include <i2c.h>
 #include <font.h>
@@ -315,11 +316,11 @@ DECL_GPIO_SET_KEY(gpio_i2c_test_gpiokey, "I2CTESTGPIO_KE0");
 void gpio_i2c_test(int scl, int sda, int poll)
 {
   int x = 0;
-  uint32_t *i2c_base = 0x3f214000;
-  uint32_t *dr  = i2c_base + 0;
-  uint32_t *rsr = i2c_base + 1;
-  uint32_t *slv = i2c_base + 2;
-  uint32_t *cr  = i2c_base + 3;
+  volatile uint32_t *i2c_base = (uint32_t*)0x3f214000;
+//  uint32_t *dr  = i2c_base + 0;
+//  uint32_t *rsr = i2c_base + 1;
+  volatile uint32_t *slv = i2c_base + 2;
+//  uint32_t *cr  = i2c_base + 3;
   int poll_counter = 0;
 
   int pins[2] = { scl, sda };
@@ -519,7 +520,7 @@ void max7219_work()
   // Set spi device
   int ret;
   const int gpio_pin_mosi = 21;
-  const int gpio_pin_cs0  = 20;
+//  const int gpio_pin_cs0  = 20;
   const int gpio_pin_sclk = 16;
   const int gpio_pin_miso = -1;
   spi_dev_t *spidev;
@@ -563,119 +564,6 @@ void max7219_work()
   printf("max7219_set_test_mode_on\n");
   max7219_set_test_mode_on();
 }
-
-void init_atmega8a()
-{
-  const int gpio_pin_mosi  = 6;
-  const int gpio_pin_miso  = 13;
-  const int gpio_pin_sclk  = 19;
-  const int gpio_pin_reset = 26;
-
-  int ret;
-  char fuse_high;
-  char fuse_low;
-  char lock_bits;
-  int flash_size;
-  int eeprom_size;
-  spi_dev_t *spidev;
-  char lock_bits_desc[128];
-  spidev = spi_allocate_emulated("spi_avr_isp", 
-      gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
-  if (IS_ERR(spidev)) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", 
-       (int)PTR_ERR(spidev));
-    return;
-  }
-
-  ret = atmega8a_init(spidev, gpio_pin_reset);
-
-  if (ret != ERR_OK) {
-    printf("Failed to init atmega8a. Error_code: %d\n", ret);
-    return;
-  }
-
-  if (atmega8a_read_fuse_bits(&fuse_low, &fuse_high) != ERR_OK)
-    printf("Failed to read program memory\n");
-
-  if (atmega8a_read_lock_bits(&lock_bits) != ERR_OK)
-    printf("Failed to read program memory\n");
-
-  atmega8a_lock_bits_describe(lock_bits_desc, sizeof(lock_bits_desc), lock_bits);
-
-  flash_size = atmega8a_get_flash_size();
-  eeprom_size = atmega8a_get_eeprom_size();
-  printf("atmega8 downloader initialization:\r\n");
-  printf("  flash size: %d bytes\r\n", flash_size);
-  printf("  eeprom size: %d bytes\r\n", eeprom_size);
-  printf("  lock bits: %x: %s\r\n", lock_bits, lock_bits_desc);
-  printf("  fuse bits: low:%02x high:%02x\r\n", fuse_low, fuse_high);
-}
-
-void atmega8a_program()
-{
-  char fuse_bits_low = 0xe0 | (ATMEGA8A_FUSE_CPU_FREQ_1MHZ & ATMEGA8A_FUSE_CPU_FREQ_MASK);
-  printf("programming atmega8a: \r\n");
-  printf("writing low fuse bits to %x\r\n", fuse_bits_low);
-  atmega8a_write_fuse_bits_low(fuse_bits_low);
-  printf("programming atmega8a complete\r\n");
-}
-
-void atmega8a_read_firmware()
-{
-  char membuf[8192];
-  int num_read;
-  num_read = min(atmega8a_get_flash_size(), sizeof(membuf));
-  printf("atmega8a_read_firmware: reading %d bytes of atmega8a flash memory\r\n.", num_read);
-  atmega8a_read_flash_memory(membuf, num_read, 0);
-  hexdump_memory(membuf, num_read);
-  puts("atmega8a_read_firmware: Success.\r\n");
-}
-
-void atmega8a_download(const void *bin, int bin_size)
-{
-  char membuf[8192];
-  const char *binary = bin;
-  int binary_size = bin_size;
-  if (bin_size > 8192) {
-    printf("Not writing binary of size %d to flash memory. Too big.\r\n",
-        bin_size);
-    return;
-  }
-
-  if (bin_size % 64) {
-    binary = membuf;
-    binary_size = ((bin_size / 64) + 1) * 64;
-    printf("Binary size %d not page-aligned (64 bytes), padding up to %d bytes\r\n", 
-        bin_size, binary_size);
-    memcpy(membuf, bin, bin_size);
-  }
-
-  printf("Erasing chip flash memory..\r\n");
-  if (atmega8a_chip_erase() != ERR_OK) {
-    printf("Failed to erase chip\r\n");
-    while(1);
-  }
-  printf("Chip flash erased.\r\n");
-  hexdump_memory(binary, binary_size);
-  printf("Writing %d bytes of binary to flash memory..\r\n");
-  if (atmega8a_write_flash(binary, binary_size, 0) != ERR_OK) {
-    printf("Failed to read program memory\n");
-    while(1);
-  }
-  printf("Write complete.\r\n");
-
-  memset(membuf, 0x00, 64);
-
-  printf("Reading.\r\n");
-  if (atmega8a_read_flash_memory(membuf, 64, 0 * 64) != ERR_OK)
-    printf("Failed to read program memory\n");
-  printf("Read complete.\r\n");
-  hexdump_memory(membuf, 64);
-  while(1);
-}
-
-extern const char _binary_firmware_atmega8a_atmega8a_bin_start;
-extern const char _binary_firmware_atmega8a_atmega8a_bin_end;
 
 #define PIN_SDA 18
 #define PIN_SCL 23
@@ -842,9 +730,6 @@ void pullup_down_test()
 
 void main()
 {
-  const char *atmega8a_bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
-  int atmega8a_bin_size = &_binary_firmware_atmega8a_atmega8a_bin_end 
-      - &_binary_firmware_atmega8a_atmega8a_bin_start;
   debug_init();
   gpio_set_init();
   spi_emulated_init();
@@ -857,10 +742,10 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  self_test();
+  // self_test();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
-  init_atmega8a();
+  avr_update();
 #ifndef CONFIG_QEMU
   init_nokia5110_display(1, 0);
   nokia5110_draw_text("Display ready", 0, 0);
@@ -879,9 +764,7 @@ void main()
 //  } else
 //    bsc_slave_debug();
 //  while(1);
-  // atmega8a_program();
-  // atmega8a_read_firmware();
-  atmega8a_download(atmega8a_bin, atmega8a_bin_size);
+  avr_update();
   while(1);
   
   print_mbox_props();

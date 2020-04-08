@@ -26,6 +26,17 @@ int _strcmp(const char *s1, const char *s2)
   return *s1 - *s2;
 }
 
+int _memcmp(const void *a, const void *b, size_t n)
+{
+  const char *p1 = a;
+  const char *p2 = b;
+  while(n--) {
+    if (*p1 != *p2)
+      return *p1 - *p2;
+  }
+  return 0;
+}
+
 int _strncmp(const char *s1, const char *s2, size_t n)
 {
   while (n && *s1 && *s2 && *s1 == *s2) {
