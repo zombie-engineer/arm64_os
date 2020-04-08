@@ -62,3 +62,11 @@ static inline int should_lock()
       spinlock_unlock(lock);       \
   } while(0)
 
+
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+
+#define __msg_codeline(__msg) "("__FILE__ ":" STRINGIFY(__LINE__) "): "__msg "\n"
+
+#define __puts_codeline(__msg) puts(__msg_codeline(__msg))
+#define __printf_codeline(__fmt, ...) printf(__msg_codeline(__fmt), ## __VA_ARGS__)

@@ -3,13 +3,8 @@
 
 #define FAIL() while(1);
 
-#define _STRINGIFY(x) #x
-#define STRINGIFY(x) _STRINGIFY(x)
+#define PERF_TEST_ITERATIONS 20
 
-#define __msg_codeline(__msg) "("__FILE__ ":" STRINGIFY(__LINE__) "): "__msg "\n"
-
-#define __puts_codeline(__msg) puts(__msg_codeline(__msg))
-#define __printf_codeline(__fmt, ...) printf(__msg_codeline(__fmt), ## __VA_ARGS__)
 
 void test_sprintf()
 {
@@ -46,13 +41,15 @@ void test_sprintf()
 void test_perf_sprintf()
 {
   char buf[1024];
-  int n;
+  int n, i;
   uint64_t ts1, ts2;
   printf("Running test_perf_sprintf. generic counter freq: %d Hz\n", 
       get_cpu_counter_64_freq());
+
 #define TEST_SPRINTF_PERF(exp, exp_n, fmt, ...)\
   ts1 = read_cpu_counter_64();\
-  n = sprintf(buf, fmt, ## __VA_ARGS__);\
+  for (i = 0; i < PERF_TEST_ITERATIONS; ++i)\
+    n = sprintf(buf, fmt, ## __VA_ARGS__);\
   ts2 = read_cpu_counter_64();\
   if (n != exp_n) {\
     __puts_codeline(" Unexpected return value for '" #fmt "'. expected " #exp_n);\
@@ -62,7 +59,8 @@ void test_perf_sprintf()
     __puts_codeline(" Unexpected string value for '" #fmt "'. expected " exp);\
     FAIL();\
   }\
-  __printf_codeline("snprintf(\"%s\") took %llu counter ticks.)", fmt, ts2- ts1);\
+  __printf_codeline("snprintf(\"%s\") took %llu counter ticks.)", fmt,\
+      (ts2 - ts1)/PERF_TEST_ITERATIONS);\
   puts(buf);\
   putc('\n');
   TEST_SPRINTF_PERF("0", 1, "%d", 0);
