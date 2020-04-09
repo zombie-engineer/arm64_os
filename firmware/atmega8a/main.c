@@ -86,6 +86,7 @@ extern void twi_master_start(void);
 
 void main() 
 {
+  int i;
   char status;
   *(char*)0x100 = 0;
   PIN_MODE_OUT(B, 0);
@@ -93,6 +94,12 @@ void main()
   PIN_MODE_OUT(D, 7);
   PIN_OFF(C, 5);
   PIN_ON(D, 7);
+  for (i = 0; i < 20; ++i) {
+    PIN_ON(B, 0);
+    wait_100_msec();
+    PIN_OFF(B, 0);
+    wait_100_msec();
+  }
   while(1) {
     PIN_ON(B, 0);
     twi_master_init();
