@@ -12,6 +12,8 @@ typedef struct spi_dev spi_dev_t;
 
 int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset);
 
+int atmega8a_reset();
+
 int atmega8a_get_flash_size();
 
 int atmega8a_get_eeprom_size();
@@ -41,3 +43,5 @@ int atmega8a_write_lock_bits(char lock_bits);
  * lock_bits: lock bits to describe
  */
 int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits);
+
+int atmega8a_spi_test();

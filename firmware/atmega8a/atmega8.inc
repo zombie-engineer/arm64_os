@@ -12,6 +12,9 @@
 .equ UCSRB , 0x0a
 .equ UCSRA , 0x0b
 .equ UDR   , 0x0c
+.equ SPCR  , 0x0d
+.equ SPSR  , 0x0e
+.equ SPDR  , 0x0f
 .equ PIND  , 0x10
 .equ DDRD  , 0x11
 .equ PORTD , 0x12
@@ -46,6 +49,19 @@
 .equ SPL   , 0x3d
 .equ SPH   , 0x3e
 .equ SREG  , 0x3f
+
+.equ SPCR_SPR0  , 0
+.equ SPCR_SPR1  , 1
+.equ SPCR_CPHA  , 2
+.equ SPCR_CPOL  , 3
+.equ SPCR_MSTR  , 4
+.equ SPCR_DORD  , 5
+.equ SPCR_SPE   , 6
+.equ SPCR_SPIE  , 7
+
+.equ SPSR_SPI2X , 0
+.equ SPSR_WCOL  , 6
+.equ SPSR_SPIF  , 7
 
 .equ UCSRB_TXB8 , 0
 .equ UCSRB_RXB8 , 1

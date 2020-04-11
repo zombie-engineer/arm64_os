@@ -46,6 +46,11 @@ static inline uint32_t get_read_signature_bytes_cmd(int byte_idx)
   return 0x00000030 | (byte_idx << 16);
 }
 
+static inline int atmega8a_is_init()
+{
+  return atmega8a_dev.spi != NULL;
+}
+
 #define _FLASH_WORD_ADDR(word_addr)  (((word_addr)&0xf00)|(((word_addr)&0xff)<<16))
 #define _EEPROM_BYTE_ADDR(byte_addr) (((byte_addr)&0x100)|(((byte_addr)&0xff)<<16))
 
@@ -187,6 +192,22 @@ int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset)
   atmega8a_dev.spi = spidev;
   atmega8a_dev.gpio_pin_reset = gpio_pin_reset;
   atmega8a_dev.gpio_set_handle = gpio_set_handle;
+  return ERR_OK;
+}
+
+int atmega8a_reset()
+{
+  atlog("atmega8a_reset");
+  if (!atmega8a_is_init()) {
+    atlog("atmega8a_reset: device is not initialized.");
+    return ERR_NOT_INIT;
+  }
+  gpio_set_on(atmega8a_dev.gpio_pin_reset);
+  wait_msec(100);
+  gpio_set_off(atmega8a_dev.gpio_pin_reset);
+  wait_msec(100);
+  gpio_set_on(atmega8a_dev.gpio_pin_reset);
+  atlog("atmega8a_reset: completed");
   return ERR_OK;
 }
 
@@ -514,4 +535,23 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
   }
 
   return n;
+}
+
+int atmega8a_spi_test()
+{
+  spi_dev_t *s = atmega8a_dev.spi;
+  int ret;
+  char cmd = 0x66;
+  char res = 0x00;
+  puts("atmega8a_spi_test\r\n");
+  spi_emulated_set_clk(s, 100000);
+  while (1) {
+    ret = s->xmit(s, &cmd, &res, 1);
+    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
+    ret = s->xmit(s, &cmd, &res, 1);
+    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
+    ret = s->xmit(s, &cmd, &res, 1);
+    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
+  }
+  return 0;
 }

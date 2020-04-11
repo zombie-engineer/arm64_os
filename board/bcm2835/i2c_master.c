@@ -2,6 +2,7 @@
 #include <common.h>
 #include <gpio.h>
 #include "board_map.h"
+#include <delays.h>
 
 /* Control */
 #define BSC_MASTER_REG_C(master_id)    BSC ## master_id ## _BASE + 0x00
@@ -90,4 +91,81 @@ int i2c_init()
 
   while(1);
   return ERR_OK;
+}
+
+void i2c_start_transfer()
+{
+  uint32_t c = BSC_MASTER_C_I2CEN|BSC_MASTER_C_ST;
+  write_reg(BSC_MASTER_REG_DLEN(1), 1);
+  write_reg(BSC_MASTER_REG_C(1), c);
+}
+
+#define LOG_ST(msg) \
+  printf("i2c:C:%08x:S:%08x-" msg "-\r\n", \
+      read_reg(BSC_MASTER_REG_C(1)), \
+      read_reg(BSC_MASTER_REG_S(1)));
+
+void i2c_test()
+{
+  uint32_t st;
+  puts("i2c_test\r\n");
+  gpio_set_pullupdown(PIN_SDA, GPIO_PULLUPDOWN_EN_PULLDOWN);
+  gpio_set_pullupdown(PIN_SCL, GPIO_PULLUPDOWN_EN_PULLDOWN);
+
+  gpio_set_function(PIN_SDA, GPIO_FUNC_ALT_0);
+  gpio_set_function(PIN_SCL, GPIO_FUNC_ALT_0);
+
+
+  write_reg(BSC_MASTER_REG_C(1), 0);
+  wait_msec(1000);
+  LOG_ST("c=0");
+
+  write_reg(BSC_MASTER_REG_C(1), BSC_MASTER_C_I2CEN|BSC_MASTER_C_CLEAR);
+  LOG_ST("c=en|clear");
+
+  // FILL FIFO
+  write_reg(BSC_MASTER_REG_FIFO(1), 0xff);
+  // START TRANSFER
+  write_reg(BSC_MASTER_REG_A(1), 0x4e);
+  write_reg(BSC_MASTER_REG_DLEN(1), 1);
+  write_reg(BSC_MASTER_REG_C(1), BSC_MASTER_C_I2CEN|BSC_MASTER_C_ST);
+  LOG_ST("c=en|st");
+  wait_msec(1000);
+  LOG_ST("c=en|st");
+
+  while(1);
+
+  write_reg(BSC_MASTER_REG_FIFO(1), 0x99);
+  // Data length is 1 byte
+  write_reg(BSC_MASTER_REG_DLEN(1), 1);
+  while(1) {
+    // Enable I2C Master 
+    write_reg(BSC_MASTER_REG_C(1), 
+        BSC_MASTER_C_I2CEN       | 
+        BSC_MASTER_C_ST          | 
+        BSC_MASTER_C_CLEAR);
+
+    while(1) {
+      st = read_reg(BSC_MASTER_REG_S(1));
+#define CHECK_STAT(x) if (st & BSC_MASTER_S_ ## x) puts(#x"-")
+      CHECK_STAT(TA);
+      CHECK_STAT(DONE);
+      CHECK_STAT(TXW);
+      CHECK_STAT(RXR);
+      CHECK_STAT(TXD);
+      CHECK_STAT(RXD);
+      CHECK_STAT(TXE);
+      CHECK_STAT(RXF);
+      CHECK_STAT(ERR);
+      CHECK_STAT(CLKT);
+      if (st & BSC_MASTER_S_TA)
+        break;
+      puts("-\r\n");
+    }
+    puts("--\r\n");
+    // write_reg(BSC_MASTER_REG_C(0), BSC_MASTER_C_READ | BSC_MASTER_C_I2CEN);
+    // c = read_reg(BSC_MASTER_REG_FIFO(0));
+    // printf("read from i2c:%x\n", (int)c);
+    wait_msec(2000);
+  }
 }

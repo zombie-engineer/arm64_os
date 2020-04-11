@@ -56,7 +56,7 @@ nop
 nop
 nop
 nop
-rjmp __int_reset
+#rjmp __int_reset
 
 TWI_ERROR:
 rjmp ERROR

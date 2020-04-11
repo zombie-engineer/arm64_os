@@ -6,3 +6,4 @@
 
 int bsc_slave_init(int mode, char addr);
 int bsc_slave_debug();
+void i2c_test();

@@ -94,3 +94,5 @@ int nokia5110_send_data(const void *data, size_t sz);
 
 // Sends data to nokia5110 display framebuffer via DMA.
 int nokia5110_send_data_dma(const void *data, size_t sz);
+
+int nokia5110_blank_screen(void);

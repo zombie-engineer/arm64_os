@@ -346,13 +346,15 @@ void gpio_i2c_test(int scl, int sda, int poll)
       int sda_set = gpio_is_set(sda_pin);
       putc(scl_set ? 'C' : '-');
       putc(sda_set ? 'D' : '-');
-      nokia5110_draw_dot(x, scl_set ? 8 : 7);
-      nokia5110_draw_dot(x, sda_set ? 14 : 13);
+      nokia5110_draw_dot(x, scl_set ? 8 : 4);
+      nokia5110_draw_dot(x, sda_set ? 40: 44);
       poll_counter++;
       if (!(poll_counter % 32))
         puts("\r\n");
-      if (++x > NOKIA5110_PIXEL_SIZE_X)
+      if (++x > NOKIA5110_PIXEL_SIZE_X) {
         x = 0;
+        nokia5110_blank_screen();
+      }
     }
   }
 
@@ -728,6 +730,19 @@ void pullup_down_test()
   }
 }
 
+void nokia5110_test_draw()
+{
+  int i;
+  int x;
+  int y;
+  for (i = 0; i < 10; ++i) {
+    x = i % NOKIA5110_PIXEL_SIZE_X;
+    y = i % NOKIA5110_PIXEL_SIZE_Y;
+    nokia5110_blank_screen();
+    nokia5110_draw_dot(x, y);
+  }
+}
+
 void main()
 {
   debug_init();
@@ -745,12 +760,17 @@ void main()
   // self_test();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
-  avr_update();
 #ifndef CONFIG_QEMU
   init_nokia5110_display(1, 0);
   nokia5110_draw_text("Display ready", 0, 0);
 #endif
-  gpio_i2c_test(8, 25, 1 /* yes poll */);
+  // nokia5110_test_draw();
+  if (avr_update()) {
+    puts("halting\n");
+    while(1) asm volatile("wfe");
+  }
+  atmega8a_spi_test();
+  i2c_test();
   while(1);
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);

@@ -36,6 +36,9 @@ checksum:
 header_end:
 .ascii "ATMGEND0"
 
+__SP_H__ = RAMEND & 0xff
+__SP_L__ = (RAMEND >> 8) & 0xff
+
 .globl __int_reset
 __int_reset:
 ldi   r16, RAMEND & 0xff

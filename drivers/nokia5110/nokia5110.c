@@ -232,6 +232,14 @@ CHECKED_FUNC(nokia5110_draw_dot, int x, int y)
   return ERR_OK;
 }
 
+int nokia5110_blank_screen(void)
+{
+  nokia5110_set_cursor(0, 0);
+  memset(nokia5110_canvas, 0, NOKIA5110_CANVAS_SIZE);
+  nokia5110_send_data(nokia5110_canvas, NOKIA5110_CANVAS_SIZE);
+  return ERR_OK;
+}
+
 CHECKED_FUNC(nokia5110_draw_line, int x0, int y0, int x1, int y1)
   int x, err;
   for (x = 0; x < 84; x++) {
