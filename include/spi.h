@@ -57,6 +57,8 @@ spi_dev_t *spi_allocate_emulated(
 
 void spi_emulated_init(void);
 
+void spi_emulated_set_clk(spi_dev_t *s, int val);
+
 void spi_emulated_print_info();
 
 int spi_type_from_string(const char *string, int len);

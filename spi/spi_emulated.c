@@ -283,7 +283,7 @@ spi_dev_t *spi_allocate_emulated(
   spidev->ce0_gpio_pin = ce0_pin;
   spidev->ce1_gpio_pin = ce1_pin;
   spidev->gpio_set_handle = gpio_set_handle;
-  spidev->clk_half_period = 50;
+  spidev->clk_half_period = 1;
 
   printf("SPIemu: allocated at %p with name: '%s'\n"
          "SPIemu: SCLK:%d,MOSI:%d,MISO:%d,CE0:%d,CE1:%d\n"
@@ -316,4 +316,12 @@ void spi_emulated_print_info()
   puts("spi_emulated debug info:\n");
   printf(" verbose_output: %d\n", spi_emulated_verbose_output);
   printf(" initialized   : %d\n", spi_emulated_initialized);
+}
+
+void spi_emulated_set_clk(spi_dev_t *s, int val)
+{
+  struct spi_emulated_dev *d = container_of(s, 
+      struct spi_emulated_dev, spidev);
+  printf("spi_emulated: setting clk period to %d micro seconds\n\r", val);
+  d->clk_half_period = val;
 }
