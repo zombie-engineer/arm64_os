@@ -6,6 +6,13 @@
 // #define F_CPU 8000000
 // #include <util/delay.h>
 
+#define DEBUG_PIN_SETUP() DDRD |= 1<<PIND7
+
+#define DEBUG_PIN_ON() PORTD |= (1<<PIND7)
+
+#define DEBUG_PIN_OFF() PORTD &= ~(1<<PIND7)
+
+
 #define I2CSLAVE_ADDR 0x4e
 #define PORT_DDR 0xb0
 #define PORT_IN  0xb1
@@ -146,12 +153,12 @@ static inline __attribute__((optimize("O2"))) void atmcmd_cmd(char cmd)
 {
   switch (cmd) {
     case ATMCMD_CMD_RESET:
-      PORTD &= ~(1<<PIND7);
+      DEBUG_PIN_OFF();
       atmcmd_status = ATMCMD_STATUS_IDLE;
       break;
     case ATMCMD_CMD_READ_SIGN:
       atmcmd_status = ATMCMD_STATUS_SEND_SIGN1;
-      PORTD &= ~(1<<PIND7);
+      DEBUG_PIN_OFF();
       while(1);
       break;
     case ATMCMD_CMD_ADC_START:
@@ -161,6 +168,7 @@ static inline __attribute__((optimize("O2"))) void atmcmd_cmd(char cmd)
       atmcmd_status = ATMCMD_STATUS_IDLE;
       break;
     default:
+      DEBUG_PIN_OFF();
       atmcmd_status = ATMCMD_STATUS_IDLE;
       SPDR = 0x7f;
       return;
@@ -279,73 +287,37 @@ ISR(TWI_vect)
 
 extern void SPI_SlaveInit(void);
 extern void SPI_SlaveReceive(void);
-void __attribute__((optimize("O2"))) main()
+
+static inline void atmcmd_start()
 {
-  char packet = 0;
-  DDRD |= 1<<PIND7;
-  PORTD |= (1<<PIND7);
   SPI_SlaveInit();
   atmcmd_status = ATMCMD_STATUS_IDLE;
   adc_value = 0x6666;
   SPDR = 0x38;
-//  while(1) {
-//  while(!(SPSR & (1<<SPIF)))
-//    ;
-//    PORTD &= ~(1<<PIND7);
-//    SPDR=packet;
-//    packet++;
-//  }
-//  while(1);
-  // SPI_SlaveReceive();
-  sei();
-  while(1);
-
-
-  PORTC |= ((1<<PINC4) | (1<<PINC5));
-  // Initial I2C Slave
-  TWAR = I2CSLAVE_ADDR & 0xfe; // Set I2C Address, Ignore I2C General address 0x00
-  TWDR = 0x00;                 // Default value 
-  
-  // Start Slave Listening: Clear TWINT Flag, Enable ACK, Enable TWI, TWI Interrupt Enable
-  TWCR = (1<<TWINT) | (1<<TWEA) | (1<<TWEN) | (1<<TWIE);
-  // Enable Global Interrupt
-  regaddr = 0;
-  regdata = 0;
-
-  sei();
-  while(1);
-
- // int i;
- // char status;
-//  *(char*)0x100 = 0;
-//  PIN_MODE_OUT(B, 0);
-//  PIN_MODE_OUT(C, 5);
-//  PIN_MODE_OUT(D, 7);
-//  PIN_OFF(C, 5);
-//  return;
 }
-//  PIN_ON(D, 7);
-//  for (i = 0; i < 40; ++i) {
-//    PIN_ON(B, 0);
-//    wait_100_msec();
-//    PIN_OFF(B, 0);
-//    wait_100_msec();
-//    wait_100_msec();
-//  }
-//  while(1) {
-//    PIN_ON(B, 0);
-//    twi_master_init();
-//    wait_3_sec();
-//    twi_master_start();
-//    status = twi_get_status();
-//    if (status != 8) {
-//      PIN_OFF(D, 7);
-//      while(1);
-//    }
-//    wait_3_sec();
-//    PIN_OFF(B, 0);
-//    twi_master_deinit();
-//    wait_3_sec();
-//  }
+
+//static inline void atmcmd_start_i2c()
+//{
+//  PORTC |= ((1<<PINC4) | (1<<PINC5));
+//  // Initial I2C Slave
+//  TWAR = I2CSLAVE_ADDR & 0xfe; // Set I2C Address, Ignore I2C General address 0x00
+//  TWDR = 0x00;                 // Default value 
+//  
+//  // Start Slave Listening: Clear TWINT Flag, Enable ACK, Enable TWI, TWI Interrupt Enable
+//  TWCR = (1<<TWINT) | (1<<TWEA) | (1<<TWEN) | (1<<TWIE);
+//  // Enable Global Interrupt
+//  regaddr = 0;
+//  regdata = 0;
 //}
-//
+
+void __attribute__((optimize("O2"))) main()
+{
+  DEBUG_PIN_SETUP();
+  DEBUG_PIN_ON();
+  atmcmd_start();
+  sei();
+  while(1);
+}
+
+
+
