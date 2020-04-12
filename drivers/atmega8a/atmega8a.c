@@ -584,7 +584,7 @@ int atmega8a_spi_test()
   uint16_t cmd_adc = 0x1122;
  // spi_emulated_set_log_level(1);
   puts("atmega8a_spi_test\r\n");
-  spi_emulated_set_clk(s, 1);
+  spi_emulated_set_clk(s, 8);
   while(atm_status != 0xd5)
     atm_get_response(s, atm_status);
   atm_send_cmd(s, ATMCMD_CMD_RESET, NULL);

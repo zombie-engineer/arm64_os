@@ -217,11 +217,15 @@ ISR(SPI_STC_vect)
   prev_cmd = cmd;
 }
 
+static char chan = 0;
+
 __attribute__((optimize("O2"))) 
 ISR(ADC_vect)
 {
   adc_value_low = ADCL;
-  adc_value_high = ADCH & 3;
+  adc_value_high = ADCH & 3 | ((chan & 1) << 7);
+  chan = chan ? 0 : 1;
+  ADMUX = 0b01000000 | chan;
   ADCSRA = 0b11001000;
   DEBUG_PIN_ON();
 }
