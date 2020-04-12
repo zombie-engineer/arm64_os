@@ -1,0 +1,16 @@
+#pragma once
+
+#define ATMCMD_STATUS_IDLE       0x00
+#define ATMCMD_STATUS_SEND_SIGN1 0x01
+#define ATMCMD_STATUS_SEND_ADC   0x02
+
+#define ATMCMD_STAT_OK          0x00
+#define ATMCMD_STAT_UNKNOWN_CMD 0x7f
+#define ATMCMD_STAT_ERR         0xff
+
+#define ATMCMD_CMD_RESET     0x00
+#define ATMCMD_CMD_READ_SIGN 0x01
+#define ATMCMD_CMD_ADC_START 0x02
+#define ATMCMD_CMD_ADC_STOP  0x03
+#define ATMCMD_CMD_GET_RESP  0x55
+

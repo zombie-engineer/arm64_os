@@ -1,4 +1,5 @@
-CFLAGS := -c -mmcu=atmega8 -OS
+INCLUDES := include
+CFLAGS := -c -mmcu=atmega8 -OS $(addprefix -I,$(INCLUDES))
 CC := avr-gcc
 LD := avr-ld
 OBJCOPY := avr-objcopy
@@ -6,6 +7,7 @@ OBJDUMP := avr-objdump
 
 dump_listing = $(OBJDUMP) -d $(1) > $(1:.o=.text)
 # dump_text = echo $(1) $(1:.o=.text)
+
 
 OBJS := \
 	uart_routines.o\
@@ -31,7 +33,7 @@ atmega8a.bin: atmega8a.o
 #	$(call dump_listing,$@)
 
 atmega8a.o: main.c twi.S delay.S spi.S adc.S
-	avr-gcc -O2 -mmcu=atmega8a $? -o $@
+	avr-gcc -O2 -mmcu=atmega8a -Iinclude $? -o $@
 	# $(LD) -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
 	$(call dump_listing,$@)
 

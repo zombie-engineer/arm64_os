@@ -3,12 +3,13 @@ LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
-INCLUDES := include
+INCLUDES = include firmware/atmega8a/include
+INCLUDES_FLAGS = $(addprefix -I,$(INCLUDES))
 
 OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
-CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles -I$(INCLUDES)
+CFLAGS := -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
@@ -80,7 +81,7 @@ BINOBJS := nokia5110_animation.o firmware/atmega8a/atmega8a.o font.o
 
 .PHONY: firmware/atmega8a/atmega8a.bin
 firmware/atmega8a/atmega8a.bin:
-	make -C firmware/atmega8a clean
+#	make -C firmware/atmega8a clean
 	make -C firmware/atmega8a
 
 firmware/atmega8a/atmega8a.bin.o: firmware/atmega8a/atmega8a.bin
@@ -179,10 +180,10 @@ DEPS := $(OBJS:.o=.d)
 $(info $(DEPS))
 
 %.d: %.c
-	cpp -M -I$(INCLUDES) $< > $@
+	cpp -M $(INCLUDES_FLAGS) $< > $@
 
 %.d: %.S
-	cpp -M -I$(INCLUDES) $< > $@
+	cpp -M $(INCLUDES_FLAGS) $< > $@
 
 -include $(DEPS)
 

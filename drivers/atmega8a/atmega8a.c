@@ -1,4 +1,5 @@
 #include <drivers/atmega8a.h>
+#include <atmcmd.h>
 #include <gpio.h>
 #include <gpio_set.h>
 #include <spi.h>
@@ -537,15 +538,6 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
 
   return n;
 }
-
-#define ATMCMD_STAT_OK  0x00
-#define ATMCMD_STAT_ERR 0xff
-
-#define ATMCMD_CMD_RESET     0x00
-#define ATMCMD_CMD_READ_SIGN 0x01
-#define ATMCMD_CMD_ADC_START 0x02
-#define ATMCMD_CMD_ADC_STOP  0x03
-#define ATMCMD_CMD_GET_RESP  0x55
 
 #define atm_err_check(err, msg)\
   if (err != ERR_OK) {\

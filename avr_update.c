@@ -64,7 +64,7 @@ static int init_atmega8a()
   return ERR_OK;
 }
 
-int avr_program()
+int avr_program(void)
 {
   int err;
   char fuse_bits_low = 0xe0 | (ATMEGA8A_FUSE_CPU_FREQ_8MHZ & ATMEGA8A_FUSE_CPU_FREQ_MASK);
@@ -78,7 +78,7 @@ int avr_program()
   return err;
 }
 
-static int atmega8a_read_firmware()
+int avr_dump_firmware(void)
 {
   int err;
   char membuf[8192];
@@ -152,7 +152,7 @@ static int atmega8a_download(const void *bin, int bin_size)
   return ERR_OK;
 }
 
-int avr_update()
+int avr_update(void)
 {
   int err;
   int check_crc = 0;
@@ -199,12 +199,12 @@ int avr_update()
 
   avr_program();
 
-//  err = atmega8a_download(bin, binsz);
-//  if (err != ERR_OK)
-//    printf("avr_update: failed to download firmware to device.\n");
-//  else {
-//    puts("avr_update: firmware on device has been updated.\n");
-//  }
+  err = atmega8a_download(bin, binsz);
+  if (err != ERR_OK)
+    printf("avr_update: failed to download firmware to device.\n");
+  else {
+    puts("avr_update: firmware on device has been updated.\n");
+  }
   atmega8a_reset();
   return err;
 }

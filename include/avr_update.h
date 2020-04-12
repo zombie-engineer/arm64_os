@@ -1,4 +1,5 @@
 #pragma once
 
-int avr_update();
-int avr_program();
+int avr_update(void);
+int avr_program(void);
+int avr_dump_firmware(void);
