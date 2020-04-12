@@ -1,3 +1,5 @@
+CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
 CC      = $(CROSS_COMPILE)gcc
 LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
@@ -11,7 +13,6 @@ OPTIMIZATION_FLAGS = -g
 
 CFLAGS := -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
-CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
@@ -47,6 +48,7 @@ OBJS := \
 
 all: kernel8.img
 
+include bins/Makefile
 include uart/Makefile
 include spi/Makefile
 include mbox/Makefile
@@ -72,37 +74,13 @@ LIBS += $(OBJS_NOKIA5110)
 LIBS += $(OBJS_ATMEGA8A)
 LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
+LIBS += $(OBJS_BINS)
 $(info LIBS = $(LIBS))
 
 OBJS += $(LIBS) lib/checksum.o font/font.o
 
-BINOBJS := nokia5110_animation.o firmware/atmega8a/atmega8a.o font.o
-.SECONDARY: $(BINOBJS)
-
-.PHONY: firmware/atmega8a/atmega8a.bin
-firmware/atmega8a/atmega8a.bin:
-#	make -C firmware/atmega8a clean
-	make -C firmware/atmega8a
-
-firmware/atmega8a/atmega8a.bin.o: firmware/atmega8a/atmega8a.bin
-
-%.o: %.bin
-	$(OBJCOPY) \
-		-B aarch64 \
-		-I binary \
-		-O elf64-littleaarch64 \
-		--section-alignment=128 \
-		--rename-section .data=.data.$(notdir $<) $< $@
-#	$(LD) -r -b binary $< -o $@
-
-firware/atmega8a/atmega8a.bin.d nokia5110_animation.d font.bin.d: font.bin
-	echo $@
-
 TARGET_PREFIX_REAL := kernel8
 TARGET_PREFIX_QEMU := kernel8_qemu
-
-.PHONY: firmware
-firmware: firmware/atmega8a/atmega8a.bin
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@

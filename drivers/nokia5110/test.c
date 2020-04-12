@@ -5,9 +5,7 @@
 #include <common.h>
 #include <console.h>
 #include <delays.h>
-
-extern const char _binary_nokia5110_animation_bin_start;
-extern const char _binary_nokia5110_animation_bin_end;
+#include <bins.h>
 
 static char frame_1[NOKIA5110_CANVAS_SIZE + 4];
 static char frame_2[NOKIA5110_CANVAS_SIZE + 4];
@@ -133,10 +131,10 @@ static int nokia5110_run_test_loop_3(int iterations, int wait_interval)
   uint64_t bufsize;
   wait_msec(5000);
 
-  video_0 = &_binary_nokia5110_animation_bin_start;
-  bufsize = (uint64_t)(&_binary_nokia5110_animation_bin_end) - (uint64_t)&_binary_nokia5110_animation_bin_start;
+  video_0 = bins_get_start_nokia5110_animation();
+  bufsize = bins_get_size_nokia5110_animation();
   numframes = bufsize / 508;
-  printf("showing video_0 from address: %08x, num frames: %d\n", &_binary_nokia5110_animation_bin_start, numframes);
+  printf("showing video_0 from address: %08x, num frames: %d\n", video_0, numframes);
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   for (i = 0; i < numframes; ++i) {
     RET_IF_ERR(nokia5110_set_cursor, 0, 0);

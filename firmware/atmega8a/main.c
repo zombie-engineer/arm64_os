@@ -13,7 +13,6 @@
 
 #define DEBUG_PIN_OFF() PORTD &= ~(1<<PIND7)
 
-
 #define I2CSLAVE_ADDR 0x4e
 #define PORT_DDR 0xb0
 #define PORT_IN  0xb1

@@ -4,12 +4,10 @@
 #include <stringlib.h>
 #include <spi.h>
 #include <drivers/atmega8a.h>
+#include <bins.h>
 
 #define ATMEGA_FIRMWARE_HEADER "ATMGBIN8"
 #define ATMEGA_FIRMWARE_HEADER_END "ATMGEND0"
-
-extern const char _binary_firmware_atmega8a_atmega8a_bin_start;
-extern const char _binary_firmware_atmega8a_atmega8a_bin_end;
 
 static int init_atmega8a()
 {
@@ -156,18 +154,15 @@ int avr_update(void)
 {
   int err;
   int check_crc = 0;
-  const char *bin = &_binary_firmware_atmega8a_atmega8a_bin_start;
-  int binsz = &_binary_firmware_atmega8a_atmega8a_bin_end 
-      - &_binary_firmware_atmega8a_atmega8a_bin_start;
+  const char *bin = bins_get_start_atmega();
+  int binsz       = bins_get_size_atmega();
   uint32_t new_checksum, old_checksum;
 
   init_atmega8a();
 
   if (check_crc) {
     printf("avr_update: Checking update blob, start:%p, end:%p, size:%d\n",
-      &_binary_firmware_atmega8a_atmega8a_bin_start,
-      &_binary_firmware_atmega8a_atmega8a_bin_end,
-      binsz);
+      bin, bin + binsz, binsz);
   
     if (strncmp(bin + 0x28, ATMEGA_FIRMWARE_HEADER, 8)) {
       puts("avr_update: no header in uploadable blob\n");
