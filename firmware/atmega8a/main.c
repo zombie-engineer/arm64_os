@@ -177,15 +177,17 @@ static inline __attribute__((optimize("O2"))) void atmcmd_cmd(char cmd)
 }
 
 static uint16_t adc_value = 0x6666;
+static char adc_value_low;
+static char adc_value_high;
 static char prev_cmd;
 
 void atmcmd_adc(char cmd)
 {
-  if (prev_cmd == 0x22)
-    SPDR = (adc_value & 0xff);
+  if (prev_cmd == 0x22) {
+    SPDR = adc_value_low;
+  }
   else if (prev_cmd == 0x11) {
-    SPDR = ((adc_value >> 8) & 0xff);
-    adc_value++;
+    SPDR = adc_value_high;
   }
   else
     SPDR = 0xff;
@@ -213,6 +215,15 @@ ISR(SPI_STC_vect)
       break;
   }
   prev_cmd = cmd;
+}
+
+__attribute__((optimize("O2"))) 
+ISR(ADC_vect)
+{
+  adc_value_low = ADCL;
+  adc_value_high = ADCH & 3;
+  ADCSRA = 0b11001000;
+  DEBUG_PIN_ON();
 }
 
 ISR(TWI_vect)
@@ -285,14 +296,16 @@ ISR(TWI_vect)
   sei();
 }
 
-extern void SPI_SlaveInit(void);
+extern void adc_init_free_int(void);
+extern void spi_init_slave(void);
 extern void SPI_SlaveReceive(void);
 
 static inline void atmcmd_start()
 {
-  SPI_SlaveInit();
+  spi_init_slave();
   atmcmd_status = ATMCMD_STATUS_IDLE;
-  adc_value = 0x6666;
+  adc_value_low = 0xff;
+  adc_value_high = 0xff;
   SPDR = 0x38;
 }
 
@@ -310,10 +323,16 @@ static inline void atmcmd_start()
 //  regdata = 0;
 //}
 
+static inline void adc_start()
+{
+  adc_init_free_int();
+}
+
 void __attribute__((optimize("O2"))) main()
 {
   DEBUG_PIN_SETUP();
   DEBUG_PIN_ON();
+  adc_start();
   atmcmd_start();
   sei();
   while(1);

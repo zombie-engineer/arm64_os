@@ -199,12 +199,12 @@ int avr_update()
 
   avr_program();
 
-//  err = atmega8a_download(bin, binsz);
-//  if (err != ERR_OK)
-//    printf("avr_update: failed to download firmware to device.\n");
-//  else {
-//    puts("avr_update: firmware on device has been updated.\n");
-//  }
+  err = atmega8a_download(bin, binsz);
+  if (err != ERR_OK)
+    printf("avr_update: failed to download firmware to device.\n");
+  else {
+    puts("avr_update: firmware on device has been updated.\n");
+  }
   atmega8a_reset();
   return err;
 }

@@ -30,7 +30,7 @@ atmega8a.bin: atmega8a.o
 #	$(LD) -T link.lds -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
 #	$(call dump_listing,$@)
 
-atmega8a.o: main.c twi.S delay.S spi.S
+atmega8a.o: main.c twi.S delay.S spi.S adc.S
 	avr-gcc -O2 -mmcu=atmega8a $? -o $@
 	# $(LD) -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
 	$(call dump_listing,$@)

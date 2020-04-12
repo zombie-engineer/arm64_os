@@ -2,16 +2,16 @@
 .include "asm_macros.h"
 .text
 
-.globl SPI_SlaveInit
-SPI_SlaveInit:
+.globl spi_init_slave
+spi_init_slave:
   ; Set MISO output, MOSI, SCLK, SS input
-  ldi r17, (1<<PB4)
-  out DDRB, r17
+  ldi r16, (1<<PB4)
+  out DDRB, r16
   ; Enable SPI
-  ldi r17, ((1<<SPCR_SPE)|(1<<SPCR_SPIE))
-  out SPCR, r17
-  ldi r17, 0x00 
-  out SPDR, r17
+  ldi r16, ((1<<SPCR_SPE)|(1<<SPCR_SPIE))
+  out SPCR, r16
+  ldi r16, 0x00 
+  out SPDR, r16
   ret
 
 .globl SPI_SlaveReceive

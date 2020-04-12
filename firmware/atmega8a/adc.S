@@ -2,6 +2,15 @@
 .include "asm_macros.h"
 .text
 
+.globl adc_init_free_int
+adc_init_free_int:
+  cbi DDRC, PC0
+  ldi r16, 0b01000000
+  out ADMUX, r16
+  ldi r16, 0b11001011;1<<ADCSRA_ADIE|1<<ADCSRA_ADFR|1<<ADCSRA_ADEN
+  out ADCSRA, r16
+  ret
+
 .globl sample_adc_0
 sample_adc_0:
 sbi DDRD, PD4
