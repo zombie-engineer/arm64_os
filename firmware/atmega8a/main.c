@@ -126,12 +126,82 @@ void i2c_slave_action(unsigned char rw_status)
   }
 }
 
-//__attribute__((optimize("O2"))) 
-//ISR(SPI_vect)
-//{
-//  asm volatile("cbi 0x18, 0\n");
-//}
-//
+static int atmcmd_status;
+
+#define ATMCMD_STATUS_IDLE       0x00
+#define ATMCMD_STATUS_SEND_SIGN1 0x01
+#define ATMCMD_STATUS_SEND_ADC   0x02
+
+#define ATMCMD_STAT_OK          0x00
+#define ATMCMD_STAT_UNKNOWN_CMD 0x7f
+#define ATMCMD_STAT_ERR         0xff
+
+#define ATMCMD_CMD_RESET     0x00
+#define ATMCMD_CMD_READ_SIGN 0x01
+#define ATMCMD_CMD_ADC_START 0x02
+#define ATMCMD_CMD_ADC_STOP  0x03
+
+static inline void atmcmd_cmd(char cmd)
+{
+  switch (cmd) {
+    case ATMCMD_CMD_RESET:
+      PORTD &= ~(1<<PIND7);
+      atmcmd_status = ATMCMD_STATUS_IDLE;
+      break;
+    case ATMCMD_CMD_READ_SIGN:
+      atmcmd_status = ATMCMD_STATUS_SEND_SIGN1;
+      PORTD &= ~(1<<PIND7);
+      while(1);
+      break;
+    case ATMCMD_CMD_ADC_START:
+      atmcmd_status = ATMCMD_STATUS_SEND_ADC;
+      break;
+    default:
+      atmcmd_status = ATMCMD_STATUS_IDLE;
+      SPDR = 0x7f;
+      return;
+  }
+  SPDR = 0x80 | cmd;
+}
+
+static uint16_t adc_value = 0x6666;
+static char prev_cmd;
+
+void atmcmd_adc(char cmd)
+{
+  if (prev_cmd == 0x22)
+    SPDR = (adc_value & 0xff);
+  else if (prev_cmd == 0x11)
+    SPDR = ((adc_value >> 8) & 0xff);
+  else
+    SPDR = 0xff;
+  adc_value++;
+}
+
+static inline void atmcmd_signature()
+{
+  SPDR = 0x71;
+}
+
+__attribute__((optimize("O2"))) 
+ISR(SPI_STC_vect)
+{
+  char cmd;
+  cmd = SPDR;
+  switch(atmcmd_status) {
+    case ATMCMD_STATUS_IDLE:
+      atmcmd_cmd(cmd); 
+      break;
+    case ATMCMD_STATUS_SEND_SIGN1:
+      atmcmd_signature();
+      break;
+    case ATMCMD_STATUS_SEND_ADC:
+      atmcmd_adc(cmd);
+      break;
+  }
+  prev_cmd = cmd;
+}
+
 ISR(TWI_vect)
 {
   static unsigned char i2c_state;
@@ -206,10 +276,21 @@ extern void SPI_SlaveInit(void);
 extern void SPI_SlaveReceive(void);
 void __attribute__((optimize("O2"))) main()
 {
+  char packet = 0;
   DDRD |= 1<<PIND7;
   PORTD |= (1<<PIND7);
   SPI_SlaveInit();
-  SPI_SlaveReceive();
+  atmcmd_status = ATMCMD_STATUS_IDLE;
+  adc_value = 0x6666;
+//  while(1) {
+//  while(!(SPSR & (1<<SPIF)))
+//    ;
+//    PORTD &= ~(1<<PIND7);
+//    SPDR=packet;
+//    packet++;
+//  }
+//  while(1);
+  // SPI_SlaveReceive();
   sei();
   while(1);
 

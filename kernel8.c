@@ -770,8 +770,9 @@ void main()
     while(1) asm volatile("wfe");
   }
   atmega8a_spi_test();
-  i2c_test();
+  puts("halting\n");
   while(1);
+  i2c_test();
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);
 

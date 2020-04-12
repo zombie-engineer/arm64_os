@@ -537,21 +537,59 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
   return n;
 }
 
+#define ATMCMD_STAT_OK  0x00
+#define ATMCMD_STAT_ERR 0xff
+
+#define ATMCMD_CMD_RESET     0x00
+#define ATMCMD_CMD_READ_SIGN 0x01
+#define ATMCMD_CMD_ADC_START 0x02
+#define ATMCMD_CMD_ADC_STOP  0x03
+#define ATMCMD_CMD_GET_RESP  0x55
+
+#define atm_err_check(err, msg)\
+  if (err != ERR_OK) {\
+        printf(msg ":err:%d\r\n", err);\
+        return err;\
+  }
+
+#define atm_status_check(status, msg)\
+  if (status != ATMCMD_STAT_OK) {\
+        printf(msg ":status:%d\r\n", status);\
+        return ERR_GENERIC;\
+  }
+
+#define atm_send_cmd(spi, cmd,resp) \
+  err = spi->xmit_byte(spi, cmd, resp);\
+  atm_err_check(err, "atm_send_cmd");
+
+#define atm_get_response(spi, dst) \
+  _Static_assert(sizeof(dst) == 1, "atm_get_response arg1 should be 1-bytes width");\
+  err = spi->xmit_byte(spi, ATMCMD_CMD_GET_RESP, &dst);\
+  printf("atm_get_response:%02x\r\n", dst);\
+  atm_err_check(err, "atm_get_response");
+
+#define atm_recv2(spi, cmd2, dst) \
+  _Static_assert(sizeof(dst) == 2, "atm_recv2 arg2 should be 2-bytes width");\
+  err = spi->xmit(spi, cmd2, (char *)&dst, sizeof(dst));\
+  atm_err_check(err, "atm_recv2");
+
 int atmega8a_spi_test()
 {
   spi_dev_t *s = atmega8a_dev.spi;
-  int ret;
-  char cmd = 0x66;
-  char res = 0x00;
+  int err;
+  char atm_status = ATMCMD_STAT_ERR;
+  uint16_t value = 0;
+  uint16_t cmd_adc = 0x1122;
+  // spi_emulated_set_log_level(1);
   puts("atmega8a_spi_test\r\n");
-  spi_emulated_set_clk(s, 100000);
-  while (1) {
-    ret = s->xmit(s, &cmd, &res, 1);
-    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
-    ret = s->xmit(s, &cmd, &res, 1);
-    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
-    ret = s->xmit(s, &cmd, &res, 1);
-    printf("atmega8a_spi_test:xmit:cmd:%02x,res:%02x,err:%d\n", cmd, res, ret);
+  spi_emulated_set_clk(s, 2000);
+  atm_get_response(s, atm_status);
+  atm_send_cmd(s, ATMCMD_CMD_RESET, NULL);
+  atm_send_cmd(s, ATMCMD_CMD_ADC_START, NULL);
+  while(1) {
+    atm_recv2(s, &cmd_adc, value);
+    printf("value:%04x\r\n", value);
+    wait_msec(10);
   }
   return 0;
 }

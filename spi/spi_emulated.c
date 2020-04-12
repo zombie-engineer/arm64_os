@@ -108,7 +108,7 @@ static int spi_emulated_xmit_bit(spi_dev_t *spidev,
       struct spi_emulated_dev, spidev);
 
   if (spi_emulated_verbose_output)
-    printf("%d-", bit_in);
+    putc('-');
 
   if (d->mosi_gpio_pin != -1) {
     if (bit_in) {
@@ -158,6 +158,9 @@ static int spi_emulated_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_ou
   if (byte_out)
     *byte_out = out;
 
+  if (spi_emulated_verbose_output)
+    printf("-MISO:%02x\r\n", out);
+
   return ERR_OK;
 }
 
@@ -168,15 +171,11 @@ static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *byte
   struct spi_emulated_dev *d = container_of(spidev, 
       struct spi_emulated_dev, spidev);
 
-  if (spi_emulated_verbose_output)
-    printf("spi_emulated_xmit: %02x, %02x\n", bytes_in[0], bytes_in[1]);
-
   spi_emulated_ce0_clear(d);
 
   for (j = 0; j < len; ++j) {
-
     if (spi_emulated_verbose_output)
-      printf("spi_emulated_xmit byte: %02x\r\n", bytes_in[j]);
+      printf("spi_emulated_xmit:%02x:", bytes_in[j]);
 
     for (i = 0; i < 8; ++i) {
       uint8_t c;
@@ -188,16 +187,15 @@ static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *byte
 
       out = (out << 1) | c;
     }
-    if (spi_emulated_verbose_output)
-      putc(':');
-
-
     if (bytes_out)
       *bytes_out++ = out;
+
+    if (spi_emulated_verbose_output)
+      printf("-MISO:%02x\r\n", out);
+    if (spi_emulated_verbose_output)
+      putc(':');
   }
   spi_emulated_ce0_set(d);
-  if (spi_emulated_verbose_output)
-    puts("\r\n");
   return ERR_OK;
 }
 
@@ -324,4 +322,9 @@ void spi_emulated_set_clk(spi_dev_t *s, int val)
       struct spi_emulated_dev, spidev);
   printf("spi_emulated: setting clk period to %d micro seconds\n\r", val);
   d->clk_half_period = val;
+}
+
+void spi_emulated_set_log_level(int log_level)
+{
+  spi_emulated_verbose_output = log_level;
 }
