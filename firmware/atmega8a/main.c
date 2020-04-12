@@ -339,7 +339,7 @@ void __attribute__((optimize("O2"))) main()
   adc_start();
   atmcmd_start();
   sei();
-  while(1);
+  asm volatile("sleep");
 }
 
 

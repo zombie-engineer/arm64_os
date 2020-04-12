@@ -6,6 +6,7 @@
 #include <common.h>
 #include <delays.h>
 #include <stringlib.h>
+#include <drivers/display/nokia5110.h>
 
 #define atlog(fmt, ...) printf(fmt "\r\n", ## __VA_ARGS__)
 
@@ -575,6 +576,29 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
   err = spi->xmit(spi, cmd2, (char *)&dst, sizeof(dst));\
   atm_err_check(err, "atm_recv2");
 
+int x = 0;
+
+static inline void on_sample(uint16_t value)
+{
+    uint16_t v;
+    int y;
+    float y_norm;
+    char chan = (value & 0x8000) ? 1: 0;
+    v = value & ((1<<10) - 1);
+    printf("%d::%04x\r\n", chan, v);
+    if (!chan)
+      return;
+    y_norm = (float)v / 0x3ff;
+    y = 24 * y_norm;
+     
+    nokia5110_draw_dot(x, y);
+    nokia5110_draw_dot(x, 24);
+    if (++x > NOKIA5110_PIXEL_SIZE_X) {
+      x = 0;
+      nokia5110_blank_screen();
+    }
+}
+
 int atmega8a_spi_test()
 {
   spi_dev_t *s = atmega8a_dev.spi;
@@ -584,14 +608,14 @@ int atmega8a_spi_test()
   uint16_t cmd_adc = 0x1122;
  // spi_emulated_set_log_level(1);
   puts("atmega8a_spi_test\r\n");
-  spi_emulated_set_clk(s, 8);
+  spi_emulated_set_clk(s, 16);
   while(atm_status != 0xd5)
     atm_get_response(s, atm_status);
   atm_send_cmd(s, ATMCMD_CMD_RESET, NULL);
   atm_send_cmd(s, ATMCMD_CMD_ADC_START, NULL);
   while(1) {
     atm_recv2(s, &cmd_adc, value);
-    printf("value:%04x\r\n", value);
+    on_sample(value);
     wait_msec(10);
   }
   return 0;
