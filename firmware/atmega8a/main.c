@@ -140,8 +140,9 @@ static int atmcmd_status;
 #define ATMCMD_CMD_READ_SIGN 0x01
 #define ATMCMD_CMD_ADC_START 0x02
 #define ATMCMD_CMD_ADC_STOP  0x03
+#define ATMCMD_CMD_GET_RESP  0x55
 
-static inline void atmcmd_cmd(char cmd)
+static inline __attribute__((optimize("O2"))) void atmcmd_cmd(char cmd)
 {
   switch (cmd) {
     case ATMCMD_CMD_RESET:
@@ -155,6 +156,9 @@ static inline void atmcmd_cmd(char cmd)
       break;
     case ATMCMD_CMD_ADC_START:
       atmcmd_status = ATMCMD_STATUS_SEND_ADC;
+      break;
+    case ATMCMD_CMD_GET_RESP:
+      atmcmd_status = ATMCMD_STATUS_IDLE;
       break;
     default:
       atmcmd_status = ATMCMD_STATUS_IDLE;
@@ -171,11 +175,12 @@ void atmcmd_adc(char cmd)
 {
   if (prev_cmd == 0x22)
     SPDR = (adc_value & 0xff);
-  else if (prev_cmd == 0x11)
+  else if (prev_cmd == 0x11) {
     SPDR = ((adc_value >> 8) & 0xff);
+    adc_value++;
+  }
   else
     SPDR = 0xff;
-  adc_value++;
 }
 
 static inline void atmcmd_signature()
@@ -195,7 +200,7 @@ ISR(SPI_STC_vect)
     case ATMCMD_STATUS_SEND_SIGN1:
       atmcmd_signature();
       break;
-    case ATMCMD_STATUS_SEND_ADC:
+   case ATMCMD_STATUS_SEND_ADC:
       atmcmd_adc(cmd);
       break;
   }
@@ -282,6 +287,7 @@ void __attribute__((optimize("O2"))) main()
   SPI_SlaveInit();
   atmcmd_status = ATMCMD_STATUS_IDLE;
   adc_value = 0x6666;
+  SPDR = 0x38;
 //  while(1) {
 //  while(!(SPSR & (1<<SPIF)))
 //    ;
