@@ -8,6 +8,7 @@
 #include <delays.h>
 #include <stringlib.h>
 #include <drivers/display/nokia5110.h>
+#include <pwm.h>
 
 #define atlog(fmt, ...) printf(fmt "\r\n", ## __VA_ARGS__)
 
@@ -568,6 +569,42 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
   err = spi->xmit(spi, cmd2, (char *)&dst, sizeof(dst));\
   atm_err_check(err, "atm_recv2");
 
+DECL_GPIO_SET_KEY(pwm0_key, "PWM0_____KEY___");
+static gpio_set_handle_t gpio_set_handle_pwm;
+static int gpio_pin_pwm0;
+
+int pwm_prepare()
+{
+  puts("pwm_prepare start\r\n");
+  gpio_pin_pwm0 = 18;
+  gpio_set_handle_pwm = gpio_set_request_1_pins(gpio_pin_pwm0, pwm0_key);
+  if (gpio_set_handle_pwm == GPIO_SET_INVALID_HANDLE) {
+    printf("Failed to request gpio pin %d for pwm0\r\n", gpio_pin_pwm0);
+    return ERR_BUSY;
+  }
+  gpio_set_function(gpio_pin_pwm0, GPIO_FUNC_ALT_5);
+  pwm_enable(0, 1);
+  puts("pwm_prepare completed\r\n");
+  return ERR_OK;
+}
+
+static inline void pwm_servo(uint16_t value)
+{
+  int err;
+  int range_start = 60;
+  int range_end = 250;
+  int range = range_end - range_start;
+  float norm = (float)(value & 0x3ff) / 0x3ff;
+  int pt = range_start + range * norm;
+  printf("pwm_servo:%d->%d\r\n", (int)value, pt);
+  err = pwm_set(0, 2000, pt);
+  if (err != ERR_OK) {
+    printf("Failed to enable pwm: %d\r\n", err);
+    return err;
+  }
+  wait_msec(10);
+}
+
 int x = 0;
 
 static inline void on_sample(uint16_t value)
@@ -578,6 +615,7 @@ static inline void on_sample(uint16_t value)
     char chan = (value & 0x8000) ? 1: 0;
     v = value & ((1<<10) - 1);
     printf("%d::%04x\r\n", chan, v);
+    pwm_servo(v);
     if (!chan)
       return;
     y_norm = (float)v / 0x3ff;
@@ -591,6 +629,7 @@ static inline void on_sample(uint16_t value)
     }
 }
 
+
 int atmega8a_spi_test()
 {
   spi_dev_t *s = atmega8a_dev.spi;
@@ -598,6 +637,11 @@ int atmega8a_spi_test()
   char atm_status = ATMCMD_STAT_ERR;
   uint16_t value = 0;
   uint16_t cmd_adc = 0x1122;
+  err = pwm_prepare();
+  if (err) {
+    printf("Failed to prepare pwm: %d\r\n", err);
+    return err;
+  }
  // spi_emulated_set_log_level(1);
   puts("atmega8a_spi_test\r\n");
   spi_emulated_set_clk(s, 16);
