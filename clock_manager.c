@@ -1,6 +1,8 @@
 #include <clock_manager.h>
+#include <common.h>
 #include <reg_access.h>
 #include <memory.h>
+#include <stringlib.h>
 
 #define CM_GP0CTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101070)
 #define CM_GP1CTL  (reg32_t)(PERIPHERAL_BASE_PHY + 0x00101078)
@@ -127,4 +129,69 @@ const char *set_clock_err_to_str(int err)
     case CM_SETCLK_ERR_BUSY : return "CM_SETCLK_ERR_BUSY";
     default                 : return "UNKNOWN";
   }
+}
+
+struct clock_desc {
+  reg32_t ctl;
+  reg32_t div;
+  const char *name;
+};
+
+static const char *src[] = {
+  " GND", 
+  " OSC", 
+  "DBG0", 
+  "DBG1", 
+  "PLLA", 
+  "PLLC", 
+  "PLLD", 
+  "HDMI", 
+  " GND", 
+  " GND", 
+  " GND", 
+  " GND", 
+  " GND", 
+  " GND", 
+  " GND", 
+  " GND"
+};
+
+void cm_print_clock(int clock_id)
+{
+  uint32_t ctlval, divval;
+  struct clock_desc *c;
+#define CLK(x) { CM_ ## x ## CTL, CM_ ## x ## DIV, #x }
+  struct clock_desc clocks[4] = {
+    CLK(GP0),
+    CLK(GP1),
+    CLK(GP2),
+    CLK(PWM) 
+  };
+
+  if (clock_id > CM_CLK_ID_MAX) {
+    puts("Clock id out of range\r\n");
+    return;
+  }
+
+  c = &clocks[clock_id];
+  ctlval = read_reg(c->ctl);
+  divval = read_reg(c->div);
+
+  printf("clock_manager:clock:%s:%08x:%08x:%s,%s,%s,MASH:%d,DIV:%d.%d\r\n", 
+      c->name,
+      ctlval,
+      divval,
+      src[ctlval & 3],
+      ((ctlval >> 4) & 1) ? "ENA" : "DIS",
+      ((ctlval >> 7) & 1) ? "BUSY" : "STPD",
+      ((ctlval >> 9) & 3),
+      (divval >> 16) & 0xffff, divval & 0xffff
+  );
+}
+
+void cm_print_clocks(void)
+{
+  int i;
+  for (i = 0; i <= CM_CLK_ID_MAX; ++i)
+    cm_print_clock(i);
 }

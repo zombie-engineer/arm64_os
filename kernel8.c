@@ -1,4 +1,5 @@
 #include <config.h>
+#include <clock_manager.h>
 #include <irq.h>
 #include <uart/uart.h>
 #include <gpio.h>
@@ -757,6 +758,7 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  print_mbox_props();
   // self_test();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
@@ -769,6 +771,7 @@ void main()
     puts("halting\n");
     while(1) asm volatile("wfe");
   }
+  cm_print_clocks();
   atmega8a_spi_test();
   puts("halting\n");
   while(1);
@@ -788,7 +791,6 @@ void main()
   avr_update();
   while(1);
   
-  print_mbox_props();
   mmu_init();
   // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;

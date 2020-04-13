@@ -14,6 +14,7 @@
 #define CM_CLK_ID_GP_1        1
 #define CM_CLK_ID_GP_2        2
 #define CM_CLK_ID_PWM         3
+#define CM_CLK_ID_MAX         CM_CLK_ID_PWM
 
 
 /* 0 Hz */
@@ -51,7 +52,8 @@
 #define CM_SETCLK_ERR_INV    -1
 #define CM_SETCLK_ERR_BUSY   -2
 
-
+void cm_print_clock(int clock_id);
+void cm_print_clocks(void);
 int cm_set_clock(int clk_id, uint32_t clock_src, uint32_t mash, uint32_t divi, uint32_t divf);
 int cm_get_clock(int clk_id);
 const char *set_clock_err_to_str(int);
