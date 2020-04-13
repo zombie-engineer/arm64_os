@@ -12,7 +12,7 @@ static DECL_SPINLOCK(gpio_set_lock);
 static inline gpio_set_t *gpio_set_get_by_handle(gpio_set_handle_t handle)
 {
   gpio_set_t *set = &gpio_sets[(int)handle];
-  if (set->active)
+  if (!set->active)
     return 0;
   return set;
 }
@@ -55,6 +55,7 @@ int gpio_set_request(gpio_set_mask_t setmask, const char *owner_key, gpio_set_ha
   set->mask = setmask;
   memcpy(set->owner_key, owner_key, GPIO_SET_OWNER_KEY_BUF_SZ);
   set->active = 1;
+  *out_handle = i;
 
   gpio_set_active_count++;
   ret = ERR_OK;
@@ -72,6 +73,7 @@ int gpio_set_release(gpio_set_handle_t handle, const char *owner_key)
 
   gpio_set_t *set = gpio_set_get_by_handle(handle);
   if (!set) {
+    printf("gpio_set_release:failed to find set by handle:%d\r\n", handle);
     ret = ERR_NOT_FOUND;
     goto out_unlock;
   }

@@ -47,13 +47,20 @@ typedef struct spi_dev {
 
 int spi0_init();
 
+#define SPI_EMU_MODE_MASTER 0
+#define SPI_EMU_MODE_SLAVE 1
+
 spi_dev_t *spi_allocate_emulated(
   const char *name,
   int sclk_pin, 
   int mosi_pin, 
   int miso_pin, 
   int ce0_pin,
-  int ce1_pin);
+  int ce1_pin,
+  int mode);
+
+
+int spi_deallocate_emulated(spi_dev_t *s);
 
 void spi_emulated_init(void);
 

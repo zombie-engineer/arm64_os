@@ -198,6 +198,29 @@ int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset)
   return ERR_OK;
 }
 
+int atmega8a_deinit()
+{
+  int err;
+  err = spi_deallocate_emulated(atmega8a_dev.spi);
+  if (err != ERR_OK) {
+    printf("atmega8a_deinit: failed to stop spi:%d\r\n", err);
+    return err;
+  }
+
+  gpio_set_off(atmega8a_dev.gpio_pin_reset);
+  gpio_set_function(atmega8a_dev.gpio_pin_reset, GPIO_FUNC_OUT);
+  err = gpio_set_release(atmega8a_dev.gpio_set_handle, atmega8a_reset_key);
+  if (err != ERR_OK) {
+    printf("atmega8a_deinit: failed to release gpioset:%d:%s:%d\r\n", 
+        atmega8a_dev.gpio_set_handle,
+        atmega8a_reset_key, err);
+    return err;
+  }
+  
+  printf("atmega8a_deinit:%d .\r\n", err);
+  return err;
+}
+
 int atmega8a_reset()
 {
   atlog("atmega8a_reset");
@@ -629,8 +652,7 @@ static inline void on_sample(uint16_t value)
     }
 }
 
-
-int atmega8a_spi_test()
+int atmega8a_spi_master_test()
 {
   spi_dev_t *s = atmega8a_dev.spi;
   int err;

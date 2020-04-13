@@ -68,7 +68,8 @@ static int command_spi_init_emulated(const string_tokens_t *args)
   GET_NUMERIC_PARAM(miso, int, 2, "miso");
   GET_NUMERIC_PARAM(ce0 , int, 3, "ce0");
   GET_NUMERIC_PARAM(ce1 , int, 4, "ce1");
-  spi_emulated_dev = spi_allocate_emulated("spi_cmdrunner", sclk, mosi, miso, ce0, ce1);
+  spi_emulated_dev = spi_allocate_emulated("spi_cmdrunner", sclk, mosi, miso, ce0, ce1, 
+    SPI_EMU_MODE_MASTER);
   if (IS_ERR(spi_emulated_dev)) {
     printf("spi_emulated_init failed with error %d\n", (int)PTR_ERR(spi_emulated_dev));
     spi_emulated_dev = NULL;

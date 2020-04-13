@@ -26,7 +26,8 @@ static int init_atmega8a()
   spi_dev_t *spidev;
   char lock_bits_desc[128];
   spidev = spi_allocate_emulated("spi_avr_isp", 
-      gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1);
+      gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1,
+      SPI_EMU_MODE_MASTER);
   if (IS_ERR(spidev)) {
     printf("Failed to initialize emulated spi. Error code: %d\n", 
        (int)PTR_ERR(spidev));
@@ -154,7 +155,7 @@ int avr_update(void)
 {
   int err;
   int check_crc = 0;
-  int download = 0;
+  int download = 1;
   const char *bin = bins_get_start_atmega();
   int binsz       = bins_get_size_atmega();
   uint32_t new_checksum, old_checksum;
@@ -204,5 +205,6 @@ int avr_update(void)
     }
   }
   atmega8a_reset();
+  err = atmega8a_deinit();
   return err;
 }

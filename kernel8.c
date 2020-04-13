@@ -439,7 +439,8 @@ void init_nokia5110_display(int report_exceptions, int run_test)
       gpio_pin_mosi, 
       -1, 
       gpio_pin_ce, 
-      -1
+      -1,
+      SPI_EMU_MODE_MASTER
   );
 
   font_get_font("myfont", &font);
@@ -482,7 +483,8 @@ void spi_work()
   sclk = 21;
   cs   = 20;
   mosi = 16;
-  max7219_set_spi_dev(spi_allocate_emulated("spi_test", sclk, mosi, -1, cs, -1));
+  max7219_set_spi_dev(spi_allocate_emulated("spi_test", sclk, mosi, -1, cs, -1,
+    SPI_EMU_MODE_MASTER));
 
   while(1)
   {
@@ -528,7 +530,8 @@ void max7219_work()
   const int gpio_pin_miso = -1;
   spi_dev_t *spidev;
 
-  spidev = spi_allocate_emulated("spi_max7219", gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1);
+  spidev = spi_allocate_emulated("spi_max7219", gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1,
+   SPI_EMU_MODE_MASTER);
   if (IS_ERR(spidev)) {
     printf("Failed to initialize emulated spi. Error code: %d\n", 
        (int)PTR_ERR(spidev));
@@ -744,6 +747,27 @@ void nokia5110_test_draw()
   }
 }
 
+int spi_slave_test_bsc()
+{
+#define BR(x) *(reg32_t)(0x3f214000 + x)
+#define CR BR(0xc)
+#define DR BR(0x0)
+
+  /* EN,SPI,TXE,RXE */
+  CR = 0b00001100000011;
+  while(1) {
+    wait_msec(500);
+    printf("%x\r\n", DR);
+  }
+  return ERR_OK;
+}
+
+int spi_slave_test()
+{
+  return ERR_OK;
+}
+
+
 void main()
 {
   debug_init();
@@ -771,8 +795,9 @@ void main()
     puts("halting\n");
     while(1) asm volatile("wfe");
   }
+  spi_slave_test();
   cm_print_clocks();
-  atmega8a_spi_test();
+  atmega8a_spi_master_test();
   puts("halting\n");
   while(1);
   i2c_test();
