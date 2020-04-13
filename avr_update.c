@@ -154,6 +154,7 @@ int avr_update(void)
 {
   int err;
   int check_crc = 0;
+  int download = 0;
   const char *bin = bins_get_start_atmega();
   int binsz       = bins_get_size_atmega();
   uint32_t new_checksum, old_checksum;
@@ -194,11 +195,13 @@ int avr_update(void)
 
   avr_program();
 
-  err = atmega8a_download(bin, binsz);
-  if (err != ERR_OK)
-    printf("avr_update: failed to download firmware to device.\n");
-  else {
-    puts("avr_update: firmware on device has been updated.\n");
+  if (download) {
+    err = atmega8a_download(bin, binsz);
+    if (err != ERR_OK)
+      printf("avr_update: failed to download firmware to device.\n");
+    else {
+      puts("avr_update: firmware on device has been updated.\n");
+    }
   }
   atmega8a_reset();
   return err;
