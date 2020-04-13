@@ -138,7 +138,6 @@ qemuds: $(TARGET_QEMU_IMG)
 .PHONY: qemuat
 qemuat:
 	/mnt/sdb1/binutils-gdb/gdb/gdb -x rungdb.gdb
-#	/home/zombie/binutils-gdb/gdb/gdb -x rungdb.gdb
 
 .PHONY: serial
 serial:
