@@ -77,20 +77,18 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 #define MSEC_TO_COUNT(v) (v * COUNT_PER_MSEC)
 #define SEC_TO_COUNT(v) (v * COUNT_PER_SEC)
 
-//void wait_1_sec()
-//{
-//  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
-//}
-//
-void wait_3_sec()
-{
+#define wait_1_sec()\
+  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
+
+#define wait_3_sec()\
   countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(3)));
-}
-//
-//void wait_100_msec()
-//{
-//  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
-//}
+
+#define wait_100_msec()\
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
+
+#define wait_200_msec()\
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(200)));
+
 //
 //void wait_1_msec()
 //{
@@ -288,11 +286,17 @@ ISR(TWI_vect)
 
 extern void adc_init_free_int(void);
 extern void spi_init_slave(void);
+extern void spi_init_master(void);
 extern void SPI_SlaveReceive(void);
 
 static inline void atmcmd_start()
 {
-  spi_init_slave();
+
+  spi_init_master();
+  while(1) {
+    SPDR = 'b';
+    while(!(SPSR & (1<<SPIF)));
+  }
   atmcmd_status = ATMCMD_STATUS_IDLE;
   adc_value_low = 0xff;
   adc_value_high = 0xff;
@@ -318,10 +322,58 @@ static inline void adc_start()
   adc_init_free_int();
 }
 
+static inline void on_startup_blink(void)
+{
+  char i;
+  for (i = 0; i < 4; ++i) {
+    DEBUG_PIN_ON();
+    wait_200_msec();
+    DEBUG_PIN_OFF();
+    wait_200_msec();
+  }
+}
+
+#define SS PINB2
+#define MOSI PINB3
+#define SCK PINB5
 void __attribute__((optimize("O2"))) main()
 {
   DEBUG_PIN_SETUP();
+  on_startup_blink();
   DEBUG_PIN_ON();
+  DDRB |= (1<<SS)|(1<<MOSI)|(1<<SCK);
+  SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR1)|(1<<SPR0);
+
+  while(1) {
+    PORTB &= ~(1<<SS);
+    SPDR = 'b';
+    while(!(SPSR & (1<<SPIF)));
+    SPDR = 'a';
+    while(!(SPSR & (1<<SPIF)));
+    SPDR = 'd';
+    while(!(SPSR & (1<<SPIF)));
+    SPDR = 'b';
+    while(!(SPSR & (1<<SPIF)));
+    SPDR = 'o';
+    while(!(SPSR & (1<<SPIF)));
+    SPDR = 'y';
+    while(!(SPSR & (1<<SPIF)));
+    PORTB |= (1<<SS);
+    DEBUG_PIN_ON();
+    wait_200_msec();
+    DEBUG_PIN_OFF();
+    wait_200_msec();
+    DEBUG_PIN_ON();
+  }
+  while(1) {
+    PORTB |= (1<<PINB2);
+    wait_1_sec();
+    SPDR = 'b';
+    while(!(SPSR & (1<<SPIF)));
+    PORTB &= ~(1<<PINB2);
+    wait_1_sec();
+  }
+  while(1);
   adc_start();
   atmcmd_start();
   sei();

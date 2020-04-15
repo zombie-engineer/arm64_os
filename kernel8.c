@@ -764,6 +764,38 @@ int spi_slave_test_bsc()
 
 int spi_slave_test()
 {
+  const int gpio_pin_cs0   = 5;
+  const int gpio_pin_mosi  = 6;
+  // const int gpio_pin_miso  = 13;
+  const int gpio_pin_sclk  = 11;
+  // const int gpio_pin_reset = 26;
+  spi_dev_t *spidev;
+  spidev = spi_allocate_emulated("spi_avr_isp", 
+      gpio_pin_sclk, gpio_pin_mosi, -1, gpio_pin_cs0, -1,
+      SPI_EMU_MODE_SLAVE);
+  if (IS_ERR(spidev)) {
+    printf("Failed to initialize emulated spi. Error code: %d\n", 
+        PTR_ERR(spidev));
+    return ERR_GENERIC;
+  }
+
+  puts("starting spi slave while loop\r\n");
+  while(1) {
+    int i;
+    char x = 0x77;
+    char from_spi[50];
+    for (i = 0; i < 50; ++i)
+      spidev->xmit_byte(spidev, x, from_spi + i);
+    for (i = 0; i < 50; ++i)
+      putc(*(from_spi + i));
+    putc('\r');
+    putc('\n');
+//    printf("char: '%c%c%c%c'd:%llu,last_up:%llu,cycles:%llu\r\n", from_spi1, from_spi2, from_spi3, from_spi4,
+//        spi_slave_stats.sclk_up_delta,
+//        spi_slave_stats.last_sclk_up,
+//        spi_slave_stats.cycles_byte_xfer
+//        );
+  }
   return ERR_OK;
 }
 
@@ -791,10 +823,12 @@ void main()
   nokia5110_draw_text("Display ready", 0, 0);
 #endif
   // nokia5110_test_draw();
+  init_atmega8a();
   if (avr_update()) {
     puts("halting\n");
     while(1) asm volatile("wfe");
   }
+  atmega8a_drop_spi();
   spi_slave_test();
   cm_print_clocks();
   atmega8a_spi_master_test();
@@ -813,7 +847,6 @@ void main()
 //  } else
 //    bsc_slave_debug();
 //  while(1);
-  avr_update();
   while(1);
   
   mmu_init();

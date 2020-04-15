@@ -198,14 +198,25 @@ int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset)
   return ERR_OK;
 }
 
-int atmega8a_deinit()
+int atmega8a_drop_spi()
 {
   int err;
-  err = spi_deallocate_emulated(atmega8a_dev.spi);
-  if (err != ERR_OK) {
-    printf("atmega8a_deinit: failed to stop spi:%d\r\n", err);
-    return err;
+  if (atmega8a_dev.spi == NULL) {
+    puts("atmega8a_drop_spi:spi already dropped. skipping.\r\n");
+    return ERR_OK;
   }
+
+  err = spi_deallocate_emulated(atmega8a_dev.spi);
+  if (err != ERR_OK)
+    printf("atmega8a_deinit: failed to stop spi:%d\r\n", err);
+  return err;
+}
+
+int atmega8a_deinit()
+{
+  int err = atmega8a_drop_spi();
+  if (err) 
+    return err;
 
   gpio_set_off(atmega8a_dev.gpio_pin_reset);
   gpio_set_function(atmega8a_dev.gpio_pin_reset, GPIO_FUNC_OUT);

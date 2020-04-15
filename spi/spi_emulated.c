@@ -127,12 +127,32 @@ static int spi_emulated_xmit_bit(spi_dev_t *spidev,
   return ERR_OK;
 }
 
+static inline OPTIMIZED void spi_emulated_slave_xmit_bit(spi_dev_t *spidev, 
+    uint8_t bit_in, uint8_t *bit_out)
+{
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
+
+  if (bit_out && d->mosi_gpio_pin != -1)
+    *bit_out = gpio_is_set(d->mosi_gpio_pin) ? 1 : 0;
+  if (d->miso_gpio_pin != -1) {
+    if (bit_in)
+      gpio_set_on(d->mosi_gpio_pin);
+    else
+      gpio_set_off(d->mosi_gpio_pin);
+  }
+}
+
 
 static int spi_emulated_xmit_dma(spi_dev_t *spidev, const void *data_out, void *data_in, uint32_t len)
 {
-  return ERR_OK;
+  return ERR_NOT_IMPLEMENTED;
 }
 
+static int spi_emulated_slave_xmit_dma(spi_dev_t *spidev, const void *data_out, void *data_in, uint32_t len)
+{
+  return ERR_NOT_IMPLEMENTED;
+}
 
 static int spi_emulated_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_out)
 {
@@ -165,6 +185,76 @@ static int spi_emulated_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_ou
 
   return ERR_OK;
 }
+
+static void spi_emulated_slave_wait_ce0(spi_emulated_dev_t *spidev)
+{
+  while(!gpio_is_set(spidev->ce0_gpio_pin));
+}
+
+static void __attribute__((optimize("O3"))) spi_emulated_slave_wait_sclk_rise(spi_emulated_dev_t *spidev)
+{
+//  uint32_t lev0, lev1;
+//  while(1) {
+//    lev0 = *(uint32_t *)GPIO_REG_GPLEV0;
+//    lev1 = *(uint32_t *)GPIO_REG_GPLEV1;
+//    printf("%08x%08x\r\n", lev0, lev1);
+//  }
+ // printf("spi_emulated_slave_wait_sclk_rise:sclk at gpio_pin:%d\r\n", 
+   //   spidev->sclk_gpio_pin);
+  while(gpio_is_set(spidev->sclk_gpio_pin)) {
+  }
+  while(!gpio_is_set(spidev->sclk_gpio_pin)) {
+  }
+}
+
+struct spi_slave_stats spi_slave_stats = { 0 };
+
+static int __attribute__((optimize("O3"))) spi_emulated_slave_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_out)
+{
+  int i;
+  char from_mosi;
+  uint64_t t1, t2, t_wait_end;
+
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
+
+  while(gpio_is_set(d->ce0_gpio_pin));
+  // t1 = read_cpu_counter_64();
+
+  from_mosi = 0;
+  for (i = 0; i < 8; ++i) {
+    spi_emulated_slave_wait_sclk_rise(d);
+    // t_wait_end = read_cpu_counter_64();
+    // spi_slave_stats.sclk_up_delta = t_wait_end - spi_slave_stats.last_sclk_up;
+    // spi_slave_stats.last_sclk_up = t_wait_end;
+    from_mosi |= (gpio_is_set(d->mosi_gpio_pin) << (7-i));
+  }
+  // t2 = read_cpu_counter_64();
+  // spi_slave_stats.cycles_byte_xfer = t2 - t1;
+  *byte_out = from_mosi;
+  return ERR_OK;
+}
+
+static int spi_emulated_slave_xmit(spi_dev_t *spidev, const char* bytes_in, char *bytes_out, uint32_t len)
+{
+  int i, j;
+  char from_mosi;
+  struct spi_emulated_dev *d = container_of(spidev, 
+      struct spi_emulated_dev, spidev);
+
+  for (j = 0; j < len; ++j) {
+    spi_emulated_slave_wait_ce0(d);
+    for (i = 0; i < 8; ++i) {
+      uint8_t mosi_bit;
+      spi_emulated_slave_xmit_bit(&d->spidev, (bytes_in[j] >> (7 - i)) & 1, &mosi_bit);
+      from_mosi = (from_mosi << 1) | mosi_bit;
+    }
+    if (bytes_out)
+      *bytes_out++ = from_mosi;
+  }
+  return ERR_OK;
+}
+
 
 static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *bytes_out, uint32_t len)
 {
@@ -238,12 +328,14 @@ static inline void spi_gpio_set_slave(
     int ce1_pin
     )
 {
+  printf("spi_gpio_set_slave:sclk:%d,mosi:%d,miso:%d,ce0:%d\r\n",
+      sclk_pin, mosi_pin,miso_pin,ce0_pin);
   gpio_set_function(sclk_pin, GPIO_FUNC_IN);
-  gpio_set_pullupdown(sclk_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(sclk_pin, GPIO_PULLUPDOWN_EN_PULLDOWN);
 
   if (mosi_pin != -1) {
     gpio_set_function(mosi_pin, GPIO_FUNC_IN);
-    gpio_set_pullupdown(mosi_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+    gpio_set_pullupdown(mosi_pin, GPIO_PULLUPDOWN_EN_PULLDOWN);
   }
 
   if (miso_pin != -1)
@@ -251,11 +343,11 @@ static inline void spi_gpio_set_slave(
 
   if (ce0_pin != -1) {
     gpio_set_function(ce0_pin, GPIO_FUNC_IN);
-    gpio_set_pullupdown(ce0_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+    gpio_set_pullupdown(ce0_pin, GPIO_PULLUPDOWN_EN_PULLDOWN);
   }
   if (ce1_pin != -1) {
     gpio_set_function(ce1_pin, GPIO_FUNC_IN);
-    gpio_set_pullupdown(ce1_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+    gpio_set_pullupdown(ce1_pin, GPIO_PULLUPDOWN_EN_PULLDOWN);
   }
 }
 
@@ -316,14 +408,19 @@ spi_dev_t *spi_allocate_emulated(
     goto error;
   }
 
-  if (mode == SPI_EMU_MODE_MASTER)
+  if (mode == SPI_EMU_MODE_MASTER) {
     spi_gpio_set_master(sclk_pin, mosi_pin, miso_pin, ce0_pin, ce1_pin);
-  else
+    spidev->spidev.xmit      = spi_emulated_xmit;
+    spidev->spidev.xmit_byte = spi_emulated_xmit_byte;
+    spidev->spidev.xmit_dma  = spi_emulated_xmit_dma;
+  }
+  else {
     spi_gpio_set_slave(sclk_pin, mosi_pin, miso_pin, ce0_pin, ce1_pin);
+    spidev->spidev.xmit      = spi_emulated_slave_xmit;
+    spidev->spidev.xmit_byte = spi_emulated_slave_xmit_byte;
+    spidev->spidev.xmit_dma  = spi_emulated_slave_xmit_dma;
+  }
 
-  spidev->spidev.xmit      = spi_emulated_xmit;
-  spidev->spidev.xmit_byte = spi_emulated_xmit_byte;
-  spidev->spidev.xmit_dma  = spi_emulated_xmit_dma;
   strncpy(spidev->spidev.name, name, SPIDEV_MAXNAMELEN);
   spidev->spidev.name[SPIDEV_MAXNAMELEN] = 0;
 
@@ -380,6 +477,7 @@ int spi_deallocate_emulated(spi_dev_t *s)
   }
   __spi_emulated_release(d);
   puts("spi_deallocate_emulated: success.\r\n");
+  return ERR_OK;
 }
 
 void spi_emulated_init()

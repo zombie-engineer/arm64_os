@@ -73,3 +73,14 @@ void spi_emulated_print_info();
 int spi_type_from_string(const char *string, int len);
 
 spi_dev_t *spi_get_dev(int type);
+
+struct spi_slave_stats {
+  uint64_t last_ce0_down;
+  uint64_t last_sclk_up;
+  uint64_t last_sclk_down;
+  uint64_t sclk_up_delta;
+  uint64_t cycles_byte_xfer;
+  uint64_t cycles_wait_spi_rise;
+};
+
+extern struct spi_slave_stats spi_slave_stats;

@@ -23,6 +23,17 @@ cbi PORTD, PD7
 1:
   rjmp 1b
 
+.globl spi_init_master
+spi_init_master:
+  ;ldi r16, 1<<PB5|1<<PB3|1<<PB2
+  ldi r16, 0b00101100
+  out DDRB, r16
+  ; Enable SPI 
+  ;ldi r16, 1<<SPCR_SPE|1<<SPCR_MSTR|1<<SPCR_SPR0|1<<SPCR_SPR1
+  ldi r16, 0b01010011
+  out SPCR, r16
+  ret
+
 
 ;.globl __vector_10
 ;__vector_10:

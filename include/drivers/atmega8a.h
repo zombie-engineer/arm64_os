@@ -12,6 +12,8 @@ typedef struct spi_dev spi_dev_t;
 
 int atmega8a_init(spi_dev_t *spidev, int gpio_pin_reset);
 
+int atmega8a_drop_spi();
+
 int atmega8a_deinit();
 
 int atmega8a_reset();

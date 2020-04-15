@@ -22,18 +22,21 @@ OBJS := \
 
 $(info $(OBJS))
 
-get_checksum = cat $(1:.bin=.map) | grep checksum | awk '{print $$1}'
+# get_checksum = cat $(1:.bin=.map) | grep checksum | awk '{print $$1}'
 
 atmega8a.bin: atmega8a.o
 	$(OBJCOPY) --only-section .text -O binary $^ $@
-#	python patch_checksum.py $@ $$($(call get_checksum, $@))
+	python patch_checksum.py $@ end
+	# $$($(call get_checksum, $@))
 
 #atmega8a.o: $(OBJS)
 #	$(LD) -T link.lds -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
 #	$(call dump_listing,$@)
 
+LDFLAGS = '--verbose=10'
+
 atmega8a.o: main.c twi.S delay.S spi.S adc.S
-	avr-gcc -O2 -mmcu=atmega8a -Iinclude $? -o $@
+	avr-gcc -O2 -mmcu=atmega8a -Iinclude $^ -o $@
 	# $(LD) -Map $(@:.o=.map) -verbose=10 -nostdlib -nostartfiles $^ -o $@
 	$(call dump_listing,$@)
 

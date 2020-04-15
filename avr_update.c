@@ -9,7 +9,7 @@
 #define ATMEGA_FIRMWARE_HEADER "ATMGBIN8"
 #define ATMEGA_FIRMWARE_HEADER_END "ATMGEND0"
 
-static int init_atmega8a()
+int init_atmega8a()
 {
   const int gpio_pin_cs0   = 5;
   const int gpio_pin_mosi  = 6;
@@ -151,36 +151,48 @@ static int atmega8a_download(const void *bin, int bin_size)
   return ERR_OK;
 }
 
+uint32_t unaligned_read32(void *addr)
+{
+  uint32_t result = 0;
+  const char *ptr = addr;
+  ptr += 3;
+  result = (result     ) | *ptr--;
+  result = (result << 8) | *ptr--;
+  result = (result << 8) | *ptr--;
+  result = (result << 8) | *ptr;
+  return result;
+
+}
+
 int avr_update(void)
 {
   int err;
-  int check_crc = 0;
-  int download = 1;
+  int check_crc = 1;
+  int reprogram = 1;
   const char *bin = bins_get_start_atmega();
   int binsz       = bins_get_size_atmega();
   uint32_t new_checksum, old_checksum;
-
-  init_atmega8a();
+  const int footer_offset = binsz - 8 - 8 - 4;
 
   if (check_crc) {
     printf("avr_update: Checking update blob, start:%p, end:%p, size:%d\n",
       bin, bin + binsz, binsz);
   
-    if (strncmp(bin + 0x28, ATMEGA_FIRMWARE_HEADER, 8)) {
+    if (strncmp(bin + footer_offset, ATMEGA_FIRMWARE_HEADER, 8)) {
       puts("avr_update: no header in uploadable blob\n");
       return ERR_INVAL_ARG;
     }
   
-    if (strncmp(bin + 0x28 + 8 + 4, ATMEGA_FIRMWARE_HEADER_END, 8)) {
+    if (strncmp(bin + footer_offset + 8 + 4, ATMEGA_FIRMWARE_HEADER_END, 8)) {
       puts("avr_update: no header end in uploadable blob\n");
       return ERR_INVAL_ARG;
     }
   
-    new_checksum = *(uint32_t*)(bin + 0x28 + 8);
+    new_checksum = unaligned_read32((void*)(bin + footer_offset + 8));
     printf("avr_update: new firmware checksum: %08x\n",
         new_checksum);
   
-    err = atmega8a_read_flash_memory(&old_checksum, 4, 0x28 + 8);
+    err = atmega8a_read_flash_memory(&old_checksum, 4, footer_offset + 8);
     if (err != ERR_OK) {
       printf("avr_update: flash read failed: %d\n", err);
       return err;
@@ -189,14 +201,13 @@ int avr_update(void)
   
     if (new_checksum == old_checksum) {
       puts("avr_update: old checksum matches new. Skipping update.\n");
-      atmega8a_reset();
-      return ERR_OK;
+      reprogram = 0;
     }
   }
 
-  avr_program();
 
-  if (download) {
+  if (reprogram) {
+    avr_program();
     err = atmega8a_download(bin, binsz);
     if (err != ERR_OK)
       printf("avr_update: failed to download firmware to device.\n");
@@ -204,7 +215,6 @@ int avr_update(void)
       puts("avr_update: firmware on device has been updated.\n");
     }
   }
-  atmega8a_reset();
-  err = atmega8a_deinit();
+  err = atmega8a_reset();
   return err;
 }
