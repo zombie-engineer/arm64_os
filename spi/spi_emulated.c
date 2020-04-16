@@ -218,28 +218,31 @@ static int __attribute__((optimize("O3"))) spi_emulated_slave_xmit_byte(spi_dev_
 #define STATE_EXPECT_SCLK_DROP 1
 #define STATE_EXPECT_SCLK_RIZE 2
 
- // uint64_t t1, t2, t_wait_end;
-  uint32_t register gpio_level   asm("x28");
-  uint32_t register mask_ce0     asm("x27") = 1<<d->ce0_gpio_pin ;
-  uint32_t register mask_sclk    asm("x26") = 1<<d->sclk_gpio_pin;
-  reg32_t  register gpio_lev_reg asm("x24") = (reg32_t)GPIO_REG_GPLEV0;
-  uint32_t register state        asm("x23") = STATE_WAIT_CE0;
-//  uint32_t register last_sclk    asm("x22")= 0;
-  uint32_t register mosi_shift   asm("x21") = d->mosi_gpio_pin;
-  uint8_t  register byte         asm("x20")= 0;
-  int      register i            asm("x19")= 0;
+  uint32_t register gpio_level;
+  uint32_t register mask_ce0 = 1<<d->ce0_gpio_pin ;
+  uint32_t register mask_sclk = 1<<d->sclk_gpio_pin;
+  reg32_t  register gpio_lev_reg = (reg32_t)GPIO_REG_GPLEV0;
+  uint32_t register state = STATE_WAIT_CE0;
+  uint32_t register mosi_shift = d->mosi_gpio_pin;
+  uint8_t  register byte = 0;
+  int      register i = 0;
 
   while(1) {
     gpio_level = read_reg(gpio_lev_reg);
-    if (gpio_level & mask_ce0)
+    if (gpio_level & mask_ce0) {
+      if (i) {
+        byte = 0;
+        i = 0;
+      }
       continue;
+    }
 
     switch(state) {
       case STATE_WAIT_CE0:
         if (!(gpio_level & mask_sclk))
-          state = STATE_EXPECT_SCLK_DROP;
-        else
           state = STATE_EXPECT_SCLK_RIZE;
+        else
+          state = STATE_EXPECT_SCLK_DROP;
         break;
       case STATE_EXPECT_SCLK_RIZE:
         if (gpio_level & mask_ce0) {

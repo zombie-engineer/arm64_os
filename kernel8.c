@@ -37,6 +37,7 @@
 #include <cpu.h>
 #include <list.h>
 #include <self_test.h>
+#include <pwm.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -762,6 +763,49 @@ int spi_slave_test_bsc()
   return ERR_OK;
 }
 
+static gpio_set_handle_t gpio_set_handle_pwm;
+static int gpio_pin_pwm0;
+static int gpio_pin_pwm1;
+DECL_GPIO_SET_KEY(pwm_key, "PWM_KEYS_18_19_");
+
+int _pwm_prepare()
+{
+  puts("pwm_prepare start\r\n");
+  gpio_pin_pwm0 = 18;
+  gpio_pin_pwm1 = 19;
+  int pins[2] = { gpio_pin_pwm0, gpio_pin_pwm1 };
+  gpio_set_handle_pwm = gpio_set_request_n_pins(pins, 2, pwm_key);
+  if (gpio_set_handle_pwm == GPIO_SET_INVALID_HANDLE) {
+    printf("Failed to request gpio pins %d,%d for pwm0,pwm1\r\n", 
+        gpio_pin_pwm0, gpio_pin_pwm1);
+    return ERR_BUSY;
+  }
+  gpio_set_function(gpio_pin_pwm0, GPIO_FUNC_ALT_5);
+  gpio_set_function(gpio_pin_pwm1, GPIO_FUNC_ALT_5);
+  pwm_enable(0, 1);
+  pwm_enable(1, 1);
+  puts("pwm_prepare completed\r\n");
+  return ERR_OK;
+}
+
+static inline void pwm_servo(uint16_t value)
+{
+  int err;
+  int range_start = 60;
+  int range_end = 250;
+  int range = range_end - range_start;
+  value &= ((1<<10) - 1);
+  float norm = (float)(value & 0x3ff) / 0x3ff;
+  int pt = range_start + range * norm;
+  // printf("pwm_servo:%d->%d\r\n", (int)value, pt);
+  err = pwm_set(0, 2000, pt);
+  if (err != ERR_OK) {
+    printf("Failed to enable pwm: %d\r\n", err);
+    return;
+  }
+ // wait_msec(10);
+}
+
 int spi_slave_test()
 {
   const int gpio_pin_cs0   = 5;
@@ -778,18 +822,21 @@ int spi_slave_test()
         PTR_ERR(spidev));
     return ERR_GENERIC;
   }
+  if (_pwm_prepare()) {
+    printf("Failed to prepare pwm\r\n");
+    return ERR_GENERIC;
+  }
 
   puts("starting spi slave while loop\r\n");
   while(1) {
-    int i;
     char x = 0x77;
     char from_spi[50];
-    for (i = 0; i < 50; ++i)
-      spidev->xmit_byte(spidev, x, from_spi + i);
-    for (i = 0; i < 50; ++i)
-      putc(*(from_spi + i));
-    putc('\r');
-    putc('\n');
+    uint16_t value;
+    spidev->xmit_byte(spidev, x, from_spi+0);
+    spidev->xmit_byte(spidev, x, from_spi+1);
+    value = *from_spi + (*(from_spi + 1) << 8);
+    printf("%04x\r\n", (int)value);
+    pwm_servo(value);
 //    printf("char: '%c%c%c%c'd:%llu,last_up:%llu,cycles:%llu\r\n", from_spi1, from_spi2, from_spi3, from_spi4,
 //        spi_slave_stats.sclk_up_delta,
 //        spi_slave_stats.last_sclk_up,

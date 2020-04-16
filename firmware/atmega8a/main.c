@@ -80,8 +80,20 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 #define wait_1_sec()\
   countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
 
+#define wait_2_sec()\
+  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(2)));
+
 #define wait_3_sec()\
   countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(3)));
+
+#define wait_1_msec()\
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
+
+#define wait_2_msec()\
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
+
+#define wait_10_msec()\
+  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(10)));
 
 #define wait_100_msec()\
   countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
@@ -336,29 +348,42 @@ static inline void on_startup_blink(void)
 #define SS PINB2
 #define MOSI PINB3
 #define SCK PINB5
+
+#define SPI_SEND(b) \
+    PORTB &= ~(1<<SS);\
+    SPDR = b;\
+    while(!(SPSR & (1<<SPIF)));\
+    asm volatile ("nop\r\nnop\r\nnop\r\n");\
+    PORTB |= (1<<SS);
+
 void __attribute__((optimize("O2"))) main()
 {
   DEBUG_PIN_SETUP();
   on_startup_blink();
   DEBUG_PIN_ON();
   DDRB |= (1<<SS)|(1<<MOSI)|(1<<SCK);
-  SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR1)|(1<<SPR0);
+  SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR1);//|(1<<SPR0);
+  while(1) {
+    ADMUX = 0b01000000;
+    ADCSRA = 0b11010000;
+    while(!(ADCSRA & (1<<ADIF)));
+    DEBUG_PIN_ON();
+    wait_2_msec();
+    DEBUG_PIN_OFF();
+    adc_value_low = ADCL;
+    adc_value_high = ADCH & 3 | ((chan & 1) << 7);
+    SPI_SEND(adc_value_low);
+    SPI_SEND(adc_value_high);
+  }
 
   while(1) {
-    PORTB &= ~(1<<SS);
-    SPDR = 'b';
-    while(!(SPSR & (1<<SPIF)));
-    SPDR = 'a';
-    while(!(SPSR & (1<<SPIF)));
-    SPDR = 'd';
-    while(!(SPSR & (1<<SPIF)));
-    SPDR = 'b';
-    while(!(SPSR & (1<<SPIF)));
-    SPDR = 'o';
-    while(!(SPSR & (1<<SPIF)));
-    SPDR = 'y';
-    while(!(SPSR & (1<<SPIF)));
-    PORTB |= (1<<SS);
+    wait_200_msec();
+    SPI_SEND(1);
+    SPI_SEND(2);
+    SPI_SEND(3);
+    SPI_SEND(4);
+    SPI_SEND(5);
+    SPI_SEND(0xee);
     DEBUG_PIN_ON();
     wait_200_msec();
     DEBUG_PIN_OFF();
