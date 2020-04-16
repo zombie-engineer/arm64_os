@@ -191,8 +191,8 @@ static void spi_emulated_slave_wait_ce0(spi_emulated_dev_t *spidev)
   while(!gpio_is_set(spidev->ce0_gpio_pin));
 }
 
-static void __attribute__((optimize("O3"))) spi_emulated_slave_wait_sclk_rise(spi_emulated_dev_t *spidev)
-{
+//static void __attribute__((optimize("O3"))) spi_emulated_slave_wait_sclk_rise(spi_emulated_dev_t *spidev)
+//{
 //  uint32_t lev0, lev1;
 //  while(1) {
 //    lev0 = *(uint32_t *)GPIO_REG_GPLEV0;
@@ -201,37 +201,84 @@ static void __attribute__((optimize("O3"))) spi_emulated_slave_wait_sclk_rise(sp
 //  }
  // printf("spi_emulated_slave_wait_sclk_rise:sclk at gpio_pin:%d\r\n", 
    //   spidev->sclk_gpio_pin);
-  while(gpio_is_set(spidev->sclk_gpio_pin)) {
-  }
-  while(!gpio_is_set(spidev->sclk_gpio_pin)) {
-  }
-}
+//  while(gpio_is_set(spidev->sclk_gpio_pin)) {
+//  }
+//  while(!gpio_is_set(spidev->sclk_gpio_pin)) {
+//  }
+//}
 
 struct spi_slave_stats spi_slave_stats = { 0 };
 
 static int __attribute__((optimize("O3"))) spi_emulated_slave_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_out)
 {
-  int i;
-  char from_mosi;
-  uint64_t t1, t2, t_wait_end;
-
+  // char from_mosi;
   struct spi_emulated_dev *d = container_of(spidev, 
       struct spi_emulated_dev, spidev);
+#define STATE_WAIT_CE0 0
+#define STATE_EXPECT_SCLK_DROP 1
+#define STATE_EXPECT_SCLK_RIZE 2
 
-  while(gpio_is_set(d->ce0_gpio_pin));
+ // uint64_t t1, t2, t_wait_end;
+  uint32_t register gpio_level   asm("x28");
+  uint32_t register mask_ce0     asm("x27") = 1<<d->ce0_gpio_pin ;
+  uint32_t register mask_sclk    asm("x26") = 1<<d->sclk_gpio_pin;
+  reg32_t  register gpio_lev_reg asm("x24") = (reg32_t)GPIO_REG_GPLEV0;
+  uint32_t register state        asm("x23") = STATE_WAIT_CE0;
+//  uint32_t register last_sclk    asm("x22")= 0;
+  uint32_t register mosi_shift   asm("x21") = d->mosi_gpio_pin;
+  uint8_t  register byte         asm("x20")= 0;
+  int      register i            asm("x19")= 0;
+
+  while(1) {
+    gpio_level = read_reg(gpio_lev_reg);
+    if (gpio_level & mask_ce0)
+      continue;
+
+    switch(state) {
+      case STATE_WAIT_CE0:
+        if (!(gpio_level & mask_sclk))
+          state = STATE_EXPECT_SCLK_DROP;
+        else
+          state = STATE_EXPECT_SCLK_RIZE;
+        break;
+      case STATE_EXPECT_SCLK_RIZE:
+        if (gpio_level & mask_ce0) {
+          // state = STATE_CE0_BREAK;
+          *byte_out = 0xaa;
+          break;
+        }
+        if (gpio_level & mask_sclk) {
+          byte |= ((gpio_level >> mosi_shift) & 1) << (7-i);
+          i++;
+          state = STATE_EXPECT_SCLK_DROP;
+        }
+        break;
+      case STATE_EXPECT_SCLK_DROP:
+        if (gpio_level & mask_ce0) {
+          *byte_out = 0xaa; //state = STATE_CE0_BREAK;
+          break;
+        }
+        if (!(gpio_level & mask_sclk))
+          state = STATE_EXPECT_SCLK_RIZE;
+        break;
+    }
+    if (i == 8)
+      break;
+  }
+  *byte_out = byte;
   // t1 = read_cpu_counter_64();
 
-  from_mosi = 0;
-  for (i = 0; i < 8; ++i) {
-    spi_emulated_slave_wait_sclk_rise(d);
-    // t_wait_end = read_cpu_counter_64();
-    // spi_slave_stats.sclk_up_delta = t_wait_end - spi_slave_stats.last_sclk_up;
-    // spi_slave_stats.last_sclk_up = t_wait_end;
-    from_mosi |= (gpio_is_set(d->mosi_gpio_pin) << (7-i));
-  }
-  // t2 = read_cpu_counter_64();
-  // spi_slave_stats.cycles_byte_xfer = t2 - t1;
-  *byte_out = from_mosi;
+ //  from_mosi = 0;
+ //  for (i = 0; i < 8; ++i) {
+ //    spi_emulated_slave_wait_sclk_rise(d);
+ //    // t_wait_end = read_cpu_counter_64();
+ //    // spi_slave_stats.sclk_up_delta = t_wait_end - spi_slave_stats.last_sclk_up;
+ //    // spi_slave_stats.last_sclk_up = t_wait_end;
+ //    from_mosi |= (gpio_is_set(d->mosi_gpio_pin) << (7-i));
+ //  }
+ //  // t2 = read_cpu_counter_64();
+ //  // spi_slave_stats.cycles_byte_xfer = t2 - t1;
+ //  *byte_out = from_mosi;
   return ERR_OK;
 }
 
