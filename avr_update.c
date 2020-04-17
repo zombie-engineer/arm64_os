@@ -13,8 +13,8 @@ int init_atmega8a()
 {
   const int gpio_pin_cs0   = 5;
   const int gpio_pin_mosi  = 6;
-  const int gpio_pin_miso  = 13;
-  const int gpio_pin_sclk  = 9;
+  const int gpio_pin_miso  = 9;
+  const int gpio_pin_sclk  = 13;
   const int gpio_pin_reset = 26;
 
   int ret;

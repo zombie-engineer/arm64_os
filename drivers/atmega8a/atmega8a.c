@@ -607,7 +607,7 @@ DECL_GPIO_SET_KEY(pwm0_key, "PWM0_____KEY___");
 static gpio_set_handle_t gpio_set_handle_pwm;
 static int gpio_pin_pwm0;
 
-int pwm_prepare()
+int _pwm_prepare()
 {
   puts("pwm_prepare start\r\n");
   gpio_pin_pwm0 = 18;
@@ -634,7 +634,7 @@ static inline void pwm_servo(uint16_t value)
   err = pwm_set(0, 2000, pt);
   if (err != ERR_OK) {
     printf("Failed to enable pwm: %d\r\n", err);
-    return err;
+    return;
   }
   wait_msec(10);
 }
@@ -670,7 +670,7 @@ int atmega8a_spi_master_test()
   char atm_status = ATMCMD_STAT_ERR;
   uint16_t value = 0;
   uint16_t cmd_adc = 0x1122;
-  err = pwm_prepare();
+  err = _pwm_prepare();
   if (err) {
     printf("Failed to prepare pwm: %d\r\n", err);
     return err;

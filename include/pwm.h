@@ -6,3 +6,5 @@
 int pwm_enable(int channel, int ms_mode);
 
 int pwm_set(int channel, int range, int data);
+
+int pwm_prepare(int gpio_pwm0, int gpio_pwm1);

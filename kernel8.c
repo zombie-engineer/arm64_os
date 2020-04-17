@@ -763,31 +763,6 @@ int spi_slave_test_bsc()
   return ERR_OK;
 }
 
-static gpio_set_handle_t gpio_set_handle_pwm;
-static int gpio_pin_pwm0;
-static int gpio_pin_pwm1;
-DECL_GPIO_SET_KEY(pwm_key, "PWM_KEYS_18_19_");
-
-int _pwm_prepare()
-{
-  puts("pwm_prepare start\r\n");
-  gpio_pin_pwm0 = 18;
-  gpio_pin_pwm1 = 19;
-  int pins[2] = { gpio_pin_pwm0, gpio_pin_pwm1 };
-  gpio_set_handle_pwm = gpio_set_request_n_pins(pins, 2, pwm_key);
-  if (gpio_set_handle_pwm == GPIO_SET_INVALID_HANDLE) {
-    printf("Failed to request gpio pins %d,%d for pwm0,pwm1\r\n", 
-        gpio_pin_pwm0, gpio_pin_pwm1);
-    return ERR_BUSY;
-  }
-  gpio_set_function(gpio_pin_pwm0, GPIO_FUNC_ALT_5);
-  gpio_set_function(gpio_pin_pwm1, GPIO_FUNC_ALT_5);
-  pwm_enable(0, 1);
-  pwm_enable(1, 1);
-  puts("pwm_prepare completed\r\n");
-  return ERR_OK;
-}
-
 static inline void pwm_servo(uint16_t value)
 {
   int err;
@@ -813,6 +788,10 @@ int spi_slave_test()
   // const int gpio_pin_miso  = 13;
   const int gpio_pin_sclk  = 11;
   // const int gpio_pin_reset = 26;
+
+  const int gpio_pin_pwm0 = 18;
+  const int gpio_pin_pwm1 = 19;
+
   spi_dev_t *spidev;
   spidev = spi_allocate_emulated("spi_avr_isp", 
       gpio_pin_sclk, gpio_pin_mosi, -1, gpio_pin_cs0, -1,
@@ -822,7 +801,7 @@ int spi_slave_test()
         PTR_ERR(spidev));
     return ERR_GENERIC;
   }
-  if (_pwm_prepare()) {
+  if (pwm_prepare(gpio_pin_pwm0, gpio_pin_pwm1)) {
     printf("Failed to prepare pwm\r\n");
     return ERR_GENERIC;
   }
@@ -895,11 +874,11 @@ void main()
 //    bsc_slave_debug();
 //  while(1);
   while(1);
-  
+
   mmu_init();
   // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
-  
+
   print_cpu_info();
   print_current_ex_level();
   systimer_init();
@@ -911,7 +890,6 @@ void main()
 
   print_mmu_features();
   print_cache_stats();
-
   // disable_l1_caches();
 
   rand_init();

@@ -5,6 +5,9 @@
 #include <clock_manager.h>
 #include <common.h>
 #include <delays.h>
+#include <gpio.h>
+#include <gpio_set.h>
+#include <bits_api.h>
 
 #define PWM_BASE   (uint64_t)(PERIPHERAL_BASE_PHY + 0x0020c000)
 
@@ -34,30 +37,35 @@
 #define PWM_CTL_MODE1 1
 #define PWM_CTL_PWEN1 0
 
-//typedef struct {
-//  char FULL1 : 1; // 0  Fifo full
-//  char EMPT1 : 1; // 1  Fifo empty
-//  char WERR1 : 1; // 2  Fifo write err
-//  char RERR1 : 1; // 3  Fifo read  err
-//  char GAPO1 : 1; // 4  Channel 1 gap occured
-//  char GAPO2 : 1; // 5  Channel 2 gap occured
-//  char GAPO3 : 1; // 6  Channel 3 gap occured
-//  char GAPO4 : 1; // 7  Channel 4 gap occured
-//  char BERR  : 1; // 8  Bus error
-//  char STA1  : 1; // 9  Channel 1 state
-//  char STA2  : 1; // 10 Channel 2 state
-//  char STA3  : 1; // 11 Channel 3 state
-//  char STA4  : 1; // 12 Channel 4 state
-//  uint32_t RESRV : 19;// 31:13
-//} pwm_sta_t;
+#define PWM_STA_FULL1 0
+#define PWM_STA_EMPT1 1
+#define PWM_STA_WERR1 2
+#define PWM_STA_RERR1 3
+#define PWM_STA_GAPO1 4
+#define PWM_STA_GAPO2 5
+#define PWM_STA_GAPO3 6
+#define PWM_STA_GAPO4 7
+#define PWM_STA_BERR  8
+#define PWM_STA_STA1  9
+#define PWM_STA_STA2  10
+#define PWM_STA_STA3  11
+#define PWM_STA_STA4  12
 
-int pwm_enable(int channel, int ms_mode)
+static gpio_set_handle_t gpio_set_handle_pwm;
+static int gpio_pin_pwm0;
+static int gpio_pin_pwm1;
+
+DECL_GPIO_SET_KEY(pwm_key, "PWM_KEYS_______");
+
+int pwm_enable(int ch, int ms_mode)
 {
   int st;
   uint32_t divi, divf;
   uint32_t sta, ctl;
+  int choff = ch << 3;
+  printf("pwm_enalbe:ch:%d:msmode:%d\r\n", ch, ms_mode);
 
-  if (channel != 0 && channel != 1)
+  if (ch != 0 && ch != 1)
     return ERR_INVAL_ARG;
 
   /* freq = 19.2 MHz = 19 200 000 */
@@ -72,30 +80,115 @@ int pwm_enable(int channel, int ms_mode)
   }
   
   ctl = read_reg(PWM_CTL);
-  ctl &= ~(1<<(PWM_CTL_PWEN1 + (channel<<3)));
-  write_reg(PWM_CTL, ctl);
+  BIT_CLEAR_U32(ctl, PWM_CTL_PWEN1 + choff);
 
+#define PWM_CTL_WRITE(x)\
+  do {\
+    write_reg(PWM_CTL, x);\
+    wait_usec(20);\
+    sta = read_reg(PWM_STA);\
+  } while (BIT_IS_SET(sta, PWM_STA_BERR))
+
+  PWM_CTL_WRITE(ctl);
+
+#define CHECK_STA(r, bit)\
+  if (r & (1<< PWM_STA_ ## bit))\
+    puts(#bit "-");
   while(1) {
     sta = read_reg(PWM_STA);
-    if (sta == 2 || sta == 0x202)
+    CHECK_STA(sta, FULL1);
+    CHECK_STA(sta, EMPT1);
+    CHECK_STA(sta, WERR1);
+    CHECK_STA(sta, RERR1);
+    CHECK_STA(sta, GAPO1);
+    CHECK_STA(sta, GAPO2);
+    CHECK_STA(sta, GAPO3);
+    CHECK_STA(sta, GAPO4);
+    CHECK_STA(sta, BERR);
+    CHECK_STA(sta, STA1);
+    CHECK_STA(sta, STA2);
+    CHECK_STA(sta, STA3);
+    CHECK_STA(sta, STA4);
+
+    if (sta & (BT(PWM_STA_EMPT1)|BT(PWM_STA_STA1+ch)))
       break;
-    //printf("PWM disabled STA: %08x\n", PWM_CONTROL->STA.val);
+    printf("pwm_enable:STA:%08x\n", sta); 
+    sta = read_reg(PWM_STA);
   }
 
   if (ms_mode)
-    ctl |= (1<<(PWM_CTL_MSEN1+(channel<<3)));
+    BIT_SET_U32(ctl, PWM_CTL_MSEN1 + choff);
   else
-    ctl &= ~(1<<(PWM_CTL_MSEN1+(channel<<3)));
-  write_reg(PWM_CTL, ctl);
-  wait_msec(10);
-  ctl |= (1<<(PWM_CTL_PWEN1+(channel<<3)));
+    BIT_CLEAR_U32(ctl, PWM_CTL_MSEN1 + choff);
+
+  PWM_CTL_WRITE(ctl);
+  BIT_SET_U32(ctl, PWM_CTL_PWEN1 + choff);
+  PWM_CTL_WRITE(ctl);
+  puts("pwm_enable_completed\r\n");
   return 0;
 }
 
-int pwm_set(int channel, int range, int data)
+int pwm_set(int ch, int range, int data)
 {
   /* freq = 10 000 Hz / range Hz */
-  write_reg(PWM_RNG1 + (channel << 2), range);
-  write_reg(PWM_DAT1 + (channel << 2), data);
+  write_reg(PWM_RNG1 + (ch << 2), range);
+  write_reg(PWM_DAT1 + (ch << 2), data);
   return 0;
 }
+
+int pwm_prepare(int gpio_pwm0, int gpio_pwm1)
+{
+  puts("pwm_prepare start\r\n");
+  int pins[] = { gpio_pwm0, gpio_pwm1 };
+  int alt_func_pwm_0 = -1;
+  int alt_func_pwm_1 = -1;
+  
+  switch (gpio_pwm0) {
+    case 12:
+      alt_func_pwm_0 = GPIO_FUNC_ALT_0;
+      break;
+    case 18:
+      alt_func_pwm_0 = GPIO_FUNC_ALT_5;
+    case -1:
+      break;
+  }
+
+  switch (gpio_pwm1) {
+    case 13:
+      alt_func_pwm_1 = GPIO_FUNC_ALT_0;
+      break;
+    case 19:
+      alt_func_pwm_1 = GPIO_FUNC_ALT_5;
+    case -1:
+      break;
+  }
+
+  if (alt_func_pwm_0 == -1 && alt_func_pwm_1 == -1) {
+    printf("Invalid combination of provided gpio pins:pwm0:%d,pwm1:%d\r\n",
+        gpio_pwm0, gpio_pwm1);
+    return ERR_INVAL_ARG;
+  }
+
+  gpio_set_handle_pwm = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), pwm_key);
+
+  if (gpio_set_handle_pwm == GPIO_SET_INVALID_HANDLE) {
+    printf("Failed to request gpio pins %d,%d for pwm0,pwm1\r\n", 
+        gpio_pin_pwm0, gpio_pin_pwm1);
+    return ERR_BUSY;
+  }
+    
+  gpio_pin_pwm0 = gpio_pwm0;
+  gpio_pin_pwm1 = gpio_pwm1;
+
+  if (alt_func_pwm_0 != -1) {
+    gpio_set_function(gpio_pin_pwm0, alt_func_pwm_0);
+    pwm_enable(0, 1);
+  }
+  if (alt_func_pwm_1 != -1) {
+    gpio_set_function(gpio_pin_pwm1, alt_func_pwm_1);
+    pwm_enable(1, 1);
+  }
+  puts("pwm_prepare completed\r\n");
+  return ERR_OK;
+}
+
