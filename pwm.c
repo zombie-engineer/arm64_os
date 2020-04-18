@@ -22,14 +22,15 @@
 #define PWM_FIF2   (reg32_t)(PWM_BASE + 0x28)
 
 #define PWM_CTL_MSEN2 15
+#define PWM_CTL_CLRF2 13
 #define PWM_CTL_USEF2 13
 #define PWM_CTL_POLA2 12
 #define PWM_CTL_SBIT2 11
 #define PWM_CTL_RPTL2 10
 #define PWM_CTL_MODE2 9
 #define PWM_CTL_PWEN2 8
-#define PWM_CTL_MSEN1 8
-#define PWM_CTL_CLRF1 7
+#define PWM_CTL_MSEN1 7
+#define PWM_CTL_CLRF1 6
 #define PWM_CTL_USEF1 5
 #define PWM_CTL_POLA1 4
 #define PWM_CTL_SBIT1 3
@@ -51,11 +52,68 @@
 #define PWM_STA_STA3  11
 #define PWM_STA_STA4  12
 
+static int clock_is_set = 0;
 static gpio_set_handle_t gpio_set_handle_pwm;
 static int gpio_pin_pwm0;
 static int gpio_pin_pwm1;
 
 DECL_GPIO_SET_KEY(pwm_key, "PWM_KEYS_______");
+
+#define PRINT_PWM_BIT(regname, regval, bit)\
+  if (regval & (1<< PWM_ ## regname ## _ ## bit))\
+    puts(#bit "-");
+
+#define PWM_PRINT_STA(regval, bit) PRINT_PWM_BIT(STA, regval, bit)
+#define PWM_PRINT_CTL(regval, bit) PRINT_PWM_BIT(CTL, regval, bit)
+
+static inline pwm_print_sta(const char *prefix, uint32_t sta, int newline)
+{
+  puts(prefix);
+  PWM_PRINT_STA(sta, FULL1);
+  PWM_PRINT_STA(sta, EMPT1);
+  PWM_PRINT_STA(sta, WERR1);
+  PWM_PRINT_STA(sta, RERR1);
+  PWM_PRINT_STA(sta, GAPO1);
+  PWM_PRINT_STA(sta, GAPO2);
+  PWM_PRINT_STA(sta, GAPO3);
+  PWM_PRINT_STA(sta, GAPO4);
+  PWM_PRINT_STA(sta, BERR);
+  PWM_PRINT_STA(sta, STA1);
+  PWM_PRINT_STA(sta, STA2);
+  PWM_PRINT_STA(sta, STA3);
+  if (newline)
+    puts("\r\n");
+}
+
+static inline pwm_print_ctl(const char *prefix, uint32_t ctl, int newline)
+{
+  puts(prefix);
+  PWM_PRINT_CTL(ctl, PWEN1);
+  PWM_PRINT_CTL(ctl, MODE1);
+  PWM_PRINT_CTL(ctl, RPTL1);
+  PWM_PRINT_CTL(ctl, SBIT1);
+  PWM_PRINT_CTL(ctl, POLA1);
+  PWM_PRINT_CTL(ctl, USEF1);
+  PWM_PRINT_CTL(ctl, CLRF1);
+  PWM_PRINT_CTL(ctl, MSEN1);
+  PWM_PRINT_CTL(ctl, PWEN2);
+  PWM_PRINT_CTL(ctl, MODE2);
+  PWM_PRINT_CTL(ctl, RPTL2);
+  PWM_PRINT_CTL(ctl, SBIT2);
+  PWM_PRINT_CTL(ctl, POLA2);
+  PWM_PRINT_CTL(ctl, USEF2);
+  PWM_PRINT_CTL(ctl, CLRF2);
+  PWM_PRINT_CTL(ctl, MSEN2);
+  if (newline)
+    puts("\r\n");
+}
+
+static inline pwm_print_ctl_sta(const char *prefix, uint32_t ctl, uint32_t sta)
+{
+  puts(prefix);
+  pwm_print_ctl(":ctl", ctl, 0);
+  pwm_print_sta(":sta", sta, 1);
+}
 
 int pwm_enable(int ch, int ms_mode)
 {
@@ -68,15 +126,18 @@ int pwm_enable(int ch, int ms_mode)
   if (ch != 0 && ch != 1)
     return ERR_INVAL_ARG;
 
-  /* freq = 19.2 MHz = 19 200 000 */
-  divi = 192; 
-  /* freq = 19.2 MHz / 192 = 100 KHz = 19200000 / 192 = 100000 */
-  divf = 0;
-
-  st = cm_set_clock(CM_CLK_ID_PWM, CM_SETCLK_SRC_OSC, CM_SETCLK_MASH_OFF, divi, divf);
-  if (st) {
-    printf("pwm_enable error: %d (%s)\n", st, set_clock_err_to_str(st));
-    return -1;
+  if (!clock_is_set) {
+    /* freq = 19.2 MHz = 19 200 000 */
+    divi = 192; 
+    /* freq = 19.2 MHz / 192 = 100 KHz = 19200000 / 192 = 100000 */
+    divf = 0;
+  
+    st = cm_set_clock(CM_CLK_ID_PWM, CM_SETCLK_SRC_OSC, CM_SETCLK_MASH_OFF, divi, divf);
+    if (st) {
+      printf("pwm_enable error: %d (%s)\n", st, set_clock_err_to_str(st));
+      return -1;
+    }
+    clock_is_set = 1;
   }
   
   ctl = read_reg(PWM_CTL);
@@ -91,24 +152,9 @@ int pwm_enable(int ch, int ms_mode)
 
   PWM_CTL_WRITE(ctl);
 
-#define CHECK_STA(r, bit)\
-  if (r & (1<< PWM_STA_ ## bit))\
-    puts(#bit "-");
   while(1) {
     sta = read_reg(PWM_STA);
-    CHECK_STA(sta, FULL1);
-    CHECK_STA(sta, EMPT1);
-    CHECK_STA(sta, WERR1);
-    CHECK_STA(sta, RERR1);
-    CHECK_STA(sta, GAPO1);
-    CHECK_STA(sta, GAPO2);
-    CHECK_STA(sta, GAPO3);
-    CHECK_STA(sta, GAPO4);
-    CHECK_STA(sta, BERR);
-    CHECK_STA(sta, STA1);
-    CHECK_STA(sta, STA2);
-    CHECK_STA(sta, STA3);
-    CHECK_STA(sta, STA4);
+    pwm_print_sta("pwm ctl off:sta:", sta, 1);
 
     if (sta & (BT(PWM_STA_EMPT1)|BT(PWM_STA_STA1+ch)))
       break;
@@ -120,8 +166,6 @@ int pwm_enable(int ch, int ms_mode)
     BIT_SET_U32(ctl, PWM_CTL_MSEN1 + choff);
   else
     BIT_CLEAR_U32(ctl, PWM_CTL_MSEN1 + choff);
-
-  PWM_CTL_WRITE(ctl);
   BIT_SET_U32(ctl, PWM_CTL_PWEN1 + choff);
   PWM_CTL_WRITE(ctl);
   puts("pwm_enable_completed\r\n");

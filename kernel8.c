@@ -763,17 +763,16 @@ int spi_slave_test_bsc()
   return ERR_OK;
 }
 
-static inline void pwm_servo(uint16_t value)
+static inline void pwm_servo(int ch, int value)
 {
   int err;
   int range_start = 60;
   int range_end = 250;
   int range = range_end - range_start;
-  value &= ((1<<10) - 1);
   float norm = (float)(value & 0x3ff) / 0x3ff;
   int pt = range_start + range * norm;
   // printf("pwm_servo:%d->%d\r\n", (int)value, pt);
-  err = pwm_set(0, 2000, pt);
+  err = pwm_set(ch, 2000, pt);
   if (err != ERR_OK) {
     printf("Failed to enable pwm: %d\r\n", err);
     return;
@@ -805,17 +804,36 @@ int spi_slave_test()
     printf("Failed to prepare pwm\r\n");
     return ERR_GENERIC;
   }
+//  while(1) {
+//    wait_msec(1000);
+//    pwm_set(0, 2000, 60);
+//    putc('+');
+//    pwm_set(1, 2000, 60);
+//    putc('+');
+//    wait_msec(1000);
+//    pwm_set(0, 2000, 280);
+//    putc('-');
+//    pwm_set(1, 2000, 280);
+//    putc('-');
+//  }
 
   puts("starting spi slave while loop\r\n");
   while(1) {
+    int ch;
     char x = 0x77;
     char from_spi[50];
     uint16_t value;
     spidev->xmit_byte(spidev, x, from_spi+0);
     spidev->xmit_byte(spidev, x, from_spi+1);
     value = *from_spi + (*(from_spi + 1) << 8);
-    printf("%04x\r\n", (int)value);
-    pwm_servo(value);
+    ch = (value >> 15) & 1;
+    value &= 0x3ff;
+    
+    if (ch)
+      printf("            %d:%04x\r\n", ch, (int)value);
+    else
+      printf("%d:%04x\r\n", ch, (int)value);
+    pwm_servo(ch, value);
 //    printf("char: '%c%c%c%c'd:%llu,last_up:%llu,cycles:%llu\r\n", from_spi1, from_spi2, from_spi3, from_spi4,
 //        spi_slave_stats.sclk_up_delta,
 //        spi_slave_stats.last_sclk_up,

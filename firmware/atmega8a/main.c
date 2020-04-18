@@ -356,6 +356,50 @@ static inline void on_startup_blink(void)
     asm volatile ("nop\r\nnop\r\nnop\r\n");\
     PORTB |= (1<<SS);
 
+static inline __attribute__((optimize("O2"))) fake_adc_sample(int ch) 
+{
+//    ADMUX = 0b01000000 | (ch & 1);
+//    ADCSRA = 0b11010000;
+//    while(!(ADCSRA & (1<<ADIF)));
+    DEBUG_PIN_ON();
+    wait_2_msec();
+    wait_2_msec();
+    wait_2_msec();
+    wait_2_msec();
+    wait_2_msec();
+    DEBUG_PIN_OFF();
+    adc_value_low = 0xee;
+    adc_value_high = 0x1 | ((ch & 1) << 7);
+    SPI_SEND(adc_value_low);
+    SPI_SEND(adc_value_high);
+}
+
+static inline __attribute__((optimize("O2"))) adc_sample(int ch) 
+{
+    ADCSRA = 0;
+    asm volatile("nop");
+    ADMUX = 0b01000000 | (ch & 1);
+    ADCSRA = 0b11010000;
+    while(!(ADCSRA & (1<<ADIF)));
+    DEBUG_PIN_ON();
+    wait_2_msec();
+    DEBUG_PIN_OFF();
+    adc_value_low = ADCL;
+    adc_value_high = ADCH & 3 | ((ch & 1) << 7);
+    SPI_SEND(adc_value_low);
+    SPI_SEND(adc_value_high);
+}
+
+static inline void __attribute__((optimize("O2"))) adc_loop() 
+{
+  while(1) {
+    adc_sample(0);
+    wait_2_msec();
+    adc_sample(1);
+    wait_3_msec();
+  }
+}
+
 void __attribute__((optimize("O2"))) main()
 {
   DEBUG_PIN_SETUP();
@@ -363,18 +407,7 @@ void __attribute__((optimize("O2"))) main()
   DEBUG_PIN_ON();
   DDRB |= (1<<SS)|(1<<MOSI)|(1<<SCK);
   SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR1);//|(1<<SPR0);
-  while(1) {
-    ADMUX = 0b01000000;
-    ADCSRA = 0b11010000;
-    while(!(ADCSRA & (1<<ADIF)));
-    DEBUG_PIN_ON();
-    wait_2_msec();
-    DEBUG_PIN_OFF();
-    adc_value_low = ADCL;
-    adc_value_high = ADCH & 3 | ((chan & 1) << 7);
-    SPI_SEND(adc_value_low);
-    SPI_SEND(adc_value_high);
-  }
+  adc_loop();
 
   while(1) {
     wait_200_msec();
