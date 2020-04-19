@@ -58,6 +58,7 @@ include drivers/max7219/Makefile
 include drivers/atmega8a/Makefile
 include drivers/f5161ah/Makefile
 include drivers/nokia5110/Makefile
+include drivers/servo/sg90/Makefile
 include board/bcm2835/Makefile
 include lib/stringlib/Makefile
 
@@ -75,6 +76,7 @@ LIBS += $(OBJS_ATMEGA8A)
 LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
 LIBS += $(OBJS_BINS)
+LIBS += $(OBJS_SERVO_SG90)
 $(info LIBS = $(LIBS))
 
 OBJS += $(LIBS) lib/checksum.o font/font.o

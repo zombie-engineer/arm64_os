@@ -77,29 +77,15 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 #define MSEC_TO_COUNT(v) (v * COUNT_PER_MSEC)
 #define SEC_TO_COUNT(v) (v * COUNT_PER_SEC)
 
-#define wait_1_sec()\
-  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
-
-#define wait_2_sec()\
-  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(2)));
-
-#define wait_3_sec()\
-  countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(3)));
-
-#define wait_1_msec()\
-  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
-
-#define wait_2_msec()\
-  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
-
-#define wait_10_msec()\
-  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(10)));
-
-#define wait_100_msec()\
-  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
-
-#define wait_200_msec()\
-  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(200)));
+#define wait_1_sec()    countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(1)));
+#define wait_2_sec()    countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(2)));
+#define wait_3_sec()    countdown_32(ARG_SPLIT_32(SEC_TO_COUNT(3)));
+#define wait_1_msec()   countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(1)));
+#define wait_2_msec()   countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(2)));
+#define wait_3_msec()   countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(3)));
+#define wait_10_msec()  countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(10)));
+#define wait_100_msec() countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(100)));
+#define wait_200_msec() countdown_32(ARG_SPLIT_32(MSEC_TO_COUNT(200)));
 
 //
 //void wait_1_msec()
@@ -356,25 +342,7 @@ static inline void on_startup_blink(void)
     asm volatile ("nop\r\nnop\r\nnop\r\n");\
     PORTB |= (1<<SS);
 
-static inline __attribute__((optimize("O2"))) fake_adc_sample(int ch) 
-{
-//    ADMUX = 0b01000000 | (ch & 1);
-//    ADCSRA = 0b11010000;
-//    while(!(ADCSRA & (1<<ADIF)));
-    DEBUG_PIN_ON();
-    wait_2_msec();
-    wait_2_msec();
-    wait_2_msec();
-    wait_2_msec();
-    wait_2_msec();
-    DEBUG_PIN_OFF();
-    adc_value_low = 0xee;
-    adc_value_high = 0x1 | ((ch & 1) << 7);
-    SPI_SEND(adc_value_low);
-    SPI_SEND(adc_value_high);
-}
-
-static inline __attribute__((optimize("O2"))) adc_sample(int ch) 
+static inline __attribute__((optimize("O2"))) void adc_sample(int ch) 
 {
     ADCSRA = 0;
     asm volatile("nop");
@@ -396,7 +364,7 @@ static inline void __attribute__((optimize("O2"))) adc_loop()
     adc_sample(0);
     wait_2_msec();
     adc_sample(1);
-    wait_3_msec();
+    wait_2_msec();
   }
 }
 

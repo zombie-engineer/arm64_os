@@ -46,8 +46,8 @@ typedef struct spi_emulated_dev {
 
 static struct spi_emulated_dev __spi_emulated_array[4];
 
-LIST_HEAD(spi_emulated_free);
-LIST_HEAD(spi_emulated_active);
+static LIST_HEAD(spi_emulated_free);
+static LIST_HEAD(spi_emulated_active);
 
 spi_emulated_dev_t *__spi_emulated_alloc()
 {

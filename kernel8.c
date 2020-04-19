@@ -38,6 +38,7 @@
 #include <list.h>
 #include <self_test.h>
 #include <pwm.h>
+#include <drivers/servo/sg90.h>
 
 #define DISPLAY_WIDTH 1824
 #define DISPLAY_HEIGHT 984
@@ -780,16 +781,43 @@ static inline void pwm_servo(int ch, int value)
  // wait_msec(10);
 }
 
+struct servo *prep_servo(int ch, int pwm_gpio_pin)
+{
+  struct pwm *pwm;
+  struct servo *servo;
+  char idbuf[16];
+  snprintf(idbuf, sizeof(idbuf), "serv_%d_%d", ch, pwm_gpio_pin);
+  pwm = pwm_bcm2835_create(pwm_gpio_pin, 1);
+  if (IS_ERR(pwm)) {
+    printf("Failed to prepare pwm for servo with gpio_pin:%d,err:%d\r\n", 
+        pwm_gpio_pin, (int)PTR_ERR(pwm));
+    return ERR_PTR(PTR_ERR(pwm));
+  }
+
+  servo = servo_sg90_create(pwm, idbuf);
+  if (IS_ERR(servo))
+    printf("Failed to create sg90 servo:%d\r\n", (int)PTR_ERR(servo));
+  return servo;
+}
+
+#define ADC_MIN 0
+#define ADC_MAX 0x3ff
+#define ANGLE_MIN -90
+#define ANGLE_MAX 90
+#define ANGLE_RANGE (ANGLE_MAX - ANGLE_MIN)
+
+#define adc_normalize(value) (((float)value) / (ADC_MAX - ADC_MIN))
+#define value_to_angle(v) ((ANGLE_RANGE * adc_normalize(v)) + ANGLE_MIN)
+
 int spi_slave_test()
 {
+  int i;
+  struct servo *servos[2];
+  const int servos_pins[2] = { 18, 19 };
+
   const int gpio_pin_cs0   = 5;
   const int gpio_pin_mosi  = 6;
-  // const int gpio_pin_miso  = 13;
   const int gpio_pin_sclk  = 11;
-  // const int gpio_pin_reset = 26;
-
-  const int gpio_pin_pwm0 = 18;
-  const int gpio_pin_pwm1 = 19;
 
   spi_dev_t *spidev;
   spidev = spi_allocate_emulated("spi_avr_isp", 
@@ -800,22 +828,12 @@ int spi_slave_test()
         PTR_ERR(spidev));
     return ERR_GENERIC;
   }
-  if (pwm_prepare(gpio_pin_pwm0, gpio_pin_pwm1)) {
-    printf("Failed to prepare pwm\r\n");
-    return ERR_GENERIC;
+
+  for(i = 0; i < ARRAY_SIZE(servos); ++i) {
+    servos[i] = prep_servo(i, servos_pins[i]);
+    if (IS_ERR(servos[i]))
+      return (int)PTR_ERR(servos[i]);
   }
-//  while(1) {
-//    wait_msec(1000);
-//    pwm_set(0, 2000, 60);
-//    putc('+');
-//    pwm_set(1, 2000, 60);
-//    putc('+');
-//    wait_msec(1000);
-//    pwm_set(0, 2000, 280);
-//    putc('-');
-//    pwm_set(1, 2000, 280);
-//    putc('-');
-//  }
 
   puts("starting spi slave while loop\r\n");
   while(1) {
@@ -833,12 +851,7 @@ int spi_slave_test()
       printf("            %d:%04x\r\n", ch, (int)value);
     else
       printf("%d:%04x\r\n", ch, (int)value);
-    pwm_servo(ch, value);
-//    printf("char: '%c%c%c%c'd:%llu,last_up:%llu,cycles:%llu\r\n", from_spi1, from_spi2, from_spi3, from_spi4,
-//        spi_slave_stats.sclk_up_delta,
-//        spi_slave_stats.last_sclk_up,
-//        spi_slave_stats.cycles_byte_xfer
-//        );
+    servos[ch]->set_angle(servos[ch], value_to_angle(value));
   }
   return ERR_OK;
 }
@@ -858,6 +871,9 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  pwm_bcm2835_init();
+  bcm2835_set_pwm_clk_freq(100000);
+  servo_sg90_init();
   print_mbox_props();
   // self_test();
   irq_init(0 /*loglevel*/);
