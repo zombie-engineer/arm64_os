@@ -15,6 +15,10 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size);
 
 int mbox_get_mac_addr(char *mac_start, char *mac_end);
 
+int mbox_set_power_state(uint32_t device_id, uint32_t *powered_on, uint32_t wait, uint32_t *exists);
+
+int mbox_get_power_state(uint32_t device_id, uint32_t *powered_on, uint32_t *exists);
+
 int mbox_get_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists);
 
 int mbox_set_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists);

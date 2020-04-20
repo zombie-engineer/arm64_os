@@ -41,7 +41,8 @@ extern volatile uint32_t mbox_buffer[36];
 #define MBOX_TAG_GET_CLOCKS            0x10007
 #define MBOX_TAG_ALLOCATE_BUFFER       0x40001
 #define MBOX_TAG_BLANK_SCREEN          0x40002
-#define MBOX_TAG_SET_POWER             0x28001
+#define MBOX_TAG_GET_POWER_STATE       0x20001
+#define MBOX_TAG_SET_POWER_STATE       0x28001
 #define MBOX_TAG_GET_CLOCK_STATE       0x30001
 #define MBOX_TAG_SET_CLOCK_STATE       0x38001
 #define MBOX_TAG_GET_CLOCK_RATE        0x30002
@@ -65,8 +66,17 @@ extern volatile uint32_t mbox_buffer[36];
 #define MBOX_TAG_SET_VIRT_OFFSET       0x48009
 #define MBOX_TAG_GET_COMMAND_LINE      0x50001
 
-
 #define MBOX_TAG_LAST      0
+
+#define MBOX_DEVICE_ID_SD      0
+#define MBOX_DEVICE_ID_UART0   1
+#define MBOX_DEVICE_ID_UART1   2
+#define MBOX_DEVICE_ID_USB     3
+#define MBOX_DEVICE_ID_I2C0    4
+#define MBOX_DEVICE_ID_I2C1    5
+#define MBOX_DEVICE_ID_I2C2    6
+#define MBOX_DEVICE_ID_SPI     7
+#define MBOX_DEVICE_ID_CCP2TX  8
 
 int mbox_prop_call_no_lock();
 int mbox_prop_call();

@@ -209,8 +209,42 @@ int mbox_get_vc_memory(int *base_addr, int *byte_size)
   return -1;
 }
 
+DECL_MBOX_REQ_2T(get_power_state, device_id, padding);
+DECL_MBOX_RSP_2T(get_power_state, device_id, state);
+DECL_MBOX_1TAG_MSG_T(get_power_state);
+
+int mbox_get_power_state(uint32_t device_id, uint32_t* powered_on, uint32_t *exists)
+{
+  DECL_MBOX_MSG(get_power_state, MBOX_TAG_GET_POWER_STATE);
+  m->tag.u.req.device_id = device_id;
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
+    *powered_on = MBOX_GET_RSP(state) & 1;
+    *exists  = ((MBOX_GET_RSP(state) >> 1) & 1) ? 0 : 1;
+    return 0;
+  }
+  return -1;
+}
+
+DECL_MBOX_REQ_2T(set_power_state, device_id, state);
+DECL_MBOX_RSP_2T(set_power_state, device_id, state);
+DECL_MBOX_1TAG_MSG_T(set_power_state);
+
+int mbox_set_power_state(uint32_t device_id, 
+    uint32_t *power_on, uint32_t wait, uint32_t *exists)
+{
+  DECL_MBOX_MSG(set_power_state, MBOX_TAG_SET_POWER_STATE);
+  m->tag.u.req.device_id = device_id;
+  m->tag.u.req.state = (*power_on & 1) | ((wait & 1)<<1);
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
+    *power_on = MBOX_GET_RSP(state) & 1;
+    *exists  = ((MBOX_GET_RSP(state) >> 1) & 1) ? 0 : 1;
+    return 0;
+  }
+  return -1;
+}
+
 DECL_MBOX_REQ_2T(get_clock_state, clock_id, padding);
-DECL_MBOX_RSP_2T(get_clock_state, enabled, exists);
+DECL_MBOX_RSP_2T(get_clock_state, clock_id, state);
 DECL_MBOX_1TAG_MSG_T(get_clock_state);
 
 int mbox_get_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists)
@@ -218,24 +252,25 @@ int mbox_get_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists)
   DECL_MBOX_MSG(get_clock_state, MBOX_TAG_GET_CLOCK_STATE);
   m->tag.u.req.clock_id = clock_id;
   if (!mbox_prop_call(MBOX_CH_PROP)) {
-    *enabled = MBOX_GET_RSP(enabled);
-    *exists = MBOX_GET_RSP(exists);
+    *enabled = MBOX_GET_RSP(state) & 1;
+    *exists = ((MBOX_GET_RSP(state) >> 1) & 1) ? 0 : 1;
     return 0;
   }
   return -1;
 }
 
-DECL_MBOX_REQ_1T(set_clock_state, clock_id);
-DECL_MBOX_RSP_2T(set_clock_state, enabled, exists);
+DECL_MBOX_REQ_2T(set_clock_state, clock_id, state);
+DECL_MBOX_RSP_2T(set_clock_state, clock_id, state);
 DECL_MBOX_1TAG_MSG_T(set_clock_state);
 
 int mbox_set_clock_state(uint32_t clock_id, uint32_t* enabled, uint32_t *exists)
 {
   DECL_MBOX_MSG(set_clock_state, MBOX_TAG_SET_CLOCK_STATE);
   m->tag.u.req.clock_id = clock_id;
+  m->tag.u.req.state = *enabled;
   if (!mbox_prop_call(MBOX_CH_PROP)) {
-    *enabled = MBOX_GET_RSP(enabled);
-    *exists = MBOX_GET_RSP(exists);
+    *enabled = MBOX_GET_RSP(state) & 1;
+    *exists = ((MBOX_GET_RSP(state)>>1) & 1) ? 0 : 1;
     return 0;
   }
   return -1;
@@ -360,3 +395,4 @@ int mbox_set_fb(mbox_set_fb_args_t *args, mbox_set_fb_res_t *res)
   res->fb_pixel_size = 4;
   return ERR_OK;
 }
+
