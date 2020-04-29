@@ -12,7 +12,29 @@
 
 #define BIT_IS_SET(val, bitpos) (val & BT(bitpos))
 
+#define BIT_IS_CLEAR(val, bitpos) (!BIT_IS_SET(val, bitpos))
+
 #define BIT_CLEAR_U32(val, bitpos) val &= ~BT(bitpos)
 
 #define BIT_SET_U32(val, bitpos) val |= BT(bitpos)
 
+#define BF_SHIFT(val, offset) ((val)<<offset)
+
+#define BF_MASK_32(width) (BF_SHIFT((uint32_t)1, width)-1)
+
+#define BF_MASK_AT_32(offset, width) (BF_MASK_32(width)<<offset)
+
+#define BITS_PLACE(type, val, width, offset) ((type)BITS_AT_POS(val, offset, BF_MASK_32(width)))
+
+#define BITS_PLACE_32(val, offset, width) (BITS_PLACE(uint32_t, val, width, offset))
+
+#define BF_EXTRACT(val, offset, width) ((val>>offset) & BF_MASK_32(width))
+
+#define BF_CLEAR(val, offset, width) val &= ~BF_MASK_AT_32(offset, width)
+
+#define BF_ORR(val, set, offset, width)\
+  val |= BITS_PLACE_32(set, width, offset)
+
+#define BF_CLEAR_AND_SET(val, set, offset, width) \
+  BF_CLEAR(val, offset, width);\
+  BF_ORR(val, set, offset, width);

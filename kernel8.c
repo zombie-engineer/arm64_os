@@ -887,6 +887,8 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  // UsbInitialise();
+  // while(1);
   bcm2835_usb_init();
   pwm_bcm2835_init();
   bcm2835_set_pwm_clk_freq(100000);

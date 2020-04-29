@@ -11,6 +11,7 @@
 #define ERR_NOT_FOUND       -7
 #define ERR_BUSY            -8
 #define ERR_GENERIC         -9
+#define ERR_ALIGN          -10
 #define MAX_ERRNO          128
 
 static inline void *ERR_PTR(int64_t err) 

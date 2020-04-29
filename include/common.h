@@ -70,3 +70,7 @@ static inline int should_lock()
 
 #define __puts_codeline(__msg) puts(__msg_codeline(__msg))
 #define __printf_codeline(__fmt, ...) printf(__msg_codeline(__fmt), ## __VA_ARGS__)
+
+#define logf(fmt, ...)\
+  printf("%s:" fmt "\r\n", __func__, ## __VA_ARGS__)
+

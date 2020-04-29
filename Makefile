@@ -16,6 +16,7 @@ LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
+	rpi-usb.o\
 	avr_update.o\
 	binblock.o\
 	console.o\
