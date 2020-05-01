@@ -1,5 +1,5 @@
 #pragma once
-#include "board_map.h"
+#include <board_map.h>
 
 #define USB_GOTGCTL        (reg32_t)(USB_BASE + 0x0000) //  RW 20 0x000f0f03
 #define USB_GOTGINT        (reg32_t)(USB_BASE + 0x0004) //  RW 20 0x000e0304

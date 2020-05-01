@@ -1,17 +1,20 @@
 #include <board/bcm2835/bcm2835_usb.h>
-#include "board_map.h"
-#include "bcm2835_usb_registers.h"
+#include <board_map.h>
 #include "bcm2835_usb_types.h"
 #include <reg_access.h>
 #include <common.h>
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <bits_api.h>
-#include "bcm2835_usb_registers_bits.h"
+#include "dwc2_regs.h"
+#include "dwc2_regs_bits.h"
 #include <usb/usb.h>
 #include <usb/usb_printers.h>
 #include <delays.h>
- #include <stringlib.h>
+#include <stringlib.h>
+#include "root_hub.h"
+#include "usb_dev_rq.h"
+
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
 //
@@ -20,29 +23,6 @@ static inline uint64_t arm_to_gpu_addr(uint64_t addr)
 {
   return 0xC0000000 | addr;
 }
-
-#define USB_DEV_RQ_MAKE(type, rq, val, idx, len)\
-  ((((uint64_t)type & 0x00ff) <<  0)\
-  |(((uint64_t)rq   & 0x00ff) <<  8)\
-  |(((uint64_t)val  & 0xffff) << 16)\
-  |(((uint64_t)idx  & 0xffff) << 32)\
-  |(((uint64_t)len  & 0xffff) << 48))
-
-#define USB_DEV_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, idx, len)\
-  USB_DEV_RQ_MAKE(\
-    USB_RQ_TYPE_GET_DESCRIPTOR,\
-    USB_RQ_GET_DESCRIPTOR,\
-    ((desc_type & 0xff) << 8|(desc_idx & 0xff)), idx, len)
-
-
-#define USB_DEV_RQ_GET_TYPE(r)   ((r    )&0xff)
-#define USB_DEV_RQ_GET_RQ(r)     ((r>>8 )&0xff)
-#define USB_DEV_RQ_GET_VALUE(r)  ((r>>16)&0xffff)
-#define USB_DEV_RQ_GET_INDEX(r)  ((r>>32)&0xffff)
-#define USB_DEV_RQ_GET_LENGTH(r) ((r>>48)&0xffff)
-
-
-
 
 #define usb_info(fmt, ...) logf(fmt, ##__VA_ARGS__)
 #define usb_err(fmt, ...) logf("err:" fmt, ##__VA_ARGS__)
@@ -92,127 +72,21 @@ DECL_STATIC_SLOT(struct bcm2835_usb_device, bcm2835_usb_device, 12)
 DECL_STATIC_SLOT(struct bcm2835_usb_hub_device, bcm2835_usb_hub_device, 12)
 
 static int usb_phy_initialized = 0;
-static int usb_root_hub_device_number = 0;
-
-static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
-	.header = {
-	  .length = sizeof(usb_root_hub_descriptor),
-    .descriptor_type = USB_DESCRIPTOR_TYPE_HUB,
-  },
-	.port_count = 1,
-  .attributes = { 
-    .raw16 = USB_HUB_MAKE_ATTR(
-      USB_HUB_ATTR_POWER_SW_MODE_GANGED,
-      USB_HUB_ATTR_NOT_COMPOUND,
-      USB_HUB_ATTR_OVER_CURRENT_PROT_GLOBAL,
-      USB_HUB_ATTR_THINKTIME_00,
-      USB_HUB_ATTR_PORT_INDICATOR_NO), 
-    },
-	.power_good_delay = 0,
-  .maximum_hub_power = 0,
-	.device_removable = (1<<1), /* Port 1 is non-removale */
-	.port_power_ctrl_mask = USB_HUB_PORT_PWD_MASK_DEFAULT
-};
-
-static ALIGNED(4) struct root_hub_configuration usb_root_hub_configuration = {
-	.cfg = {
-		.header.length = sizeof(struct usb_configuration_descriptor),
-		.header.descriptor_type = USB_DESCRIPTOR_TYPE_CONFIGURATION,
-		.total_length = sizeof(struct root_hub_configuration),
-		.num_interfaces = 1,
-		.configuration_value = 1,
-		.iconfiguration = 2,
-		.attributes = USB_CFG_MAKE_ATTR(0, 1),
-	},
-	.iface = {
-		.header = {
-			.length = sizeof(struct usb_interface_descriptor),
-			.descriptor_type = USB_DESCRIPTOR_TYPE_INTERFACE,
-		},
-		.number = 0,
-		.alt_setting = 0,
-		.endpoint_count = 1,
-		.class = USB_IFACE_CLASS_HUB,
-		.subclass = 0,
-		.protocol = 0,
-		.string_index = 0,
-	},
-	.ep = {
-		.header = {
-			.length = sizeof(struct usb_endpoint_descriptor),
-			.descriptor_type = USB_DESCRIPTOR_TYPE_ENDPOINT,
-		},
-		.endpoint_address = USB_EP_MAKE_ADDR(1, IN),
-		.attributes = USB_EP_MAKE_ATTR(INTERRUPT, IGNORE, IGNORE),
-		.max_packet_size = 64,
-		.interval = 0xff,
-	},
-};
-
-static ALIGNED(4) struct usb_device_descriptor usb_root_hub_device_descriptor = {
-	.length = sizeof(struct usb_device_descriptor),
-	.descriptor_type = USB_DESCRIPTOR_TYPE_DEVICE,
-	.bcd_usb = USB_SPEC_2_0,
-	.device_class = USB_DEVICE_CLASS_HUB,
-	.device_subclass = 0,
-	.device_protocol = 0,
-	.max_packet_size_0 = 64,
-	.id_vendor = 0,
-	.id_product = 0,
-	.bcd_device = USB_DEV_RELEASE_NUM,
-	.i_manufacturer = USB_ROOT_HUB_STRING_IDX_MANUFACTURER,
-	.i_product = USB_ROOT_HUB_STRING_IDX_PRODUCT,
-	.i_serial_number = USB_ROOT_HUB_STRING_IDX_SERIAL,
-	.num_configurations = 1,
-};
-
-static struct bcm2835_root_hub_string_descriptor0 bcm2835_root_hub_string0 ALIGNED(4) = {
-  .h = {
-    .length = sizeof(bcm2835_root_hub_string0),
-    .descriptor_type = USB_DESCRIPTOR_TYPE_STRING
-  },
-  .lang_id = USB_LANG_ID_EN_US
-};
-
-struct usb_string_descriptor root_hub_product_string = {
-	.header = {
-		.length = sizeof(USB_ROOT_HUB_STRING_PRODUCT) + 2,
-		.descriptor_type = USB_DESCRIPTOR_TYPE_STRING,
-	},
-	.data = USB_ROOT_HUB_STRING_PRODUCT
-};
-
-struct usb_string_descriptor root_hub_manufacturer_string = {
-	.header = {
-		.length = sizeof(USB_ROOT_HUB_STRING_PRODUCT) + 2,
-		.descriptor_type = USB_DESCRIPTOR_TYPE_STRING,
-	},
-	.data = USB_ROOT_HUB_STRING_MANUFACTURER
-};
-
-struct usb_string_descriptor root_hub_serial_string = {
-	.header = {
-		.length = sizeof(USB_ROOT_HUB_STRING_PRODUCT) + 2,
-		.descriptor_type = USB_DESCRIPTOR_TYPE_STRING,
-	},
-	.data = USB_ROOT_HUB_STRING_SERIAL
-};
 
 static inline void print_usb_device(struct bcm2835_usb_device *dev)
 {
   printf("usb_device:parent:(%d:%d),pipe0:(max:%d,spd:%d,ep:%d,num:%d,ls_port:%d,ls_pt:%d)",
       dev->parent_hub.number, 
       dev->parent_hub.port_number,
-      (int)dev->pipe0.max_size,
-      (int)dev->pipe0.speed,
-      (int)dev->pipe0.endpoint,
-      (int)dev->pipe0.number,
-      (int)dev->pipe0.ls_node_port,
-      (int)dev->pipe0.ls_node_point
+      dev->pipe0.max_packet_size,
+      dev->pipe0.speed,
+      dev->pipe0.endpoint,
+      dev->pipe0.number,
+      dev->pipe0.ls_node_port,
+      dev->pipe0.ls_node_point
       );
   puts("\r\n");
 }
-
 
 #define USB_HOST_TRANSFER_SIZE_PID_DATA0 0
 #define USB_HOST_TRANSFER_SIZE_PID_DATA1 1
@@ -221,7 +95,10 @@ static inline void print_usb_device(struct bcm2835_usb_device *dev)
 #define USB_HOST_TRANSFER_SIZE_PID_MDATA 3
 
 #define USB_HOST_TRANSFER_SIZE_VALUE(size, packet_count, packet_id, do_ping)\
-  (BITS_PLACE_32(size, 0, 19)|BITS_PLACE_32(packet_count, 19, 10)|BITS_PLACE_32(packet_id, 29, 2)|BITS_PLACE_32(do_ping, 31, 1))
+   (BITS_PLACE_32(size        , 0 , 19)\
+   |BITS_PLACE_32(packet_count, 19, 10)\
+   |BITS_PLACE_32(packet_id   , 29,  2)\
+   |BITS_PLACE_32(do_ping     , 31,  1))
 
 #define USB_HOST_TRANSFER_SPLT_VALUE(hub_addr, port_addr, split_en)\
   (BITS_PLACE_32(hub_addr, 0, 7)|BITS_PLACE_32(port_addr, 7, 7)|BITS_PLACE_32(split_en, 31, 1))
@@ -237,15 +114,30 @@ static inline void print_usb_device(struct bcm2835_usb_device *dev)
 
 static inline uint32_t bcm2835_usb_get_xfer(int length, int low_speed, int packet_id, int max_packet_size)
 {
-  uint32_t packet_count = low_speed 
-    ? ((length + 7) >> 3) 
-    : ((length + max_packet_size - 1) / max_packet_size);
-
+  int packet_size = low_speed ? 8 : max_packet_size;
+  int packet_count = (length + packet_size  - 1) / packet_size;
   if (!packet_count)
     packet_count = 1;
 
   return USB_HOST_TRANSFER_SIZE_VALUE(length, packet_count, packet_id, 0);
 }
+
+static struct bcm2835_usb_device *bcm2835_usb_allocate_device()
+{
+  struct bcm2835_usb_device *dev;
+  dev = bcm2835_usb_device_alloc();
+  if (dev == NULL)
+    return ERR_PTR(ERR_BUSY);
+
+  dev->config.status = USB_DEVICE_STATUS_ATTACHED;
+  dev->parent_hub.port_number = 0;
+  dev->parent_hub.number = 0xff;
+  dev->payload_type = USB_PAYLOAD_TYPE_NONE;
+  dev->payload.hub = 0;
+  return dev;
+}
+
+static int bcm2835_usb_enumerate_hub(struct bcm2835_usb_device *dev);
 
 #define INT_FLAG(reg, flag)\
   BIT_IS_SET(reg, USB_CHANNEL_INTERRUPT_ ## flag)
@@ -425,29 +317,27 @@ static int xfer(struct xfer_control *x, int ch)
   return ERR_OK;
 }
 
-static int bcm2835_channel_transfer(struct bcm2835_usb_pipe pipe,
-  struct bcm2835_usb_pipe_control pctl, 
+static int bcm2835_channel_transfer(struct bcm2835_usb_pipe *pipe,
+  struct bcm2835_usb_pipe_control *pctl, 
   void *buf, 
   int bufsz,
   int packet_id) 
 {
   int err = ERR_OK;
   int i; 
-  int ch = pctl.channel;
+  int ch = pctl->channel;
 
   const int max_retries = 8;
-  uint16_t max_packet_size;
   uint32_t chr, splt, intr, siz, dma;
   // uint32_t offset = 0;
   // struct bcm2835_usb_xfer_ctrl xctl = { 0 };
   uint32_t *ptr;
+  usb_info("TRANSFER------------------------------\r\n");
 
   if ((uint64_t)buf & 3) {
     puts("bcm2835_channel_transfer:buffer not aligned to 4 bytes\r\n");
     return ERR_ALIGN;
   }
-
-  max_packet_size = size_to_usb_packet_size(pipe.max_size);
 
   /* Clear all existing interrupts. */
   CLEAR_INTR();
@@ -455,23 +345,23 @@ static int bcm2835_channel_transfer(struct bcm2835_usb_pipe pipe,
 
   /* Program the channel. */
   chr = 0;
-  chr |= (max_packet_size & 0x7ff) << 0 ;
-  chr |= (pipe.endpoint & 0xf)     << 11;
-  chr |= (pctl.direction & 1)  << 15;
-  chr |= (pipe.speed == USB_SPEED_LOW ? 1 : 0) << 17;
-  chr |= (pctl.transfer_type & 1) << 18;
-  chr |= (pipe.number & 0x7f) << 22;
+  chr |= (pipe->max_packet_size & 0x7ff) << 0 ;
+  chr |= (pipe->endpoint        &   0xf) << 11;
+  chr |= (pctl->direction       &     1) << 15;
+  chr |= (pipe->speed == USB_SPEED_LOW ? 1 : 0) << 17;
+  chr |= (pctl->transfer_type    &     1) << 18;
+  chr |= (pipe->number          &  0x7f) << 22;
   SET_CHAR();
 
   /* Clear and setup split control to low speed devices */
   splt = 0;
   splt |= 1 << 31; // split_enable
-  splt |= (pipe.ls_node_point & 0x7f) << 0;
-  splt |= (pipe.ls_node_port  & 0x7f) << 7;
+  splt |= (pipe->ls_node_point & 0x7f) << 0;
+  splt |= (pipe->ls_node_port  & 0x7f) << 7;
   SET_SPLT();
 
   /* Set transfer size. */
-  siz = bcm2835_usb_get_xfer(bufsz, pipe.speed, packet_id, max_packet_size);
+  siz = bcm2835_usb_get_xfer(bufsz, pipe->speed, packet_id, pipe->max_packet_size);
   SET_SIZ();
 
   ptr = (uint32_t*)buf;
@@ -562,349 +452,9 @@ static int bcm2835_channel_transfer(struct bcm2835_usb_pipe pipe,
 	return err;
 }
 
-static inline void bcm2835_usb_root_hub_reply(void *dst, int dst_sz, void *reply, int reply_sz, int *out_num_bytes)
-{
-  if (reply_sz) {
-    if (reply_sz > dst_sz) {
-      usb_warn("truncating reply_size from %d to %d", reply_sz, dst_sz);
-      reply_sz = dst_sz;
-    }
-    memcpy(dst, reply, reply_sz);
-  }
-  *out_num_bytes = reply_sz;
-}
-
-static int bcm2835_usb_root_hub_rq_set_addr(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
-{
-	usb_root_hub_device_number = USB_DEV_RQ_GET_VALUE(rq);
-  return ERR_OK;
-}
-
-static int bcm2835_usb_root_hub_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
-{
-  int err = ERR_OK;
-  int type = USB_DEV_RQ_GET_TYPE(rq);
-  int value = USB_DEV_RQ_GET_VALUE(rq);
-  uint32_t r;
-  switch (type) {
-    case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
-      switch (value) {
-        case USB_HUB_FEATURE_PORT_POWER:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_CLEAR_U32(r, USB_HPRT_PWR);
-          write_reg(USB_HPRT, r);
-          break;
-        case USB_HUB_FEATURE_ENABLE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_ENA);
-          write_reg(USB_HPRT, r);
-          break;
-        case USB_HUB_FEATURE_ENABLE_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_EN_CHNG);
-          write_reg(USB_HPRT, r);
-          break;
-        case USB_HUB_FEATURE_SUSPEND_CHANGE:
-          /* power and clock register to 0 */
-          write_reg(USB_PCGCR, 0);
-					wait_msec(5);
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_RES);
-          write_reg(USB_HPRT, r);
-					wait_msec(100);
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_CLEAR_U32(r, USB_HPRT_SUSP);
-          BIT_CLEAR_U32(r, USB_HPRT_RES);
-          write_reg(USB_HPRT, r);
-        case USB_HUB_FEATURE_OVERCURRENT_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_OVR_CURR_CHNG);
-          write_reg(USB_HPRT, r);
-        case USB_HUB_FEATURE_CONNECTION_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_CONN_DET);
-          write_reg(USB_HPRT, r);
-          break;
-        default:
-          usb_warn("Unsupported request value: %04x\n", value);
-          break;
-      }
-      break;
-    default:
-      usb_warn("Unsupported feature type: %02x\n", type);
-      break;
-  }
-  return err;
-}
-
-static int bcm2835_usb_root_hub_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
-{
-  int err = ERR_OK;
-  int type = USB_DEV_RQ_GET_TYPE(rq);
-  int value = USB_DEV_RQ_GET_VALUE(rq);
-  int r;
-  switch (type) {
-    case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
-      switch (value) {
-        case USB_HUB_FEATURE_PORT_POWER:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_PWR);
-          write_reg(USB_HPRT, r);
-          break;
-        default:
-          usb_warn("Unsupported request value: %04x\n", value);
-          break;
-      }
-      break;
-    default:
-      usb_warn("Unsupported feature type: %02x\n", type);
-      break;
-  }
-  return err;
-}
-
-static int bcm2835_hub_get_port_status(struct usb_hub_port_status *s)
-{
-  uint32_t r = read_reg(USB_HPRT);
-  usb_info("port_status:");
-  print_usb_hprt(r);
-  puts("\r\n");
-
-  s->status = USB_HUB_MAKEPORT_STATUS(
-      USB_HPRT_GET_CONN_STS(r), 
-      USB_HPRT_GET_ENA(r), 
-      USB_HPRT_GET_SUSP(r), 
-      USB_HPRT_GET_OVR_CURR_ACT(r), 
-      USB_HPRT_GET_RST(r), 
-      USB_HPRT_GET_PWR(r), 
-      (USB_HPRT_GET_SPD(r) == USB_SPEED_LOW),
-      (USB_HPRT_GET_SPD(r) == USB_SPEED_HIGH),
-      USB_HPRT_GET_TST_CTL(r), 
-      0
-  );
-  s->changed = USB_HUB_MAKEPORT_STATUS(
-      USB_HPRT_GET_CONN_DET(r), 
-      0, //USB_HPRT_GET_EN_CHNG(r), 
-      0,
-      USB_HPRT_GET_OVR_CURR_CHNG(r), 
-      0, 0, 0, 0, 0, 0);
-  return ERR_OK;
-}
-
-static int bcm2835_usb_root_hub_rq_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
-{
-  int err = ERR_OK;
-  uint32_t status;
-  int reply_sz = 0;
-  int type = USB_DEV_RQ_GET_TYPE(rq);
-  int index = USB_DEV_RQ_GET_INDEX(rq);
-  struct usb_hub_port_status port_status ALIGNED(4);
-  void *reply = NULL;
-  switch (type) {
-    case USB_RQ_HUB_TYPE_GET_HUB_STATUS:
-      status = USB_HUB_MAKE_STATUS(USB_HUB_STATUS_LOCAL_POWER_LOST, USB_HUB_STATUS_NO_OVERCURRENT);
-      reply = &status;
-      reply_sz = sizeof(status);
-      break;
-    case USB_RQ_HUB_TYPE_GET_PORT_STATUS:
-      if (index == 1) {
-        err = bcm2835_hub_get_port_status(&port_status);
-        if (err == ERR_OK) {
-          reply = &port_status;
-          reply_sz = sizeof(port_status);
-        }
-      } else {
-        usb_err("non existing port index %d requested for status", index);
-      }
-      break;
-    default:
-      usb_err("unknown get status request type: %x", type);
-      err = ERR_INVAL_ARG;
-      break;
-  }
-  bcm2835_usb_root_hub_reply(buf, buf_sz, reply, reply_sz, out_num_bytes);
-  return err;
-}
-
-
-static int bcm2835_usb_root_hub_rq_get_desc(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
-{
-  int err = ERR_OK;
-  int reply_sz = 0;
-  void *reply = NULL;
-  int rq_value = USB_DEV_RQ_GET_VALUE(rq);
-  int desc_type = (rq_value >> 8) & 0xff;
-  int desc_idx = rq_value & 0xff;
-
-  switch(desc_type) {
-    case USB_DESCRIPTOR_TYPE_HUB:
-      reply_sz = sizeof(usb_root_hub_descriptor);
-      reply = &usb_root_hub_descriptor;
-      break;
-    case USB_DESCRIPTOR_TYPE_STRING:
-      usb_info("GET_STRING:%d", desc_idx);
-      switch (desc_idx) {
-        /* string index 0 returns supported lang ids */
-        case 0:
-          reply_sz = sizeof(bcm2835_root_hub_string0);
-          reply = &bcm2835_root_hub_string0;
-          break;
-        case USB_ROOT_HUB_STRING_IDX_PRODUCT:
-          reply_sz = root_hub_product_string.header.length;
-          reply = &root_hub_product_string;
-          break;
-        case USB_ROOT_HUB_STRING_IDX_MANUFACTURER:
-          reply_sz = root_hub_manufacturer_string.header.length;
-          reply = &root_hub_manufacturer_string;
-          break;
-        case USB_ROOT_HUB_STRING_IDX_SERIAL:
-          reply_sz = root_hub_serial_string.header.length;
-          reply = &root_hub_serial_string;
-          break;
-        default:
-          usb_err("requested string %d does not exit", desc_idx);
-          err = ERR_INVAL_ARG;
-          break;
-      } 
-      break;
-    case USB_DESCRIPTOR_TYPE_DEVICE:
-      reply_sz = sizeof(struct usb_device_descriptor);
-      reply = &usb_root_hub_device_descriptor;
-      break;
-    case USB_DESCRIPTOR_TYPE_CONFIGURATION:
-      reply_sz = sizeof(usb_root_hub_configuration);
-      reply = &usb_root_hub_configuration;
-      break;
-    default:
-      err = ERR_INVAL_ARG;
-      usb_err("unknown descriptor type requested: value: %02x", rq_value);
-    break;
-  }
-  bcm2835_usb_root_hub_reply(buf, buf_sz, reply, reply_sz, out_num_bytes);
-  return err;
-}
-
-static const char *usb_desc_type_to_string(int t)
-{
-#define DECL_CASE(type) case USB_DESCRIPTOR_TYPE_##type: return #type
-  switch(t) {
-    DECL_CASE(DEVICE);
-    DECL_CASE(CONFIGURATION);
-    DECL_CASE(STRING);
-    DECL_CASE(INTERFACE);
-    DECL_CASE(ENDPOINT);
-    DECL_CASE(QUALIFIER);
-    DECL_CASE(OTHERSPEED_CONFIG);
-    DECL_CASE(INTERFACE_POWER);
-    DECL_CASE(HID);
-    DECL_CASE(HID_REPORT);
-    DECL_CASE(HID_PHYSICAL);
-    DECL_CASE(HUB);
-    default: return "UNKNOWN";
-  }
-#undef DECL_CASE
-}
-
-static const char *usb_req_to_string(int req)
-{
-#define DECL_CASE(r) case USB_RQ_##r: return #r
-  switch (req) {
-    DECL_CASE(GET_STATUS);
-    DECL_CASE(CLEAR_FEATURE);
-    DECL_CASE(SET_FEATURE);
-    DECL_CASE(SET_ADDRESS);
-    DECL_CASE(GET_DESCRIPTOR);
-    DECL_CASE(SET_DESCRIPTOR);
-    DECL_CASE(GET_CONFIGURATION);
-    DECL_CASE(SET_CONFIGURATION);
-    DECL_CASE(GET_INTERFACE);
-    DECL_CASE(SET_INTERFACE);
-    DECL_CASE(SYNCH_FRAME);
-    default: return "UNKNOWN";
-  }
-#undef DECL_CASE
-}
-
-static void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
-{
-  int type   = USB_DEV_RQ_GET_TYPE(rq);
-  int req    = USB_DEV_RQ_GET_RQ(rq);
-  int value  = USB_DEV_RQ_GET_VALUE(rq);
-  int index  = USB_DEV_RQ_GET_INDEX(rq);
-  int length = USB_DEV_RQ_GET_LENGTH(rq);
-  int value_hi = (value >> 8) & 0xff;
-  int value_lo = value & 0xff;
-  const char *subtype = NULL;
-
-  switch(req) {
-    case USB_RQ_GET_DESCRIPTOR:
-      subtype = usb_desc_type_to_string(value_hi);
-      break;
-    default:
-      break;
-  } 
-  snprintf(buf, buf_sz, "rq:%016x:type:%02x,req:%02x/%s,vl:%04x.%s/%d,idx:%04x,len:%04x",
-    rq, type, req,
-    usb_req_to_string(req),
-    value, subtype ? subtype :"", value_lo, index, length);
-}
-
-static int bcm2835_usb_root_hub_rq(uint64_t rq, 
-    void *buf, int buf_sz, int *out_num_bytes)
-{
-  int err;
-  char rq_desc[256];
-  int request = USB_DEV_RQ_GET_RQ(rq);
-  usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
-  usb_info("[] %s", rq_desc);
-
-  switch (request)
-  {
-    case USB_RQ_GET_STATUS:
-      err = bcm2835_usb_root_hub_rq_get_status(rq, buf, buf_sz, out_num_bytes);
-      break;
-    case USB_RQ_SET_FEATURE:
-      err = bcm2835_usb_root_hub_rq_set_feature(rq, buf, buf_sz, out_num_bytes);
-      break;
-    case USB_RQ_CLEAR_FEATURE:
-      err = bcm2835_usb_root_hub_rq_clear_feature(rq, buf, buf_sz, out_num_bytes);
-      break;
-    case USB_RQ_SET_ADDRESS:
-      err = bcm2835_usb_root_hub_rq_set_addr(rq, buf, buf_sz, out_num_bytes);
-      break;
-    case USB_RQ_GET_DESCRIPTOR:
-      err = bcm2835_usb_root_hub_rq_get_desc(rq, buf, buf_sz, out_num_bytes);
-      break;
-    case USB_RQ_SET_DESCRIPTOR:
-      err = ERR_NOT_IMPLEMENTED;
-      break;
-    case USB_RQ_GET_CONFIGURATION:
-      err = ERR_NOT_IMPLEMENTED;
-      break;
-    case USB_RQ_SET_CONFIGURATION:
-      /* ignore it */
-      err = ERR_OK;
-      break;
-    case USB_RQ_GET_INTERFACE:
-      err = ERR_NOT_IMPLEMENTED;
-      break;
-    case USB_RQ_SET_INTERFACE:
-      err = ERR_NOT_IMPLEMENTED;
-      break;
-    case USB_RQ_SYNCH_FRAME:
-      err = ERR_NOT_IMPLEMENTED;
-      break;
-    default:
-      err = ERR_INVAL_ARG;
-      usb_err("unknown usb rq: %d", request);
-      break;
-  }
-  usb_info("root hub control message processed with status: %d, bytes:%d", err, *out_num_bytes);
-  return err;
-}
-
-static int bcm2835_usb_submit_control_message(struct bcm2835_usb_pipe pipe,
-  struct bcm2835_usb_pipe_control pctl,
+static int bcm2835_usb_submit_control_message(
+  struct bcm2835_usb_pipe *pipe,
+  struct bcm2835_usb_pipe_control *pctl,
   void *buf,
   int buf_sz,
   uint64_t rq,
@@ -913,16 +463,16 @@ static int bcm2835_usb_submit_control_message(struct bcm2835_usb_pipe pipe,
 {
   int err;
   int num_bytes = 0;
-	struct bcm2835_usb_pipe_control int_pctl = pctl;
+	struct bcm2835_usb_pipe_control int_pctl = *pctl;
   usb_info("started:rq:%08x,buf_sz:%d", rq, buf_sz);
 
 	int_pctl.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL;
 	int_pctl.direction     = USB_DIRECTION_OUT;
 
-  if (pipe.number == usb_root_hub_device_number)
-    err = bcm2835_usb_root_hub_rq(rq, buf, buf_sz, &num_bytes);
+  if (pipe->number == usb_root_hub_device_number)
+    err = usb_root_hub_process_req(rq, buf, buf_sz, &num_bytes);
   else
-    err = bcm2835_channel_transfer(pipe, int_pctl, (uint8_t *)&rq, 8, 3);
+    err = bcm2835_channel_transfer(pipe, &int_pctl, (uint8_t *)&rq, 8, 3);
 
   if (out_num_bytes)
     *out_num_bytes = num_bytes;
@@ -932,7 +482,7 @@ static int bcm2835_usb_submit_control_message(struct bcm2835_usb_pipe pipe,
 }
 
 static int bcm2835_usb_get_descriptor(
-    struct bcm2835_usb_pipe p, 
+    struct bcm2835_usb_pipe *p, 
     int desc_type, 
     int desc_idx,
     int lang_id, 
@@ -951,7 +501,7 @@ static int bcm2835_usb_get_descriptor(
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
 
-  err = bcm2835_usb_submit_control_message(p, pctl, 
+  err = bcm2835_usb_submit_control_message(p, &pctl, 
       &header, sizeof(header), rq, USB_CONTROL_MSG_TIMEOUT_MS, bytes_transferred);
   if (err) {
     usb_err("failed to read descriptor header:%d", err);
@@ -970,7 +520,7 @@ static int bcm2835_usb_get_descriptor(
   }
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
-  err = bcm2835_usb_submit_control_message(p, pctl, 
+  err = bcm2835_usb_submit_control_message(p, &pctl, 
       buf, header.length, rq, USB_CONTROL_MSG_TIMEOUT_MS, bytes_transferred);
   if (err)
     usb_err("failed to read descriptor header:%d", err);
@@ -1004,7 +554,7 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
   }
 }
 
-int bcm2835_usb_read_string_descriptor(struct bcm2835_usb_pipe pipe, int string_index, char *buf, uint32_t buf_sz)
+int bcm2835_usb_read_string_descriptor(struct bcm2835_usb_pipe *pipe, int string_index, char *buf, uint32_t buf_sz)
 {
 	int err;
 	int transferred = 0;
@@ -1027,7 +577,7 @@ int bcm2835_usb_read_string_descriptor(struct bcm2835_usb_pipe pipe, int string_
   return ERR_OK;
 }
 
-int bcm2835_usb_hub_read_port_status(struct bcm2835_usb_pipe pipe, int port, struct usb_hub_port_status *status)
+int bcm2835_usb_hub_read_port_status(struct bcm2835_usb_pipe *pipe, int port, struct usb_hub_port_status *status)
 {
   int err;
 	int transferred = 0;
@@ -1044,20 +594,21 @@ int bcm2835_usb_hub_read_port_status(struct bcm2835_usb_pipe pipe, int port, str
     sizeof(*status)
   );
 
-	err = bcm2835_usb_submit_control_message(pipe, pctl, status, sizeof(*status), rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
+	err = bcm2835_usb_submit_control_message(
+      pipe, &pctl, status, sizeof(*status), rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
   if (err != ERR_OK) {
     usb_err("failed to read port status for port: %d, err:%d", port, err);
     return err;
   }
 	if (transferred < sizeof(uint32_t)) {
 		usb_err("failed to read hub device:%i port:%i status\n",
-			pipe.number, port);
+			pipe->number, port);
 		return ERR_GENERIC;
 	}
 	return ERR_OK;
 }
 
-int bcm2835_usb_hub_change_port_feature(struct bcm2835_usb_pipe pipe, int feature, uint8_t port, int set)
+int bcm2835_usb_hub_change_port_feature(struct bcm2835_usb_pipe *pipe, int feature, uint8_t port, int set)
 {
   int err;
   int transferred;
@@ -1075,7 +626,7 @@ int bcm2835_usb_hub_change_port_feature(struct bcm2835_usb_pipe pipe, int featur
     0
   );
 
-	err = bcm2835_usb_submit_control_message(pipe, pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
+	err = bcm2835_usb_submit_control_message(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
   if (err != ERR_OK) {
     usb_err("failed to change hub/port feature: port:%d,feature:%d,err:%d",
       port, feature, err);
@@ -1091,60 +642,438 @@ int bcm2835_usb_hub_port_reset(struct bcm2835_usb_device *dev, uint8_t port)
   int err;
   int i, j;
 	struct usb_hub_port_status port_status ALIGNED(4);
+  /* * * */
+  uint32_t r;
+#define SET(b)\
+  r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;\
+  BIT_SET_U32(r, USB_HPRT_ ## b);           \
+  write_reg(USB_HPRT, r); \
+  printf("bit set " #b"-> %08x\r\n", r);      \
+  wait_msec(100);
+
+#define CLR(b)\
+  r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;\
+  BIT_CLEAR_U32(r, USB_HPRT_ ## b);         \
+  write_reg(USB_HPRT, r);\
+  printf("bit clear" #b"-> %08x\r\n", r);     \
+  wait_msec(100);
+
+#define PR(after)\
+  printf("HPRT: after " #after ":\r\n");\
+  r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;\
+  print_usb_hprt(r);\
+  puts("\r\n");
+
+  while(1) {
+    // SET(RST);
+    r = read_reg(USB_PCGCR);
+    r |= (1<<5)|1;
+    write_reg(USB_PCGCR, r);
+    printf("CLOCK:%08x\n", r);
+  	wait_msec(10);
+    write_reg(USB_PCGCR, 0);
+    r = read_reg(USB_HPRT) & ~0x2e;
+    BIT_CLEAR_U32(r, USB_HPRT_SUSP);
+    BIT_SET_U32(r, USB_HPRT_RST);
+    BIT_SET_U32(r, USB_HPRT_PWR);
+    write_reg(USB_HPRT, r);
+    printf("P1:%08x\n", r);
+		wait_msec(60);
+ 
+    hexdump_memory(USB_GOTGCTL, 0x1000);
+    r = read_reg(USB_HPRT) & ~0x2e;
+   //  BIT_CLEAR_U32(r, USB_HPRT_RST);
+    r = 0x1401;
+    write_reg(USB_HPRT, r);
+    printf("P2:%08x\n", r);
+    wait_msec(2500);
+    for (i = 0; i < 60; ++i) {
+      r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+      printf("%08x\r\n", r);
+//      if (r != 0x0021401) {
+//        PR(ok);
+//        break;
+//      }
+      wait_msec(100);
+
+    }
+  }
+  CLR(PWR);
+  PR(power_off);
+  SET(PWR);
+  PR(power_on);
+  SET(RST);
+  PR(reset_on);
+  CLR(RST);
+  PR(reset_off);
+  SET(ENA);
+  PR(ena_on);
+  CLR(RST);
+  PR(ena_off);
+
+
+  while(1);
+  /* * * */
   for (i = 0; i < max_retries; ++i) {
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_RESET, port + 1, 1);
+    usb_info("resetting hub port %d, retry: %d/%d", port, i, max_retries);
+    err = bcm2835_usb_hub_change_port_feature(&dev->pipe0, USB_HUB_FEATURE_RESET, port + 1, 1);
     if (err)
       return err;
+    usb_info("waiting hub port status changed");
     for (j = 0; j < max_retries; ++j) {
       wait_msec(20);
-      err = bcm2835_usb_hub_read_port_status(dev->pipe0, port + 1, &port_status);
+      err = bcm2835_usb_hub_read_port_status(&dev->pipe0, port + 1, &port_status);
       if (err)
         return err;
-//      if (BIT_IS_SET(port_status.change, USB_HUB_STATUS_CONNECTED_CHANGED) || 
-//          BIT_IS_SET(port_status.status, USB_HUB_STATUS_ENABLED_CHANGED))
-//        break;
+      usb_info("got port status: %04x:%04x", port_status.status, port_status.changed);
+      if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_CH_BIT_RESET_CHANGED) || 
+          BIT_IS_SET(port_status.status, USB_PORT_STATUS_BIT_ENABLED))
+        break;
     } 
   }
-  return bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_RESET_CHANGE, port + 1, 1);
+  return bcm2835_usb_hub_change_port_feature(&dev->pipe0, USB_HUB_FEATURE_RESET_CHANGE, port + 1, 0);
 } 
+
+
+
+#define USB_HUB_CLR_FEATURE(__feature, __port)\
+  err = bcm2835_usb_hub_change_port_feature(\
+      &dev->pipe0, USB_HUB_FEATURE_ ## __feature, __port, 0);\
+  if (err) {\
+    usb_err("clear feature "#__feature" failed: port:%d err:%d\n",\
+        port, err);\
+    goto out_err;\
+  }
+
+static int bcm2835_usb_set_address(struct bcm2835_usb_pipe *p, uint8_t channel, int address)
+{
+  int err;
+	struct bcm2835_usb_pipe_control pctl; 
+  uint64_t rq = USB_DEV_RQ_MAKE(USB_RQ_TYPE_SET_ADDRESS, USB_RQ_SET_ADDRESS, address, 0, 0);
+
+	pctl.channel       = channel;
+	pctl.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL;
+  pctl.direction     = USB_DIRECTION_OUT;
+
+  err = bcm2835_usb_submit_control_message(p, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  usb_info("completed with status: %d", err);
+  return err;
+}
+
+static int usb_dev_parse_configuration(struct bcm2835_usb_device *dev, const void *cfgbuf, int cfgbuf_sz)
+{
+  const struct usb_descriptor_header *hdr;
+  struct usb_interface_descriptor *current_iface;
+  struct usb_endpoint_descriptor *current_ep;
+  const struct usb_configuration_descriptor *current_cfg = cfgbuf;
+  int err = ERR_OK;
+  uint8_t ep_idx = 0;
+  uint8_t hid_num = 0;
+  void *cfgbuf_end = (char *)cfgbuf + cfgbuf_sz;
+  hdr = cfgbuf;
+  dev->max_interface = 0;
+  print_usb_configuration_desc(current_cfg);
+
+  while((void*)hdr < cfgbuf_end) {
+    usb_info("hdr:type:%d,length:%d", hdr->descriptor_type, hdr->length);
+    switch(hdr->descriptor_type) {
+      case USB_DESCRIPTOR_TYPE_INTERFACE:
+        current_iface = &dev->ifaces[dev->max_interface];
+        usb_info("iface:dev:%p,iface:%p", dev, current_iface);
+        memcpy(current_iface, hdr, sizeof(*current_iface));
+        print_usb_interface_desc(current_iface);
+        dev->max_interface++;
+        ep_idx = 0;
+        break;
+      case USB_DESCRIPTOR_TYPE_ENDPOINT:
+        current_ep = &dev->eps[dev->max_interface-1][ep_idx];
+        usb_info("endpoint:dev:%p:%d/%d,%p", dev, dev->max_interface-1, ep_idx, current_ep);
+			  memcpy(current_ep, hdr, sizeof(*current_ep));
+        print_usb_endpoint_desc(current_ep);
+  			ep_idx++;
+        break;
+      case USB_DESCRIPTOR_TYPE_HID:
+        usb_err("fix HID descriptor");
+        while(1);
+        if (hid_num == 0) {
+//          err = bcm2835_add_hid_payload(dev);
+//          if (err != ERR_OK)
+//            goto err;
+//        }
+//        if (hid_num < USB_MAX_HID_PER_DEVICE) {
+//          memcpy(&dev->payload.hid->descriptor[hid_num],
+//             config_buffer, sizeof(struct usb_hid_descriptor));
+//          dev->payload.hid->hid_interface[hid_num] = dev->max_interface - 1;
+//          hid_num++;
+        }
+        break;
+      case USB_DESCRIPTOR_TYPE_CONFIGURATION:
+        break;
+      default:
+        usb_err("unknown descriptor type: %d", hdr->descriptor_type);
+        return ERR_GENERIC;
+        break;
+    }
+    usb_info("hdr:%p\r\n", hdr);
+    hdr = (const struct usb_descriptor_header *)(((char *)hdr) + hdr->length);
+  }
+  usb_info("completed with status:%d", err);
+  return err;
+}
+
+static int bcm2835_usb_set_configuration(struct bcm2835_usb_pipe *pipe, uint8_t channel, int configuration)
+{
+  int err;
+	struct bcm2835_usb_pipe_control pctl = {
+		.channel = channel,
+		.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL,
+		.direction = USB_DIRECTION_OUT,
+	};
+  uint64_t rq = USB_DEV_RQ_MAKE(USB_RQ_TYPE_SET_CONFIGURATION, USB_RQ_SET_CONFIGURATION, configuration, 0, 0);
+  err = bcm2835_usb_submit_control_message(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  usb_info("completed with status: %d", err);
+  return err;
+}
+
+static int bcm2835_usb_enumerate_device(
+    struct bcm2835_usb_device *dev, 
+    struct bcm2835_usb_device *parent_hub, 
+    uint8_t port_num)
+{
+  int err;
+  uint8_t address, config_num;
+  int transferred;
+  char buffer[256];
+  uint8_t config_buffer[1024];
+
+  struct usb_device_descriptor dev_desc = { 0 };
+  struct usb_configuration_descriptor config_desc = { 0 };
+  struct bcm2835_usb_pipe_control pctl;
+  uint64_t rq;
+
+  usb_info("started");
+  address = dev->pipe0.number;
+  dev->pipe0.number = 0;
+  dev->pipe0.max_packet_size = 8;
+
+  pctl.channel = 0;
+  pctl.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL;
+  pctl.direction = USB_DIRECTION_IN;
+
+  rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0, 8);
+  err = bcm2835_usb_submit_control_message(&dev->pipe0, &pctl, 
+      &dev_desc, sizeof(dev_desc), rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
+  if (err)
+    goto err;
+
+  dev->pipe0.max_packet_size = dev_desc.max_packet_size_0;
+  dev->config.status = USB_DEVICE_STATUS_DEFAULT;
+
+  if (parent_hub) {
+    err = bcm2835_usb_hub_port_reset(parent_hub, port_num);
+    if (err != ERR_OK)
+      goto err;
+  }
+
+  err = bcm2835_usb_set_address(&dev->pipe0, pctl.channel, address);
+  if (err)
+    goto err;
+
+  dev->pipe0.number = address;
+  wait_msec(10);
+  dev->config.status = USB_DEVICE_STATUS_ADDRESSED;
+  GET_DESC(&dev->pipe0, DEVICE,        0, 0, &dev->descriptor, sizeof(dev->descriptor));
+  if (err) {
+    usb_err("failed to get device descriptor, err: %d", err);
+    goto err;
+  }
+  print_usb_device_descriptor(&dev->descriptor);
+  GET_DESC(&dev->pipe0, CONFIGURATION, 0, 0, &config_desc, sizeof(config_desc));
+  if (err) {
+    usb_err("failed to get configuration descriptor, err: %d", err);
+    goto err;
+  }
+
+  dev->config.string_index = config_desc.iconfiguration;
+  config_num = config_desc.configuration_value;
+
+  rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, 0, config_desc.total_length);
+
+  err = bcm2835_usb_submit_control_message(&dev->pipe0, &pctl, config_buffer,
+      config_desc.total_length, rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
+  if (err) {
+    usb_err("failed to get full configuration %d with total_length = %d", 
+        config_num, 
+        config_desc.total_length);
+    goto err;
+  }
+
+  if (transferred != config_desc.total_length) {
+    usb_err("failed to recieve total of requested bytes %d < %d",
+        transferred, config_desc.total_length);
+    err = ERR_GENERIC;
+    goto err;
+  }
+
+  err = usb_dev_parse_configuration(dev, config_buffer, config_desc.total_length);
+  if (err != ERR_OK) {
+    usb_err("failed to parse configuration for device");
+    goto err;
+  }
+
+  err = bcm2835_usb_set_configuration(&dev->pipe0, pctl.channel, config_num);
+  if (err != ERR_OK) {
+    usb_err("failed to set configuration %d for device", config_num);
+    goto err;
+  }
+
+  usb_info("configuration set");
+  dev->config.index = config_num;
+  dev->config.status = USB_DEVICE_STATUS_CONFIGURED;
+
+  if (dev->descriptor.i_product) {
+    usb_info("reading string descriptor for product: %d", dev->descriptor.i_product);
+    err = bcm2835_usb_read_string_descriptor(&dev->pipe0, dev->descriptor.i_product, buffer, sizeof(buffer));
+    if (err != ERR_OK)
+      goto err;
+  }
+
+  if (dev->descriptor.i_manufacturer != 0) {
+    usb_info("reading string descriptor for manufacturer_id: %d", dev->descriptor.i_manufacturer);
+    err = bcm2835_usb_read_string_descriptor(&dev->pipe0, dev->descriptor.i_manufacturer, buffer, sizeof(buffer));
+    if (err != ERR_OK)
+      goto err;
+  }
+
+  if (dev->descriptor.i_serial_number != 0) {
+    usb_info("reading string descriptor for serial_number: %d", dev->descriptor.i_serial_number);
+    err = bcm2835_usb_read_string_descriptor(&dev->pipe0, dev->descriptor.i_serial_number, buffer, sizeof(buffer));
+    if (err != ERR_OK)
+      goto err;
+  }
+
+  if (dev->config.string_index) {
+    usb_info("reading config string descriptor: %d", dev->config.string_index);
+    err = bcm2835_usb_read_string_descriptor(&dev->pipe0, dev->config.string_index, buffer, sizeof(buffer));
+    if (err != ERR_OK)
+      goto err;
+  }
+
+  if (dev->descriptor.device_class == USB_IFACE_CLASS_HUB) {
+    err = bcm2835_usb_enumerate_hub(dev);
+    if (err != ERR_OK) {
+      usb_err("error enumerating hub:%d", err);
+      goto err;
+    }
+//  } else if (hid_num > 0) {
+//    dev->payload.hid->max_hid = hid_num;
+//    err = bcm2835_usb_enumerate_hid(dev->pipe0, dev);
+//    if (err != ERR_OK)
+//      goto err;
+  }
+  puts("bcm2835_usb_enumerate_devices:completed\r\n");
+  return ERR_OK;
+err:
+  return err;
+}
 
 static int bcm2835_usb_hub_port_connection_changed(struct bcm2835_usb_device *dev, uint8_t port)
 {
-  return ERR_OK;
-}
-
-int bcm2835_usb_hub_check_connection(struct bcm2835_usb_device *dev, uint8_t port)
-{
-	int err;
+  int err = ERR_OK;
 	struct usb_hub_port_status port_status ALIGNED(4);
-  usb_info("check connection");
-	// struct bcm2835_usb_hub_device *hub;
-
-//	if (!IsHub(device->Pipe0.Number)) return ErrorDevice;
-	// hub = dev->payload.hub;
-
-  err = bcm2835_usb_hub_read_port_status(dev->pipe0, port + 1, &port_status);
+  struct bcm2835_usb_device *dev_on_port = NULL;
+  err = bcm2835_usb_hub_read_port_status(&dev->pipe0, port + 1, &port_status);
 	if (err != ERR_OK) {
+    usb_err("failed to reset port %d status, err: %d", port, err);
     return err;
   }
   usb_info("port_status: %04x:%04x", port_status.status, port_status.changed);
+  USB_HUB_CLR_FEATURE(CONNECTION_CHANGE, port + 1);
+
+  err = bcm2835_usb_hub_port_reset(dev, port);
+  if (err != ERR_OK) {
+    usb_err("failed to reset port %d", port);
+    goto out_err;
+  }
+
+  dev_on_port = bcm2835_usb_allocate_device();
+  if (!dev_on_port) {
+    usb_err("failed to allocate device for port %d", port);
+    goto out_err;
+  }
+
+  err = bcm2835_usb_hub_read_port_status(&dev->pipe0, port + 1, &port_status);
+	if (err != ERR_OK) {
+    usb_err("failed to reset port %d status, err: %d", port, err);
+    return err;
+  }
+  usb_info("port_status: %04x:%04x", port_status.status, port_status.changed);
+
+	if (BIT_IS_SET(port_status.status, USB_PORT_STATUS_BIT_HIGHSPEED))
+    dev_on_port->pipe0.speed = USB_SPEED_HIGH;
+  else if (BIT_IS_SET(port_status.status, USB_PORT_STATUS_BIT_LOWSPEED)) {
+		dev_on_port->pipe0.speed = USB_SPEED_LOW;
+		dev_on_port->pipe0.ls_node_point = dev->pipe0.number;
+		dev_on_port->pipe0.ls_node_port = port;
+	}
+	else 
+    dev_on_port->pipe0.speed = USB_SPEED_FULL;
+
+	dev_on_port->parent_hub.number = dev->pipe0.number;
+	dev_on_port->parent_hub.port_number = port;
+
+  err = bcm2835_usb_enumerate_device(dev_on_port, dev, port);
+  if (err != ERR_OK) {
+    int saved_err = err;
+    usb_err("failed to enumerate device");
+    //usb_deallocate_device(dev_on_port);
+    USB_HUB_CLR_FEATURE(ENABLE, port);
+    err = saved_err;
+    goto out_err;
+  }
+
+out_err:
+  usb_info("completed with status:%d", err);
+  return err;
+}
+
+
+int bcm2835_usb_hub_check_connection(struct bcm2835_usb_device *dev, uint8_t port)
+{
+	int err = ERR_OK;
+	struct usb_hub_port_status port_status ALIGNED(4);
+  usb_info("check connection for port: %d", port + 1);
+
+  err = bcm2835_usb_hub_read_port_status(&dev->pipe0, port + 1, &port_status);
+	if (err != ERR_OK)
+    return err;
+
+  usb_info("port_status %d: %04x:%04x", port + 1, port_status.status, port_status.changed);
 	if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_BIT_CONNECTED)) {
-		usb_info("device:%i, port: %i connected changed\n", dev->pipe0.number, port);
+		usb_info("device: %d, port: %d connected changed\n", dev->pipe0.number, port + 1);
 		err = bcm2835_usb_hub_port_connection_changed(dev, port);
     if (err) {
-		  usb_err("device:%i, port: %i connected changed err:%d\n", dev->pipe0.number, port, err);
-      return err;
+      goto out_err;
     }
+	} else {
+    printf("logic");
+    while(1);
+  }
+
+#define USB_HUB_CHK_AND_CLR(__v, __port, __bit, __feature)\
+	if (BIT_IS_SET(__v, USB_PORT_STATUS_BIT_## __bit)) {\
+		usb_info("bit "#__bit" is set on port:%d. clearing...\n", __port);\
+    USB_HUB_CLR_FEATURE(__feature, __port);\
 	}
 
-	if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_BIT_ENABLED)) {
-		usb_info("device:%i, port: %i enabled changed\n", dev->pipe0.number, port);
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_ENABLE_CHANGE, port, 0);
-    if (err) {
-		  usb_err("device:%i, port: %i enabled changed err:%d\n", dev->pipe0.number, port, err);
-      return err;
-    }
-
+  usb_info("ENABLED");
+  USB_HUB_CHK_AND_CLR(port_status.changed, port, ENABLED    , ENABLE_CHANGE);
+  usb_info("SUSPENDED");
+  USB_HUB_CHK_AND_CLR(port_status.changed, port, SUSPENDED  , SUSPEND_CHANGE);
+  usb_info("OVERCURRENT");
+  USB_HUB_CHK_AND_CLR(port_status.changed, port, OVERCURRENT, OVERCURRENT_CHANGE);
+  usb_info("RESET");
+  USB_HUB_CHK_AND_CLR(port_status.changed, port, RESET      , RESET_CHANGE);
     //		if (BIT_IS_CLEAR(port_status.status, USB_PORT_STATUS_BIT_ENABLED) && 
     //        BIT_IS_SET(port_status.status, USB_PORT_STATUS_BIT_CONNECTED) &&
     //        data->children[port] != NULL) {
@@ -1155,36 +1084,11 @@ int bcm2835_usb_hub_check_connection(struct bcm2835_usb_device *dev, uint8_t por
     //        return err;
     //      }
     //		}
-	}
 
-	if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_BIT_SUSPENDED)) {
-		usb_info("device:%i, port: %i suspended changed\n", dev->pipe0.number, port);
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_SUSPEND_CHANGE, port, 0);
-    if (err) {
-		  usb_err("device:%i, port: %i suspended changed err:%d\n", dev->pipe0.number, port, err);
-      return err;
-    }
-	}
 
-	if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_BIT_OVERCURRENT)) {
-		usb_info("device:%i, port: %i overcurrent changed\n", dev->pipe0.number, port);
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_OVERCURRENT_CHANGE, port, 0);
-    if (err) {
-		  usb_err("device:%i, port: %i overcurrent changed err:%d\n", dev->pipe0.number, port, err);
-      return err;
-    }
-	}
-
-	if (BIT_IS_SET(port_status.changed, USB_PORT_STATUS_BIT_RESET)) {
-		usb_info("device:%i, port: %i reset changed\n", dev->pipe0.number, port);
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_RESET_CHANGE, port, 0);
-    if (err) {
-		  usb_err("device:%i, port: %i reset changed err:%d\n", dev->pipe0.number, port, err);
-      return err;
-    }
-	}
-
-	return ERR_OK;
+out_err:
+  usb_info("completed with status:%d", err);
+  return err;
 }
 
 int bcm2835_usb_hub_add_payload(struct bcm2835_usb_device *dev)
@@ -1199,39 +1103,6 @@ int bcm2835_usb_hub_add_payload(struct bcm2835_usb_device *dev)
 }
 
 
-static int bcm2835_usb_set_address(struct bcm2835_usb_pipe p, uint8_t channel, int address)
-{
-  int err;
-	struct bcm2835_usb_pipe_control pctl; 
-  uint64_t rq = USB_DEV_RQ_MAKE(USB_RQ_TYPE_SET_ADDRESS, USB_RQ_SET_ADDRESS, address, 0, 0);
-
-	pctl.channel       = channel;
-	pctl.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL;
-  pctl.direction     = USB_DIRECTION_OUT;
-
-  err = bcm2835_usb_submit_control_message(p, pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
-  usb_info("completed with status: %d", err);
-  return err;
-}
-
-static int bcm2835_usb_set_configuration(struct bcm2835_usb_pipe pipe, uint8_t channel, int configuration)
-{
-  int err;
-	struct bcm2835_usb_pipe_control pctl = {
-		.channel = channel,
-		.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL,
-		.direction = USB_DIRECTION_OUT,
-	};
-  uint64_t rq = USB_DEV_RQ_MAKE(USB_RQ_TYPE_SET_CONFIGURATION, USB_RQ_SET_CONFIGURATION, configuration, 0, 0);
-  err = bcm2835_usb_submit_control_message(pipe, pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
-  usb_info("completed with status: %d", err);
-  return err;
-}
-
-static void print_usb_hub(struct bcm2835_usb_hub_device *h)
-{
-}
-
 static int bcm2835_usb_enumerate_hub(struct bcm2835_usb_device *dev)
 {
   int i, err, transferred;
@@ -1241,26 +1112,25 @@ static int bcm2835_usb_enumerate_hub(struct bcm2835_usb_device *dev)
   usb_info("enumerate:====================================================");
   h = &hub;
 
-  GET_DESC(dev->pipe0, HUB, 0, 0, h, sizeof(*h));
+  GET_DESC(&dev->pipe0, HUB, 0, 0, h, sizeof(*h));
   if (err) {
     usb_err("failed to get device descriptor, err: %d", err);
     return err;
   }
-  usb_info("hhh");
   print_usb_hub_descriptor(h);
-  usb_info("hhh");
 
   print_usb_device_descriptor(&dev->descriptor);
 
-  err = bcm2835_usb_hub_read_port_status(dev->pipe0, 0, &status);
+  err = bcm2835_usb_hub_read_port_status(&dev->pipe0, 0, &status);
   if (err) {
     usb_err("failed to read hub port status. Enumeration will not continue. err: %d", err);
     return err;
   }
 
-	usb_info("powering on port");
+	usb_info("powering on ports");
   for (i = 0; i < h->port_count; ++i) {
-    err = bcm2835_usb_hub_change_port_feature(dev->pipe0, USB_HUB_FEATURE_PORT_POWER, i + 1, 1);
+	  usb_info("powering on port %d", i + 1);
+    err = bcm2835_usb_hub_change_port_feature(&dev->pipe0, USB_HUB_FEATURE_PORT_POWER, i + 1, 1);
     if (err != ERR_OK)
       return err;
     wait_msec(h->power_good_delay * 2);
@@ -1528,229 +1398,10 @@ int bcm2835_usb_enumerate_hid (struct bcm2835_usb_pipe pipe, struct bcm2835_usb_
 	return err;
 }
 
-static struct bcm2835_usb_device *bcm2835_usb_allocate_device()
-{
-  struct bcm2835_usb_device *dev;
-  dev = bcm2835_usb_device_alloc();
-  if (dev == NULL)
-    return ERR_PTR(ERR_BUSY);
-
-  dev->config.status = USB_DEVICE_STATUS_ATTACHED;
-  dev->parent_hub.port_number = 0;
-  dev->parent_hub.number = 0xff;
-  dev->payload_type = USB_PAYLOAD_TYPE_NONE;
-  dev->payload.hub = 0;
-  return dev;
-}
-
-static int bcm2835_add_hid_payload()
-{
-  return ERR_OK;
-}
-
-static int usb_dev_parse_configuration(struct bcm2835_usb_device *dev, const void *cfgbuf, int cfgbuf_sz)
-{
-  const struct usb_descriptor_header *hdr;
-  struct usb_interface_descriptor *current_iface;
-  struct usb_endpoint_descriptor *current_ep;
-  const struct usb_configuration_descriptor *current_cfg = cfgbuf;
-  int err = ERR_OK;
-  uint8_t ep_idx = 0;
-  uint8_t hid_num = 0;
-  void *cfgbuf_end = (char *)cfgbuf + cfgbuf_sz;
-  hdr = cfgbuf;
-  dev->max_interface = 0;
-  print_usb_configuration_desc(current_cfg);
-
-  while((void*)hdr < cfgbuf_end) {
-    usb_info("hdr:type:%d,length:%d", hdr->descriptor_type, hdr->length);
-    switch(hdr->descriptor_type) {
-      case USB_DESCRIPTOR_TYPE_INTERFACE:
-        current_iface = &dev->ifaces[dev->max_interface];
-        usb_info("iface:dev:%p,iface:%p", dev, current_iface);
-        memcpy(current_iface, hdr, sizeof(*current_iface));
-        print_usb_interface_desc(current_iface);
-        dev->max_interface++;
-        ep_idx = 0;
-        break;
-      case USB_DESCRIPTOR_TYPE_ENDPOINT:
-        current_ep = &dev->eps[dev->max_interface-1][ep_idx];
-        usb_info("endpoint:dev:%p:%d/%d,%p", dev, dev->max_interface-1, ep_idx, current_ep);
-			  memcpy(current_ep, hdr, sizeof(*current_ep));
-        print_usb_endpoint_desc(current_ep);
-  			ep_idx++;
-        break;
-      case USB_DESCRIPTOR_TYPE_HID:
-        usb_err("fix HID descriptor");
-        while(1);
-        if (hid_num == 0) {
-          err = bcm2835_add_hid_payload(dev);
-//          if (err != ERR_OK)
-//            goto err;
-//        }
-//        if (hid_num < USB_MAX_HID_PER_DEVICE) {
-//          memcpy(&dev->payload.hid->descriptor[hid_num],
-//             config_buffer, sizeof(struct usb_hid_descriptor));
-//          dev->payload.hid->hid_interface[hid_num] = dev->max_interface - 1;
-//          hid_num++;
-        }
-        break;
-      case USB_DESCRIPTOR_TYPE_CONFIGURATION:
-        break;
-      default:
-        usb_err("unknown descriptor type: %d", hdr->descriptor_type);
-        return ERR_GENERIC;
-        break;
-    }
-    usb_info("hdr:%p\r\n", hdr);
-    hdr = (const struct usb_descriptor_header *)(((char *)hdr) + hdr->length);
-  }
-  usb_info("completed with status:%d", err);
-  return err;
-}
-
-static int bcm2835_usb_enumerate_device(
-    struct bcm2835_usb_device *dev, 
-    struct bcm2835_usb_device *parent_hub, 
-    uint8_t port_num)
-{
-  int err;
-  uint8_t address, config_num;
-  int transferred;
-  char buffer[256];
-  uint8_t config_buffer[1024];
-
-  struct usb_device_descriptor dev_desc = { 0 };
-  struct usb_configuration_descriptor config_desc = { 0 };
-  struct bcm2835_usb_pipe_control pctl;
-  uint64_t rq;
-
-  usb_info("started");
-  address = dev->pipe0.number;
-  dev->pipe0.number = 0;
-  dev->pipe0.max_size = USB_PACKET_SIZE_8;
-
-  pctl.channel = 0;
-  pctl.transfer_type = USB_EP_TRANSFER_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_IN;
-
-  rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0, 8);
-  err = bcm2835_usb_submit_control_message(dev->pipe0, pctl, 
-      &dev_desc, sizeof(dev_desc), rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
-  if (err)
-    goto err;
-
-  dev->pipe0.max_size = size_to_usb_packet_size(dev_desc.max_packet_size_0);
-  dev->config.status = USB_DEVICE_STATUS_DEFAULT;
-
-  if (parent_hub) {
-    err = bcm2835_usb_hub_port_reset(parent_hub, port_num);
-    if (err != ERR_OK)
-      goto err;
-  }
-
-  err = bcm2835_usb_set_address(dev->pipe0, pctl.channel, address);
-  if (err)
-    goto err;
-
-  dev->pipe0.number = address;
-  wait_msec(10);
-  dev->config.status = USB_DEVICE_STATUS_ADDRESSED;
-  GET_DESC(dev->pipe0, DEVICE,        0, 0, &dev->descriptor, sizeof(dev->descriptor));
-  if (err) {
-    usb_err("failed to get device descriptor, err: %d", err);
-    goto err;
-  }
-  print_usb_device_descriptor(&dev->descriptor);
-  GET_DESC(dev->pipe0, CONFIGURATION, 0, 0, &config_desc, sizeof(config_desc));
-
-  if (err) {
-    usb_err("failed to get configuration descriptor, err: %d", err);
-    goto err;
-  }
-
-  dev->config.string_index = config_desc.iconfiguration;
-  config_num = config_desc.configuration_value;
-
-  rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, 0, config_desc.total_length);
-
-  err = bcm2835_usb_submit_control_message(dev->pipe0, pctl, config_buffer,
-      config_desc.total_length, rq, USB_CONTROL_MSG_TIMEOUT_MS, &transferred);
-  if (err) {
-    usb_err("failed to get full configuration %d with total_length = %d", 
-        config_num, 
-        config_desc.total_length);
-    goto err;
-  }
-
-  if (transferred != config_desc.total_length) {
-    usb_err("failed to recieve total of requested bytes %d < %d",
-        transferred, config_desc.total_length);
-    err = ERR_GENERIC;
-    goto err;
-  }
-
-  err = usb_dev_parse_configuration(dev, config_buffer, config_desc.total_length);
-  if (err != ERR_OK) {
-    usb_err("failed to parse configuration for device");
-    goto err;
-  }
-
-  err = bcm2835_usb_set_configuration(dev->pipe0, pctl.channel, config_num);
-  if (err != ERR_OK) {
-    usb_err("failed to set configuration %d for device", config_num);
-    goto err;
-  }
-
-  usb_info("configuration set");
-  dev->config.index = config_num;
-  dev->config.status = USB_DEVICE_STATUS_CONFIGURED;
-
-  if (dev->descriptor.i_product) {
-    usb_info("reading string descriptor for product: %d", dev->descriptor.i_product);
-    err = bcm2835_usb_read_string_descriptor(dev->pipe0, dev->descriptor.i_product, buffer, sizeof(buffer));
-    if (err != ERR_OK)
-      goto err;
-  }
-
-  if (dev->descriptor.i_manufacturer != 0) {
-    usb_info("reading string descriptor for manufacturer_id: %d", dev->descriptor.i_manufacturer);
-    err = bcm2835_usb_read_string_descriptor(dev->pipe0, dev->descriptor.i_manufacturer, buffer, sizeof(buffer));
-    if (err != ERR_OK)
-      goto err;
-  }
-
-  if (dev->descriptor.i_serial_number != 0) {
-    usb_info("reading string descriptor for serial_number: %d", dev->descriptor.i_serial_number);
-    err = bcm2835_usb_read_string_descriptor(dev->pipe0, dev->descriptor.i_serial_number, buffer, sizeof(buffer));
-    if (err != ERR_OK)
-      goto err;
-  }
-
-  if (dev->config.string_index) {
-    usb_info("reading config string descriptor: %d", dev->config.string_index);
-    err = bcm2835_usb_read_string_descriptor(dev->pipe0, dev->config.string_index, buffer, sizeof(buffer));
-    if (err != ERR_OK)
-      goto err;
-  }
-
-  if (dev->descriptor.device_class == USB_IFACE_CLASS_HUB) {
-    err = bcm2835_usb_enumerate_hub(dev);
-    if (err != ERR_OK) {
-      usb_err("error enumerating hub:%d", err);
-      goto err;
-    }
-//  } else if (hid_num > 0) {
-//    dev->payload.hid->max_hid = hid_num;
-//    err = bcm2835_usb_enumerate_hid(dev->pipe0, dev);
-//    if (err != ERR_OK)
-//      goto err;
-  }
-  puts("bcm2835_usb_enumerate_devices:completed\r\n");
-  return ERR_OK;
-err:
-  return err;
-}
+//static int bcm2835_add_hid_payload()
+//{
+//  return ERR_OK;
+//}
 
 static int bcm2835_usb_attach_root_hub()
 {
@@ -1764,7 +1415,7 @@ static int bcm2835_usb_attach_root_hub()
   root_hub_dev->pipe0.number = usb_root_hub_device_number;
   root_hub_dev->config.status = USB_DEVICE_STATUS_POWERED;
   root_hub_dev->pipe0.speed = USB_SPEED_FULL;
-  root_hub_dev->pipe0.max_size = USB_PACKET_SIZE_64;
+  root_hub_dev->pipe0.max_packet_size = 64;
   print_usb_device(root_hub_dev);
   err = bcm2835_usb_enumerate_device(root_hub_dev, NULL, 0);
   usb_info("completed");
@@ -1881,6 +1532,7 @@ int bcm2835_usb_init()
   usb_info("powered_on");
   bcm2835_usb_print_basic_regs();
   bcm2835_usb_print_hw_regs();
+  return 0;
 
   err = bcm2835_usb_start();
   if (err)

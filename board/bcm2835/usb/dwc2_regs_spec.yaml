@@ -128,3 +128,12 @@ USB_HPRT:
   - [ TST_CTL,      13,  4]
   - [ SPD,          17,  2]
 
+USB_PCGCR:
+  - [ STOP_PCLK,       0, 1]
+  - [ GATE_HCLK,       1, 1]
+  - [ PWR_CLMP,        2, 1]
+  - [ RST_PDWN_MODULE, 3, 1]
+  - [ PHY_SUSPENDED,   4, 1]
+  - [ EN_SLP_CLK_GATE, 5, 1]
+  - [ PHY_SLEEPING,    6, 1]
+  - [ DEEP_SLEEP,      7, 1]

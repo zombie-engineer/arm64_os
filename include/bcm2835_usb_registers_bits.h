@@ -447,7 +447,7 @@ v,
 #define USB_HPRT_CLR_SPD(v)                      BF_CLEAR(v, 17, 2 )
 static inline void print_usb_hprt(uint32_t v)
 {
-  printf("%08x,CONN_STS:%x,CONN_DET:%x,ENA:%x,EN_CHNG:%x,OVR_CURR_ACT:%x,OVR_CURR_CHNG:%x,RES:%x,SUSP:%x,RST:%x,RES0:%x,LN_STS:%x,PWR:%x,TST_CTL:%x,SPD:%x",
+  printf("%08x,CONN_STS:%x,CONN_DET:%x,ENA:%x,EN_CHNG:%x,OVR_CURR_ACT:%x\r\n,OVR_CURR_CHNG:%x,RES:%x,SUSP:%x,RST:%x,RES0:%x,LN_STS:%x,PWR:%x,TST_CTL:%x,SPD:%x",
 v,
     (int)USB_HPRT_GET_CONN_STS(v),
     (int)USB_HPRT_GET_CONN_DET(v),
@@ -463,4 +463,41 @@ v,
     (int)USB_HPRT_GET_PWR(v),
     (int)USB_HPRT_GET_TST_CTL(v),
     (int)USB_HPRT_GET_SPD(v));
+}
+#define USB_PCGCR_GET_STOP_PCLK(v)               BF_EXTRACT(v, 0 , 1 )
+#define USB_PCGCR_GET_GATE_HCLK(v)               BF_EXTRACT(v, 1 , 1 )
+#define USB_PCGCR_GET_PWR_CLMP(v)                BF_EXTRACT(v, 2 , 1 )
+#define USB_PCGCR_GET_RST_PDWN_MODULE(v)         BF_EXTRACT(v, 3 , 1 )
+#define USB_PCGCR_GET_PHY_SUSPENDED(v)           BF_EXTRACT(v, 4 , 1 )
+#define USB_PCGCR_GET_EN_SLP_CLK_GATE(v)         BF_EXTRACT(v, 5 , 1 )
+#define USB_PCGCR_GET_PHY_SLEEPING(v)            BF_EXTRACT(v, 6 , 1 )
+#define USB_PCGCR_GET_DEEP_SLEEP(v)              BF_EXTRACT(v, 7 , 1 )
+#define USB_PCGCR_CLR_SET_STOP_PCLK(v, set)              BF_CLEAR_AND_SET(v, set, 0 , 1 )
+#define USB_PCGCR_CLR_SET_GATE_HCLK(v, set)              BF_CLEAR_AND_SET(v, set, 1 , 1 )
+#define USB_PCGCR_CLR_SET_PWR_CLMP(v, set)               BF_CLEAR_AND_SET(v, set, 2 , 1 )
+#define USB_PCGCR_CLR_SET_RST_PDWN_MODULE(v, set)        BF_CLEAR_AND_SET(v, set, 3 , 1 )
+#define USB_PCGCR_CLR_SET_PHY_SUSPENDED(v, set)          BF_CLEAR_AND_SET(v, set, 4 , 1 )
+#define USB_PCGCR_CLR_SET_EN_SLP_CLK_GATE(v, set)        BF_CLEAR_AND_SET(v, set, 5 , 1 )
+#define USB_PCGCR_CLR_SET_PHY_SLEEPING(v, set)           BF_CLEAR_AND_SET(v, set, 6 , 1 )
+#define USB_PCGCR_CLR_SET_DEEP_SLEEP(v, set)             BF_CLEAR_AND_SET(v, set, 7 , 1 )
+#define USB_PCGCR_CLR_STOP_PCLK(v)               BF_CLEAR(v, 0 , 1 )
+#define USB_PCGCR_CLR_GATE_HCLK(v)               BF_CLEAR(v, 1 , 1 )
+#define USB_PCGCR_CLR_PWR_CLMP(v)                BF_CLEAR(v, 2 , 1 )
+#define USB_PCGCR_CLR_RST_PDWN_MODULE(v)         BF_CLEAR(v, 3 , 1 )
+#define USB_PCGCR_CLR_PHY_SUSPENDED(v)           BF_CLEAR(v, 4 , 1 )
+#define USB_PCGCR_CLR_EN_SLP_CLK_GATE(v)         BF_CLEAR(v, 5 , 1 )
+#define USB_PCGCR_CLR_PHY_SLEEPING(v)            BF_CLEAR(v, 6 , 1 )
+#define USB_PCGCR_CLR_DEEP_SLEEP(v)              BF_CLEAR(v, 7 , 1 )
+static inline void print_usb_pcgcr(uint32_t v)
+{
+  printf("%08x,STOP_PCLK:%x,GATE_HCLK:%x,PWR_CLMP:%x,RST_PDWN_MODULE:%x,PHY_SUSPENDED:%x,EN_SLP_CLK_GATE:%x,PHY_SLEEPING:%x,DEEP_SLEEP:%x",
+v,
+    (int)USB_PCGCR_GET_STOP_PCLK(v),
+    (int)USB_PCGCR_GET_GATE_HCLK(v),
+    (int)USB_PCGCR_GET_PWR_CLMP(v),
+    (int)USB_PCGCR_GET_RST_PDWN_MODULE(v),
+    (int)USB_PCGCR_GET_PHY_SUSPENDED(v),
+    (int)USB_PCGCR_GET_EN_SLP_CLK_GATE(v),
+    (int)USB_PCGCR_GET_PHY_SLEEPING(v),
+    (int)USB_PCGCR_GET_DEEP_SLEEP(v));
 }

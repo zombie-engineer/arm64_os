@@ -22,22 +22,19 @@ struct bcm2835_usb_config_control {
 };
 
 struct bcm2835_usb_pipe {
-  uint8_t max_size : 2;
-  uint8_t speed    : 2;
-  uint8_t endpoint : 4;
-  uint8_t number   : 8;
-  uint16_t reserved : 2;
-  uint16_t ls_node_port : 7;
-  uint16_t ls_node_point: 7;
-} PACKED;
+  int max_packet_size;
+  int speed;
+  int endpoint;
+  int number;
+  int ls_node_port;
+  int ls_node_point;
+};
 
 struct bcm2835_usb_pipe_control {
-  uint32_t reserved0_13  : 14;
-  uint32_t transfer_type : 2 ;
-  uint32_t channel       : 8 ;
-  uint32_t direction     : 1;
-  uint32_t reserved25_31 : 1;
-} PACKED;
+  int transfer_type;
+  int channel;
+  int direction;
+};
 
 struct bcm2835_usb_device {
   struct list_head STATIC_SLOT_OBJ_FIELD(bcm2835_usb_device);
@@ -94,18 +91,3 @@ struct xfer_control {
   int src_sz;
 };
 
-struct bcm2835_root_hub_string_descriptor0 {
-  struct usb_descriptor_header h;
-  uint16_t lang_id;
-} PACKED;
-
-struct root_hub_configuration {
-	struct usb_configuration_descriptor cfg;
-	struct usb_interface_descriptor iface;
-	struct usb_endpoint_descriptor ep;
-} PACKED;
-
-struct usb_hub_port_status {
-  uint16_t status;
-  uint16_t changed;
-};

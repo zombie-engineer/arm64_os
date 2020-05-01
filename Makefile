@@ -5,13 +5,12 @@ LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
-INCLUDES = include firmware/atmega8a/include
-INCLUDES_FLAGS = $(addprefix -I,$(INCLUDES))
+INCLUDES := include firmware/atmega8a/include
 
 OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
-CFLAGS := -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
+CFLAGS = -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
@@ -63,6 +62,8 @@ include drivers/servo/sg90/Makefile
 include board/bcm2835/Makefile
 include lib/stringlib/Makefile
 
+$(info INCLUDES = "$(INCLUDES)")
+INCLUDES_FLAGS = $(addprefix -I,$(INCLUDES))
 
 LIBS = 
 LIBS += $(OBJS_UART) 
