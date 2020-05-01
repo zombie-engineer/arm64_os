@@ -25,9 +25,23 @@ void hexdump_addr(unsigned int *addr);
 
 void hexdump_memory(const void *addr, size_t sz);
 
-#define print_reg32(regname) printf(#regname " %08x\n",  *regname)
+#define __endline "\r\n"
 
-#define print_reg32_at(regname) printf(#regname " %08x\n",  *(reg32_t)regname)
+#define print_reg32(regname) printf(#regname " %08x" __endline,  *regname)
+
+#define print_reg32_at(regname) printf(#regname " %08x" __endline,  *(reg32_t)regname)
+
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+
+#define __msg_codeline(__msg) "("__FILE__ ":" STRINGIFY(__LINE__) "): "__msg __endline
+
+#define __puts_codeline(__msg) puts(__msg_codeline(__msg))
+#define __printf_codeline(__fmt, ...) printf(__msg_codeline(__fmt), ## __VA_ARGS__)
+
+#define logf(__prefix, __fmt, ...)\
+  printf(__prefix "%s:" __fmt __endline, __func__, ## __VA_ARGS__)
+
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(*arr))
 
@@ -62,15 +76,4 @@ static inline int should_lock()
       spinlock_unlock(lock);       \
   } while(0)
 
-
-#define _STRINGIFY(x) #x
-#define STRINGIFY(x) _STRINGIFY(x)
-
-#define __msg_codeline(__msg) "("__FILE__ ":" STRINGIFY(__LINE__) "): "__msg "\n"
-
-#define __puts_codeline(__msg) puts(__msg_codeline(__msg))
-#define __printf_codeline(__fmt, ...) printf(__msg_codeline(__fmt), ## __VA_ARGS__)
-
-#define logf(fmt, ...)\
-  printf("%s:" fmt "\r\n", __func__, ## __VA_ARGS__)
 

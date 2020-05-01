@@ -1,3 +1,4 @@
+#pragma once
 #define USB_HOST_CHAR_GET_MAX_PACK_SZ(v)         BF_EXTRACT(v, 0 , 11)
 #define USB_HOST_CHAR_GET_EP(v)                  BF_EXTRACT(v, 11, 4 )
 #define USB_HOST_CHAR_GET_EP_DIR(v)              BF_EXTRACT(v, 15, 1 )

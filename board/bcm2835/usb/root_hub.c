@@ -11,9 +11,11 @@
 #define USB_ROOT_HUB_STRING_IDX_PRODUCT      1
 #define USB_ROOT_HUB_STRING_IDX_MANUFACTURER 2
 #define USB_ROOT_HUB_STRING_IDX_SERIAL       3
-#define USB_ROOT_HUB_STRING_PRODUCT          u"root_hub"
-#define USB_ROOT_HUB_STRING_MANUFACTURER     u"broadcom"
-#define USB_ROOT_HUB_STRING_SERIAL           u"seri"
+
+#define USB_ROOT_HUB_STRING_PRODUCT          u"ROOT_HUB"
+#define USB_ROOT_HUB_STRING_MANUFACTURER     u"BROADCOM"
+#define USB_ROOT_HUB_STRING_SERIAL           u"123-123-999"
+
 #define USB_SPEC_2_0                         0x200
 #define USB_DEV_RELEASE_NUM                  0x100
 
@@ -26,7 +28,13 @@
 #define RHWARN(fmt, ...)\
   printf("[RH WARN]: "fmt "\r\n", ## __VA_ARGS__)
 
+#define RHDEBUG(fmt, ...)\
+  if (usb_root_hub_debug)\
+    printf("[RH DEBUG]: "fmt "\r\n", ## __VA_ARGS__)
+
+
 int usb_root_hub_device_number = 0;
+int usb_root_hub_debug = 0;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
 	.header = {
@@ -42,7 +50,7 @@ static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
       USB_HUB_ATTR_THINKTIME_00,
       USB_HUB_ATTR_PORT_INDICATOR_NO), 
     },
-	.power_good_delay = 0,
+	.power_good_delay = 100,
   .maximum_hub_power = 0,
 	.device_removable = (1<<1), /* Port 1 is non-removale */
 	.port_power_ctrl_mask = USB_HUB_PORT_PWD_MASK_DEFAULT
@@ -66,7 +74,7 @@ static ALIGNED(4) struct root_hub_configuration usb_root_hub_configuration = {
 		.number = 0,
 		.alt_setting = 0,
 		.endpoint_count = 1,
-		.class = USB_IFACE_CLASS_HUB,
+		.class = USB_INTERFACE_CLASS_HUB,
 		.subclass = 0,
 		.protocol = 0,
 		.string_index = 0,
@@ -118,7 +126,7 @@ struct usb_string_descriptor usb_rh_string_product = {
 
 struct usb_string_descriptor usb_rh_string_manufact = {
 	.header = {
-		.length = sizeof(USB_ROOT_HUB_STRING_PRODUCT) + 2,
+		.length = sizeof(USB_ROOT_HUB_STRING_MANUFACTURER) + 2,
 		.descriptor_type = USB_DESCRIPTOR_TYPE_STRING,
 	},
 	.data = USB_ROOT_HUB_STRING_MANUFACTURER
@@ -126,7 +134,7 @@ struct usb_string_descriptor usb_rh_string_manufact = {
 
 struct usb_string_descriptor usb_rh_string_serial = {
 	.header = {
-		.length = sizeof(USB_ROOT_HUB_STRING_PRODUCT) + 2,
+		.length = sizeof(USB_ROOT_HUB_STRING_SERIAL) + 2,
 		.descriptor_type = USB_DESCRIPTOR_TYPE_STRING,
 	},
 	.data = USB_ROOT_HUB_STRING_SERIAL
@@ -136,7 +144,7 @@ static inline void usb_root_hub_reply(void *dst, int dst_sz, void *reply, int re
 {
   if (reply_sz) {
     if (reply_sz > dst_sz) {
-      RHWARN("truncating reply_size from %d to %d", reply_sz, dst_sz);
+      RHDEBUG("truncating reply_size from %d to %d", reply_sz, dst_sz);
       reply_sz = dst_sz;
     }
     memcpy(dst, reply, reply_sz);
@@ -159,7 +167,6 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
       reply = &usb_root_hub_descriptor;
       break;
     case USB_DESCRIPTOR_TYPE_STRING:
-      RHLOG("GET_STRING:%d", desc_idx);
       switch (desc_idx) {
         /* string index 0 returns supported lang ids */
         case 0:
@@ -201,12 +208,10 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
   return err;
 }
 
-static int hub_get_port_status(struct usb_hub_port_status *s)
+static inline void hub_get_port_status(struct usb_hub_port_status *s)
 {
   uint32_t r = read_reg(USB_HPRT);
-  RHLOG("port_status:");
-  print_usb_hprt(r);
-  puts("\r\n");
+  RHLOG("STATUS:%08x", r);
 
   s->status = USB_HUB_MAKEPORT_STATUS(
       USB_HPRT_GET_CONN_STS(r), 
@@ -222,11 +227,10 @@ static int hub_get_port_status(struct usb_hub_port_status *s)
   );
   s->changed = USB_HUB_MAKEPORT_STATUS(
       USB_HPRT_GET_CONN_DET(r), 
-      0, //USB_HPRT_GET_EN_CHNG(r), 
+      USB_HPRT_GET_EN_CHNG(r), 
       0,
       USB_HPRT_GET_OVR_CURR_CHNG(r), 
       0, 0, 0, 0, 0, 0);
-  return ERR_OK;
 }
 
 static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
@@ -247,11 +251,9 @@ static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_by
       break;
     case USB_RQ_HUB_TYPE_GET_PORT_STATUS:
       if (index == 1) {
-        err = hub_get_port_status(&port_status);
-        if (err == ERR_OK) {
-          reply = &port_status;
-          reply_sz = sizeof(port_status);
-        }
+        hub_get_port_status(&port_status);
+        reply = &port_status;
+        reply_sz = sizeof(port_status);
       } else
         RHERR("non existing port index %d requested for status", index);
       break;
@@ -276,7 +278,6 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
   int type = USB_DEV_RQ_GET_TYPE(rq);
   int value = USB_DEV_RQ_GET_VALUE(rq);
   int r;
-  RHLOG("type:%08x,val:%08x", type, value);
   switch (type) {
     case USB_RQ_HUB_TYPE_SET_HUB_FEATURE:
       /* Skipping */
@@ -284,23 +285,29 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
     case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
       switch (value) {
         case USB_HUB_FEATURE_PORT_POWER:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_PWR);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_RESET:
           r = read_reg(USB_PCGCR);
-          RHLOG("USB_PCGCR:%08x\r\n", r);
           USB_PCGCR_CLR_EN_SLP_CLK_GATE(r);
           USB_PCGCR_CLR_STOP_PCLK(r);
           write_reg(USB_PCGCR, r);
           wait_msec(10);
-          RHLOG("r:%08x\n", r);
           write_reg(USB_PCGCR, 0);
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_RST);
+          BIT_SET_U32(r, USB_HPRT_PWR);
+          BIT_CLEAR_U32(r, USB_HPRT_SUSP);
           write_reg(USB_HPRT, r);
-          RHLOG("USB_PCGCR:%08x\r\n", r);
+					wait_msec(60);
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
+          BIT_CLEAR_U32(r, USB_HPRT_RST);
+          write_reg(USB_HPRT, r);
           break;
         default:
           RHWARN("Unsupported request value: %04x\n", value);
@@ -327,55 +334,58 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
     case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
       switch (value) {
         case USB_HUB_FEATURE_PORT_POWER:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
+          RHLOG("HPRT:%08x->%08x", r, r & ~(uint32_t)BT(USB_HPRT_PWR));
           BIT_CLEAR_U32(r, USB_HPRT_PWR);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_ENABLE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_ENA);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_ENABLE_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_EN_CHNG);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_RESET_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT);
           RHLOG("USB_HUB_FEATURE_RESET_CHANGE:%08x", r);
           break;
         case USB_HUB_FEATURE_SUSPEND_CHANGE:
           /* power and clock register to 0 */
           write_reg(USB_PCGCR, 0);
 					wait_msec(5);
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT) & USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_RES);
           write_reg(USB_HPRT, r);
 					wait_msec(100);
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT) & USB_HPRT_WRITE_MASK;
           BIT_CLEAR_U32(r, USB_HPRT_SUSP);
           BIT_CLEAR_U32(r, USB_HPRT_RES);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_OVERCURRENT_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
-          BIT_SET_U32(r, USB_HPRT_OVR_CURR_CHNG);
+          r = read_reg(USB_HPRT) & USB_HPRT_WRITE_MASK;
+          BIT_SET_U32(r, USB_HPRT_OVRCURR_CHNG);
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_CONNECTION_CHANGE:
-          r = read_reg(USB_HPRT) & USB_HPRT_BIT_CLEAR;
+          r = read_reg(USB_HPRT) & USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_CONN_DET);
           write_reg(USB_HPRT, r);
-          RHLOG("USB_HUB_FEATURE_CONNECTION_CHANGE: %08x\r\n", r);
           break;
         default:
-          RHWARN("Unsupported request value: %04x\n", value);
+          RHWARN("Unsupported request value: %04x", value);
           break;
       }
       break;
     default:
-      RHWARN("Unsupported feature type: %02x\n", type);
+      RHWARN("Unsupported feature type: %02x", type);
       break;
   }
   return err;
@@ -387,7 +397,7 @@ int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_by
   char rq_desc[256];
   int request = USB_DEV_RQ_GET_RQ(rq);
   usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
-  RHLOG("%s", rq_desc);
+  RHLOG("root_hub req:%s", rq_desc);
 
   switch (request)
   {
@@ -430,6 +440,6 @@ int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_by
       RHERR("unknown usb rq: %d", request);
       break;
   }
-  RHLOG("root hub control message processed with status: %d, bytes:%d", err, *out_num_bytes);
+  RHDEBUG("root hub control message processed with status: %d, bytes:%d", err, *out_num_bytes);
   return err;
 }

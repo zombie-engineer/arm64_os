@@ -435,12 +435,25 @@
 #define USB_GNPTXFSIZ_IN_EP_TXF0_DEP         16//  31 0xffff0000 0x0000ffff 0x0
 #define USB_GNPTXFSIZ_NP_TXF_DEP             16//  31 0xffff0000 0x0000ffff 0x0
 
+/* 0: Connection status: 1 - has connection , 0 - no connection 
+ * 1: Connection detected: 1 - connection detected, 0 - not, write 1 to clear
+ * 2: Enabled: 1 - enabled, 0 - not enabled                , write 1 to clear
+ * 3: Enabled changed: enabled status changed,             , write 1 to clear
+ * 4: Overcurrent status: 1 overcurrent, 0 - no overcurr
+ * 5: Overcurrent status change:                           , write 1 to clear
+ * 6: Suspended  1 - suspend / 0 - not
+ * 8: Reset      1 - assert reset, 0 - deassert reset
+ * 10: Line status ??
+ * 12: Power :   1 - enable / 0 -disable
+ * 17: Speed ???
+ */
+
 #define USB_HPRT_CONN_STS                     0//  0 0x00000001 0xfffffffe 0x0
 #define USB_HPRT_CONN_DET                     1//  1 0x00000002 0xfffffffd 0x0
 #define USB_HPRT_ENA                          2//  2 0x00000004 0xfffffffb 0x0
 #define USB_HPRT_EN_CHNG                      3//  3 0x00000008 0xfffffff7 0x0
-#define USB_HPRT_OVR_CURR_ACT                 4//  4 0x00000010 0xffffffef 0x0
-#define USB_HPRT_OVR_CURR_CHNG                5//  5 0x00000020 0xffffffdf 0x0
+#define USB_HPRT_OVRCURR_ACT                  4//  4 0x00000010 0xffffffef 0x0
+#define USB_HPRT_OVRCURR_CHNG                 5//  5 0x00000020 0xffffffdf 0x0
 #define USB_HPRT_RES                          6//  6 0x00000040 0xffffffbf 0x0
 #define USB_HPRT_SUSP                         7//  7 0x00000080 0xffffff7f 0x0
 #define USB_HPRT_RST                          8//  8 0x00000100 0xfffffeff 0x0
@@ -449,7 +462,19 @@
 #define USB_HPRT_PWR                         12//  12 0x00001000 0xffffefff 0x0
 #define USB_HPRT_TST_CTL                     13//  16 0x0001e000 0xfffe1fff 0x0
 #define USB_HPRT_SPD                         17//  18 0x00060000 0xfff9ffff 0x0
-#define USB_HPRT_BIT_CLEAR ~0x2e
+
+#define USB_HPRT_WRITE_CLEAR_BITS \
+   ((1<<USB_HPRT_OVRCURR_CHNG)|\
+    (1<<USB_HPRT_EN_CHNG     )|\
+    (1<<USB_HPRT_ENA         )|\
+    (1<<USB_HPRT_CONN_DET    ))
+
+#define USB_HPRT_WRITE_MASK ~(uint32_t)USB_HPRT_WRITE_CLEAR_BITS
+
+#define USB_HCTSIZ0_PID_DATA0 0
+#define USB_HCTSIZ0_PID_DATA1 2
+#define USB_HCTSIZ0_PID_DATA2 1
+#define USB_HCTSIZ0_PID_SETUP 3
 
 #define USB_HOST_CHAR_MAX_PACK_SZ_BF  0, 11
 #define USB_HOST_CHAR_EP_BF           11, 4

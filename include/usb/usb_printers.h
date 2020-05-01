@@ -39,7 +39,7 @@ static inline void print_usb_device_descriptor(struct usb_device_descriptor *d)
 
 static inline void print_usb_configuration_desc(const struct usb_configuration_descriptor *c)
 {
-  printf("cfg_desc:%p:type:%d,len:%d,tlen:%d,inum:%d,val:%d,str:%d,at:%x,pwr:%d\r\n",
+  printf("cfg_desc:%p:type:%d,len:%d,tlen:%d,inum:%d,conf:%d,iconf:%d,attr:%x,maxpwr:%d\r\n",
     c,
     c->header.descriptor_type,
     c->header.length,
@@ -79,5 +79,26 @@ static inline void print_usb_interface_desc(struct usb_interface_descriptor *i)
     i->subclass,
     i->protocol,
     i->string_index);
+}
+
+const char *usb_descriptor_type_to_string(int t)
+{
+#define __CASE(__t) case USB_DESCRIPTOR_TYPE_ ##__t: return #__t;
+  switch(t) {
+    __CASE(DEVICE);
+    __CASE(CONFIGURATION);
+    __CASE(STRING);
+    __CASE(INTERFACE);
+    __CASE(ENDPOINT);
+    __CASE(QUALIFIER);
+    __CASE(OTHERSPEED_CONFIG);
+    __CASE(INTERFACE_POWER);
+    __CASE(HID);
+    __CASE(HID_REPORT);
+    __CASE(HID_PHYSICAL);
+    __CASE(HUB);
+    default: return "UNKNOWN";
+#undef  __CASE
+  }
 }
 

@@ -18,6 +18,13 @@
     USB_RQ_GET_DESCRIPTOR,\
     ((desc_type & 0xff) << 8|(desc_idx & 0xff)), idx, len)
 
+#define USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, idx, len)\
+  USB_DEV_RQ_MAKE(\
+    USB_RQ_HUB_TYPE_GET_HUB_DESCRIPTOR,\
+    USB_RQ_GET_DESCRIPTOR,\
+    ((desc_type & 0xff) << 8|(desc_idx & 0xff)), idx, len)
+
+
 #define USB_DEV_RQ_GET_TYPE(r)   ((r    )&0xff)
 #define USB_DEV_RQ_GET_RQ(r)     ((r>>8 )&0xff)
 #define USB_DEV_RQ_GET_VALUE(r)  ((r>>16)&0xffff)
@@ -66,6 +73,28 @@ static const char *usb_desc_type_to_string(int t)
 #undef DECL_CASE
 }
 
+static const char *usb_feature_to_string(int t)
+{
+#define DECL_CASE(__f) case USB_HUB_FEATURE_## __f: return #__f
+  switch(t) {
+    DECL_CASE(CONNECTION);
+    DECL_CASE(ENABLE);
+    DECL_CASE(SUSPEND);
+    DECL_CASE(OVERCURRENT);
+    DECL_CASE(RESET);
+    DECL_CASE(PORT_POWER);
+    DECL_CASE(LOWSPEED);
+    DECL_CASE(HIGHSPEED);
+    DECL_CASE(CONNECTION_CHANGE);
+    DECL_CASE(ENABLE_CHANGE);
+    DECL_CASE(SUSPEND_CHANGE);
+    DECL_CASE(OVERCURRENT_CHANGE);
+    DECL_CASE(RESET_CHANGE);
+    default: return "UNKNOWN";
+  }
+#undef DECL_CASE
+}
+
 static inline void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
 {
   int type   = USB_DEV_RQ_GET_TYPE(rq);
@@ -81,12 +110,22 @@ static inline void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
     case USB_RQ_GET_DESCRIPTOR:
       subtype = usb_desc_type_to_string(value_hi);
       break;
+    case USB_RQ_CLEAR_FEATURE:
+    case USB_RQ_SET_FEATURE:
+      subtype = usb_feature_to_string(value);
+      break;
     default:
       break;
   } 
-  snprintf(buf, buf_sz, "rq:%016x:type:%02x,req:%02x/%s,vl:%04x.%s/%d,idx:%04x,len:%04x",
-    rq, type, req,
+
+  snprintf(buf, buf_sz, "%016x %s %s t:%02x r:%02x v:%04x(%d,%d) i:%04x l:%04x",
+    rq, 
     usb_req_to_string(req),
-    value, subtype ? subtype :"", value_lo, index, length);
+    subtype ? subtype : "",
+    type, 
+    req,
+    value, value_hi, value_lo,
+    index, 
+    length);
 }
 
