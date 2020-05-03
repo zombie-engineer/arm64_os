@@ -211,45 +211,41 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
 static inline void hub_get_port_status(struct usb_hub_port_status *s)
 {
   uint32_t r = read_reg(USB_HPRT);
-  RHLOG("STATUS:%08x", r);
+  RHLOG("dwc2 port status: %08x", r);
+  s->status.raw         = 0;
+  s->status.connected   = USB_HPRT_GET_CONN_STS(r);
+  s->status.enabled     = USB_HPRT_GET_ENA(r);
+  s->status.suspended   = USB_HPRT_GET_SUSP(r);
+  s->status.overcurrent = USB_HPRT_GET_OVR_CURR_ACT(r);
+  s->status.reset       = USB_HPRT_GET_RST(r);
+  s->status.power       = USB_HPRT_GET_PWR(r);
+  s->status.low_speed   = USB_HPRT_GET_SPD(r) == USB_SPEED_LOW  ? 1 : 0;
+  s->status.high_speed  = USB_HPRT_GET_SPD(r) == USB_SPEED_HIGH ? 1 : 0;
 
-  s->status = USB_HUB_MAKEPORT_STATUS(
-      USB_HPRT_GET_CONN_STS(r), 
-      USB_HPRT_GET_ENA(r), 
-      USB_HPRT_GET_SUSP(r), 
-      USB_HPRT_GET_OVR_CURR_ACT(r), 
-      USB_HPRT_GET_RST(r), 
-      USB_HPRT_GET_PWR(r), 
-      (USB_HPRT_GET_SPD(r) == USB_SPEED_LOW),
-      (USB_HPRT_GET_SPD(r) == USB_SPEED_HIGH),
-      USB_HPRT_GET_TST_CTL(r), 
-      0
-  );
-  s->changed = USB_HUB_MAKEPORT_STATUS(
-      USB_HPRT_GET_CONN_DET(r), 
-      USB_HPRT_GET_EN_CHNG(r), 
-      0,
-      USB_HPRT_GET_OVR_CURR_CHNG(r), 
-      0, 0, 0, 0, 0, 0);
+  s->change.raw                 = 0;
+  s->change.connected_changed   = USB_HPRT_GET_CONN_DET(r);
+  s->change.enabled_changed     = USB_HPRT_GET_EN_CHNG(r);
+  s->change.overcurrent_changed = USB_HPRT_GET_OVR_CURR_CHNG(r);
 }
 
 static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes)
 {
   int err = ERR_OK;
-  uint32_t status;
   int reply_sz = 0;
   int type = USB_DEV_RQ_GET_TYPE(rq);
   int index = USB_DEV_RQ_GET_INDEX(rq);
-  struct usb_hub_port_status port_status ALIGNED(4);
   void *reply = NULL;
 
+  struct usb_hub_status       hub_status ALIGNED(4) = { 0 };
+  struct usb_hub_port_status port_status ALIGNED(4) = { 0 };
+
   switch (type) {
-    case USB_RQ_HUB_TYPE_GET_HUB_STATUS:
-      status = USB_HUB_MAKE_STATUS(USB_HUB_STATUS_LOCAL_POWER_LOST, USB_HUB_STATUS_NO_OVERCURRENT);
-      reply = &status;
-      reply_sz = sizeof(status);
+    case USB_RQ_TYPE_HUB_GET_HUB_STATUS:
+      hub_status.status.local_power_source = 1;
+      reply = &hub_status;
+      reply_sz = sizeof(hub_status);
       break;
-    case USB_RQ_HUB_TYPE_GET_PORT_STATUS:
+    case USB_RQ_TYPE_HUB_GET_PORT_STATUS:
       if (index == 1) {
         hub_get_port_status(&port_status);
         reply = &port_status;
@@ -279,10 +275,10 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
   int value = USB_DEV_RQ_GET_VALUE(rq);
   int r;
   switch (type) {
-    case USB_RQ_HUB_TYPE_SET_HUB_FEATURE:
+    case USB_RQ_TYPE_HUB_SET_HUB_FEATURE:
       /* Skipping */
       break;
-    case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
+    case USB_RQ_TYPE_HUB_SET_PORT_FEATURE:
       switch (value) {
         case USB_HUB_FEATURE_PORT_POWER:
           r = read_reg(USB_HPRT);
@@ -328,10 +324,10 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
   int value = USB_DEV_RQ_GET_VALUE(rq);
   uint32_t r;
   switch (type) {
-    case USB_RQ_HUB_TYPE_SET_HUB_FEATURE:
+    case USB_RQ_TYPE_HUB_SET_HUB_FEATURE:
       /* Skipping */
       break;
-    case USB_RQ_HUB_TYPE_SET_PORT_FEATURE:
+    case USB_RQ_TYPE_HUB_SET_PORT_FEATURE:
       switch (value) {
         case USB_HUB_FEATURE_PORT_POWER:
           r = read_reg(USB_HPRT);

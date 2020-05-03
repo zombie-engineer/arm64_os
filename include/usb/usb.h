@@ -2,6 +2,13 @@
 #include <types.h>
 #include <compiler.h>
 
+/*
+ * Default address at which powered-on / reset device
+ * is listening
+ */
+#define USB_DEFAULT_ADDRESS 0
+#define USB_DEFAULT_PACKET_SIZE 8
+
 #define USB_RQ_TYPE_DEV_CLEAR_FEATURE   0b10000000
 #define USB_RQ_TYPE_IFACE_CLEAR_FEATURE 0b10000001
 #define USB_RQ_TYPE_EP_CLEAR_FEATURE    0b10000010
@@ -21,18 +28,18 @@
 #define USB_RQ_TYPE_SET_INTERFACE       0b00000001
 #define USB_RQ_TYPE_SYNCH_FRAME         0b00000010
 
-#define USB_RQ_HUB_TYPE_CLEAR_HUB_FEATURE  0b00100000
-#define USB_RQ_HUB_TYPE_CLEAR_PORT_FEATURE 0b00100011
-#define USB_RQ_HUB_TYPE_CLEAR_TT_BUFFER    0b00100011
-#define USB_RQ_HUB_TYPE_GET_HUB_DESCRIPTOR 0b10100000
-#define USB_RQ_HUB_TYPE_GET_HUB_STATUS     0b10100000
-#define USB_RQ_HUB_TYPE_GET_PORT_STATUS    0b10100011
-#define USB_RQ_HUB_TYPE_RESET_TT           0b00100011
-#define USB_RQ_HUB_TYPE_SET_HUB_DESCRIPTOR 0b00100000
-#define USB_RQ_HUB_TYPE_SET_HUB_FEATURE    0b00100000
-#define USB_RQ_HUB_TYPE_SET_PORT_FEATURE   0b00100011
-#define USB_RQ_HUB_TYPE_GET_TT_STATE       0b10100011
-#define USB_RQ_HUB_TYPE_STOP_TT            0b00100011
+#define USB_RQ_TYPE_HUB_CLEAR_HUB_FEATURE  0b00100000
+#define USB_RQ_TYPE_HUB_CLEAR_PORT_FEATURE 0b00100011
+#define USB_RQ_TYPE_HUB_CLEAR_TT_BUFFER    0b00100011
+#define USB_RQ_TYPE_HUB_GET_HUB_DESCRIPTOR 0b10100000
+#define USB_RQ_TYPE_HUB_GET_HUB_STATUS     0b10100000
+#define USB_RQ_TYPE_HUB_GET_PORT_STATUS    0b10100011
+#define USB_RQ_TYPE_HUB_RESET_TT           0b00100011
+#define USB_RQ_TYPE_HUB_SET_HUB_DESCRIPTOR 0b00100000
+#define USB_RQ_TYPE_HUB_SET_HUB_FEATURE    0b00100000
+#define USB_RQ_TYPE_HUB_SET_PORT_FEATURE   0b00100011
+#define USB_RQ_TYPE_HUB_GET_TT_STATE       0b10100011
+#define USB_RQ_TYPE_HUB_STOP_TT            0b00100011
 
 #define USB_MAX_HID_PER_DEVICE 4
 #define USB_MAX_CHILDREN_PER_DEVICE 10
@@ -72,6 +79,7 @@
 #define USB_HUB_FEATURE_PORT_POWER         8
 #define USB_HUB_FEATURE_LOWSPEED           9
 #define USB_HUB_FEATURE_HIGHSPEED          10
+
 #define USB_HUB_FEATURE_CONNECTION_CHANGE  16
 #define USB_HUB_FEATURE_ENABLE_CHANGE      17
 #define USB_HUB_FEATURE_SUSPEND_CHANGE     18
@@ -192,21 +200,48 @@
 #define USB_PORT_STATUS_BIT_TESTMODE   11
 #define USB_PORT_STATUS_BIT_INDICATOR  12
 
-#define USB_HUB_MAKEPORT_STATUS(con, en, sus, ovrc, rst, pwr, ls, hs, tst, ind)\
-  (((con  & 1) << USB_PORT_STATUS_BIT_CONNECTED)\
-  |((en   & 1) << USB_PORT_STATUS_BIT_ENABLED)\
-  |((sus  & 1) << USB_PORT_STATUS_BIT_SUSPENDED)\
-  |((ovrc & 1) << USB_PORT_STATUS_BIT_OVERCURRENT)\
-  |((rst  & 1) << USB_PORT_STATUS_BIT_RESET)\
-  |((pwr  & 1) << USB_PORT_STATUS_BIT_POWER)\
-  |((ls   & 1) << USB_PORT_STATUS_BIT_LOWSPEED)\
-  |((hs   & 1) << USB_PORT_STATUS_BIT_HIGHSPEED)\
-  |((tst  & 1) << USB_PORT_STATUS_BIT_TESTMODE)\
-  |((ind  & 1) << USB_PORT_STATUS_BIT_INDICATOR))
-  
-struct usb_hub_port_full_status {
-  uint16_t status;
-  uint16_t change;
+struct usb_hub_status {
+  struct {
+    uint16_t local_power_source : 1;
+    uint16_t overcurrent        : 1;
+    uint16_t unused             :14;
+  } status;
+  struct {
+    uint16_t local_power_source : 1;
+    uint16_t overcurrent        : 1;
+    uint16_t unused             :14;
+  } change;
+} PACKED;
+
+struct usb_hub_port_status {
+  union {
+    struct {
+      uint16_t connected   : 1; // 0
+      uint16_t enabled     : 1; // 1
+      uint16_t suspended   : 1; // 2
+      uint16_t overcurrent : 1; // 3
+      uint16_t reset       : 1; // 4
+      uint16_t unused5     : 3; // 7:5
+      uint16_t power       : 1; // 8
+      uint16_t low_speed   : 1; // 9
+      uint16_t high_speed  : 1; // 10
+      uint16_t test_mode   : 1; // 11
+      uint16_t indicator   : 1; // 12
+      uint16_t unused13    : 3;
+    };
+    uint16_t raw;
+  } status;
+  union {
+    struct {
+      uint16_t connected_changed   : 1; // 0
+      uint16_t enabled_changed     : 1; // 1
+      uint16_t suspended_changed   : 1; // 2
+      uint16_t overcurrent_changed : 1; // 3
+      uint16_t reset_changed       : 1; // 4
+      uint16_t unused              :11;
+    };
+    uint16_t raw;
+  } change;
 } PACKED;
 
 struct usb_descriptor_header {
@@ -276,10 +311,10 @@ struct usb_other_speed_configuration_descriptor {
 #define USB_SPEED_FULL 1
 #define USB_SPEED_LOW  2
 
-#define USB_EP_TRANSFER_TYPE_CONTROL     0
-#define USB_EP_TRANSFER_TYPE_ISOCHRONOUS 1
-#define USB_EP_TRANSFER_TYPE_BULK        2
-#define USB_EP_TRANSFER_TYPE_INTERRUPT   3
+#define USB_ENDPOINT_TYPE_CONTROL     0
+#define USB_ENDPOINT_TYPE_ISOCHRONOUS 1
+#define USB_ENDPOINT_TYPE_BULK        2
+#define USB_ENDPOINT_TYPE_INTERRUPT   3
 
 #define USB_EP_USAGE_TYPE_DATA       0b00
 #define USB_EP_USAGE_TYPE_FEEDBACK   0b01
@@ -295,19 +330,10 @@ struct usb_other_speed_configuration_descriptor {
 
 #define USB_EP_MAKE_ADDR(num, dir) ((num & 0xf) | (USB_DIRECTION_ ## dir << 7))
 #define USB_EP_MAKE_ATTR(xfer_type, sync_type, use_type)\
-  ((USB_EP_TRANSFER_TYPE_ ## xfer_type & 3)|((USB_EP_SYNC_TYPE_ ## sync_type & 3)<<2)|((USB_EP_USAGE_TYPE_ ## use_type & 3)<<4))
+  ((USB_ENDPOINT_TYPE_ ## xfer_type & 3)|((USB_EP_SYNC_TYPE_ ## sync_type & 3)<<2)|((USB_EP_USAGE_TYPE_ ## use_type & 3)<<4))
 
 #define USB_DIRECTION_OUT 0
 #define USB_DIRECTION_IN  1
-
-
-#define USB_HUB_STATUS_LOCAL_POWER_GOOD 0
-#define USB_HUB_STATUS_LOCAL_POWER_LOST 1
-
-#define USB_HUB_STATUS_NO_OVERCURRENT 0
-#define USB_HUB_STATUS_OVERCURRENT    1
-
-#define USB_HUB_MAKE_STATUS(local_power_source, overcurrent) ((local_power_source&1)|((overcurrent&1)<1))
 
 struct usb_hid_descriptor {
 	struct usb_descriptor_header header;

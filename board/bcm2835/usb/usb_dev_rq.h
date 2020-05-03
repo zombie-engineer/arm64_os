@@ -1,29 +1,27 @@
 #pragma once
 #include <usb/usb.h>
+#include <usb/usb_printers.h>
 
 /*
  * USB device request helpers
  */
 
-#define USB_DEV_RQ_MAKE(type, rq, val, idx, len)\
-  ((((uint64_t)type & 0x00ff) <<  0)\
-  |(((uint64_t)rq   & 0x00ff) <<  8)\
-  |(((uint64_t)val  & 0xffff) << 16)\
-  |(((uint64_t)idx  & 0xffff) << 32)\
-  |(((uint64_t)len  & 0xffff) << 48))
+#define __PUTBITS64(__val, __mask, __shift) (((uint64_t)__val & __mask) << __shift)
 
-#define USB_DEV_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, idx, len)\
-  USB_DEV_RQ_MAKE(\
-    USB_RQ_TYPE_GET_DESCRIPTOR,\
-    USB_RQ_GET_DESCRIPTOR,\
-    ((desc_type & 0xff) << 8|(desc_idx & 0xff)), idx, len)
+#define USB_DEV_RQ_MAKE(__type, __rq, __val, __idx, __len)\
+  ( __PUTBITS64(USB_RQ_TYPE_ ## __type, 0xff  ,  0)\
+   |__PUTBITS64(USB_RQ_      ## __rq  , 0xffff,  8)\
+   |__PUTBITS64(                __val , 0xffff, 16)\
+   |__PUTBITS64(                __idx , 0xffff, 32)\
+   |__PUTBITS64(                __len , 0xffff, 48))
 
-#define USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, idx, len)\
-  USB_DEV_RQ_MAKE(\
-    USB_RQ_HUB_TYPE_GET_HUB_DESCRIPTOR,\
-    USB_RQ_GET_DESCRIPTOR,\
-    ((desc_type & 0xff) << 8|(desc_idx & 0xff)), idx, len)
+#define USB_DEV_RQ_MAKE_GET_DESCRIPTOR(__desc_type, __desc_idx, __idx, __len)\
+  USB_DEV_RQ_MAKE(GET_DESCRIPTOR, GET_DESCRIPTOR,\
+    ((__desc_type & 0xff) << 8|(__desc_idx & 0xff)), __idx, __len)
 
+#define USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(__desc_type, __desc_idx, __idx, __len)\
+  USB_DEV_RQ_MAKE(HUB_GET_HUB_DESCRIPTOR, GET_DESCRIPTOR,\
+    ((__desc_type & 0xff) << 8|(__desc_idx & 0xff)), __idx, __len)
 
 #define USB_DEV_RQ_GET_TYPE(r)   ((r    )&0xff)
 #define USB_DEV_RQ_GET_RQ(r)     ((r>>8 )&0xff)
@@ -51,50 +49,6 @@ static const char *usb_req_to_string(int req)
 #undef DECL_CASE
 }
 
-
-static const char *usb_desc_type_to_string(int t)
-{
-#define DECL_CASE(type) case USB_DESCRIPTOR_TYPE_##type: return #type
-  switch(t) {
-    DECL_CASE(DEVICE);
-    DECL_CASE(CONFIGURATION);
-    DECL_CASE(STRING);
-    DECL_CASE(INTERFACE);
-    DECL_CASE(ENDPOINT);
-    DECL_CASE(QUALIFIER);
-    DECL_CASE(OTHERSPEED_CONFIG);
-    DECL_CASE(INTERFACE_POWER);
-    DECL_CASE(HID);
-    DECL_CASE(HID_REPORT);
-    DECL_CASE(HID_PHYSICAL);
-    DECL_CASE(HUB);
-    default: return "UNKNOWN";
-  }
-#undef DECL_CASE
-}
-
-static const char *usb_feature_to_string(int t)
-{
-#define DECL_CASE(__f) case USB_HUB_FEATURE_## __f: return #__f
-  switch(t) {
-    DECL_CASE(CONNECTION);
-    DECL_CASE(ENABLE);
-    DECL_CASE(SUSPEND);
-    DECL_CASE(OVERCURRENT);
-    DECL_CASE(RESET);
-    DECL_CASE(PORT_POWER);
-    DECL_CASE(LOWSPEED);
-    DECL_CASE(HIGHSPEED);
-    DECL_CASE(CONNECTION_CHANGE);
-    DECL_CASE(ENABLE_CHANGE);
-    DECL_CASE(SUSPEND_CHANGE);
-    DECL_CASE(OVERCURRENT_CHANGE);
-    DECL_CASE(RESET_CHANGE);
-    default: return "UNKNOWN";
-  }
-#undef DECL_CASE
-}
-
 static inline void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
 {
   int type   = USB_DEV_RQ_GET_TYPE(rq);
@@ -108,7 +62,7 @@ static inline void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
 
   switch(req) {
     case USB_RQ_GET_DESCRIPTOR:
-      subtype = usb_desc_type_to_string(value_hi);
+      subtype = usb_descriptor_type_to_string(value_hi);
       break;
     case USB_RQ_CLEAR_FEATURE:
     case USB_RQ_SET_FEATURE:

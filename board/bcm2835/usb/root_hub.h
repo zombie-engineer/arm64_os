@@ -9,11 +9,6 @@ struct root_hub_configuration {
 	struct usb_endpoint_descriptor ep;
 } PACKED;
 
-struct usb_hub_port_status {
-  uint16_t status;
-  uint16_t changed;
-} PACKED;
-
 struct usb_root_hub_string_descriptor0 {
   struct usb_descriptor_header h;
   uint16_t lang_id;

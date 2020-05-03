@@ -1,6 +1,7 @@
 #pragma once
 #include <usb/usb.h>
 #include <common.h>
+#include <stringlib.h>
 
 static inline void print_usb_hub_descriptor(struct usb_hub_descriptor *h)
 {
@@ -81,7 +82,58 @@ static inline void print_usb_interface_desc(struct usb_interface_descriptor *i)
     i->string_index);
 }
 
-const char *usb_descriptor_type_to_string(int t)
+static inline const char *usb_device_class_to_string(int t)
+{
+  switch(t) {
+#define __CASE(__f) case USB_INTERFACE_CLASS_## __f: return #__f
+    __CASE(RESERVED);
+    __CASE(AUDIO);
+    __CASE(COMMUNICATIONS);
+    __CASE(HID);
+    __CASE(PHYSICAL);
+    __CASE(IMAGE);
+    __CASE(PRINTER);
+    __CASE(MASSSTORAGE);
+    __CASE(HUB);
+    __CASE(CDCDATA);
+    __CASE(SMARTCARD);
+    __CASE(CONTENTSECURITY);
+    __CASE(VIDEO);
+    __CASE(PERSONALHEALTHCARE);
+    __CASE(AUDIOVIDEO);
+    __CASE(DIAGNOSTICDEVICE);
+    __CASE(WIRELESSCONTROLLER);
+    __CASE(MISCELLANEOUS);
+    __CASE(APPLICATIONSPECIFIC);
+    __CASE(VENDORSPECIFIC);
+    default: return "UNKNOWN";
+#undef __CASE
+  }
+}
+
+static inline const char *usb_feature_to_string(int t)
+{
+#define DECL_CASE(__f) case USB_HUB_FEATURE_## __f: return #__f
+  switch(t) {
+    DECL_CASE(CONNECTION);
+    DECL_CASE(ENABLE);
+    DECL_CASE(SUSPEND);
+    DECL_CASE(OVERCURRENT);
+    DECL_CASE(RESET);
+    DECL_CASE(PORT_POWER);
+    DECL_CASE(LOWSPEED);
+    DECL_CASE(HIGHSPEED);
+    DECL_CASE(CONNECTION_CHANGE);
+    DECL_CASE(ENABLE_CHANGE);
+    DECL_CASE(SUSPEND_CHANGE);
+    DECL_CASE(OVERCURRENT_CHANGE);
+    DECL_CASE(RESET_CHANGE);
+    default: return "UNKNOWN";
+  }
+#undef DECL_CASE
+}
+
+static inline const char *usb_descriptor_type_to_string(int t)
 {
 #define __CASE(__t) case USB_DESCRIPTOR_TYPE_ ##__t: return #__t;
   switch(t) {
@@ -102,3 +154,47 @@ const char *usb_descriptor_type_to_string(int t)
   }
 }
 
+static inline const char *usb_endpoint_type_to_string(int t)
+{
+#define __CASE(__t) case USB_ENDPOINT_TYPE_ ##__t: return #__t;
+  switch(t) {
+    __CASE(CONTROL);
+    __CASE(ISOCHRONOUS);
+    __CASE(BULK);
+    __CASE(INTERRUPT);
+    default: return "UNKNOWN";
+  }
+#undef  __CASE
+}
+
+static inline const char *usb_endpoint_type_to_short_string(int t)
+{
+#define __CASE(__t, __short) case USB_ENDPOINT_TYPE_ ##__t: return __short
+  switch(t) {
+    __CASE(CONTROL    , "CTRL");
+    __CASE(ISOCHRONOUS, "ISOC");
+    __CASE(BULK       , "BULK");
+    __CASE(INTERRUPT  , "INTR");
+    default    : return "UNKN";
+  }
+#undef  __CASE
+}
+
+static inline const char *usb_direction_to_string(int d)
+{
+  if (d == USB_DIRECTION_OUT)
+    return "OUT";
+  if (d == USB_DIRECTION_IN)
+    return "IN";
+  return "UNK";
+}
+
+static inline const char *usb_speed_to_string(int s)
+{
+  switch (s) {
+    case USB_SPEED_HIGH: return "HIGH";
+    case USB_SPEED_FULL: return "FULL";
+    case USB_SPEED_LOW : return "LOW";
+    default: return "UNDEFINED";                    
+  }
+}
