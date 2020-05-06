@@ -339,8 +339,13 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
   const int to_transfer_size = 8;
   int err, num_bytes;
   uint64_t rq;
-  struct usb_device_descriptor dev_desc = { 0 };
-  HCDLOG("setting device default state: %d", dev->pipe0.address, usb_root_hub_device_number);
+  struct usb_device_descriptor desc = { 0 };
+
+  if (dev->location.hub)
+    HCDLOG("setting DEFAULT state for device at hub:%d.port:%d", 
+      dev->location.hub->address, dev->location.hub_port);
+  else
+    HCDLOG("setting DEFAULT state for root hub device");
 
   dev->pipe0.address = USB_DEFAULT_ADDRESS;
   dev->pipe0.max_packet_size = USB_DEFAULT_PACKET_SIZE;
@@ -350,7 +355,7 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
       to_transfer_size);
   err = usb_hcd_submit_cm(&dev->pipe0, pctl, 
-      &dev_desc, to_transfer_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
+      &desc, to_transfer_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
   CHECK_ERR_SILENT();
 
   if (num_bytes != to_transfer_size) {
@@ -362,11 +367,17 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
 
   // print_usb_device_descriptor(&dev_desc);
 
-  dev->pipe0.max_packet_size = dev_desc.max_packet_size_0;
+  dev->pipe0.max_packet_size = desc.max_packet_size_0;
   dev->state = USB_DEVICE_STATE_DEFAULT;
-  HCDLOG("Device in DEFAULT state now. max packet size is %d", dev->pipe0.max_packet_size);
+  HCDLOG("device in state DEFAULT: bcd:%04x, class:%s(class:%d,subclass:%d,proto:%d), max_packet_size: %d",
+      desc.bcd_usb, 
+      usb_device_subclass_to_string(desc.device_class, desc.device_subclass, desc.device_protocol), 
+      desc.device_class,
+      desc.device_subclass,
+      desc.device_protocol, 
+      desc.max_packet_size_0);
 out_err:
-  return ERR_OK;
+  return err;
 }
 
 static inline int usb_hcd_allocate_device_address()
@@ -426,7 +437,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev, struct usb_hcd
   wait_msec(10);
   dev->state = USB_DEVICE_STATE_ADDRESSED;
 out_err:
-  return ERR_OK;
+  return err;
 }
 
 /*
@@ -495,7 +506,7 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hc
   READ_STRING(dev->descriptor.i_serial_number, "serial number");
   READ_STRING(dev->configuration_string, "configuration");
 out_err:
-  return ERR_OK;
+  return err;
 }
 
 int usb_hcd_enumerate_device(struct usb_hcd_device *dev)

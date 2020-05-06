@@ -53,6 +53,19 @@ static inline void __hexdump_line(void *addr, int sz)
   putc('\n');
 }
 
+void hexdump_memory_ex(const char *tag, int line_width, const void *addr, size_t sz)
+{
+  int last_sz;
+  unsigned char *ptr = addr;
+  while(sz) {
+    last_sz = min(line_width, sz);
+    puts(tag);
+    __hexdump_line(ptr, last_sz);
+    ptr += last_sz;
+    sz -= last_sz;
+  }
+}
+
 void hexdump_memory(const void *addr, size_t sz)
 {
   const int line_width = 16;

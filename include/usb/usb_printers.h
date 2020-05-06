@@ -82,6 +82,29 @@ static inline void print_usb_interface_desc(struct usb_interface_descriptor *i)
     i->string_index);
 }
 
+/*
+ * Get device subclass name by triple "class,subclass,protocol"
+ * https://www.usb.org/defined-class-codes
+ */
+static inline const char *usb_device_subclass_to_string(int class, int subclass, int proto)
+{
+  switch(class) {
+    case USB_DEVICE_CLASS_HUB:
+      switch (subclass) {
+        case 0:
+          switch (proto) {
+            case 0: return "HUB_FULLSPEED";
+            case 1: return "HUB_HIGHSPEED_SINGLE_TT";
+            case 2: return "HUB_HIGHSPEED_MULTI_TT";
+            default: return "UNKNOWN_HUB";
+          }
+        default: return "UNKNOWN_HUB";
+      }
+    case USB_DEVICE_CLASS_VENDOR_SPEC: return "VENDOR_SPECIFIC";
+    default: return "UNKNOWN_CLASS";
+  }
+}
+
 static inline const char *usb_device_class_to_string(int t)
 {
   switch(t) {

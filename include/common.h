@@ -23,6 +23,8 @@ void _putc(char ch);
 
 void hexdump_addr(unsigned int *addr);
 
+void hexdump_memory_ex(const char *tag, int line_width, const void *addr, size_t sz);
+
 void hexdump_memory(const void *addr, size_t sz);
 
 #define __endline "\r\n"
