@@ -29,11 +29,11 @@
 #include <drivers/atmega8a.h>
 #include <drivers/display/nokia5110.h>
 #include <drivers/display/nokia5110_console.h>
+#include <drivers/usb/usbd.h>
 #include <debug.h>
 #include <unhandled_exception.h>
 #include <board/bcm2835/bcm2835.h>
 #include <board/bcm2835/bcm2835_irq.h>
-#include <board/bcm2835/bcm2835_usb.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -887,9 +887,10 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  UsbInitialise();
+  usbd_init();
+  usbd_print_device_tree();
+  // UsbInitialise();
   while(1);
-  bcm2835_usb_init();
   pwm_bcm2835_init();
   bcm2835_set_pwm_clk_freq(100000);
   servo_sg90_init();

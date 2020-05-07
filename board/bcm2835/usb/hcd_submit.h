@@ -1,5 +1,5 @@
 #pragma once
-#include "hcd.h"
+#include <drivers/usb/hcd.h>
 
 int usb_hcd_submit_cm(
   struct usb_hcd_pipe *pipe,

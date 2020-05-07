@@ -1,3 +1,4 @@
+#include <drivers/usb/hcd.h>
 #include <board/bcm2835/bcm2835_usb.h>
 #include "hcd_hub.h"
 #include "hcd_submit.h"
@@ -15,7 +16,6 @@
 #include <usb/usb.h>
 #include <delays.h>
 #include <stringlib.h>
-#include "hcd.h"
 #include "root_hub.h"
 #include "usb_dev_rq.h"
 
@@ -224,7 +224,8 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
   int err = ERR_OK;
   void *cfgbuf_end = (char *)cfgbuf + cfgbuf_sz;
   hdr = cfgbuf;
-  // hexdump_memory(cfgbuf, cfgbuf_sz);
+  if (usb_hcd_print_debug)
+    hexdump_memory(cfgbuf, cfgbuf_sz);
 
   while((void*)hdr < cfgbuf_end && should_continue) {
     HCDDEBUG("found descriptor:%s(%d),size:%d", 
@@ -248,7 +249,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         ep = i->endpoints;
         end_ep = i->endpoints + USB_MAX_ENDPOINTS_PER_DEVICE;
 
-        HCDLOG("-- address:%d,interface:%d,num_endpoints:%d", dev->address, 
+        HCDDEBUG("-- address:%d,interface:%d,num_endpoints:%d", dev->address, 
           i->descriptor.number,
           i->descriptor.endpoint_count);
         // print_usb_interface_desc(&i->descriptor);
@@ -266,7 +267,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
           break;
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
-        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,packet_size:%d", 
+        HCDDEBUG("---- address:%d,interface:%d,endpoint:%d,dir:%s,packet_size:%d", 
           dev->address, 
           i->descriptor.number, 
           ep->descriptor.endpoint_address & 0x7f,
@@ -281,7 +282,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         while(1);
         break;
       case USB_DESCRIPTOR_TYPE_CONFIGURATION:
-        HCDLOG("configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
+        HCDDEBUG("configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
           c->num_interfaces, c->iconfiguration);
         //print_usb_configuration_desc(c);
         break;
@@ -306,7 +307,9 @@ static int usb_hcd_set_configuration(struct usb_hcd_pipe *pipe, uint8_t channel,
 
   uint64_t rq = USB_DEV_RQ_MAKE(SET_CONFIGURATION, SET_CONFIGURATION, configuration, 0, 0);
   err = usb_hcd_submit_cm(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
-  HCDLOG("completed with status: %d", err);
+  CHECK_ERR("failed to set configuration");
+
+out_err:
   return err;
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hcd.h"
+#include <drivers/usb/hcd.h>
 #include "usb_dev_rq.h"
 #include "common.h"
 #include "hcd_submit.h"

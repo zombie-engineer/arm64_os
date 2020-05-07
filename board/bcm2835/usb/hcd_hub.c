@@ -83,15 +83,14 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
-  HUBPORTLOG("status: %04x:%04x", port_status.status, port_status.change);
+  HUBPORTDBG("status: %04x:%04x", port_status.status, port_status.change);
 
   err = usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_CONNECTION_CHANGE);
   CHECK_ERR_SILENT();
-  HUBPORTLOG("CONNECTION_CHANGE cleared");
+  HUBPORTDBG("CONNECTION_CHANGE cleared");
   
   err = usb_hub_enumerate_port_reset(h, port);
   CHECK_ERR_SILENT();
-  HUBPORTLOG("reset and enabled successfully");
 
   port_dev = usb_hcd_allocate_device();
   if (!port_dev) {
@@ -104,7 +103,7 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
-  HUBPORTLOG("status: %04x:%04x", port_status.status, port_status.change);
+  HUBPORTDBG("status: %04x:%04x", port_status.status, port_status.change);
 
 	if (port_status.status.high_speed)
     port_dev->pipe0.speed = USB_SPEED_HIGH;
@@ -116,22 +115,23 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 	else 
     port_dev->pipe0.speed = USB_SPEED_FULL;
 
-  HUBPORTLOG("device speed: %s(%d)", usb_speed_to_string(port_dev->pipe0.speed));
+  HUBPORTDBG("device speed: %s(%d)", usb_speed_to_string(port_dev->pipe0.speed));
 
   err = usb_hcd_enumerate_device(port_dev);
   if (err != ERR_OK) {
     int saved_err = err;
-    HCDERR("failed to enumerate device");
+    HUBPORTERR("failed to enumerate device");
     //usb_deallocate_device(port_dev);
     err = usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_ENABLE);
     if (err != ERR_OK)
-      HUBERR("failed to disable port %d", port);
+      HUBPORTERR("failed to disable port %d", port);
     err = saved_err;
     goto out_err;
   }
 
 out_err:
-  HCDLOG("completed with status:%d", err);
+  if (err != ERR_OK)
+    HUBPORTERR("failed to handle CONNECTION_CHANGED status");
   return err;
 }
 
@@ -208,6 +208,7 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
     err = usb_hub_port_check_connection(h, port);
     if (err != ERR_OK) {
       HUBPORTERR("failed check connection, skipping");
+      err = ERR_OK;
       continue;
     }
   }

@@ -58,6 +58,7 @@ include drivers/max7219/Makefile
 include drivers/atmega8a/Makefile
 include drivers/f5161ah/Makefile
 include drivers/nokia5110/Makefile
+include drivers/usbd/Makefile
 include drivers/servo/sg90/Makefile
 include board/bcm2835/Makefile
 include lib/stringlib/Makefile
@@ -74,6 +75,7 @@ LIBS += $(OBJS_MAX7219)
 LIBS += $(OBJS_F5161AH)
 LIBS += $(OBJS_SPI)
 LIBS += $(OBJS_NOKIA5110)
+LIBS += $(OBJS_USBD)
 LIBS += $(OBJS_ATMEGA8A)
 LIBS += $(OBJS_BOARD_BCM2835)
 LIBS += $(OBJS_STRINGLIB)
