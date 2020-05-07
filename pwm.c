@@ -54,9 +54,6 @@
 #define PWM_STA_STA3  11
 #define PWM_STA_STA4  12
 
-    //printf("writing:%08x to ctl\r\n", x);\
-    //pwm_print_ctl_sta("pwm_after_write", ctl, sta);
-
 #define PWM_CTL_WRITE(x)\
   do {\
     write_reg(PWM_CTL, x);\
@@ -358,7 +355,7 @@ struct pwm *pwm_bcm2835_create(int gpio_pin, int ms_mode)
 err_enable:
   gpio_set_function(gpio_pin, GPIO_FUNC_OUT);
   gpio_set_off(gpio_pin);
-err_handle:
+// err_handle:
   PWM_RELEASE_GPIO_HANDLE(p);
 err:
   pwm_bcm2835_release(p);
