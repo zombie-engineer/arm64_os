@@ -84,12 +84,19 @@ struct usb_hcd_device {
   struct usb_hcd_pipe pipe0;
   struct usb_hcd_pipe_control pipe0_control;
 
+  /*
+   * This device is added to a parent's hub list of it's children
+   */
+  struct list_head hub_children;
+
   struct usb_device_descriptor descriptor ALIGNED(4);
   struct usb_hcd_interface interfaces[USB_MAX_INTERFACES_PER_DEVICE] ALIGNED (4);
   struct usb_hcd_device_class_base *class; 
 };
 
 struct usb_hcd_device *usb_hcd_allocate_device();
+
+void usb_hcd_deallocate_device(struct usb_hcd_device *d);
 
 int usb_hcd_enumerate_device(struct usb_hcd_device *dev);
 

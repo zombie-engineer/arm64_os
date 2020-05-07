@@ -6,9 +6,27 @@
 #include "hcd_submit.h"
 #include "hcd_constants.h"
 
-#define HUBLOG(fmt, ...) printf("[USB HUB:%02d] " fmt __endline, h->d->address, ## __VA_ARGS__)
-#define HUBPORTLOG(fmt, ...) printf("[USB HUB:%02d.%d] " fmt __endline, h->d->address, port, ## __VA_ARGS__)
-#define HUBERR(fmt, ...) printf("[USB HUB:%d ERR] err: %d: " fmt __endline, h->d->address, err, ## __VA_ARGS__)
+#define _FMT_PREFIX_HUB          "[USB hub:%02d] "
+#define _FMT_PREFIX_HUB_ERR      "[USB hub:%02d err:%d] "
+#define _FMT_PREFIX_HUB_PORT     "[USB hub:%02d port:%02d] "
+#define _FMT_PREFIX_HUB_PORT_ERR "[USB hub:%02d port:%02d err:%d] "
+
+#define _FMT_ARG_HUB           h->d->address
+#define _FMT_ARG_HUB_ERR       h->d->address, err
+#define _FMT_ARG_HUB_PORT      h->d->address, port
+#define _FMT_ARG_HUB_PORT_ERR  h->d->address, port, err
+
+#define IF_DBG if (usb_hcd_print_debug)
+
+#define _PRNT(__t, __fmt, ...)\
+  printf(_FMT_PREFIX_ ## __t __fmt __endline, _FMT_ARG_ ## __t, ## __VA_ARGS__)
+
+#define HUBLOG(__fmt, ...)            _PRNT(HUB         , __fmt, ##__VA_ARGS__)
+#define HUBDBG(__fmt, ...)     IF_DBG _PRNT(HUB         , __fmt, ##__VA_ARGS__)
+#define HUBERR(__fmt, ...)            _PRNT(HUB_ERR     , __fmt, ##__VA_ARGS__)
+#define HUBPORTLOG(__fmt, ...)        _PRNT(HUB_PORT    , __fmt, ##__VA_ARGS__)
+#define HUBPORTDBG(__fmt, ...) IF_DBG _PRNT(HUB_PORT    , __fmt, ##__VA_ARGS__)
+#define HUBPORTERR(__fmt, ...)        _PRNT(HUB_PORT_ERR, __fmt, ##__VA_ARGS__)
 
 typedef struct usb_hcd_device_class_hub {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_hcd_device_class_hub);
@@ -17,6 +35,9 @@ typedef struct usb_hcd_device_class_hub {
 	struct usb_hub_descriptor descriptor;
   struct list_head children;
 } usb_hub_t;
+
+struct usb_hcd_device_class_hub *usb_hcd_allocate_hub();
+void usb_hcd_deallocate_hub(struct usb_hcd_device_class_hub *h);
 
 void usb_hcd_hub_init();
 

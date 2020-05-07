@@ -61,7 +61,7 @@ static inline void list_add(struct list_head *new, struct list_head *head)
   for (pos = list_first_entry(head, typeof(*pos), member),\
       tmp = list_next_entry(pos, member);\
       &pos->member != (head);\
-      pos = tmp; tmp = list_next_entry(tmp))
+      pos = tmp, tmp = list_next_entry(tmp, member))
 
 
 static inline void __list_del(struct list_head *entry)
@@ -75,6 +75,13 @@ static inline void __list_del(struct list_head *entry)
 static inline void list_del(struct list_head *entry)
 {
   __list_del(entry);
+}
+
+static inline void list_del_init(struct list_head *entry)
+{
+  __list_del(entry);
+  entry->prev = entry;
+  entry->next = entry;
 }
 
 static inline void list_move(struct list_head *list, 
