@@ -57,6 +57,13 @@ static inline void list_add(struct list_head *new, struct list_head *head)
       &pos->member != (head); \
       pos = list_next_entry(pos, member))
 
+#define list_for_each_entry_safe(pos, tmp, head, member) \
+  for (pos = list_first_entry(head, typeof(*pos), member),\
+      tmp = list_next_entry(pos, member);\
+      &pos->member != (head);\
+      pos = tmp; tmp = list_next_entry(tmp))
+
+
 static inline void __list_del(struct list_head *entry)
 {
   entry->prev->next = entry->next;
