@@ -211,7 +211,7 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
 static inline void hub_get_port_status(struct usb_hub_port_status *s)
 {
   uint32_t r = read_reg(USB_HPRT);
-  RHLOG("dwc2 port status: %08x", r);
+  RHDEBUG("dwc2 port status: %08x", r);
   s->status.raw         = 0;
   s->status.connected   = USB_HPRT_GET_CONN_STS(r);
   s->status.enabled     = USB_HPRT_GET_ENA(r);
@@ -332,7 +332,7 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
         case USB_HUB_FEATURE_PORT_POWER:
           r = read_reg(USB_HPRT);
           r &= USB_HPRT_WRITE_MASK;
-          RHLOG("HPRT:%08x->%08x", r, r & ~(uint32_t)BT(USB_HPRT_PWR));
+          RHDEBUG("HPRT:%08x->%08x", r, r & ~(uint32_t)BT(USB_HPRT_PWR));
           BIT_CLEAR_U32(r, USB_HPRT_PWR);
           write_reg(USB_HPRT, r);
           break;
@@ -350,7 +350,7 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
           break;
         case USB_HUB_FEATURE_RESET_CHANGE:
           r = read_reg(USB_HPRT);
-          RHLOG("USB_HUB_FEATURE_RESET_CHANGE:%08x", r);
+          RHDEBUG("USB_HUB_FEATURE_RESET_CHANGE:%08x", r);
           break;
         case USB_HUB_FEATURE_SUSPEND_CHANGE:
           /* power and clock register to 0 */
@@ -393,7 +393,7 @@ int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_by
   char rq_desc[256];
   int request = USB_DEV_RQ_GET_RQ(rq);
   usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
-  RHLOG("root_hub req:%s", rq_desc);
+  RHDEBUG("root_hub req:%s", rq_desc);
 
   switch (request)
   {
