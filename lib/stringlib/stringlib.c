@@ -151,3 +151,36 @@ void * _memcpy(void *dst, const void *src, size_t n)
   }
   return dst;
 }
+
+void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
+{
+  const char *sptr = src;
+  const char *send = src + src_sz;
+
+  char *dptr = buf;
+  char *dend = buf + buf_sz;
+  char c;
+
+  if (dptr >= dend)
+    return;
+
+  c = *sptr++;
+  while (1) {
+    *sptr++;
+    *dptr++ = c;
+    if (dptr >= dend) {
+      *(dptr - 1) = 0;
+      break;
+    }
+    c = *sptr++;
+    if (!c) {
+      *dptr = 0;
+      break;
+    }
+    if (send - sptr < 1) {
+      *dptr++ = c;
+      *dptr = 0;
+      break;
+    }
+  } 
+}
