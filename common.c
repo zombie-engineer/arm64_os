@@ -42,7 +42,7 @@ void hexdump_addr(unsigned int *addr)
   }
 }
 
-static inline void __hexdump_line(void *addr, int sz)
+static inline void __hexdump_line(const void *addr, int sz)
 {
   int i;
   const unsigned char *ptr = addr;
@@ -56,7 +56,7 @@ static inline void __hexdump_line(void *addr, int sz)
 void hexdump_memory_ex(const char *tag, int line_width, const void *addr, size_t sz)
 {
   int last_sz;
-  unsigned char *ptr = addr;
+  const unsigned char *ptr = addr;
   while(sz) {
     last_sz = min(line_width, sz);
     puts(tag);
@@ -70,7 +70,7 @@ void hexdump_memory(const void *addr, size_t sz)
 {
   const int line_width = 16;
   int last_sz;
-  unsigned char *ptr = addr;
+  const unsigned char *ptr = addr;
   while(sz) {
     last_sz = min(line_width, sz);
     __hexdump_line(ptr, last_sz);
@@ -79,4 +79,25 @@ void hexdump_memory(const void *addr, size_t sz)
   }
 }
 
+int prefix_padding_to_string(const char *prefix, int depth, char *buf, int buf_sz)
+{
+  int buf_sz_saved = buf_sz;
+  const char padchar = '-';
+  char c;
 
+  while(buf_sz > 0) {
+    c = *prefix;
+    if (!c)
+      break;
+
+    *buf++ = c;
+    buf_sz--;
+    prefix++;
+  }
+  while(buf_sz > 0 && depth) {
+    *buf++ = padchar;
+    depth--;
+  }
+  *buf = 0;
+  return buf_sz_saved - buf_sz;
+}

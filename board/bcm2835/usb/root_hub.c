@@ -4,7 +4,7 @@
 #include <reg_access.h>
 #include <bits_api.h>
 #include <delays.h>
-#include "usb_dev_rq.h"
+#include <drivers/usb/usb_dev_rq.h>
 #include "dwc2_regs.h"
 #include "dwc2_regs_bits.h"
 
@@ -35,6 +35,7 @@
 
 int usb_root_hub_device_number = 0;
 int usb_root_hub_debug = 0;
+struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
 	.header = {

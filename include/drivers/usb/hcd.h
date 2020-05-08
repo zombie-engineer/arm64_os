@@ -11,6 +11,8 @@
 #define USB_MAX_ENDPOINTS_PER_DEVICE 16
 
 extern int usb_hcd_print_debug;
+struct usb_hcd_device;
+extern struct usb_hcd_device *root_hub;
 
 #define HCDLOGPREFIX(__log_level) "[USBHCD "#__log_level"] "
 
@@ -92,6 +94,11 @@ struct usb_hcd_device {
   struct usb_device_descriptor descriptor ALIGNED(4);
   struct usb_hcd_interface interfaces[USB_MAX_INTERFACES_PER_DEVICE] ALIGNED (4);
   struct usb_hcd_device_class_base *class; 
+
+  char string_manufacturer[64];
+  char string_product[64];
+  char string_serial[64];
+  char string_configuration[64];
 };
 
 struct usb_hcd_device *usb_hcd_allocate_device();
@@ -101,6 +108,8 @@ void usb_hcd_deallocate_device(struct usb_hcd_device *d);
 int usb_hcd_enumerate_device(struct usb_hcd_device *dev);
 
 int usb_hcd_device_to_string(struct usb_hcd_device *dev, const char *prefix, char *buf, int bufsz);
+
+const char *usb_hcd_device_class_to_string(int c);
 
 void usb_hcd_print_device(struct usb_hcd_device *dev);
 
@@ -133,3 +142,14 @@ int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, 
   CHECK_ERR("failed to get descriptor "#__desc_type);\
   __CHECK_DESC_TYPE(__dst, __desc_type);
 
+int usb_hcd_submit_cm(
+  struct usb_hcd_pipe *pipe,
+  struct usb_hcd_pipe_control *pctl,
+  void *buf,
+  int buf_sz,
+  uint64_t rq,
+  int timeout,
+  int *out_num_bytes);
+
+int usb_hcd_init();
+int usb_hcd_start();

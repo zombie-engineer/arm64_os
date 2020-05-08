@@ -1,7 +1,6 @@
 #include <drivers/usb/hcd.h>
 #include <board/bcm2835/bcm2835_usb.h>
-#include "hcd_hub.h"
-#include "hcd_submit.h"
+#include <drivers/usb/hcd_hub.h>
 #include "hcd_constants.h"
 #include <board_map.h>
 #include <reg_access.h>
@@ -17,7 +16,7 @@
 #include <delays.h>
 #include <stringlib.h>
 #include "root_hub.h"
-#include "usb_dev_rq.h"
+#include <drivers/usb/usb_dev_rq.h>
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -104,6 +103,7 @@ struct usb_hcd_device *usb_hcd_allocate_device()
   dev->location.hub_port = 0;
   dev->class = NULL;
   dev->pipe0.address = 0;
+  INIT_LIST_HEAD(&dev->hub_children);
   return dev;
 }
 
@@ -510,17 +510,17 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hc
   dev->configuration = config_num;
   dev->state = USB_DEVICE_STATE_CONFIGURED;
 
-#define READ_STRING(__string_idx, __nice_name)\
+#define READ_STRING(__string_idx, __nice_name, dst, dst_sz)\
   if (__string_idx) {\
     err = usb_hcd_read_string_descriptor(&dev->pipe0,\
-        __string_idx, buffer, sizeof(buffer));\
+        __string_idx, dst, dst_sz);\
     CHECK_ERR("failed to get "#__nice_name" string");\
   }
 
-  READ_STRING(dev->descriptor.i_product      , "product");
-  READ_STRING(dev->descriptor.i_manufacturer , "manufacturer");
-  READ_STRING(dev->descriptor.i_serial_number, "serial number");
-  READ_STRING(dev->configuration_string      , "configuration");
+  READ_STRING(dev->descriptor.i_product      , "product", dev->string_product, sizeof(dev->string_product));
+  READ_STRING(dev->descriptor.i_manufacturer , "manufacturer", dev->string_manufacturer, sizeof(dev->string_manufacturer));
+  READ_STRING(dev->descriptor.i_serial_number, "serial number", dev->string_serial, sizeof(dev->string_serial));
+  READ_STRING(dev->configuration_string      , "configuration", dev->string_configuration, sizeof(dev->string_configuration));
 out_err:
   return err;
 }
@@ -771,26 +771,33 @@ int usb_hcd_start()
 static int usb_hcd_attach_root_hub()
 {
   int err;
-  struct usb_hcd_device *root_hub_dev;
 
-  HCDDEBUG("started");
-  root_hub_dev = usb_hcd_allocate_device();
-  if (IS_ERR(root_hub_dev))
-    return PTR_ERR(root_hub_dev);
+  if (root_hub) {
+    err = ERR_BUSY;
+    HCDERR("root_hub already attached");
+    goto out_err;
+  }
+
+  root_hub = usb_hcd_allocate_device();
+  if (IS_ERR(root_hub)) {
+    err = PTR_ERR(root_hub);
+    goto out_err;
+  }
 
   /*
-   * Defaultly -), our root hub is in not in ADDRESSED state,
+   * by default our root hub is in not in ADDRESSED state,
    * so it should respond on default address.
    */
   usb_root_hub_device_number = USB_DEFAULT_ADDRESS;
-  root_hub_dev->state = USB_DEVICE_STATE_POWERED;
-  root_hub_dev->pipe0.speed = USB_SPEED_FULL;
-  root_hub_dev->pipe0.max_packet_size = 64;
-  err = usb_hcd_enumerate_device(root_hub_dev);
+  root_hub->state = USB_DEVICE_STATE_POWERED;
+  root_hub->pipe0.speed = USB_SPEED_FULL;
+  root_hub->pipe0.max_packet_size = 64;
+  err = usb_hcd_enumerate_device(root_hub);
   if (err != ERR_OK)
     HCDERR("failed to add root hub. err: %d", err);
   else
     HCDDEBUG("root hub added");
+out_err:
   return err;
 }
 
@@ -915,27 +922,13 @@ USB_GHWCFG1:00000000,USB_GHWCFG2:228ddd50,USB_GHWCFG3:0ff000e8,USB_GHWCFG4:1ff00
 
 */
 
-static int prefix_padding_to_string(const char *prefix, int depth, char *buf, int buf_sz)
+const char *usb_hcd_device_class_to_string(int c)
 {
-  int buf_sz_saved = buf_sz;
-  const char padchar = '-';
-  char c;
-
-  while(buf_sz > 0) {
-    c = *prefix;
-    if (!c)
-      break;
-
-    *buf++ = c;
-    buf_sz--;
-    prefix++;
+  switch(c) {
+    case USB_HCD_DEVICE_CLASS_HUB: return "HUB";
+    case USB_HCD_DEVICE_CLASS_HID: return "HID";
+    default: return "UNKNOWN";
   }
-  while(buf_sz > 0 && depth) {
-    *buf++ = padchar;
-    depth--;
-  }
-  *buf = 0;
-  return buf_sz_saved - buf_sz;
 }
 
 static int usb_hcd_device_path_to_string(struct usb_hcd_device *dev, char *buf, int bufsz)

@@ -1,5 +1,5 @@
-#include "hcd_submit.h"
-#include "usb_dev_rq.h"
+#include <drivers/usb/hcd.h>
+#include <drivers/usb/usb_dev_rq.h>
 #include "root_hub.h"
 #include "dwc2.h"
 #include "dwc2_regs.h"

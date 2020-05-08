@@ -177,7 +177,7 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
       *dptr = 0;
       break;
     }
-    if (send - sptr < 1) {
+    if (send - sptr < 2) {
       *dptr++ = c;
       *dptr = 0;
       break;

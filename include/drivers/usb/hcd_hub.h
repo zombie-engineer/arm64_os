@@ -1,10 +1,10 @@
 #pragma once
 
 #include <drivers/usb/hcd.h>
-#include "usb_dev_rq.h"
+#include <drivers/usb/usb_dev_rq.h>
 #include "common.h"
-#include "hcd_submit.h"
-#include "hcd_constants.h"
+
+#define USB_CONTROL_MSG_TIMEOUT_MS 10
 
 #define _FMT_PREFIX_HUB          "[USB hub:%02d] "
 #define _FMT_PREFIX_HUB_ERR      "[USB hub:%02d err:%d] "

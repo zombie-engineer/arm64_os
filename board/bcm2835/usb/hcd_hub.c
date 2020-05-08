@@ -1,4 +1,4 @@
-#include "hcd_hub.h"
+#include <drivers/usb/hcd_hub.h>
 #include <delays.h>
 #include <bits_api.h>
 
@@ -20,6 +20,9 @@ struct usb_hcd_device_class_hub *usb_hcd_allocate_hub()
 {
   struct usb_hcd_device_class_hub *hub;
   hub = usb_hcd_device_class_hub_alloc();
+  hub->base.device_class = USB_HCD_DEVICE_CLASS_HUB;
+  memset(&hub->descriptor, 0, sizeof(hub->descriptor));
+  INIT_LIST_HEAD(&hub->children);
   return hub;
 }
 
@@ -111,9 +114,12 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 		port_dev->pipe0.speed = USB_SPEED_LOW;
 		port_dev->pipe0.ls_node_point = h->d->pipe0.address;
 		port_dev->pipe0.ls_node_port = port;
+    HUBPORTLOG("low speed device");
 	}
-	else 
+	else {
     port_dev->pipe0.speed = USB_SPEED_FULL;
+    HUBPORTLOG("full speed device");
+  }
 
   HUBPORTDBG("device speed: %s(%d)", usb_speed_to_string(port_dev->pipe0.speed));
 
@@ -121,7 +127,6 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
   if (err != ERR_OK) {
     int saved_err = err;
     HUBPORTERR("failed to enumerate device");
-    //usb_deallocate_device(port_dev);
     err = usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_ENABLE);
     if (err != ERR_OK)
       HUBPORTERR("failed to disable port %d", port);
@@ -129,9 +134,15 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
     goto out_err;
   }
 
+  list_add(&port_dev->hub_children, &h->children);
+  HUBPORTLOG("hub: %p, adding device %p to port, h->children:%p", h, port_dev, &h->children);
+
 out_err:
-  if (err != ERR_OK)
+  if (err != ERR_OK) {
     HUBPORTERR("failed to handle CONNECTION_CHANGED status");
+    if (port_dev)
+      usb_hcd_deallocate_device(port_dev);
+  }
   return err;
 }
 

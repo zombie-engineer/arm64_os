@@ -78,4 +78,4 @@ static inline int should_lock()
       spinlock_unlock(lock);       \
   } while(0)
 
-
+int prefix_padding_to_string(const char *prefix, int depth, char *buf, int buf_sz);
