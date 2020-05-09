@@ -33,7 +33,7 @@
 #define BF_CLEAR(val, offset, width) val &= ~BF_MASK_AT_32(offset, width)
 
 #define BF_ORR(val, set, offset, width)\
-  val |= BITS_PLACE_32(set, width, offset)
+  val |= BITS_PLACE_32(set, offset, width)
 
 #define BF_CLEAR_AND_SET(val, set, offset, width) \
   BF_CLEAR(val, offset, width);\

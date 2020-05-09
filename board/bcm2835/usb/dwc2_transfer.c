@@ -1,6 +1,8 @@
 #include "dwc2.h"
 #include "dwc2_regs.h"
-#include <bits_api.h>
+#include "dwc2_reg_access.h"
+#include "dwc2_log.h"
+#include "bits_api.h"
 #include <stringlib.h>
 #include <common.h>
 #include "dwc2_regs_bits.h"
@@ -9,40 +11,7 @@
 #include <usb/usb_printers.h>
 #include <error.h>
 
-#define DWCINFO(fmt, ...) printf("[DWC2 INFO] "fmt __endline, ##__VA_ARGS__)
-#define DWCDEBUG(fmt, ...) if (dwc2_print_debug > 0)\
-                          printf("[DWC2 DBG] "fmt __endline, ##__VA_ARGS__)
-#define DWCDEBUG2(fmt, ...) if (dwc2_print_debug > 1)\
-                          printf("[DWC2 DBG2] "fmt __endline, ##__VA_ARGS__)
-#define DWCERR(fmt, ...)  printf("[DWC2 ERR] %s: "fmt __endline, __func__, ##__VA_ARGS__)
-#define DWCWARN(fmt, ...) printf("[DWC2 WARN] %s: "fmt __endline, __func__, ##__VA_ARGS__)
-
-#define CLEAR_INTR()    __write_ch_reg(USB_HCINT0   , ch, 0xffffffff)
-#define CLEAR_INTRMSK() __write_ch_reg(USB_HCINTMSK0, ch, 0x00000000)
-#define SET_SPLT()      __write_ch_reg(USB_HCSPLT0  , ch, splt); DWCDEBUG2("transfer:splt:ch:%d,%08x->%p", ch, splt, USB_HCSPLT0 + ch * 8);
-#define SET_CHAR()      __write_ch_reg(USB_HCCHAR0  , ch, chr);  DWCDEBUG2("transfer:char:ch:%d,%08x->%p", ch, chr , USB_HCCHAR0 + ch * 8);
-#define SET_SIZ()       __write_ch_reg(USB_HCTSIZ0  , ch, siz);  DWCDEBUG2("transfer:size:ch:%d,%08x->%p", ch, siz , USB_HCTSIZ0 + ch * 8);
-#define SET_DMA()       __write_ch_reg(USB_HCDMA0   , ch, dma);  DWCDEBUG2("transfer:dma :ch:%d,%08x->%p", ch, dma , USB_HCDMA0  + ch * 8);
-
-#define GET_CHAR()      chr     = __read_ch_reg(USB_HCCHAR0  , ch); DWCDEBUG2("transfer:read_chac :%d,%p->%08x", ch, USB_HCCHAR0 + ch * 8, chr);
-#define GET_SIZ()       siz     = __read_ch_reg(USB_HCTSIZ0  , ch)
-#define GET_SPLT()      splt    = __read_ch_reg(USB_HCSPLT0  , ch); DWCDEBUG2("transfer:read_splt:%d,%p->%08x", ch, USB_HCSPLT0 + ch * 8, splt);
-#define GET_INTR()      intr    = __read_ch_reg(USB_HCINT0   , ch); DWCDEBUG2("transfer:read_intr:%p->%08x", USB_HCINT0 + ch * 8, intr);
-#define GET_INTRMSK()   intrmsk = __read_ch_reg(USB_HCINTMSK0, ch)
-#define GET_DMA()       dma     = __read_ch_reg(USB_HCDMA0   , ch)
-
 static int dwc2_print_debug = 0;
-
-static inline uint32_t __read_ch_reg(reg32_t reg, int chan)
-{
-  return read_reg(reg + chan * 8);
-}
-
-static inline void __write_ch_reg(reg32_t reg, int chan, uint32_t val)
-{
-  write_reg(reg + chan * 8, val);
-}
-
 
 static inline int dwc2_char_reg_to_string(int ch, char *buf, int bufsz)
 {
@@ -119,7 +88,7 @@ int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz)
 #define DWC2_MAKE_TSIZE(size, packet_count, pid, do_ping)\
    (BITS_PLACE_32(size        , 0 , 19)\
    |BITS_PLACE_32(packet_count, 19, 10)\
-   |BITS_PLACE_32(pid   , 29,  2)\
+   |BITS_PLACE_32(pid         , 29,  2)\
    |BITS_PLACE_32(do_ping     , 31,  1))
 
 #define DWC2_MAKE_SPLT(hub_addr, port_addr, split_en)\
@@ -177,7 +146,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
 int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
 {
   int err = ERR_OK;
-  int i; 
+  int i, j; 
   int ch = pipe.u.dwc_channel;
 
   const int max_retries = 8;
@@ -245,10 +214,6 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     } while(!USB_HOST_INTR_GET_HALT(intr));
 
     if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
-      if (USB_HOST_INTR_GET_ACK(intr)) {
-        err = ERR_OK;
-        goto out_err;
-      }
       if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
         DWCERR("AHB error");
         err = ERR_GENERIC;
@@ -305,6 +270,10 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
         err = ERR_GENERIC;
         goto out_err;
       }
+      if (USB_HOST_INTR_GET_ACK(intr)) {
+        err = ERR_OK;
+        goto out_err;
+      }
     }
 
     GET_SPLT();
@@ -344,11 +313,12 @@ int dwc2_init_channels()
     USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(channel_char, 1);
     USB_HOST_CHAR_CLR_SET_CHAN_DISABLE(channel_char, 1);
     USB_HOST_CHAR_CLR_SET_EP_DIR(channel_char, USB_DIRECTION_IN);
+    __write_ch_reg(USB_HCCHAR0, i, channel_char);
     do {
-      DWCINFO("waiting until channel %d enabled", i);
       channel_char = __read_ch_reg(USB_HCCHAR0, i);
     } while(USB_HOST_CHAR_GET_CHAN_ENABLE(channel_char));
   }
   DWCINFO("channel initialization completed");
   return ERR_OK;
 }
+

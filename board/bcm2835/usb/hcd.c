@@ -17,6 +17,8 @@
 #include <stringlib.h>
 #include "root_hub.h"
 #include <drivers/usb/usb_dev_rq.h>
+#include "dwc2_reg_access.h"
+#include "dwc2_log.h"
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -568,19 +570,19 @@ out_err:
   return err;
 }
 
-static void usb_hcd_reset()
+void usb_hcd_reset()
 {
   uint32_t rst;
   do {
     rst = read_reg(USB_GRSTCTL);
   } while(!USB_GRSTCTL_GET_AHB_IDLE(rst));
 
-  USB_GRSTCTL_CLR_SET_H_SFT_RST(rst, 1)
+  USB_GRSTCTL_CLR_SET_C_SFT_RST(rst, 1)
   write_reg(USB_GRSTCTL, rst);
 
   do {
     rst = read_reg(USB_GRSTCTL);
-  } while(!USB_GRSTCTL_GET_AHB_IDLE(rst) || USB_GRSTCTL_GET_H_SFT_RST(rst));
+  } while(!USB_GRSTCTL_GET_AHB_IDLE(rst) || USB_GRSTCTL_GET_C_SFT_RST(rst));
   HCDLOG("reset done.");
 }
 
@@ -641,6 +643,15 @@ static const char *hwconfig_fs_iface_to_string(int fs)
   }
 }
 
+void usb_hcd_start_vbus()
+{
+  uint32_t ctl;
+  ctl  = read_reg(USB_GUSBCFG);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_EXT_VBUS_DRV);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_TERM_SEL_DL_PULSE);
+  write_reg(USB_GUSBCFG, ctl);
+}
+
 int usb_hcd_start()
 {
   int err = ERR_OK;
@@ -652,10 +663,7 @@ int usb_hcd_start()
   uint32_t hostport;
   int hs_phy_iface, fs_phy_iface;
 
-  ctl  = read_reg(USB_GUSBCFG);
-  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_EXT_VBUS_DRV);
-  BIT_CLEAR_U32(ctl, USB_GUSBCFG_TERM_SEL_DL_PULSE);
-  write_reg(USB_GUSBCFG, ctl);
+  usb_hcd_start_vbus();
   usb_hcd_reset();
 
   if (!usb_utmi_initialized) {
@@ -666,6 +674,7 @@ int usb_hcd_start()
     /* Disable PHY */
     BIT_CLEAR_U32(ctl, USB_GUSBCFG_PHY_IF);
     write_reg(USB_GUSBCFG, ctl);
+    usb_hcd_reset();
     usb_utmi_initialized = 1;
   }
 
@@ -694,7 +703,7 @@ int usb_hcd_start()
   BIT_SET_U32(ahb, USB_GAHBCFG_DMA_EN);
   BIT_CLEAR_U32(ahb, USB_GAHBCFG_DMA_REM_MODE);
   write_reg(USB_GAHBCFG, ahb);
-  
+
   ctl = read_reg(USB_GUSBCFG);
   switch(hwcfg2 & 7) {
     case 0:
@@ -728,6 +737,7 @@ int usb_hcd_start()
     HCDLOG("selecting host clock: 30-60MHz");
     USB_HCFG_CLR_SET_LS_PHY_CLK_SEL(hostcfg, USB_CLK_30_60MHZ);
   }
+
   USB_HCFG_CLR_SET_LS_SUPP(hostcfg, 1);
   write_reg(USB_HCFG, hostcfg);
 

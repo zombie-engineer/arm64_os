@@ -106,7 +106,7 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
-  HUBPORTDBG("status: %04x:%04x", port_status.status, port_status.change);
+  HUBPORTLOG("status: %04x:%04x", port_status.status, port_status.change);
 
 	if (port_status.status.high_speed)
     port_dev->pipe0.speed = USB_SPEED_HIGH;

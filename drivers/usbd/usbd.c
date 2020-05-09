@@ -38,7 +38,7 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
     d->class ? usb_hcd_device_class_to_string(d->class->device_class) : "NONE",
     d->class ? d->class->device_class : 0);
 
-  printf("%smanufacturer: %s, product: %s, serial: %s" __endline,
+  printf("%smanufacturer: '%s', product: '%s', serial: '%s'" __endline,
     padding,
     d->string_manufacturer, d->string_product, d->string_serial);
 
