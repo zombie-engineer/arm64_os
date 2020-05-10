@@ -32,7 +32,7 @@ int usb_hcd_submit_cm(
       .ep_address      = pipe->endpoint,
       .ep_type         = USB_ENDPOINT_TYPE_CONTROL,
       .ep_direction    = USB_DIRECTION_OUT,
-      .low_speed       = pipe->speed == USB_SPEED_LOW ? 1 : 0,
+      .speed           = pipe->speed,
       .max_packet_size = pipe->max_packet_size,
       .dwc_channel     = pctl->channel
     }

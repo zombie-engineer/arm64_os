@@ -75,12 +75,12 @@ static inline int dwc2_channel_regs_to_string(int ch, char *buf, int bufsz)
 
 int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz)
 {
-  return snprintf(buf, bufsz, "%016lx:%s:%d/%d/%s/%s/%d:%d", 
+  return snprintf(buf, bufsz, "%016lx:ep:%s,addr:%d,ep:%d,dir:%s,speed:%s(%d),sz:%d,ch:%d", 
       desc.u.raw, 
       usb_endpoint_type_to_short_string(desc.u.ep_type),
       desc.u.device_address, desc.u.ep_address,
       usb_direction_to_string(desc.u.ep_direction),
-      desc.u.low_speed ? "ls" : "--",
+      usb_speed_to_string(desc.u.speed), desc.u.speed,
       desc.u.max_packet_size,
       desc.u.dwc_channel);
 }
@@ -171,7 +171,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
   chr |= (pipe.u.max_packet_size & 0x7ff) << 0 ;
   chr |= (pipe.u.ep_address      &   0xf) << 11;
   chr |= (pipe.u.ep_direction    &     1) << 15;
-  chr |= (pipe.u.low_speed       &     1) << 17;
+  chr |= (pipe.u.speed == USB_SPEED_LOW ? 1 : 0) << 17;
   chr |= (pipe.u.ep_type         &     2) << 18;
   chr |= (pipe.u.device_address  &  0x7f) << 22;
   SET_CHAR();
@@ -184,7 +184,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
   SET_SPLT();
 
   /* Set transfer size. */
-  siz = dwc2_make_tsize(bufsz, pipe.u.low_speed, pid, pipe.u.max_packet_size);
+  siz = dwc2_make_tsize(bufsz, pipe.u.speed == USB_SPEED_LOW, pid, pipe.u.max_packet_size);
   SET_SIZ();
 
   ptr = (uint32_t*)buf;

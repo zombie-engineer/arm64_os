@@ -10,7 +10,7 @@ typedef struct dwc2_pipe_desc {
       uint64_t ep_address      :  4;
       uint64_t ep_type         :  2;
       uint64_t ep_direction    :  1;
-      uint64_t low_speed       :  1;
+      uint64_t speed           :  2;
       uint64_t max_packet_size : 11;
       uint64_t dwc_channel     :  3;
     };
