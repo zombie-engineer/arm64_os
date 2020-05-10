@@ -199,6 +199,7 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   dev->class = &h->base;
 
   GET_DESC(&dev->pipe0, HUB, 0, 0, &h->descriptor, sizeof(h->descriptor));
+  wait_msec(1000);
 
   err = usb_hub_get_status(h, &status);
   CHECK_ERR("failed to read hub port status. Enumeration will not continue");
@@ -211,8 +212,10 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
       HUBPORTERR("failed to power on, skipping");
       continue;
     }
+    // HUBLOG("power_good_delay: %d msec", h->descriptor.power_good_delay);
+    wait_msec(h->descriptor.power_good_delay * 2);
   }
-  wait_msec(h->descriptor.power_good_delay * 2);
+  wait_msec(1000);
 
   for (port = 0; port < h->descriptor.port_count; ++port) {
     HUBPORTDBG("check connection");

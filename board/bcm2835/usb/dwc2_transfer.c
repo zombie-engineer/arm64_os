@@ -209,7 +209,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     SET_CHAR();
 
     do {
-      wait_msec(100);
+      wait_usec(100);
       GET_INTR();
     } while(!USB_HOST_INTR_GET_HALT(intr));
 
