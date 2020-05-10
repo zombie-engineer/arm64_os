@@ -13,6 +13,8 @@ typedef struct dwc2_pipe_desc {
       uint64_t speed           :  2;
       uint64_t max_packet_size : 11;
       uint64_t dwc_channel     :  3;
+      uint64_t hub_address     :  7;
+      uint64_t hub_port        :  7;
     };
     uint64_t raw;
   } u;

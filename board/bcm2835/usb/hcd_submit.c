@@ -34,7 +34,9 @@ int usb_hcd_submit_cm(
       .ep_direction    = USB_DIRECTION_OUT,
       .speed           = pipe->speed,
       .max_packet_size = pipe->max_packet_size,
-      .dwc_channel     = pctl->channel
+      .dwc_channel     = pctl->channel,
+      .hub_address     = pipe->ls_hub_address,
+      .hub_port        = pipe->ls_hub_port
     }
   };
 

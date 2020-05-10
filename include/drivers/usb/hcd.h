@@ -27,8 +27,8 @@ struct usb_hcd_pipe {
   int endpoint;
   int speed;
   int max_packet_size;
-  int ls_node_port;
-  int ls_node_point;
+  int ls_hub_port;
+  int ls_hub_address;
 };
 
 struct usb_hcd_pipe_control {

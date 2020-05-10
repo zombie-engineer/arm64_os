@@ -178,9 +178,12 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   /* Clear and setup split control to low speed devices */
   splt = 0;
- //  splt |= 1 << 31; // split_enable
- //  splt |= (pipe.ls_node_point & 0x7f) << 0;
- //  splt |= (pipe.ls_node_port  & 0x7f) << 7;
+  if (pipe.u.speed != USB_SPEED_HIGH) {
+    USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
+    USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, pipe.u.hub_address);
+    USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, pipe.u.hub_port);
+    printf("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
+  }
   SET_SPLT();
 
   /* Set transfer size. */
@@ -193,7 +196,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     CLEAR_INTR();
     CLEAR_INTRMSK();
     GET_SPLT();
-    BIT_CLEAR_U32(splt, 16);
+    USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
     SET_SPLT();
 
     dma = RAM_PHY_TO_BUS_UNCACHED((uint64_t)ptr);
@@ -202,10 +205,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
     /* launch transmission */
     GET_CHAR();
-    BIT_CLEAR_U32(chr, 20);
-    BIT_CLEAR_U32(chr, 21); // 1 frame/packet
-    BIT_SET_U32(chr, 20);
-    BIT_SET_U32(chr, 31); // enable channel
+    USB_HOST_CHAR_CLR_SET_PACK_PER_FRM(chr, 1);
+    USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
+    USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
 
     do {
@@ -213,6 +215,25 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       GET_INTR();
     } while(!USB_HOST_INTR_GET_HALT(intr));
 
+    GET_SPLT();
+    if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
+      printf("SPLT ENA: %08x\r\n", splt);
+      CLEAR_INTR();
+      CLEAR_INTRMSK();
+      USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
+      SET_SPLT();
+      GET_CHAR();
+      USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
+      USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
+      SET_CHAR();
+      do {
+        wait_usec(100);
+        GET_INTR();
+        printf("INTR: %08x\r\n", intr);
+      } while(!USB_HOST_INTR_GET_HALT(intr));
+      GET_SPLT();
+      printf("SPLT ENA: %08x\r\n", splt);
+    }
     if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
       if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
         DWCERR("AHB error");

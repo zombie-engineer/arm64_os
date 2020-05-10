@@ -112,13 +112,15 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
     port_dev->pipe0.speed = USB_SPEED_HIGH;
   else if (port_status.status.low_speed) {
 		port_dev->pipe0.speed = USB_SPEED_LOW;
-		port_dev->pipe0.ls_node_point = h->d->pipe0.address;
-		port_dev->pipe0.ls_node_port = port;
     HUBPORTLOG("low speed device");
 	}
 	else {
     port_dev->pipe0.speed = USB_SPEED_FULL;
     HUBPORTLOG("full speed device");
+  }
+  if (!port_status.status.high_speed) {
+		port_dev->pipe0.ls_hub_address = h->d->address;
+		port_dev->pipe0.ls_hub_port = port;
   }
 
   HUBPORTDBG("device speed: %s(%d)", usb_speed_to_string(port_dev->pipe0.speed));
@@ -190,8 +192,8 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   h = usb_hcd_allocate_hub();
 
   if (!h) {
-    HCDERR("failed to allocate hub device object");
     err = ERR_BUSY;
+    HCDERR("failed to allocate hub device object");
     goto out_err;
   }
 
