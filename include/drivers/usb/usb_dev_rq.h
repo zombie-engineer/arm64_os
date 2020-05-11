@@ -23,6 +23,10 @@
   USB_DEV_RQ_MAKE(HUB_GET_HUB_DESCRIPTOR, GET_DESCRIPTOR,\
     ((__desc_type & 0xff) << 8|(__desc_idx & 0xff)), __idx, __len)
 
+#define USB_DEV_HID_RQ_MAKE_GET_DESCRIPTOR(__desc_type, __desc_idx, __idx, __len)\
+  USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR,\
+    ((__desc_type & 0xff) << 8|(__desc_idx & 0xff)), __idx, __len)
+
 #define USB_DEV_RQ_GET_TYPE(r)   ((r    )&0xff)
 #define USB_DEV_RQ_GET_RQ(r)     ((r>>8 )&0xff)
 #define USB_DEV_RQ_GET_VALUE(r)  ((r>>16)&0xffff)

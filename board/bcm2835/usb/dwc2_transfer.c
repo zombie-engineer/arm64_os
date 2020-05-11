@@ -147,11 +147,17 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 {
   int err = ERR_OK;
   int i, j; 
+  int offset = 0;
   int ch = pipe.u.dwc_channel;
 
-  const int max_retries = 8;
+  /*
+   * Randomly chose number of retryable failures before exiting with
+   * error.
+   */
+  const int max_retries = 10;
+
   uint32_t chr, splt, intr, siz, dma;
-  uint32_t *ptr;
+  uint64_t dma_dst;
 
   dwc2_transfer_prologue(pipe, buf, bufsz, pid);
 
@@ -182,7 +188,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
     USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, pipe.u.hub_address);
     USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, pipe.u.hub_port);
-    printf("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
+    DWCDEBUG("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
   }
   SET_SPLT();
 
@@ -190,17 +196,19 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
   siz = dwc2_make_tsize(bufsz, pipe.u.speed == USB_SPEED_LOW, pid, pipe.u.max_packet_size);
   SET_SIZ();
 
-  ptr = (uint32_t*)buf;
+  dma_dst = (uint64_t)buf;
   for (i = 0; i < max_retries; ++i) {
     DWCDEBUG2("transfer: try:%d", i);
+    if (dma_dst & 3)
+      kernel_panic("UNALIGNED DMA address");
+
     CLEAR_INTR();
     CLEAR_INTRMSK();
     GET_SPLT();
     USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
     SET_SPLT();
 
-    dma = RAM_PHY_TO_BUS_UNCACHED((uint64_t)ptr);
-    ptr++;
+    dma = RAM_PHY_TO_BUS_UNCACHED(dma_dst);
     SET_DMA();
 
     /* launch transmission */
@@ -217,7 +225,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
-      printf("SPLT ENA: %08x\r\n", splt);
+      DWCDEBUG("SPLT ENA: %08x", splt);
       CLEAR_INTR();
       CLEAR_INTRMSK();
       USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
@@ -229,11 +237,12 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       do {
         wait_usec(100);
         GET_INTR();
-        printf("INTR: %08x\r\n", intr);
+        DWCDEBUG("INTR: %08x", intr);
       } while(!USB_HOST_INTR_GET_HALT(intr));
       GET_SPLT();
-      printf("SPLT ENA: %08x\r\n", splt);
+      DWCDEBUG("SPLT ENA: %08x", splt);
     }
+
     if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
       if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
         DWCERR("AHB error");
@@ -292,6 +301,24 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
         goto out_err;
       }
       if (USB_HOST_INTR_GET_ACK(intr)) {
+        GET_SIZ();
+        if (dwc2_print_debug > 1)
+          hexdump_memory(buf, bufsz);
+
+        DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
+          siz,
+          USB_HOST_SIZE_GET_PACKET_COUNT(siz),
+          USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
+
+        if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+          dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+          /* 
+           * packet was successfully retrieved, so we reset number of 
+           * retries before failure
+           */
+          i = 0;
+          continue;
+        }
         err = ERR_OK;
         goto out_err;
       }

@@ -1,6 +1,7 @@
 #include <drivers/usb/hcd.h>
 #include <board/bcm2835/bcm2835_usb.h>
 #include <drivers/usb/hcd_hub.h>
+#include <drivers/usb/hcd_hid.h>
 #include "hcd_constants.h"
 #include <board_map.h>
 #include <reg_access.h>
@@ -19,6 +20,7 @@
 #include <drivers/usb/usb_dev_rq.h>
 #include "dwc2_reg_access.h"
 #include "dwc2_log.h"
+#include <mem_access.h>
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -74,15 +76,15 @@ static int usb_utmi_initialized = 0;
 
 static inline void print_usb_device(struct usb_hcd_device *dev)
 {
-  printf("usb_device:parent:(%p:%d),pipe0:(max:%d,spd:%d,ep:%d,address:%d,ls_port:%d,ls_pt:%d)",
+  printf("usb_device:parent:(%p:%d),pipe0:(max:%d,spd:%d,ep:%d,address:%d,hubaddr:%d,hubport:%d)",
       dev->location.hub, 
       dev->location.hub_port,
       dev->pipe0.max_packet_size,
       dev->pipe0.speed,
       dev->pipe0.endpoint,
       dev->pipe0.address,
-      dev->pipe0.ls_node_port,
-      dev->pipe0.ls_node_point
+      dev->pipe0.ls_hub_address,
+      dev->pipe0.ls_hub_port
       );
   puts(__endline);
 }
@@ -159,6 +161,7 @@ int usb_hcd_get_descriptor(
   else
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
 
+
   err = usb_hcd_submit_cm(p, &pctl, 
       &header, sizeof(header), rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
   if (err) {
@@ -179,6 +182,8 @@ int usb_hcd_get_descriptor(
 
   if (desc_type != USB_DESCRIPTOR_TYPE_HUB)
     rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
+  else if (desc_type == USB_DESCRIPTOR_TYPE_HID_REPORT)
+    rq = USB_DEV_HID_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
   else
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
   err = usb_hcd_submit_cm(p, &pctl, 
@@ -213,6 +218,50 @@ out_err:
   return err;
 }
 
+static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_descriptor *hid_desc)
+{
+  int err = ERR_OK;
+  struct usb_hcd_device_class_hid *h;
+  struct usb_hcd_hid_interface *i;
+  hexdump_memory(hid_desc, sizeof(struct usb_hid_descriptor));
+  if (!dev->class) {
+    h = usb_hcd_allocate_hid();
+    if (!h) {
+      err = ERR_BUSY;
+      HCDERR("failed to allocate hid device");
+      goto out_err;
+    }
+    h->d = dev;
+    dev->class = &h->base;
+  }
+
+  if (dev->class->device_class != USB_HCD_DEVICE_CLASS_HID) {
+    err = ERR_BUSY;
+    HCDERR("existring device type already identified as non-hid (%s)", 
+      usb_hcd_device_class_to_string(dev->class->device_class));
+    goto out_err;
+  }
+
+  i = usb_hcd_allocate_hid_interface();
+  if (!i) {
+    err = ERR_BUSY;
+    HCDERR("failed to allocate hid interface");
+    goto out_err;
+  }
+  list_add_tail(&i->hid_interfaces, &h->hid_interfaces);
+
+  memcpy(&i->descriptor, hid_desc, sizeof(struct usb_hid_descriptor));
+
+  HCDLOG("hid: version:%04x, country:%d, desc_count:%d, type:%d, length:%d\r\n",
+    get_unaligned_16_le(&hid_desc->hid_version), 
+    hid_desc->country_code,
+    hid_desc->descriptor_count, 
+    hid_desc->type,
+    get_unaligned_16_le(&hid_desc->length));
+out_err:
+  return err;
+}
+
 static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *cfgbuf, int cfgbuf_sz)
 {
   const struct usb_descriptor_header *hdr;
@@ -230,8 +279,8 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
     hexdump_memory(cfgbuf, cfgbuf_sz);
 
   while((void*)hdr < cfgbuf_end && should_continue) {
-    HCDDEBUG("found descriptor:%s(%d),size:%d", 
-        usb_descriptor_type_to_string(hdr->descriptor_type), 
+    HCDDEBUG("found descriptor:%s(%d),size:%d",
+        usb_descriptor_type_to_string(hdr->descriptor_type),
         hdr->descriptor_type,
         hdr->length);
     switch(hdr->descriptor_type) {
@@ -280,8 +329,11 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         ep++;
         break;
       case USB_DESCRIPTOR_TYPE_HID:
-        HCDERR("Unimplemented parsing of USB_DESCRIPTOR_TYPE_HID");
-        while(1);
+        err = usb_hcd_parse_handle_hid(dev, (struct usb_hid_descriptor *)hdr);
+        if (err != ERR_OK) {
+          HCDERR("failed to parse hid interface. skipping");
+          err = ERR_OK;
+        }
         break;
       case USB_DESCRIPTOR_TYPE_CONFIGURATION:
         HCDDEBUG("configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
@@ -550,18 +602,15 @@ int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
   err = usb_hcd_to_configured_state(dev, &pctl);
   CHECK_ERR_SILENT();
 
-  switch(dev->descriptor.device_class) {
-    case USB_INTERFACE_CLASS_HUB:
+  if (dev->descriptor.device_class == USB_INTERFACE_CLASS_HUB) {
       HCDDEBUG("HUB: vendor:%04x:product:%04x", dev->descriptor.id_vendor, dev->descriptor.id_product);
       HCDDEBUG("   : max_packet_size: %d", dev->descriptor.max_packet_size_0);
       err = usb_hub_enumerate(dev);
       CHECK_ERR_SILENT();
-      break;
-    case USB_INTERFACE_CLASS_HID:
-      HCDLOG("HID enumeration not implemented");
-      break;
-    default:
-      break;
+  } else if (dev->class && dev->class->device_class == USB_HCD_DEVICE_CLASS_HID) {
+      HCDLOG("Enumerate HID");
+      err = usb_hid_enumerate(dev);
+      CHECK_ERR_SILENT();
   }
 out_err:
   HCDDEBUG("=============================================================");
@@ -869,6 +918,7 @@ int usb_hcd_init()
   uint32_t vendor_id, user_id;
   STATIC_SLOT_INIT_FREE(usb_hcd_device);
   usb_hcd_hub_init();
+  usb_hcd_hid_init();
 
   vendor_id = read_reg(USB_GSNPSID);
   user_id   = read_reg(USB_GUID);

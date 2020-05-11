@@ -2,6 +2,7 @@
 
 #include <drivers/usb/hcd.h>
 #include <drivers/usb/usb_dev_rq.h>
+#include <memory/static_slot.h>
 #include "common.h"
 
 #define USB_CONTROL_MSG_TIMEOUT_MS 10

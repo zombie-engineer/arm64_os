@@ -40,6 +40,11 @@ static inline void list_add(struct list_head *new, struct list_head *head)
   __list_add(new, head, head->next);
 }
 
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
+{
+  __list_add(new, head->prev, head);
+}
+
 #define list_entry(ptr, type, member) \
   container_of(ptr, type, member)
 

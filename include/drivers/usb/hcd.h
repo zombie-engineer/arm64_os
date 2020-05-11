@@ -1,8 +1,17 @@
 #pragma once
 #include <list.h>
 #include <usb/usb.h>
+#include <usb/usb_printers.h>
 #include <memory/static_slot.h>
 
+/*
+ * Looks like the device class is not really needed
+ * because it a bit duplicates device/interfaces classes
+ * in USB descritors spec. But device class in usb device
+ * descriptor does not have HID, so this abstraction
+ * of HCD device a bit different that the one in
+ * descriptors.
+ */
 #define USB_HCD_DEVICE_CLASS_UNDEFINED 0
 #define USB_HCD_DEVICE_CLASS_HUB       1
 #define USB_HCD_DEVICE_CLASS_HID       2

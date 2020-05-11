@@ -888,6 +888,8 @@ void main()
   init_uart(1);
   init_consoles();
   // UsbInitialise();
+  irq_init(0 /*loglevel*/);
+  add_unhandled_exception_hook(report_unhandled_exception);
   usbd_init();
   usbd_print_device_tree();
   while(1);
@@ -896,8 +898,6 @@ void main()
   servo_sg90_init();
   print_mbox_props();
   // self_test();
-  irq_init(0 /*loglevel*/);
-  add_unhandled_exception_hook(report_unhandled_exception);
 #ifndef CONFIG_QEMU
   init_nokia5110_display(1, 0);
   nokia5110_draw_text("Display ready", 0, 0);
