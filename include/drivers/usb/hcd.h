@@ -101,6 +101,8 @@ struct usb_hcd_device {
   struct list_head hub_children;
 
   struct usb_device_descriptor descriptor ALIGNED(4);
+
+  int num_interfaces;
   struct usb_hcd_interface interfaces[USB_MAX_INTERFACES_PER_DEVICE] ALIGNED (4);
   struct usb_hcd_device_class_base *class; 
 
@@ -157,6 +159,13 @@ int usb_hcd_submit_cm(
   void *buf,
   int buf_sz,
   uint64_t rq,
+  int timeout,
+  int *out_num_bytes);
+
+int usb_hcd_submit_interrupt(
+  struct usb_hcd_pipe *pipe,
+  void *buf,
+  int buf_sz,
   int timeout,
   int *out_num_bytes);
 

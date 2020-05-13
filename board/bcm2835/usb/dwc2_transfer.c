@@ -223,6 +223,12 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       GET_INTR();
     } while(!USB_HOST_INTR_GET_HALT(intr));
 
+    if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
+        pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
+      DWCERR("NAK");
+      goto out_err;
+    }
+
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
       DWCDEBUG("SPLT ENA: %08x", splt);
@@ -239,8 +245,15 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
         GET_INTR();
         DWCDEBUG("INTR: %08x", intr);
       } while(!USB_HOST_INTR_GET_HALT(intr));
+
       GET_SPLT();
       DWCDEBUG("SPLT ENA: %08x", splt);
+    }
+
+    if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
+        pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
+      DWCERR("NAK2");
+      goto out_err;
     }
 
     if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
@@ -253,7 +266,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
         DWCWARN("STALL");
       }
       if (USB_HOST_INTR_GET_NAK(intr)) {
-        DWCWARN("NAK. retrying");
+        DWCERR("NAK. retrying");
         continue;
       }
       if (USB_HOST_INTR_GET_NYET(intr)) {

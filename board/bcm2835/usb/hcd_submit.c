@@ -84,3 +84,30 @@ out_err:
   return ERR_OK;
 }
 
+int usb_hcd_submit_interrupt(
+  struct usb_hcd_pipe *pipe,
+  void *buf,
+  int buf_sz,
+  int timeout,
+  int *out_num_bytes)
+{
+  int err;
+
+  dwc2_pipe_desc_t pipedesc = {
+    .u = { 
+      .device_address  = pipe->address,
+      .ep_address      = pipe->endpoint,
+      .ep_type         = USB_ENDPOINT_TYPE_INTERRUPT,
+      .ep_direction    = USB_DIRECTION_IN,
+      .speed           = pipe->speed,
+      .max_packet_size = pipe->max_packet_size,
+      .dwc_channel     = 0,
+      .hub_address     = pipe->ls_hub_address,
+      .hub_port        = pipe->ls_hub_port
+    }
+  };
+  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA1, out_num_bytes);
+  CHECK_ERR("a");
+out_err:
+  return err;
+}

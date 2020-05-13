@@ -223,7 +223,7 @@ static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_d
   int err = ERR_OK;
   struct usb_hcd_device_class_hid *h;
   struct usb_hcd_hid_interface *i;
-  hexdump_memory(hid_desc, sizeof(struct usb_hid_descriptor));
+
   if (!dev->class) {
     h = usb_hcd_allocate_hid();
     if (!h) {
@@ -233,7 +233,8 @@ static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_d
     }
     h->d = dev;
     dev->class = &h->base;
-  }
+  } else
+    h = usb_hcd_device_to_hid(dev);
 
   if (dev->class->device_class != USB_HCD_DEVICE_CLASS_HID) {
     err = ERR_BUSY;
@@ -252,7 +253,7 @@ static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_d
 
   memcpy(&i->descriptor, hid_desc, sizeof(struct usb_hid_descriptor));
 
-  HCDLOG("hid: version:%04x, country:%d, desc_count:%d, type:%d, length:%d\r\n",
+  HCDLOG("hid: version:%04x, country:%d, desc_count:%d, type:%d, length:%d",
     get_unaligned_16_le(&hid_desc->hid_version), 
     hid_desc->country_code,
     hid_desc->descriptor_count, 
@@ -279,16 +280,19 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
     hexdump_memory(cfgbuf, cfgbuf_sz);
 
   while((void*)hdr < cfgbuf_end && should_continue) {
-    HCDDEBUG("found descriptor:%s(%d),size:%d",
+    HCDLOG("found descriptor:%s(%d),size:%d",
         usb_descriptor_type_to_string(hdr->descriptor_type),
         hdr->descriptor_type,
         hdr->length);
     switch(hdr->descriptor_type) {
       case USB_DESCRIPTOR_TYPE_INTERFACE:
-        if (!i)
+        if (!i) {
           i = dev->interfaces;
-        else
+        }
+        else {
           i++;
+          dev->num_interfaces++;
+        }
         if (i >= end_i) {
           /* VULNURABILITY idea */
           HCDERR("inteface count reached limit %d", end_i - dev->interfaces);
@@ -300,10 +304,11 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         ep = i->endpoints;
         end_ep = i->endpoints + USB_MAX_ENDPOINTS_PER_DEVICE;
 
-        HCDDEBUG("-- address:%d,interface:%d,num_endpoints:%d", dev->address, 
+        HCDLOG("-- address:%d,interface:%d,num_endpoints:%d,class:%s(%d,%d,%d)", dev->address, 
           i->descriptor.number,
-          i->descriptor.endpoint_count);
-        // print_usb_interface_desc(&i->descriptor);
+          i->descriptor.endpoint_count,
+          usb_full_class_to_string(i->descriptor.class, i->descriptor.subclass, i->descriptor.protocol),
+          i->descriptor.class, i->descriptor.subclass, i->descriptor.protocol);
         break;
       case USB_DESCRIPTOR_TYPE_ENDPOINT:
         if (!ep) {
@@ -318,14 +323,17 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
           break;
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
-        HCDDEBUG("---- address:%d,interface:%d,endpoint:%d,dir:%s,packet_size:%d", 
+        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d", 
           dev->address, 
           i->descriptor.number, 
           ep->descriptor.endpoint_address & 0x7f,
           usb_direction_to_string(ep->descriptor.endpoint_address >> 7),
+          ep->descriptor.attributes,
+          usb_endpoint_type_to_string(ep->descriptor.attributes & 3),
+          usb_endpoint_synch_type_to_string((ep->descriptor.attributes >> 2) & 3),
+          usb_endpoint_usage_type_to_string((ep->descriptor.attributes >> 4) & 3),
           ep->descriptor.max_packet_size
         );
-        // print_usb_endpoint_desc(&ep->descriptor);
         ep++;
         break;
       case USB_DESCRIPTOR_TYPE_HID:
@@ -336,9 +344,8 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         }
         break;
       case USB_DESCRIPTOR_TYPE_CONFIGURATION:
-        HCDDEBUG("configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
+        HCDLOG("---- configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
           c->num_interfaces, c->iconfiguration);
-        //print_usb_configuration_desc(c);
         break;
       default:
         HCDERR("Unimplemented parsing of unknown descriptor type %d", hdr->descriptor_type);
@@ -383,7 +390,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
         desc->id_vendor,
         desc->id_product,
         desc->bcd_usb, 
-        usb_device_subclass_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
+        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
         desc->device_class,
         desc->device_subclass,
         desc->device_protocol, 
@@ -392,7 +399,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
     HCDLOG("%s: bcd:%04x, class:%s(class:%d,subclass:%d,proto:%d), max_packet_size: %d",
         prefix,
         desc->bcd_usb, 
-        usb_device_subclass_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
+        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
         desc->device_class,
         desc->device_subclass,
         desc->device_protocol, 

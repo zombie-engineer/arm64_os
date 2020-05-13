@@ -86,9 +86,33 @@ static inline void print_usb_interface_desc(struct usb_interface_descriptor *i)
  * Get device subclass name by triple "class,subclass,protocol"
  * https://www.usb.org/defined-class-codes
  */
-static inline const char *usb_device_subclass_to_string(int class, int subclass, int proto)
+static inline const char *usb_full_class_to_string(int class, int subclass, int proto)
 {
   switch(class) {
+    case USB_INTERFACE_CLASS_HID:
+      switch (subclass) {
+        case 0: 
+          switch (proto) {
+            case 0:  return "HID_NO_SUBCLASS_NO_PROTO";
+            case 1:  return "HID_NO_SUBCLASS_KEYBOARD";
+            case 2:  return "HID_NO_SUBCLASS_MOUSE"   ;
+            default: return "HID_NO_SUBCLASS_UNKNOWN" ;
+          }
+        case 1:
+          switch (proto) {
+            case 0:  return "HID_BOOT_SUBCLASS_NO_PROTO";
+            case 1:  return "HID_BOOT_SUBCLASS_KEYBOARD";
+            case 2:  return "HID_BOOT_SUBCLASS_MOUSE"   ;
+            default: return "HID_BOOT_SUBCLASS_UNKNOWN" ;
+          }
+        default:
+          switch (proto) {
+            case 0:  return "UNKNOWN_HID_NO_PROTO";
+            case 1:  return "UNKNOWN_HID_KEYBOARD";
+            case 2:  return "UNKNOWN_HID_MOUSE"   ;
+            default: return "UNKNOWN_HID_UNKNOWN" ;
+          }
+      }
     case USB_DEVICE_CLASS_HUB:
       switch (subclass) {
         case 0:
@@ -185,6 +209,32 @@ static inline const char *usb_endpoint_type_to_string(int t)
     __CASE(ISOCHRONOUS);
     __CASE(BULK);
     __CASE(INTERRUPT);
+    default: return "UNKNOWN";
+  }
+#undef  __CASE
+}
+
+static inline const char *usb_endpoint_synch_type_to_string(int t)
+{
+#define __CASE(__t) case USB_EP_SYNC_TYPE_ ##__t: return #__t;
+  switch(t) {
+    __CASE(NONE);
+    __CASE(ASYNC);
+    __CASE(ADAPTIVE);
+    __CASE(SYNC);
+    default: return "UNKNOWN";
+  }
+#undef  __CASE
+}
+
+static inline const char *usb_endpoint_usage_type_to_string(int t)
+{
+#define __CASE(__t) case USB_EP_USAGE_TYPE_ ##__t: return #__t;
+  switch(t) {
+    __CASE(DATA);
+    __CASE(FEEDBACK);
+    __CASE(XDFEEDBACK);
+    __CASE(RESERVED);
     default: return "UNKNOWN";
   }
 #undef  __CASE
