@@ -110,23 +110,23 @@ int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
 {
   int err;
   int num_bytes;
+  int nak;
   char buf[64] ALIGNED(4);
 
   struct usb_hcd_pipe pipe = {
     .address = dev->pipe0.address,
     .endpoint = ep,
     .speed = dev->pipe0.speed,
-    .max_packet_size = dev->pipe0.speed,
+    .max_packet_size = dev->pipe0.max_packet_size,
     .ls_hub_port = dev->pipe0.ls_hub_port,
     .ls_hub_address = dev->pipe0.ls_hub_address
   };
 
- // HCDLOG("usb_hid_mouse_get_report");
-
   memset(buf, 0x66, sizeof(buf));
-  err = usb_hcd_submit_interrupt(&pipe, buf, sizeof(buf), 1000, &num_bytes);
+  err = usb_hcd_submit_interrupt(&pipe, buf, 7, 1000, &num_bytes, &nak);
   CHECK_ERR("a");
-  hexdump_memory(buf, 8);
+  if (!nak)
+   hexdump_memory(buf, 8);
 out_err:
   return err;
 }
@@ -155,21 +155,10 @@ int usb_hid_enumerate(struct usb_hcd_device *dev)
     }
     hid_index++;
   }
-  while(1);
-
-  err = usb_hid_set_idle(dev, 0);
-  err = usb_hid_set_report(dev, 0);
-  err = usb_hid_set_idle(dev, 1);
-  CHECK_ERR("failed to set idle");
   while(1) {
-    err = usb_hid_mouse_get_report(dev, 0);
-    err = usb_hid_mouse_get_report(dev, 1);
     err = usb_hid_mouse_get_report(dev, 2);
-    err = usb_hid_mouse_get_report(dev, 3);
   }
 
-  // GET_DESC(&dev->pipe0, HID_REPORT, 0, 0, &buffer, 65);// sizeof(config_desc));
- /// hexdump_memory(buffer, sizeof(buffer));
 out_err:
   return err;
 }

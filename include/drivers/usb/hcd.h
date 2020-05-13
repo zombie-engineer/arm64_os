@@ -167,7 +167,8 @@ int usb_hcd_submit_interrupt(
   void *buf,
   int buf_sz,
   int timeout,
-  int *out_num_bytes);
+  int *out_num_bytes,
+  int *out_nak);
 
 int usb_hcd_init();
 int usb_hcd_start();

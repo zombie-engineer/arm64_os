@@ -50,7 +50,7 @@ int usb_hcd_submit_cm(
   /*
    * Send SETUP packet
    */
-  err = dwc2_transfer(pipedesc, &rq, sizeof(rq), USB_HCTSIZ0_PID_SETUP, NULL);
+  err = dwc2_transfer(pipedesc, &rq, sizeof(rq), USB_HCTSIZ0_PID_SETUP, NULL, NULL);
   CHECK_ERR_SILENT();
   HCDDEBUG("%s:SETUP sent %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), sizeof(rq), sizeof(rq));
 
@@ -59,7 +59,7 @@ int usb_hcd_submit_cm(
    */
   if (buf) {
     pipedesc.u.ep_direction = pctl->direction;
-    err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA1, &num_bytes);
+    err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA1, &num_bytes, NULL);
     CHECK_ERR_SILENT();
     HCDDEBUG("%s:DATA transferred %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), num_bytes, buf_sz); 
   }
@@ -72,7 +72,7 @@ int usb_hcd_submit_cm(
   else
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
 
-  err = dwc2_transfer(pipedesc, 0, 0, USB_HCTSIZ0_PID_DATA1, &num_bytes_last);
+  err = dwc2_transfer(pipedesc, 0, 0, USB_HCTSIZ0_PID_DATA1, &num_bytes_last, NULL);
   CHECK_ERR_SILENT();
   HCDDEBUG("%s:ACK", usb_direction_to_string(pctl->direction));
 
@@ -89,7 +89,8 @@ int usb_hcd_submit_interrupt(
   void *buf,
   int buf_sz,
   int timeout,
-  int *out_num_bytes)
+  int *out_num_bytes,
+  int *out_nak)
 {
   int err;
 
@@ -106,7 +107,7 @@ int usb_hcd_submit_interrupt(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA1, out_num_bytes);
+  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes, out_nak);
   CHECK_ERR("a");
 out_err:
   return err;

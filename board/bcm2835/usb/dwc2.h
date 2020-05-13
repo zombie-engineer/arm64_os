@@ -25,6 +25,6 @@ typedef struct dwc2_pipe_desc {
  */
 int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz);
 
-int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes);
+int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes, int *out_nak);
 
 int dwc2_init_channels();

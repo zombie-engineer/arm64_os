@@ -75,9 +75,9 @@ static inline int dwc2_channel_regs_to_string(int ch, char *buf, int bufsz)
 
 int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz)
 {
-  return snprintf(buf, bufsz, "%016lx:ep:%s,addr:%d,ep:%d,dir:%s,speed:%s(%d),sz:%d,ch:%d", 
+  return snprintf(buf, bufsz, "%016lx:ep:%s(%d),addr:%d,ep:%d,dir:%s,speed:%s(%d),sz:%d,ch:%d", 
       desc.u.raw, 
-      usb_endpoint_type_to_short_string(desc.u.ep_type),
+      usb_endpoint_type_to_short_string(desc.u.ep_type), desc.u.ep_type,
       desc.u.device_address, desc.u.ep_address,
       usb_direction_to_string(desc.u.ep_direction),
       usb_speed_to_string(desc.u.speed), desc.u.speed,
@@ -127,7 +127,13 @@ static inline int get_num_packets(int datasz, int low_speed, int max_packet_size
 
 static inline uint32_t dwc2_make_tsize(int length, int low_speed, int pid, int max_packet_size)
 {
-  return DWC2_MAKE_TSIZE(length, get_num_packets(length, low_speed, max_packet_size), pid, 0);
+  uint32_t r = 0;
+  int num_packets = get_num_packets(length, low_speed, max_packet_size);
+  USB_HOST_SIZE_CLR_SET_SIZE(r, length);
+  USB_HOST_SIZE_CLR_SET_PACKET_COUNT(r, num_packets);
+  USB_HOST_SIZE_CLR_SET_PID(r, pid);
+  // printf("tsize: %08x, num_packets: %d, bytes: %d\r\n", r, num_packets, length);
+  return r;
 }
 
 static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid)
@@ -143,7 +149,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   }
 }
 
-int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
+int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes, int *out_nak) 
 {
   int err = ERR_OK;
   int i, j; 
@@ -161,6 +167,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   dwc2_transfer_prologue(pipe, buf, bufsz, pid);
 
+  if (out_nak)
+    *out_nak = 0;
+
   ch = pipe.u.dwc_channel = 6;
 
   if ((uint64_t)buf & 3) {
@@ -174,12 +183,12 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   /* Program the channel. */
   chr = 0;
-  chr |= (pipe.u.max_packet_size & 0x7ff) << 0 ;
-  chr |= (pipe.u.ep_address      &   0xf) << 11;
-  chr |= (pipe.u.ep_direction    &     1) << 15;
-  chr |= (pipe.u.speed == USB_SPEED_LOW ? 1 : 0) << 17;
-  chr |= (pipe.u.ep_type         &     2) << 18;
-  chr |= (pipe.u.device_address  &  0x7f) << 22;
+  USB_HOST_CHAR_CLR_SET_MAX_PACK_SZ(chr, pipe.u.max_packet_size);
+  USB_HOST_CHAR_CLR_SET_EP(chr, pipe.u.ep_address);
+  USB_HOST_CHAR_CLR_SET_EP_DIR(chr, pipe.u.ep_direction);
+  USB_HOST_CHAR_CLR_SET_IS_LOW(chr, pipe.u.speed == USB_SPEED_LOW ? 1 : 0);
+  USB_HOST_CHAR_CLR_SET_EP_TYPE(chr, pipe.u.ep_type);
+  USB_HOST_CHAR_CLR_SET_DEV_ADDR(chr, pipe.u.device_address);
   SET_CHAR();
 
   /* Clear and setup split control to low speed devices */
@@ -225,7 +234,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
     if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
         pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
-      DWCERR("NAK");
+      if (out_nak)
+        *out_nak = 1;
+      // DWCERR("NAK");
       goto out_err;
     }
 
@@ -252,7 +263,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
     if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
         pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
-      DWCERR("NAK2");
+      if (out_nak)
+        *out_nak = 1;
+      // DWCERR("NAK2");
       goto out_err;
     }
 
