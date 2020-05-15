@@ -79,10 +79,9 @@ void hexdump_memory(const void *addr, size_t sz)
   }
 }
 
-int prefix_padding_to_string(const char *prefix, int depth, char *buf, int buf_sz)
+int prefix_padding_to_string(const char *prefix, char padchar, int depth, int repeat, char *buf, int buf_sz)
 {
   int buf_sz_saved = buf_sz;
-  const char padchar = '-';
   char c;
 
   while(buf_sz > 0) {
@@ -94,6 +93,7 @@ int prefix_padding_to_string(const char *prefix, int depth, char *buf, int buf_s
     buf_sz--;
     prefix++;
   }
+  depth *= repeat;
   while(buf_sz > 0 && depth) {
     *buf++ = padchar;
     depth--;

@@ -89,6 +89,8 @@ static inline void print_usb_interface_desc(struct usb_interface_descriptor *i)
 static inline const char *usb_full_class_to_string(int class, int subclass, int proto)
 {
   switch(class) {
+    case USB_INTERFACE_CLASS_MASSSTORAGE:
+      return "MASS_STORAGE_DEVICE";
     case USB_INTERFACE_CLASS_HID:
       switch (subclass) {
         case 0: 

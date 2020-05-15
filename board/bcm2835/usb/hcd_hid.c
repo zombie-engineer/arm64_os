@@ -83,34 +83,10 @@ out_err:
   return err;
 }
 
-int usb_hid_set_report(struct usb_hcd_device *dev, int report_index)
-{
-  int err;
-  int num_bytes;
-	struct usb_hcd_pipe_control pctl;
-  uint64_t rq;
-  printf("usb_hid_set_report: %d \r\n", report_index);
-
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_OUT;
-
-  char buf = 0;
-  rq = USB_DEV_RQ_MAKE(CLASS_SET_INTERFACE, HID_SET_REPORT, 0x0200, 0, 1);
-  err = usb_hcd_submit_cm(&dev->pipe0, &pctl, 
-      &buf, 1, rq, 1000, &num_bytes);
-  CHECK_ERR("failed to read descriptor header");
-//  memset(buf, 0xff, sizeof(buf));
-out_err:
-  return err;
-}
-
-
 int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
 {
   int err;
   int num_bytes;
-  int nak;
   char buf[64] ALIGNED(4);
 
   struct usb_hcd_pipe pipe = {
@@ -123,10 +99,9 @@ int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
   };
 
   memset(buf, 0x66, sizeof(buf));
-  err = usb_hcd_submit_interrupt(&pipe, buf, 7, 1000, &num_bytes, &nak);
+  err = usb_hcd_submit_interrupt(&pipe, buf, 7, 1000, &num_bytes);
   CHECK_ERR("a");
-  if (!nak)
-   hexdump_memory(buf, 8);
+  hexdump_memory(buf, 8);
 out_err:
   return err;
 }
@@ -155,10 +130,6 @@ int usb_hid_enumerate(struct usb_hcd_device *dev)
     }
     hid_index++;
   }
-  while(1) {
-    err = usb_hid_mouse_get_report(dev, 2);
-  }
-
 out_err:
   return err;
 }

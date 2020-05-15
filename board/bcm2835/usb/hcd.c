@@ -18,9 +18,11 @@
 #include <stringlib.h>
 #include "root_hub.h"
 #include <drivers/usb/usb_dev_rq.h>
+#include <drivers/usb/usb_mass_storage.h>
 #include "dwc2_reg_access.h"
 #include "dwc2_log.h"
 #include <mem_access.h>
+
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -286,13 +288,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         hdr->length);
     switch(hdr->descriptor_type) {
       case USB_DESCRIPTOR_TYPE_INTERFACE:
-        if (!i) {
-          i = dev->interfaces;
-        }
-        else {
-          i++;
-          dev->num_interfaces++;
-        }
+        i = &dev->interfaces[dev->num_interfaces++];
         if (i >= end_i) {
           /* VULNURABILITY idea */
           HCDERR("inteface count reached limit %d", end_i - dev->interfaces);
@@ -406,6 +402,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
         desc->max_packet_size_0);
 }
    
+
 /*
  * At this point device's port has been:
  * - signalled by us to reset via SET_FEATURE FEATURE_RESET
@@ -618,6 +615,9 @@ int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
       HCDLOG("Enumerate HID");
       err = usb_hid_enumerate(dev);
       CHECK_ERR_SILENT();
+  } else if (usb_hcd_get_interface_class(dev, 0) == USB_INTERFACE_CLASS_MASSSTORAGE) {
+      usb_mass_storage_init(dev);
+      while(1);
   }
 out_err:
   HCDDEBUG("=============================================================");
@@ -645,14 +645,14 @@ void usb_hcd_reset()
 static int bcm2835_usb_recieve_fifo_flush()
 {
   uint32_t rst;
-  printf("bcm2835_usb_recieve_fifo_flush: started\r\n");
+  HCDDEBUG("bcm2835_usb_recieve_fifo_flush: started\r\n");
   rst = read_reg(USB_GRSTCTL);
   USB_GRSTCTL_CLR_SET_RXF_FLSH(rst, 1);
   write_reg(USB_GRSTCTL, rst);
   do { 
     rst = read_reg(USB_GRSTCTL);
   } while(USB_GRSTCTL_GET_RXF_FLSH(rst));
-  printf("bcm2835_usb_recieve_fifo_flush: completed\r\n");
+  HCDDEBUG("bcm2835_usb_recieve_fifo_flush: completed\r\n");
   return ERR_OK;
 }
 
@@ -1018,7 +1018,7 @@ static int usb_hcd_device_to_string_r(struct usb_hcd_device *dev, const char *pr
   int n = 0;
   struct usb_hcd_device_class_hub *hub;
 
-  n = prefix_padding_to_string(prefix, depth, buf, bufsz);
+  n = prefix_padding_to_string(prefix, ' ', depth, 1, buf, bufsz);
   n += snprintf(buf + n, bufsz - n, "USB device:");
   n += usb_hcd_device_path_to_string(dev, buf + n, bufsz - n);
 

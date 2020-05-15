@@ -149,7 +149,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   }
 }
 
-int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes, int *out_nak) 
+int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
 {
   int err = ERR_OK;
   int i, j; 
@@ -166,9 +166,6 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
   uint64_t dma_dst;
 
   dwc2_transfer_prologue(pipe, buf, bufsz, pid);
-
-  if (out_nak)
-    *out_nak = 0;
 
   ch = pipe.u.dwc_channel = 6;
 
@@ -232,14 +229,6 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       GET_INTR();
     } while(!USB_HOST_INTR_GET_HALT(intr));
 
-    if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
-        pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
-      if (out_nak)
-        *out_nak = 1;
-      // DWCERR("NAK");
-      goto out_err;
-    }
-
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
       DWCDEBUG("SPLT ENA: %08x", splt);
@@ -261,12 +250,18 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       DWCDEBUG("SPLT ENA: %08x", splt);
     }
 
-    if (USB_HOST_INTR_GET_NAK(intr) && pipe.u.ep_direction == USB_DIRECTION_IN &&
-        pipe.u.ep_type == USB_ENDPOINT_TYPE_INTERRUPT) {
-      if (out_nak)
-        *out_nak = 1;
-      // DWCERR("NAK2");
-      goto out_err;
+    if (USB_HOST_INTR_GET_NAK(intr)) {
+      /* 
+       * Here interrupt should have HALT and NAK set.
+       * We do not need to check anything else here, just
+       * go and retry once again.
+       * This way of ignoring the NAKs is for mouse interrupts.
+       * Maybe it's wrong to do so and I should add some timeout or
+       * immediately return NAK to the caller for him to do the logic
+       */
+      DWCDEBUG("NAK. retrying");
+      i = 0;
+      continue;
     }
 
     if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
@@ -277,10 +272,6 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       }
       if (USB_HOST_INTR_GET_STALL(intr)) {
         DWCWARN("STALL");
-      }
-      if (USB_HOST_INTR_GET_NAK(intr)) {
-        DWCERR("NAK. retrying");
-        continue;
       }
       if (USB_HOST_INTR_GET_NYET(intr)) {
         DWCWARN("NYET. retrying.");

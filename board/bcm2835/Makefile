@@ -5,6 +5,7 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/hcd \
 	usb/hid_parser \
 	usb/hcd_submit \
+	usb/hcd_mass_storage \
 	usb/hcd_hid \
 	usb/hcd_hub \
 	usb/root_hub \

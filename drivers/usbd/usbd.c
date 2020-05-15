@@ -27,7 +27,8 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
   int i;
   struct usb_hcd_device *child;
   char padding[128];
-  prefix_padding_to_string("-", depth, padding, sizeof(padding)); 
+  char *subpadding = "  ";
+  prefix_padding_to_string(" ", ' ', depth, 2, padding, sizeof(padding)); 
 
   printf("%sport:%02d: USB device: addr=%02d id=%04x:%04x class=%s(%d)" __endline,
     padding,
@@ -38,15 +39,26 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
     d->class ? usb_hcd_device_class_to_string(d->class->device_class) : "NONE",
     d->class ? d->class->device_class : 0);
 
-  printf("%smanufacturer: '%s', product: '%s', serial: '%s'" __endline,
+  printf("%s%smanufacturer: '%s', product: '%s', serial: '%s'" __endline,
     padding,
+    subpadding,
     d->string_manufacturer, d->string_product, d->string_serial);
 
+  for (i = 0; i < d->num_interfaces; ++i) {
+    struct usb_hcd_interface *iface = &d->interfaces[i];
+    const char *class_string = usb_full_class_to_string(
+      iface->descriptor.class,
+      iface->descriptor.subclass,
+      iface->descriptor.protocol);
+    printf("%s%sinterface:%s" __endline, padding, subpadding, class_string);
+  }
   if (d->class) {
     switch(d->class->device_class) {
       case USB_HCD_DEVICE_CLASS_HUB:
         h = usb_hcd_device_to_hub(d);
-        printf("%snum_ports=%d" __endline, padding, h->descriptor.port_count);
+        printf("%s%snum_ports=%d" __endline, padding, 
+          subpadding,
+          h->descriptor.port_count);
         for (i = 0; i < h->descriptor.port_count; ++i) {
           list_for_each_entry(child, &h->children, hub_children) {
             if (child->location.hub_port == i)
@@ -54,11 +66,10 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
           }
         }
       default:
-        puts(__endline);
         break;
     }
-  } else
-    puts(__endline);
+  }
+  puts(__endline);
 }
 
 void usbd_print_device_tree()

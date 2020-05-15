@@ -112,6 +112,13 @@ struct usb_hcd_device {
   char string_configuration[64];
 };
 
+static inline int usb_hcd_get_interface_class(struct usb_hcd_device *d, int interface_num)
+{
+  if (interface_num >= d->num_interfaces)
+    return -1;
+  return d->interfaces[interface_num].descriptor.class;
+}
+
 struct usb_hcd_device *usb_hcd_allocate_device();
 
 void usb_hcd_deallocate_device(struct usb_hcd_device *d);
@@ -167,8 +174,7 @@ int usb_hcd_submit_interrupt(
   void *buf,
   int buf_sz,
   int timeout,
-  int *out_num_bytes,
-  int *out_nak);
+  int *out_num_bytes);
 
 int usb_hcd_init();
 int usb_hcd_start();
