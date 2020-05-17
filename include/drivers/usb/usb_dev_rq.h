@@ -8,6 +8,36 @@
 
 #define __PUTBITS64(__val, __mask, __shift) (((uint64_t)__val & __mask) << __shift)
 
+struct usb_device_request {
+  union {
+    struct {
+      uint8_t request_type;
+      uint8_t request;
+      uint16_t index;
+      uint16_t length;
+    };
+    uint64_t raw;
+  };
+} PACKED;
+
+
+#define USB_DEVICE_REQUEST_TYPE_HOST2DEV 0
+#define USB_DEVICE_REQUEST_TYPE_DEV2HOST 1
+
+#define USB_DEVICE_REQUEST_TYPE_STANDARD 0
+#define USB_DEVICE_REQUEST_TYPE_CLASS    1
+#define USB_DEVICE_REQUEST_TYPE_VENDOR   2
+
+#define USB_DEVICE_REQUEST_TYPE_DEVICE    0
+#define USB_DEVICE_REQUEST_TYPE_INTERFACE 1
+#define USB_DEVICE_REQUEST_TYPE_ENDPOINT  2
+#define USB_DEVICE_REQUEST_TYPE_OTHER     3
+
+#define USB_DEVICE_REQUEST_TYPE(__dir, __type, __recipient)\
+  (char)( ((USB_DEVICE_REQUEST_TYPE_ ## __dir & 1) << 7)\
+  | ((USB_DEVICE_REQUEST_TYPE_ ## __type & 3) << 5)\
+  | ((USB_DEVICE_REQUEST_TYPE_ ## __recipient & 0xf)))
+
 #define USB_DEV_RQ_MAKE(__type, __rq, __val, __idx, __len)\
   ( __PUTBITS64(USB_RQ_TYPE_ ## __type, 0xff  ,  0)\
    |__PUTBITS64(USB_RQ_      ## __rq  , 0xffff,  8)\

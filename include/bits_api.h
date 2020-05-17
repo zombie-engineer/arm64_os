@@ -9,6 +9,7 @@
 #define BITWIZE_OR(a, b) (a | b)
 
 #define BT(bitpos) (1<<(bitpos))
+#define BT_V(bitpos, bitval) ((bitval&1)<<(bitpos))
 
 #define BIT_IS_SET(val, bitpos) (val & BT(bitpos))
 
@@ -17,6 +18,8 @@
 #define BIT_CLEAR_U32(val, bitpos) val &= ~BT(bitpos)
 
 #define BIT_SET_U32(val, bitpos) val |= BT(bitpos)
+
+#define BIT_SET_V_8(val, bitpos, bitval) val |= BT_V(bitpos, bitval)
 
 #define BF_SHIFT(val, offset) ((val)<<offset)
 
