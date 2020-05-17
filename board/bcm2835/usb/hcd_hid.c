@@ -99,7 +99,7 @@ int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
   };
 
   memset(buf, 0x66, sizeof(buf));
-  err = usb_hcd_submit_interrupt(&pipe, buf, 7, 1000, &num_bytes);
+  err = hcd_transfer_interrupt(&pipe, buf, 7, 1000, &num_bytes);
   CHECK_ERR("a");
   hexdump_memory(buf, 8);
 out_err:

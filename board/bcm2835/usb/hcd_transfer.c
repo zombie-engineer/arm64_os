@@ -84,7 +84,7 @@ out_err:
   return ERR_OK;
 }
 
-int usb_hcd_submit_interrupt(
+int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,
   void *buf,
   int buf_sz,
