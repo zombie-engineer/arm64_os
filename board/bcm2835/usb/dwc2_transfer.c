@@ -10,6 +10,7 @@
 #include <usb/usb.h>
 #include <usb/usb_printers.h>
 #include <error.h>
+#include <delays.h>
 
 static int dwc2_print_debug = 0;
 
@@ -152,8 +153,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
 int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
 {
   int err = ERR_OK;
-  int i, j; 
-  int offset = 0;
+  int i; 
   int ch = pipe.u.dwc_channel;
 
   /*

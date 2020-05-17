@@ -86,7 +86,7 @@ static ALIGNED(4) struct root_hub_configuration usb_root_hub_configuration = {
 			.descriptor_type = USB_DESCRIPTOR_TYPE_ENDPOINT,
 		},
 		.endpoint_address = USB_EP_MAKE_ADDR(1, IN),
-		.attributes = USB_EP_MAKE_ATTR(INTERRUPT, IGNORE, IGNORE),
+		.attributes = USB_EP_MAKE_ATTR(INTERRUPT, NONE, IGNORE),
 		.max_packet_size = 64,
 		.interval = 0xff,
 	},
