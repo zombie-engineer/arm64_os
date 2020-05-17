@@ -2,7 +2,6 @@
 #include <compiler.h>
 #include <types.h>
 
-
 typedef struct dwc2_pipe_desc {
   union {
     struct {

@@ -12,7 +12,7 @@
 #include <error.h>
 #include <delays.h>
 
-static int dwc2_print_debug = 0;
+int dwc2_print_debug = 0;
 
 static inline int dwc2_char_reg_to_string(int ch, char *buf, int bufsz)
 {

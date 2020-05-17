@@ -38,14 +38,26 @@ static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd,
 int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
 {
   int err;
+  int num_bytes;
   const char SCSI_CMD_LENGTH = 6;
-  char cswbuf[sizeof(struct cbw) + SCSI_CMD_LENGTH] ALIGNED(4);
+  char cbwbuf[sizeof(struct cbw) + SCSI_CMD_LENGTH] ALIGNED(4);
+  char cswbuf[36] ALIGNED(4);
   struct scsi_response_inquiry response ALIGNED(4);
-  struct cbw *c = (struct cbw*) cswbuf;
-  struct scsi_op_inquiry *op = (struct scsi_op_inquiry *)(cswbuf + sizeof(*c));
+  struct csw status ALIGNED(4);
+  struct cbw *c = (struct cbw*) cbwbuf;
+  struct scsi_op_inquiry *op = (struct scsi_op_inquiry *)(cbwbuf + sizeof(*c));
+  struct usb_hcd_pipe p ALIGNED(4) = {
+    .address = dev->pipe0.address,
+    .endpoint = 2,
+    .speed = dev->pipe0.speed,
+    .max_packet_size = 512,
+    .ls_hub_port = dev->pipe0.ls_hub_port,
+    .ls_hub_address = dev->pipe0.ls_hub_address
+  };
 
-  memset(cswbuf, 0, sizeof(cswbuf));
+  memset(cbwbuf   , 0, sizeof(cbwbuf));
   memset(&response, 0, sizeof(response));
+  memset(&status  , 0, sizeof(status));
 
   c->cbw_signature   = CBW_SIGNATURE;
   c->cbw_tag         = 1;
@@ -55,8 +67,17 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
   c->cbw_length      = SCSI_CMD_LENGTH;
 
   scsi_fill_cmd_inquiry(op, 0, 0, sizeof(response));
-  // err = hcd_transfer_bulk();
+
+extern int dwc2_print_debug;
+  dwc2_print_debug = 2;
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), &num_bytes);
+  CHECK_ERR("failed to send CBW");
+  p.endpoint = 1;
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), &num_bytes);
+  hexdump_memory(&status, sizeof(status));
+  CHECK_ERR("failed to send CBW");
 out_err:
+  while(1);
   return err;
 }
 
@@ -133,7 +154,10 @@ void usb_mass_storage_init(struct usb_hcd_device* dev)
   CHECK_ERR("failed to reset mass storage device");
 
   err = usb_mass_get_max_lun(dev, &max_lun);
-  //err = usb_mass_
+  CHECK_ERR("failed to get max lun");
+  err = usb_mass_inquiry(dev, 0);
+  CHECK_ERR("failed to send INQUIRY request");
 out_err:
+  while(1);
   return err;
 }
