@@ -160,7 +160,7 @@ int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, 
   CHECK_ERR("failed to get descriptor "#__desc_type);\
   __CHECK_DESC_TYPE(__dst, __desc_type);
 
-int usb_hcd_submit_cm(
+int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
   void *buf,

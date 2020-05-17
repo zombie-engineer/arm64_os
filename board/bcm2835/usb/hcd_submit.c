@@ -4,7 +4,7 @@
 #include "dwc2.h"
 #include "dwc2_regs.h"
 
-static inline void usb_hcd_submit_cm_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
+static inline void hcd_transmit_control_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
 {
   char rq_desc[256];
   if (usb_hcd_print_debug) {
@@ -13,7 +13,7 @@ static inline void usb_hcd_submit_cm_prologue(struct usb_hcd_pipe *pipe, uint64_
   }
 }
 
-int usb_hcd_submit_cm(
+int hcd_transmit_control(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
   void *buf,
@@ -40,7 +40,7 @@ int usb_hcd_submit_cm(
     }
   };
 
-  usb_hcd_submit_cm_prologue(pipe, rq);
+  hcd_transmit_control_prologue(pipe, rq);
 
   if (pipe->address == usb_root_hub_device_number) {
     err = usb_root_hub_process_req(rq, buf, buf_sz, &num_bytes);
