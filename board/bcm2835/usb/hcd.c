@@ -164,7 +164,7 @@ int usb_hcd_get_descriptor(
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
 
 
-  err = hcd_transmit_control(p, &pctl, 
+  err = hcd_transfer_control(p, &pctl, 
       &header, sizeof(header), rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
@@ -188,7 +188,7 @@ int usb_hcd_get_descriptor(
     rq = USB_DEV_HID_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
   else
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
-  err = hcd_transmit_control(p, &pctl, 
+  err = hcd_transfer_control(p, &pctl, 
       buf, header.length, rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
   if (err)
     HCDERR("failed to read descriptor header");
@@ -363,7 +363,7 @@ static int usb_hcd_set_configuration(struct usb_hcd_pipe *pipe, uint8_t channel,
 	};
 
   uint64_t rq = USB_DEV_RQ_MAKE(SET_CONFIGURATION, SET_CONFIGURATION, configuration, 0, 0);
-  err = hcd_transmit_control(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  err = hcd_transfer_control(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
   CHECK_ERR("failed to set configuration");
 
 out_err:
@@ -434,7 +434,7 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
       to_transfer_size);
-  err = hcd_transmit_control(&dev->pipe0, pctl, 
+  err = hcd_transfer_control(&dev->pipe0, pctl, 
       &desc, to_transfer_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
   CHECK_ERR_SILENT();
 
@@ -469,7 +469,7 @@ static int usb_hcd_set_address(struct usb_hcd_pipe *p, uint8_t channel, int addr
 	pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
   pctl.direction     = USB_DIRECTION_OUT;
 
-  err = hcd_transmit_control(p, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  err = hcd_transfer_control(p, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
   CHECK_ERR("failed to set address");
 out_err:
   return err;
@@ -547,7 +547,7 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hc
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, 0, config_desc.total_length);
 
-  err = hcd_transmit_control(&dev->pipe0, pctl, config_buffer,
+  err = hcd_transfer_control(&dev->pipe0, pctl, config_buffer,
       config_desc.total_length, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
   CHECK_ERR("failed to get full configuration %d with total_length = %d", 
       config_num, config_desc.total_length);

@@ -54,7 +54,7 @@ int usb_hid_get_desc(struct usb_hcd_device *dev, int hid_index, void *buf, int b
   rq = USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR, USB_DESCRIPTOR_TYPE_HID_REPORT << 8, hid_index, bufsz);
   memset(buf, 0xff, sizeof(buf));
 
-  err = hcd_transmit_control(&dev->pipe0, &pctl, 
+  err = hcd_transfer_control(&dev->pipe0, &pctl, 
       buf, bufsz, rq, 1000, &num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
@@ -77,7 +77,7 @@ int usb_hid_set_idle(struct usb_hcd_device *dev, int idx)
   pctl.direction = USB_DIRECTION_OUT;
 
   rq = USB_DEV_RQ_MAKE(CLASS_SET_INTERFACE, HID_SET_IDLE, 0, 0, 0);
-  err = hcd_transmit_control(&dev->pipe0, &pctl, 0, 0, rq, 1000, &num_bytes);
+  err = hcd_transfer_control(&dev->pipe0, &pctl, 0, 0, rq, 1000, &num_bytes);
   CHECK_ERR("failed to set idle");
 out_err:
   return err;

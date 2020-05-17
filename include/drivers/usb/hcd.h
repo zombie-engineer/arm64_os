@@ -176,5 +176,13 @@ int hcd_transfer_interrupt(
   int timeout,
   int *out_num_bytes);
 
+int hcd_transfer_bulk(
+  struct usb_hcd_pipe *pipe,
+  int direction,
+  void *buf,
+  int buf_sz,
+  int *out_num_bytes);
+
 int usb_hcd_init();
+
 int usb_hcd_start();

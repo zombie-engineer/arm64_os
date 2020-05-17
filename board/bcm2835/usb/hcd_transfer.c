@@ -4,7 +4,7 @@
 #include "dwc2.h"
 #include "dwc2_regs.h"
 
-static inline void hcd_transmit_control_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
+static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
 {
   char rq_desc[256];
   if (usb_hcd_print_debug) {
@@ -13,7 +13,7 @@ static inline void hcd_transmit_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
-int hcd_transmit_control(
+int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
   void *buf,
@@ -40,7 +40,7 @@ int hcd_transmit_control(
     }
   };
 
-  hcd_transmit_control_prologue(pipe, rq);
+  hcd_transfer_control_prologue(pipe, rq);
 
   if (pipe->address == usb_root_hub_device_number) {
     err = usb_root_hub_process_req(rq, buf, buf_sz, &num_bytes);
@@ -99,6 +99,34 @@ int hcd_transfer_interrupt(
       .ep_address      = pipe->endpoint,
       .ep_type         = USB_ENDPOINT_TYPE_INTERRUPT,
       .ep_direction    = USB_DIRECTION_IN,
+      .speed           = pipe->speed,
+      .max_packet_size = pipe->max_packet_size,
+      .dwc_channel     = 0,
+      .hub_address     = pipe->ls_hub_address,
+      .hub_port        = pipe->ls_hub_port
+    }
+  };
+  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes);
+  CHECK_ERR("a");
+out_err:
+  return err;
+}
+
+int hcd_transfer_bulk(
+  struct usb_hcd_pipe *pipe,
+  int direction,
+  void *buf,
+  int buf_sz,
+  int *out_num_bytes)
+{
+  int err;
+
+  dwc2_pipe_desc_t pipedesc = {
+    .u = { 
+      .device_address  = pipe->address,
+      .ep_address      = pipe->endpoint,
+      .ep_type         = USB_ENDPOINT_TYPE_BULK,
+      .ep_direction    = direction,
       .speed           = pipe->speed,
       .max_packet_size = pipe->max_packet_size,
       .dwc_channel     = 0,
