@@ -617,7 +617,7 @@ int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
       CHECK_ERR_SILENT();
   } else if (usb_hcd_get_interface_class(dev, 0) == USB_INTERFACE_CLASS_MASSSTORAGE) {
       usb_mass_storage_init(dev);
-      while(1);
+      // while(1);
   }
 out_err:
   HCDDEBUG("=============================================================");

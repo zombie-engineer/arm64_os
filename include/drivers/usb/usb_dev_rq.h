@@ -13,6 +13,7 @@ struct usb_device_request {
     struct {
       uint8_t request_type;
       uint8_t request;
+      uint16_t value;
       uint16_t index;
       uint16_t length;
     };

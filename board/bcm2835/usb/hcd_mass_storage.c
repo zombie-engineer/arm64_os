@@ -68,8 +68,6 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
 
   scsi_fill_cmd_inquiry(op, 0, 0, sizeof(response));
 
-extern int dwc2_print_debug;
-  dwc2_print_debug = 2;
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), &num_bytes);
   CHECK_ERR("failed to send CBW");
   p.endpoint = 1;
@@ -89,9 +87,16 @@ int usb_mass_get_max_lun(struct usb_hcd_device *dev, int *out_max_lun)
   struct usb_device_request rq = { 
     .request_type = USB_DEVICE_REQUEST_TYPE(DEV2HOST, CLASS, INTERFACE),
     .request      = MASS_REQUEST_GET_MAX_LUN,
+    .value        = 0,
     .index        = 0,
     .length       = 1,
   };
+
+  rq.request_type = 0xa1;
+  rq.request = 0xfe;
+  rq.value = 0;
+  rq.index = 0;
+  rq.length = 1;
   char max_lun ALIGNED(4);
 
   MASSLOG("usb_mass_get_max_lun: %016x", rq.raw);
@@ -125,9 +130,15 @@ int usb_mass_reset(struct usb_hcd_device *dev)
   struct usb_device_request rq = { 
     .request_type = USB_DEVICE_REQUEST_TYPE(HOST2DEV, CLASS, INTERFACE),
     .request      = MASS_REQUEST_RESET,
+    .value        = 0,
     .index        = 0,
     .length       = 0,
   };
+  rq.request_type = 0b00100001;
+  rq.request = 0xff;
+  rq.value = 0;
+  rq.index = 0;
+  rq.length = 0;
 
   MASSLOG("usb_mass_reset: %016x", rq.raw);
 
@@ -149,10 +160,17 @@ void usb_mass_storage_init(struct usb_hcd_device* dev)
 {
   int err;
   int max_lun = 0;
+extern int dwc2_print_debug;
+  dwc2_print_debug = 2;
   MASSLOG("usb_mass_storage_init");
   err = usb_mass_reset(dev);
   CHECK_ERR("failed to reset mass storage device");
 
+  err = usb_mass_get_max_lun(dev, &max_lun);
+  CHECK_ERR("failed to get max lun");
+  return ERR_OK;
+  err = usb_mass_reset(dev);
+  CHECK_ERR("failed to reset mass storage device");
   err = usb_mass_get_max_lun(dev, &max_lun);
   CHECK_ERR("failed to get max lun");
   err = usb_mass_inquiry(dev, 0);

@@ -150,6 +150,64 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   }
 }
 
+static inline int dwc2_wait_halted(int ch, int *pid_toggle)
+{
+  int intr;
+  int timeout = 1;
+  while(1) {
+    GET_INTR();
+    if (USB_HOST_INTR_GET_HALT(intr)) {
+      timeout = 0;
+      break;
+    }
+    wait_usec(100);
+  }
+
+  if (timeout)
+    return ERR_TIMEOUT;
+
+  if (USB_HOST_INTR_GET_XFER_COMPLETE(intr))
+    return ERR_OK;
+
+  // if (USB_HOST_INTR_GET_ACK(intr))
+  //   return ERR_OK;
+  
+  if (USB_HOST_INTR_GET_NAK(intr))
+    return ERR_RETRY;
+
+  if (USB_HOST_INTR_GET_NYET(intr))
+    DWCWARN("NYET");
+
+  if (USB_HOST_INTR_GET_STALL(intr))
+    DWCWARN("STALL");
+
+  if (USB_HOST_INTR_GET_AHB_ERR(intr))
+    DWCERR("AHB_ERR");
+
+  if (USB_HOST_INTR_GET_TRNSERR(intr))
+    DWCERR("TRANSFER_ERR.");
+
+  if (USB_HOST_INTR_GET_BABBLERR(intr))
+    DWCERR("BABBLE_ERR");
+
+  if (USB_HOST_INTR_GET_FRMOVRN(intr))
+    DWCERR("FRAME_OVERRUN");
+
+  if (USB_HOST_INTR_GET_DATTGGLERR(intr))
+    DWCERR("DATA_TOGGLE_ERR");
+
+  if (USB_HOST_INTR_GET_BUFNOTAVAIL(intr))
+    DWCERR("BUF_NOT_AVAIL");
+
+  if (USB_HOST_INTR_GET_EXCESSXMIT(intr))
+    DWCERR("EXCESS_XMIT_ERR");
+
+  if (USB_HOST_INTR_GET_FRMLISTROLL(intr))
+    DWCERR("FRM_LIST_ROLL");
+
+  return ERR_GENERIC;
+}
+
 int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
 {
   int err = ERR_OK;
@@ -164,6 +222,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   uint32_t chr, splt, intr, siz, dma;
   uint64_t dma_dst;
+  int *pid_toggle = 0;
 
   dwc2_transfer_prologue(pipe, buf, bufsz, pid);
 
@@ -204,7 +263,7 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   dma_dst = (uint64_t)buf;
   for (i = 0; i < max_retries; ++i) {
-    DWCDEBUG2("transfer: try:%d", i);
+    DWCDEBUG2("transfer: iteration:%d", i);
     if (dma_dst & 3)
       kernel_panic("UNALIGNED DMA address");
 
@@ -224,10 +283,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
 
-    do {
-      wait_usec(100);
-      GET_INTR();
-    } while(!USB_HOST_INTR_GET_HALT(intr));
+    err = dwc2_wait_halted(ch, pid_toggle);
+    if (err)
+      goto out_err;
 
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
@@ -240,105 +298,36 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
       USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
       SET_CHAR();
-      do {
-        wait_usec(100);
-        GET_INTR();
-        DWCDEBUG("INTR: %08x", intr);
-      } while(!USB_HOST_INTR_GET_HALT(intr));
+      err = dwc2_wait_halted(ch, pid_toggle);
+      if (err)
+        goto out_err;
 
       GET_SPLT();
       DWCDEBUG("SPLT ENA: %08x", splt);
     }
 
-    if (USB_HOST_INTR_GET_NAK(intr)) {
-      /* 
-       * Here interrupt should have HALT and NAK set.
-       * We do not need to check anything else here, just
-       * go and retry once again.
-       * This way of ignoring the NAKs is for mouse interrupts.
-       * Maybe it's wrong to do so and I should add some timeout or
-       * immediately return NAK to the caller for him to do the logic
-       */
-      DWCDEBUG("NAK. retrying");
-      i = 0;
-      continue;
-    }
+    GET_INTR();
+    if (USB_HOST_INTR_GET_ACK(intr)) {
+      GET_SIZ();
+      if (dwc2_print_debug > 1)
+        hexdump_memory(buf, bufsz);
 
-    if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
-      if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
-        DWCERR("AHB error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_STALL(intr)) {
-        DWCWARN("STALL");
-      }
-      if (USB_HOST_INTR_GET_NYET(intr)) {
-        DWCWARN("NYET. retrying.");
+      DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
+        siz,
+        USB_HOST_SIZE_GET_PACKET_COUNT(siz),
+        USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
+
+      if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+        dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+        /* 
+         * packet was successfully retrieved, so we reset number of 
+         * retries before failure
+         */
+        i = 0;
         continue;
       }
-      if (USB_HOST_INTR_GET_TRNSERR(intr)) {
-        DWCERR("transfer error.");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_BABBLERR(intr)) {
-        DWCERR("BABBLE error.");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_FRMOVRN(intr)) {
-        DWCERR("frame overrun");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_DATTGGLERR(intr)) {
-        DWCERR("data toggle error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_DATTGGLERR(intr)) {
-        DWCERR("data toggle error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_BUFNOTAVAIL(intr)) {
-        DWCERR("buffer not available error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_EXCESSXMIT(intr)) {
-        DWCERR("excess transmit error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_FRMLISTROLL(intr)) {
-        DWCERR("frame list roll error");
-        err = ERR_GENERIC;
-        goto out_err;
-      }
-      if (USB_HOST_INTR_GET_ACK(intr)) {
-        GET_SIZ();
-        if (dwc2_print_debug > 1)
-          hexdump_memory(buf, bufsz);
-
-        DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
-          siz,
-          USB_HOST_SIZE_GET_PACKET_COUNT(siz),
-          USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
-
-        if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-          dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-          /* 
-           * packet was successfully retrieved, so we reset number of 
-           * retries before failure
-           */
-          i = 0;
-          continue;
-        }
-        err = ERR_OK;
-        goto out_err;
-      }
+      err = ERR_OK;
+      goto out_err;
     }
 
     GET_SPLT();
