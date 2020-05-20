@@ -49,7 +49,7 @@ struct scsi_response_inquiry {
   uint8_t cmdque                 : 1;
   uint8_t obsolete4              : 6;
 
-  char    t10_vendor_id[8]       ;   // +8
+  char    vendor_id[8]           ;   // +8
   char    product_id[16]         ;   // +16
   char    product_revision_lvl[4];   // +32
   char    drive_serial_number[8] ;   // +36
@@ -60,6 +60,15 @@ struct scsi_response_inquiry {
   char    reserved[22]           ;   // +74
   char    copyright_notice[0]    ;   // +96
 } PACKED;
+
+static inline void scsi_inquiry_data_to_string(char *buf, int bufsz, struct scsi_response_inquiry *data)
+{
+  snprintf(buf, bufsz, "version: %d, data_format: %d, vendor: %s, product: %s\n", 
+    data->version, 
+    data->response_data_format,
+    data->vendor_id,
+    data->product_id);
+}
 
 static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd, 
   int page_code, int allocation_length)
@@ -72,13 +81,21 @@ static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd,
   op->control = 0;
 }
 
+static inline void csw_print(struct csw *s)
+{
+  printf("CSW: %08x:%08x:data_residue:%d,status:%d" __endline,
+    s->csw_signature,
+    s->csw_tag,
+    s->csw_data_residue,
+    s->csw_status);
+}
+
 int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
 {
   int err;
   int num_bytes;
   const char SCSI_CMD_LENGTH = 6;
   char cbwbuf[31] ALIGNED(4);
-  char cswbuf[36] ALIGNED(4);
   char buf[128] ALIGNED(4);
   struct scsi_response_inquiry response ALIGNED(4);
   struct csw status ALIGNED(4);
@@ -116,11 +133,17 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
   CHECK_ERR("failed to send CBW");
   p.endpoint = 1;
-  memset(buf, 0x66, sizeof(buf));
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, sizeof(buf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
-  hexdump_memory(buf, sizeof(buf));
-  hexdump_memory(&status, sizeof(status));
-  CHECK_ERR("failed to send CBW");
+  CHECK_ERR("failed to recieve CBW");
+  {
+    char description[256];
+    scsi_inquiry_data_to_string(
+      description, sizeof(description), 
+      (struct scsi_response_inquiry *)buf);
+    printf("%s\r\n", description);
+  }
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), USB_HCTSIZ0_PID_DATA1, &num_bytes);
+  csw_print(&status);
 out_err:
   while(1);
   return err;

@@ -285,6 +285,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
     USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
+    wait_usec(100);
 
     status = dwc2_wait_halted(ch, pid_toggle);
     if (status)
@@ -301,6 +302,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
       USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
       SET_CHAR();
+      wait_usec(100);
       status = dwc2_wait_halted(ch, pid_toggle);
       if (status)
         goto out;
