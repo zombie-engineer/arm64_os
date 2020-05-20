@@ -13,18 +13,43 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
+int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, const void *buf, int bufsz, int pid, const char *debug_desc, int *out_num_bytes)
+{
+  int err = ERR_OK;
+  int num_bytes;
+  dwc2_transfer_status_t status;
+  while(1) {
+    status = dwc2_transfer(pipedesc, buf, bufsz, pid, &num_bytes);
+    if (status == DWC2_STATUS_ACK)
+      break;
+    if (status == DWC2_STATUS_NAK)
+      continue;
+    if (status == DWC2_STATUS_NYET)
+      continue;
+    err = ERR_GENERIC; 
+    break;
+  }
+  CHECK_ERR("dwc2_transfer failed");
+
+  HCDDEBUG("%s:%s sent %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), debug_desc, num_bytes, bufsz);
+out_err:
+  if (out_num_bytes)
+    *out_num_bytes = bufsz;
+  return err;
+}
+
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
   void *buf,
-  int buf_sz,
+  int bufsz,
   uint64_t rq,
   int timeout,
   int *out_num_bytes)
 {
   int err;
   int num_bytes = 0;
-  int num_bytes_last = 0;
+  uint64_t rqbuf ALIGNED(4) = rq;
 
   dwc2_pipe_desc_t pipedesc = {
     .u = { 
@@ -43,25 +68,23 @@ int hcd_transfer_control(
   hcd_transfer_control_prologue(pipe, rq);
 
   if (pipe->address == usb_root_hub_device_number) {
-    err = usb_root_hub_process_req(rq, buf, buf_sz, &num_bytes);
+    err = usb_root_hub_process_req(rq, buf, bufsz, &num_bytes);
     goto out_err;
   }
 
   /*
    * Send SETUP packet
    */
-  err = dwc2_transfer(pipedesc, &rq, sizeof(rq), USB_HCTSIZ0_PID_SETUP, NULL);
+  err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), USB_HCTSIZ0_PID_SETUP, "SETUP", NULL);
   CHECK_ERR_SILENT();
-  HCDDEBUG("%s:SETUP sent %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), sizeof(rq), sizeof(rq));
 
   /*
    * Transmit DATA packet
    */
   if (buf) {
     pipedesc.u.ep_direction = pctl->direction;
-    err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA1, &num_bytes);
+    err = __hcd_dwc2_transfer(pipedesc, buf, bufsz, USB_HCTSIZ0_PID_DATA1, "DATA", &num_bytes);
     CHECK_ERR_SILENT();
-    HCDDEBUG("%s:DATA transferred %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), num_bytes, buf_sz); 
   }
 
   /*
@@ -72,9 +95,8 @@ int hcd_transfer_control(
   else
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
 
-  err = dwc2_transfer(pipedesc, 0, 0, USB_HCTSIZ0_PID_DATA1, &num_bytes_last);
+  err = __hcd_dwc2_transfer(pipedesc, 0, 0, USB_HCTSIZ0_PID_DATA1, "ACK", NULL);
   CHECK_ERR_SILENT();
-  HCDDEBUG("%s:ACK", usb_direction_to_string(pctl->direction));
 
 out_err:
   if (out_num_bytes)
@@ -91,6 +113,7 @@ int hcd_transfer_interrupt(
   int timeout,
   int *out_num_bytes)
 {
+  dwc2_transfer_status_t status;
   int err;
 
   dwc2_pipe_desc_t pipedesc = {
@@ -106,7 +129,12 @@ int hcd_transfer_interrupt(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes);
+  status = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes);
+  switch(status) {
+    case DWC2_STATUS_ACK: err = ERR_OK; break;
+    case DWC2_STATUS_NAK: err = ERR_RETRY; break;
+    default: err = ERR_GENERIC; break;
+  }
   CHECK_ERR("a");
 out_err:
   return err;
@@ -117,9 +145,11 @@ int hcd_transfer_bulk(
   int direction,
   void *buf,
   int buf_sz,
+  int pid,
   int *out_num_bytes)
 {
   int err;
+  dwc2_transfer_status_t status;
 
   dwc2_pipe_desc_t pipedesc = {
     .u = { 
@@ -134,7 +164,9 @@ int hcd_transfer_bulk(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  err = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes);
+  status = dwc2_transfer(pipedesc, buf, buf_sz, pid, out_num_bytes);
+  if (status != DWC2_STATUS_ACK)
+    err = ERR_GENERIC;
   CHECK_ERR("a");
 out_err:
   return err;

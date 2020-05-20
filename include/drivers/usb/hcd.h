@@ -181,6 +181,7 @@ int hcd_transfer_bulk(
   int direction,
   void *buf,
   int buf_sz,
+  int pid,
   int *out_num_bytes);
 
 int usb_hcd_init();

@@ -133,7 +133,6 @@ static inline uint32_t dwc2_make_tsize(int length, int low_speed, int pid, int m
   USB_HOST_SIZE_CLR_SET_SIZE(r, length);
   USB_HOST_SIZE_CLR_SET_PACKET_COUNT(r, num_packets);
   USB_HOST_SIZE_CLR_SET_PID(r, pid);
-  // printf("tsize: %08x, num_packets: %d, bytes: %d\r\n", r, num_packets, length);
   return r;
 }
 
@@ -150,7 +149,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   }
 }
 
-static inline int dwc2_wait_halted(int ch, int *pid_toggle)
+static inline dwc2_transfer_status_t dwc2_wait_halted(int ch, int *pid_toggle)
 {
   int intr;
   int timeout = 1;
@@ -164,19 +163,21 @@ static inline int dwc2_wait_halted(int ch, int *pid_toggle)
   }
 
   if (timeout)
-    return ERR_TIMEOUT;
+    return DWC2_STATUS_TIMEOUT;
 
   if (USB_HOST_INTR_GET_XFER_COMPLETE(intr))
-    return ERR_OK;
+    return DWC2_STATUS_ACK;
 
-  // if (USB_HOST_INTR_GET_ACK(intr))
-  //   return ERR_OK;
+  if (USB_HOST_INTR_GET_ACK(intr))
+    return DWC2_STATUS_ACK;
   
   if (USB_HOST_INTR_GET_NAK(intr))
-    return ERR_RETRY;
+    return DWC2_STATUS_NAK;
 
-  if (USB_HOST_INTR_GET_NYET(intr))
+  if (USB_HOST_INTR_GET_NYET(intr)) {
     DWCWARN("NYET");
+    return DWC2_STATUS_NYET;
+  }
 
   if (USB_HOST_INTR_GET_STALL(intr))
     DWCWARN("STALL");
@@ -205,12 +206,13 @@ static inline int dwc2_wait_halted(int ch, int *pid_toggle)
   if (USB_HOST_INTR_GET_FRMLISTROLL(intr))
     DWCERR("FRM_LIST_ROLL");
 
-  return ERR_GENERIC;
+  return DWC2_STATUS_ERR;
 }
 
-int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
+dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
 {
-  int err = ERR_OK;
+  dwc2_transfer_status_t status = DWC2_STATUS_ACK;
+  int err;
   int i; 
   int ch = pipe.u.dwc_channel;
 
@@ -230,10 +232,11 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
 
   if ((uint64_t)buf & 3) {
     DWCERR("dwc2_transfer:buffer not aligned to 4 bytes\r\n");
-    return ERR_ALIGN;
+    return DWC2_STATUS_ERR;
   }
 
   /* Clear all existing interrupts. */
+  GET_INTR();
   CLEAR_INTR();
   CLEAR_INTRMSK();
 
@@ -283,9 +286,9 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
     USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
 
-    err = dwc2_wait_halted(ch, pid_toggle);
-    if (err)
-      goto out_err;
+    status = dwc2_wait_halted(ch, pid_toggle);
+    if (status)
+      goto out;
 
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
@@ -298,48 +301,43 @@ int dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out
       USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
       USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
       SET_CHAR();
-      err = dwc2_wait_halted(ch, pid_toggle);
-      if (err)
-        goto out_err;
+      status = dwc2_wait_halted(ch, pid_toggle);
+      if (status)
+        goto out;
 
       GET_SPLT();
       DWCDEBUG("SPLT ENA: %08x", splt);
     }
 
     GET_INTR();
-    if (USB_HOST_INTR_GET_ACK(intr)) {
-      GET_SIZ();
-      if (dwc2_print_debug > 1)
-        hexdump_memory(buf, bufsz);
+    GET_SIZ();
+    if (dwc2_print_debug > 1)
+      hexdump_memory(buf, bufsz);
 
-      DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
-        siz,
-        USB_HOST_SIZE_GET_PACKET_COUNT(siz),
-        USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
+    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
+      siz,
+      USB_HOST_SIZE_GET_PACKET_COUNT(siz),
+      USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
 
-      if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-        dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-        /* 
-         * packet was successfully retrieved, so we reset number of 
-         * retries before failure
-         */
-        i = 0;
-        continue;
-      }
-      err = ERR_OK;
-      goto out_err;
+    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+      /* 
+       * packet was successfully retrieved, so we reset number of 
+       * retries before failure
+       */
+      i = 0;
+      continue;
     }
-
-    GET_SPLT();
+    break;
   }
-out_err:
+out:
   if (out_num_bytes) {
     GET_SIZ();
     *out_num_bytes = bufsz - USB_HOST_SIZE_GET_SIZE(siz);
   }
   
   DWCDEBUG("=======TRANSFER END=tsz:%08x========================", siz);
-	return err;
+	return status;
 }
 
 static int dwc2_hwcfg_get_num_host_channels()
@@ -355,21 +353,21 @@ int dwc2_init_channels()
   uint32_t channel_char;
   num_channels = dwc2_hwcfg_get_num_host_channels();
   for (i = 0; i < num_channels; ++i) {
-    channel_char = __read_ch_reg(USB_HCCHAR0, i);
+    channel_char = __read_ch_reg(USB_HCCHAR0, i, usb_host_char_to_string);
     USB_HOST_CHAR_CLR_CHAN_ENABLE(channel_char);
     USB_HOST_CHAR_CLR_SET_CHAN_DISABLE(channel_char, 1);
     USB_HOST_CHAR_CLR_SET_EP_DIR(channel_char, USB_DIRECTION_IN);
-    __write_ch_reg(USB_HCCHAR0, i, channel_char);
+    __write_ch_reg(USB_HCCHAR0, i, channel_char, usb_host_char_to_string);
     DWCINFO("channel %d disabled", i);
   }
   for (i = 0; i < num_channels; ++i) {
-    channel_char = __read_ch_reg(USB_HCCHAR0, i);
+    channel_char = __read_ch_reg(USB_HCCHAR0, i, usb_host_char_to_string);
     USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(channel_char, 1);
     USB_HOST_CHAR_CLR_SET_CHAN_DISABLE(channel_char, 1);
     USB_HOST_CHAR_CLR_SET_EP_DIR(channel_char, USB_DIRECTION_IN);
-    __write_ch_reg(USB_HCCHAR0, i, channel_char);
+    __write_ch_reg(USB_HCCHAR0, i, channel_char, usb_host_char_to_string);
     do {
-      channel_char = __read_ch_reg(USB_HCCHAR0, i);
+      channel_char = __read_ch_reg(USB_HCCHAR0, i, usb_host_char_to_string);
     } while(USB_HOST_CHAR_GET_CHAN_ENABLE(channel_char));
   }
   DWCINFO("channel initialization completed");

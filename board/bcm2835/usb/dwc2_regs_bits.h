@@ -1,4 +1,5 @@
 #pragma once
+
 #define USB_HOST_CHAR_GET_MAX_PACK_SZ(v)         BF_EXTRACT(v, 0 , 11)
 #define USB_HOST_CHAR_GET_EP(v)                  BF_EXTRACT(v, 11, 4 )
 #define USB_HOST_CHAR_GET_EP_DIR(v)              BF_EXTRACT(v, 15, 1 )
@@ -29,10 +30,12 @@
 #define USB_HOST_CHAR_CLR_ODD_FRAME(v)           BF_CLEAR(v, 29, 1 )
 #define USB_HOST_CHAR_CLR_CHAN_DISABLE(v)        BF_CLEAR(v, 30, 1 )
 #define USB_HOST_CHAR_CLR_CHAN_ENABLE(v)         BF_CLEAR(v, 31, 1 )
-static inline void print_usb_host_char(uint32_t v)
+
+
+static inline int usb_host_char_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,MAX_PACK_SZ:%x,EP:%x,EP_DIR:%x,IS_LOW:%x,EP_TYPE:%x,PACK_PER_FRM:%x,DEV_ADDR:%x,ODD_FRAME:%x,CHAN_DISABLE:%x,CHAN_ENABLE:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,MAX_PACK_SZ:%x,EP:%x,EP_DIR:%x,IS_LOW:%x,EP_TYPE:%x,PACK_PER_FRM:%x,DEV_ADDR:%x,ODD_FRAME:%x,CHAN_DISABLE:%x,CHAN_ENABLE:%x",
+    v,
     (int)USB_HOST_CHAR_GET_MAX_PACK_SZ(v),
     (int)USB_HOST_CHAR_GET_EP(v),
     (int)USB_HOST_CHAR_GET_EP_DIR(v),
@@ -59,10 +62,12 @@ v,
 #define USB_HOST_SPLT_CLR_TRANS_POS(v)           BF_CLEAR(v, 14, 2 )
 #define USB_HOST_SPLT_CLR_COMPLETE_SPLIT(v)      BF_CLEAR(v, 16, 1 )
 #define USB_HOST_SPLT_CLR_SPLT_ENABLE(v)         BF_CLEAR(v, 31, 1 )
-static inline void print_usb_host_splt(uint32_t v)
+
+
+static inline int usb_host_splt_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,PORT_ADDR:%x,HUB_ADDR:%x,TRANS_POS:%x,COMPLETE_SPLIT:%x,SPLT_ENABLE:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,PORT_ADDR:%x,HUB_ADDR:%x,TRANS_POS:%x,COMPLETE_SPLIT:%x,SPLT_ENABLE:%x",
+    v,
     (int)USB_HOST_SPLT_GET_PORT_ADDR(v),
     (int)USB_HOST_SPLT_GET_HUB_ADDR(v),
     (int)USB_HOST_SPLT_GET_TRANS_POS(v),
@@ -81,10 +86,12 @@ v,
 #define USB_HOST_SIZE_CLR_PACKET_COUNT(v)        BF_CLEAR(v, 19, 10)
 #define USB_HOST_SIZE_CLR_PID(v)                 BF_CLEAR(v, 29, 2 )
 #define USB_HOST_SIZE_CLR_DO_PING(v)             BF_CLEAR(v, 31, 1 )
-static inline void print_usb_host_size(uint32_t v)
+
+
+static inline int usb_host_size_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,SIZE:%x,PACKET_COUNT:%x,PID:%x,DO_PING:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,SIZE:%x,PACKET_COUNT:%x,PID:%x,DO_PING:%x",
+    v,
     (int)USB_HOST_SIZE_GET_SIZE(v),
     (int)USB_HOST_SIZE_GET_PACKET_COUNT(v),
     (int)USB_HOST_SIZE_GET_PID(v),
@@ -132,10 +139,12 @@ v,
 #define USB_HOST_INTR_CLR_BUFNOTAVAIL(v)         BF_CLEAR(v, 11, 1 )
 #define USB_HOST_INTR_CLR_EXCESSXMIT(v)          BF_CLEAR(v, 12, 1 )
 #define USB_HOST_INTR_CLR_FRMLISTROLL(v)         BF_CLEAR(v, 13, 1 )
-static inline void print_usb_host_intr(uint32_t v)
+
+
+static inline int usb_host_intr_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,XFER_COMPLETE:%x,HALT:%x,AHB_ERR:%x,STALL:%x,NAK:%x,ACK:%x,NYET:%x,TRNSERR:%x,BABBLERR:%x,FRMOVRN:%x,DATTGGLERR:%x,BUFNOTAVAIL:%x,EXCESSXMIT:%x,FRMLISTROLL:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,XFER_COMPLETE:%x,HALT:%x,AHB_ERR:%x,STALL:%x,NAK:%x,ACK:%x,NYET:%x,TRNSERR:%x,BABBLERR:%x,FRMOVRN:%x,DATTGGLERR:%x,BUFNOTAVAIL:%x,EXCESSXMIT:%x,FRMLISTROLL:%x",
+    v,
     (int)USB_HOST_INTR_GET_XFER_COMPLETE(v),
     (int)USB_HOST_INTR_GET_HALT(v),
     (int)USB_HOST_INTR_GET_AHB_ERR(v),
@@ -190,10 +199,12 @@ v,
 #define USB_GHWCFG2_CLR_NPERIO_TX_QUEUE_DEPTH(v) BF_CLEAR(v, 22, 2 )
 #define USB_GHWCFG2_CLR_PERIO_TX_QUEUE_DEPTH(v)  BF_CLEAR(v, 24, 2 )
 #define USB_GHWCFG2_CLR_TOKEN_QUEUE_DEPTH(v)     BF_CLEAR(v, 26, 5 )
-static inline void print_usb_ghwcfg2(uint32_t v)
+
+
+static inline int usb_ghwcfg2_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,MODE:%x,ARCHITECTURE:%x,SINGLE_POINT:%x,HSPHY_INTERFACE:%x,FSPHY_INTERFACE:%x,NUM_EPS:%x,NUM_HOST_CHAN:%x,EN_PERIO_HOST:%x,DFIFO_DYNAMIC:%x,UNKNOWN4:%x,NPERIO_TX_QUEUE_DEPTH:%x,PERIO_TX_QUEUE_DEPTH:%x,TOKEN_QUEUE_DEPTH:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,MODE:%x,ARCHITECTURE:%x,SINGLE_POINT:%x,HSPHY_INTERFACE:%x,FSPHY_INTERFACE:%x,NUM_EPS:%x,NUM_HOST_CHAN:%x,EN_PERIO_HOST:%x,DFIFO_DYNAMIC:%x,UNKNOWN4:%x,NPERIO_TX_QUEUE_DEPTH:%x,PERIO_TX_QUEUE_DEPTH:%x,TOKEN_QUEUE_DEPTH:%x",
+    v,
     (int)USB_GHWCFG2_GET_MODE(v),
     (int)USB_GHWCFG2_GET_ARCHITECTURE(v),
     (int)USB_GHWCFG2_GET_SINGLE_POINT(v),
@@ -235,10 +246,12 @@ v,
 #define USB_GHWCFG3_CLR_SYNC_RESET_TYPE(v)       BF_CLEAR(v, 11, 1 )
 #define USB_GHWCFG3_CLR_UNKNOWN(v)               BF_CLEAR(v, 12, 4 )
 #define USB_GHWCFG3_CLR_DFIFO_DEPTH(v)           BF_CLEAR(v, 16, 16)
-static inline void print_usb_ghwcfg3(uint32_t v)
+
+
+static inline int usb_ghwcfg3_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,TRANS_COUNT_WIDTH:%x,PACKET_COUNT_WIDTH:%x,MODE:%x,I2C_INTERFACE:%x,VENDOR_CTL_INTERFACE:%x,RM_OPT_FEATURES:%x,SYNC_RESET_TYPE:%x,UNKNOWN:%x,DFIFO_DEPTH:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,TRANS_COUNT_WIDTH:%x,PACKET_COUNT_WIDTH:%x,MODE:%x,I2C_INTERFACE:%x,VENDOR_CTL_INTERFACE:%x,RM_OPT_FEATURES:%x,SYNC_RESET_TYPE:%x,UNKNOWN:%x,DFIFO_DEPTH:%x",
+    v,
     (int)USB_GHWCFG3_GET_TRANS_COUNT_WIDTH(v),
     (int)USB_GHWCFG3_GET_PACKET_COUNT_WIDTH(v),
     (int)USB_GHWCFG3_GET_MODE(v),
@@ -297,10 +310,12 @@ v,
 #define USB_GHWCFG4_CLR_NUM_IN_EPS(v)            BF_CLEAR(v, 26, 4 )
 #define USB_GHWCFG4_CLR_EN_DESC_DMA(v)           BF_CLEAR(v, 30, 1 )
 #define USB_GHWCFG4_CLR_EN_DESC_DMA_DYNAMIC(v)   BF_CLEAR(v, 31, 1 )
-static inline void print_usb_ghwcfg4(uint32_t v)
+
+
+static inline int usb_ghwcfg4_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,NUM_PERIO_EPS:%x,EN_PWROPT:%x,MIN_AHB_FREQ_LESSTHAN_60:%x,PART_POWER_OFF:%x,UNKNOWN1:%x,HSPHY_DWIDTH:%x,NUM_CRL_EPS:%x,EN_IDDIG_FILTER:%x,EN_VBUSVALID_FILTER:%x,EN_A_VALID_FILTER:%x,EN_B_VALID_FILTER:%x,EN_SESSIONEND_FILTER:%x,EN_DED_TX_FIFO:%x,NUM_IN_EPS:%x,EN_DESC_DMA:%x,EN_DESC_DMA_DYNAMIC:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,NUM_PERIO_EPS:%x,EN_PWROPT:%x,MIN_AHB_FREQ_LESSTHAN_60:%x,PART_POWER_OFF:%x,UNKNOWN1:%x,HSPHY_DWIDTH:%x,NUM_CRL_EPS:%x,EN_IDDIG_FILTER:%x,EN_VBUSVALID_FILTER:%x,EN_A_VALID_FILTER:%x,EN_B_VALID_FILTER:%x,EN_SESSIONEND_FILTER:%x,EN_DED_TX_FIFO:%x,NUM_IN_EPS:%x,EN_DESC_DMA:%x,EN_DESC_DMA_DYNAMIC:%x",
+    v,
     (int)USB_GHWCFG4_GET_NUM_PERIO_EPS(v),
     (int)USB_GHWCFG4_GET_EN_PWROPT(v),
     (int)USB_GHWCFG4_GET_MIN_AHB_FREQ_LESSTHAN_60(v),
@@ -345,10 +360,12 @@ v,
 #define USB_HCFG_CLR_PERIO_SCHED_ENA(v)          BF_CLEAR(v, 26, 1 )
 #define USB_HCFG_CLR_PERIO_SCHED_STA(v)          BF_CLEAR(v, 27, 1 )
 #define USB_HCFG_CLR_MODE_CHNG_TIME(v)           BF_CLEAR(v, 31, 1 )
-static inline void print_usb_hcfg(uint32_t v)
+
+
+static inline int usb_hcfg_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,LS_PHY_CLK_SEL:%x,LS_SUPP:%x,EN_32KHZ_SUP:%x,RES_VAL_PERIOD:%x,DMA_DESC_ENA:%x,FRAME_LIST_ENTR:%x,PERIO_SCHED_ENA:%x,PERIO_SCHED_STA:%x,MODE_CHNG_TIME:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,LS_PHY_CLK_SEL:%x,LS_SUPP:%x,EN_32KHZ_SUP:%x,RES_VAL_PERIOD:%x,DMA_DESC_ENA:%x,FRAME_LIST_ENTR:%x,PERIO_SCHED_ENA:%x,PERIO_SCHED_STA:%x,MODE_CHNG_TIME:%x",
+    v,
     (int)USB_HCFG_GET_LS_PHY_CLK_SEL(v),
     (int)USB_HCFG_GET_LS_SUPP(v),
     (int)USB_HCFG_GET_EN_32KHZ_SUP(v),
@@ -389,10 +406,12 @@ v,
 #define USB_GRSTCTL_CLR_UNKNOWN(v)               BF_CLEAR(v, 11, 1 )
 #define USB_GRSTCTL_CLR_DMA_REQ(v)               BF_CLEAR(v, 30, 1 )
 #define USB_GRSTCTL_CLR_AHB_IDLE(v)              BF_CLEAR(v, 31, 1 )
-static inline void print_usb_grstctl(uint32_t v)
+
+
+static inline int usb_grstctl_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,C_SFT_RST:%x,H_SFT_RST:%x,FRM_CNTR_RST:%x,INT_TKN_Q_FLSH:%x,RXF_FLSH:%x,TXF_FLSH:%x,TXF_NUM:%x,UNKNOWN:%x,DMA_REQ:%x,AHB_IDLE:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,C_SFT_RST:%x,H_SFT_RST:%x,FRM_CNTR_RST:%x,INT_TKN_Q_FLSH:%x,RXF_FLSH:%x,TXF_FLSH:%x,TXF_NUM:%x,UNKNOWN:%x,DMA_REQ:%x,AHB_IDLE:%x",
+    v,
     (int)USB_GRSTCTL_GET_C_SFT_RST(v),
     (int)USB_GRSTCTL_GET_H_SFT_RST(v),
     (int)USB_GRSTCTL_GET_FRM_CNTR_RST(v),
@@ -446,10 +465,12 @@ v,
 #define USB_HPRT_CLR_PWR(v)                      BF_CLEAR(v, 12, 1 )
 #define USB_HPRT_CLR_TST_CTL(v)                  BF_CLEAR(v, 13, 4 )
 #define USB_HPRT_CLR_SPD(v)                      BF_CLEAR(v, 17, 2 )
-static inline void print_usb_hprt(uint32_t v)
+
+
+static inline int usb_hprt_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,CONN_STS:%x,CONN_DET:%x,ENA:%x,EN_CHNG:%x,OVR_CURR_ACT:%x\r\n,OVR_CURR_CHNG:%x,RES:%x,SUSP:%x,RST:%x,RES0:%x,LN_STS:%x,PWR:%x,TST_CTL:%x,SPD:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,CONN_STS:%x,CONN_DET:%x,ENA:%x,EN_CHNG:%x,OVR_CURR_ACT:%x,OVR_CURR_CHNG:%x,RES:%x,SUSP:%x,RST:%x,RES0:%x,LN_STS:%x,PWR:%x,TST_CTL:%x,SPD:%x",
+    v,
     (int)USB_HPRT_GET_CONN_STS(v),
     (int)USB_HPRT_GET_CONN_DET(v),
     (int)USB_HPRT_GET_ENA(v),
@@ -489,10 +510,12 @@ v,
 #define USB_PCGCR_CLR_EN_SLP_CLK_GATE(v)         BF_CLEAR(v, 5 , 1 )
 #define USB_PCGCR_CLR_PHY_SLEEPING(v)            BF_CLEAR(v, 6 , 1 )
 #define USB_PCGCR_CLR_DEEP_SLEEP(v)              BF_CLEAR(v, 7 , 1 )
-static inline void print_usb_pcgcr(uint32_t v)
+
+
+static inline int usb_pcgcr_to_string(char *buf, int bufsz, uint32_t v)
 {
-  printf("%08x,STOP_PCLK:%x,GATE_HCLK:%x,PWR_CLMP:%x,RST_PDWN_MODULE:%x,PHY_SUSPENDED:%x,EN_SLP_CLK_GATE:%x,PHY_SLEEPING:%x,DEEP_SLEEP:%x",
-v,
+  return snprintf(buf, bufsz, "%08x,STOP_PCLK:%x,GATE_HCLK:%x,PWR_CLMP:%x,RST_PDWN_MODULE:%x,PHY_SUSPENDED:%x,EN_SLP_CLK_GATE:%x,PHY_SLEEPING:%x,DEEP_SLEEP:%x",
+    v,
     (int)USB_PCGCR_GET_STOP_PCLK(v),
     (int)USB_PCGCR_GET_GATE_HCLK(v),
     (int)USB_PCGCR_GET_PWR_CLMP(v),
