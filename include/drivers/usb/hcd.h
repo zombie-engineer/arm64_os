@@ -1,6 +1,7 @@
 #pragma once
 #include <list.h>
 #include <usb/usb.h>
+#include <usb/usb_pid.h>
 #include <usb/usb_printers.h>
 #include <memory/static_slot.h>
 
@@ -65,6 +66,7 @@ struct usb_hcd_device_location {
 struct usb_hcd_endpoint {
   struct usb_hcd_device *device;
   struct usb_endpoint_descriptor descriptor ALIGNED(4);
+  usb_pid_t next_toggle_pid;
 };
 
 static inline int hcd_endpoint_get_number(struct usb_hcd_endpoint *ep)
@@ -220,12 +222,19 @@ int hcd_transfer_interrupt(
   int timeout,
   int *out_num_bytes);
 
+/*
+ * manage bulk transfer
+ * direction: IN/OUT
+ * buf: source/desctination 
+ * sz: transfer size
+ * pid: PID packet type to provide. Will be overwritten by next pid
+ */
 int hcd_transfer_bulk(
   struct usb_hcd_pipe *pipe,
   int direction,
   void *buf,
-  int buf_sz,
-  int pid,
+  int sz,
+  usb_pid_t *pid,
   int *out_num_bytes);
 
 int usb_hcd_init();

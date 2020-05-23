@@ -234,6 +234,9 @@ int usb_cbw_transfer(
   };
 
   char cmdbuf[31];
+
+  usb_pid_t *next_pid = &ep_out->next_toggle_pid;
+
   memset(cmdbuf, 0, sizeof(cmdbuf));
   if (sizeof(cbw) + cmdsz > sizeof(cmdbuf))
     kernel_panic("no way");
@@ -241,17 +244,20 @@ int usb_cbw_transfer(
   memcpy(cmdbuf, &cbw, sizeof(cbw));
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
 
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
   CHECK_ERR("failed to send CBW");
   if (data && datasz) {
-    if (data_direction == USB_DIRECTION_IN)
+    if (data_direction == USB_DIRECTION_IN) {
       p.endpoint = hcd_endpoint_get_number(ep_in);
-    err = hcd_transfer_bulk(&p, data_direction, data, datasz, USB_HCTSIZ0_PID_DATA0, &num_bytes);
+      next_pid = &ep_in->next_toggle_pid;
+    }
+    err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
     CHECK_ERR("failed to transfer data");
   }
 
   p.endpoint = hcd_endpoint_get_number(ep_in);
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  next_pid = &ep_in->next_toggle_pid;
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_ERR("failed to get CSW");
   csw_print(&status);
 out_err:
@@ -303,7 +309,7 @@ out_err:
   return err;
 }
 
-int usb_mass_inquiry(struct usb_hcd_device *dev, int lun, int pid, int pid2)
+int usb_mass_inquiry(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in, int lun)
 {
   int err;
   int num_bytes;
@@ -316,14 +322,17 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun, int pid, int pid2)
   struct scsi_op_inquiry *op = (struct scsi_op_inquiry *)(cbwbuf + sizeof(*c));
 
   struct csw status ALIGNED(4);
+
   struct usb_hcd_pipe p ALIGNED(4) = {
-    .address = dev->pipe0.address,
-    .endpoint = 2,
-    .speed = dev->pipe0.speed,
-    .max_packet_size = 512,
-    .ls_hub_port = dev->pipe0.ls_hub_port,
-    .ls_hub_address = dev->pipe0.ls_hub_address
+    .address         = hcd_endpoint_get_address(ep_out),
+    .endpoint        = hcd_endpoint_get_number(ep_out),
+    .speed           = ep_out->device->pipe0.speed,
+    .max_packet_size = hcd_endpoint_get_max_packet_size(ep_out),
+    .ls_hub_port     = ep_out->device->pipe0.ls_hub_port,
+    .ls_hub_address  = ep_out->device->pipe0.ls_hub_address
   };
+
+  usb_pid_t *next_pid = &ep_out->next_toggle_pid;
 
   if (sizeof(cbwbuf) != 31)
     kernel_panic("should be 31 bytes");
@@ -342,11 +351,12 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun, int pid, int pid2)
 
   scsi_fill_cmd_inquiry(op, 0, 0, 95);
   MASSLOG("INQUIRY:SEND CBW");
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), 2, &num_bytes);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), next_pid, &num_bytes);
   CHECK_ERR("failed to send CBW");
   p.endpoint = 1;
   MASSLOG("INQUIRY:RECV DATA");
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, 95/*sizeof(response)*/, 2, &num_bytes);
+  next_pid = &ep_in->next_toggle_pid;
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, 95/*sizeof(response)*/, next_pid, &num_bytes);
   CHECK_ERR("failed to recieve CBW");
   {
     char description[256];
@@ -356,13 +366,10 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun, int pid, int pid2)
     printf("%s\r\n", description);
   }
   MASSLOG("INQUIRY:RECV CSW size:%d", sizeof(status));
-  wait_usec(500);
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), 0, &num_bytes);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_ERR("failed to recieve CSW");
   csw_print(&status);
 out_err:
-  if (err)
-    err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), USB_HCTSIZ0_PID_DATA1, &num_bytes);
   return err;
 }
 
@@ -449,10 +456,9 @@ int usb_mass_storage_init(struct usb_hcd_device* dev)
   CHECK_ERR("failed to get max lun");
   dwc2_set_log_level(2);
   err = usb_mass_test_unit_ready(ep_out, ep_in, lun);
-  err = usb_mass_inquiry(dev, 0, USB_HCTSIZ0_PID_DATA0, USB_HCTSIZ0_PID_DATA0);
-  while(1);
+  err = usb_mass_inquiry(ep_out, ep_in, lun);
   CHECK_ERR("failed to send INQUIRY request");
-  err = usb_mass_inquiry(dev, 0, USB_HCTSIZ0_PID_DATA1, USB_HCTSIZ0_PID_DATA0);
+  err = usb_mass_inquiry(ep_out, ep_in, lun);
   CHECK_ERR("failed to send INQUIRY request");
   while(1);
   CHECK_ERR("failed to test unit ready");
@@ -460,11 +466,11 @@ int usb_mass_storage_init(struct usb_hcd_device* dev)
   // hexdump_memory(readbuf, 512);
   while(1) {
     memset(readbuf, 0, 2048);
-    err = usb_mass_read10(ep_out, ep_in, 0, 0, readbuf, 512);
+    err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
     hexdump_memory(readbuf, 512);
   }
   memset(readbuf, 0, 2048);
-  err = usb_mass_read10(ep_out, ep_in, 0, 1, readbuf, 512);
+  err = usb_mass_read10(ep_out, ep_in, lun, 1, readbuf, 512);
   hexdump_memory(readbuf, 512);
 out_err:
   while(1);

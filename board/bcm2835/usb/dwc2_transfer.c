@@ -159,7 +159,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   }
 }
 
-static inline dwc2_transfer_status_t dwc2_wait_halted(int ch, int *pid_toggle)
+static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
 {
   int intr;
   int timeout = 1;
@@ -227,12 +227,35 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch, int *pid_toggle)
   return DWC2_STATUS_ERR;
 }
 
-dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes) 
+int usb_pid_to_dwc_pid(usb_pid_t pid)
+{
+  switch (pid) {
+    case USB_PID_DATA0: return USB_HCTSIZ0_PID_DATA0;
+    case USB_PID_DATA1: return USB_HCTSIZ0_PID_DATA1;
+    case USB_PID_DATA2: return USB_HCTSIZ0_PID_DATA2;
+    case USB_PID_SETUP: return USB_HCTSIZ0_PID_SETUP;
+    default: return 0xff;
+  }
+}
+
+usb_pid_t dwc_pid_to_usb_pid(int pid)
+{
+  switch (pid) {
+    case USB_HCTSIZ0_PID_DATA0: return USB_PID_DATA0;
+    case USB_HCTSIZ0_PID_DATA1: return USB_PID_DATA1;
+    case USB_HCTSIZ0_PID_DATA2: return USB_PID_DATA2;
+    case USB_HCTSIZ0_PID_SETUP: return USB_PID_SETUP;
+    default: return 0xff;
+  }
+}
+
+dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes) 
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
   int err;
   int i; 
   int ch = pipe.u.dwc_channel;
+  int dwc_pid = usb_pid_to_dwc_pid(*pid);
 
   /*
    * Randomly chose number of retryable failures before exiting with
@@ -242,9 +265,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
 
   uint32_t chr, splt, intr, siz, dma;
   uint64_t dma_dst;
-  int *pid_toggle = 0;
 
-  dwc2_transfer_prologue(pipe, buf, bufsz, pid);
+  dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);
 
   ch = pipe.u.dwc_channel = 6;
 
@@ -279,7 +301,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   SET_SPLT();
 
   /* Set transfer size. */
-  siz = dwc2_make_tsize(bufsz, pipe.u.speed == USB_SPEED_LOW, pid, pipe.u.max_packet_size);
+  siz = dwc2_make_tsize(bufsz, pipe.u.speed == USB_SPEED_LOW, dwc_pid, pipe.u.max_packet_size);
   SET_SIZ();
 
   dma_dst = (uint64_t)buf;
@@ -305,7 +327,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     SET_CHAR();
     wait_usec(100);
 
-    status = dwc2_wait_halted(ch, pid_toggle);
+    status = dwc2_wait_halted(ch);
     if (status) {
       if (status == DWC2_STATUS_NAK)
         DWCERR("exiting with NAK");
@@ -324,7 +346,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
       SET_CHAR();
       wait_usec(100);
-      status = dwc2_wait_halted(ch, pid_toggle);
+      status = dwc2_wait_halted(ch);
       if (status)
         goto out;
 
@@ -333,7 +355,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     }
 
     GET_INTR();
-    GET_SIZ();
+    // GET_SIZ();
 
     DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
       siz,
@@ -360,6 +382,7 @@ out:
     GET_SIZ();
     *out_num_bytes = bufsz - USB_HOST_SIZE_GET_SIZE(siz);
   }
+  *pid = dwc_pid_to_usb_pid(USB_HOST_SIZE_GET_PID(siz));
   
   DWCDEBUG("=======TRANSFER END=tsz:%08x========================", siz);
 	return status;

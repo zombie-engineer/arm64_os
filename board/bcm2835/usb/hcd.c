@@ -320,6 +320,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
         ep->device = dev;
+        ep->next_toggle_pid = USB_PID_DATA0;
         HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d,int:%d", 
           dev->address, 
           i->descriptor.number, 

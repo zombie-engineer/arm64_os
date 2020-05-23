@@ -13,7 +13,7 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
-int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, const void *buf, int bufsz, int pid, const char *debug_desc, int *out_num_bytes)
+int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, const void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
 {
   int err = ERR_OK;
   int num_bytes;
@@ -50,6 +50,7 @@ int hcd_transfer_control(
   int err;
   int num_bytes = 0;
   uint64_t rqbuf ALIGNED(4) = rq;
+  usb_pid_t pid;
 
   dwc2_pipe_desc_t pipedesc = {
     .u = { 
@@ -75,15 +76,17 @@ int hcd_transfer_control(
   /*
    * Send SETUP packet
    */
-  err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), USB_HCTSIZ0_PID_SETUP, "SETUP", NULL);
+  pid = USB_PID_SETUP;
+  err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), &pid, "SETUP", NULL);
   CHECK_ERR_SILENT();
 
   /*
    * Transmit DATA packet
    */
   if (buf) {
+    pid = USB_PID_DATA1;
     pipedesc.u.ep_direction = pctl->direction;
-    err = __hcd_dwc2_transfer(pipedesc, buf, bufsz, USB_HCTSIZ0_PID_DATA1, "DATA", &num_bytes);
+    err = __hcd_dwc2_transfer(pipedesc, buf, bufsz, &pid, "DATA", &num_bytes);
     CHECK_ERR_SILENT();
   }
 
@@ -95,7 +98,8 @@ int hcd_transfer_control(
   else
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
 
-  err = __hcd_dwc2_transfer(pipedesc, 0, 0, USB_HCTSIZ0_PID_DATA1, "ACK", NULL);
+  pid = USB_PID_DATA1;
+  err = __hcd_dwc2_transfer(pipedesc, 0, 0, &pid, "ACK", NULL);
   CHECK_ERR_SILENT();
 
 out_err:
@@ -129,7 +133,7 @@ int hcd_transfer_interrupt(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  status = dwc2_transfer(pipedesc, buf, buf_sz, USB_HCTSIZ0_PID_DATA0, out_num_bytes);
+  status = dwc2_transfer(pipedesc, buf, buf_sz, USB_PID_DATA0, out_num_bytes);
   switch(status) {
     case DWC2_STATUS_ACK: err = ERR_OK; break;
     case DWC2_STATUS_NAK: err = ERR_RETRY; break;
@@ -145,7 +149,7 @@ int hcd_transfer_bulk(
   int direction,
   void *buf,
   int buf_sz,
-  int pid,
+  usb_pid_t *pid,
   int *out_num_bytes)
 {
   int err = ERR_OK;
