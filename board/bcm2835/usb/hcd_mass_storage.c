@@ -134,7 +134,7 @@ static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd,
   op->opcode = SCSI_OPCODE_INQUIRY;
   op->evpd = evpd;
   op->page_code = page_code;
-  op->allocation_length = allocation_length;
+  set_unaligned_16_le(&op->allocation_length, allocation_length);
   op->control = 0;
 }
 
@@ -314,61 +314,19 @@ int usb_mass_inquiry(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *e
   int err;
   int num_bytes;
   const char SCSI_CMD_LENGTH = 6;
-  char cbwbuf[31] ALIGNED(4);
-  struct cbw *c = (struct cbw*) cbwbuf;
   char buf[128] ALIGNED(4);
+  char description[256];
+  struct scsi_op_inquiry cmd;
 
-  struct scsi_response_inquiry response ALIGNED(4);
-  struct scsi_op_inquiry *op = (struct scsi_op_inquiry *)(cbwbuf + sizeof(*c));
+  memset(&cmd, 0, sizeof(cmd));
+  memset(buf , 0, sizeof(buf));
 
-  struct csw status ALIGNED(4);
-
-  struct usb_hcd_pipe p ALIGNED(4) = {
-    .address         = hcd_endpoint_get_address(ep_out),
-    .endpoint        = hcd_endpoint_get_number(ep_out),
-    .speed           = ep_out->device->pipe0.speed,
-    .max_packet_size = hcd_endpoint_get_max_packet_size(ep_out),
-    .ls_hub_port     = ep_out->device->pipe0.ls_hub_port,
-    .ls_hub_address  = ep_out->device->pipe0.ls_hub_address
-  };
-
-  usb_pid_t *next_pid = &ep_out->next_toggle_pid;
-
-  if (sizeof(cbwbuf) != 31)
-    kernel_panic("should be 31 bytes");
-
-  memset(cbwbuf   , 0, sizeof(cbwbuf));
-  memset(&response, 0, sizeof(response));
-  memset(&status  , 0, sizeof(status));
-  memset(buf      , 0, sizeof(buf));
-
-  c->cbw_signature   = CBW_SIGNATURE;
-  c->cbw_tag         = 1;
-  c->cbw_data_length = 95;
-  c->cbw_flags       = cbw_make_flags(USB_DIRECTION_IN);
-  c->cbw_lun         = lun;
-  c->cbw_length      = SCSI_CMD_LENGTH;
-
-  scsi_fill_cmd_inquiry(op, 0, 0, 95);
+  scsi_fill_cmd_inquiry(&cmd, 0, 0, 95);
   MASSLOG("INQUIRY:SEND CBW");
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), next_pid, &num_bytes);
-  CHECK_ERR("failed to send CBW");
-  p.endpoint = 1;
-  MASSLOG("INQUIRY:RECV DATA");
-  next_pid = &ep_in->next_toggle_pid;
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, 95/*sizeof(response)*/, next_pid, &num_bytes);
-  CHECK_ERR("failed to recieve CBW");
-  {
-    char description[256];
-    scsi_inquiry_data_to_string(
-      description, sizeof(description), 
-      (struct scsi_response_inquiry *)buf);
-    printf("%s\r\n", description);
-  }
-  MASSLOG("INQUIRY:RECV CSW size:%d", sizeof(status));
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
-  CHECK_ERR("failed to recieve CSW");
-  csw_print(&status);
+  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, 95);
+  CHECK_ERR("INQUIRY CMD failed");
+  scsi_inquiry_data_to_string(description, sizeof(description), (struct scsi_response_inquiry *)buf);
+  MASSLOG("%s", description);
 out_err:
   return err;
 }
@@ -409,11 +367,6 @@ out_err:
   HCDLOG("max_lun: %d", max_lun);
   *out_max_lun = max_lun;
   return err;
-}
-
-int cbw_transfer(struct usb_hcd_pipe *d, int dir, void *buf, int bufsz)
-{
-  return 0;
 }
 
 int usb_mass_storage_init(struct usb_hcd_device* dev)
