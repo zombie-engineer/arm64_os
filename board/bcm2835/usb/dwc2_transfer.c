@@ -152,7 +152,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
   if (dwc2_log_level) {
     dwc2_pipe_desc_to_string(pipe, pipe_str_buf, sizeof(pipe_str_buf));
     DWCDEBUG("=======TRANSFER=====================================");
-    DWCDEBUG("pipe:%s", pipe_str_buf);
+    DWCDEBUG("pipe:%s,size:%d,pid:%d", pipe_str_buf, bufsz, pid);
 
     if (pipe.u.ep_direction == USB_DIRECTION_OUT)
       hexdump_memory(buf, bufsz);
@@ -334,23 +334,25 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
 
     GET_INTR();
     GET_SIZ();
-    if (dwc2_log_level > 1)
-      hexdump_memory(buf, bufsz);
 
     DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
       siz,
       USB_HOST_SIZE_GET_PACKET_COUNT(siz),
       USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
 
-    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-      /* 
-       * packet was successfully retrieved, so we reset number of 
-       * retries before failure
-       */
-      i = 0;
-      continue;
-    }
+    if (dwc2_log_level > 1)
+      hexdump_memory(buf, bufsz);
+//    if (pipe.u.ep_direction == USB_DIRECTION_OUT) {
+//    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+//  //  if (USB_HOST_SIZE_GET_SIZE(siz)) {
+//      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+//      /* 
+//       * packet was successfully retrieved, so we reset number of 
+//       * retries before failure
+//       */
+//      i = 0;
+//      continue;
+//    }//}
     break;
   }
 out:
