@@ -22,6 +22,11 @@ struct cbw {
   char     cbw_block[0];    // +15
 } PACKED;
 
+static inline char cbw_make_flags(int direction)
+{
+  return BT_V(7, direction);
+}
+
 static inline void cbw_set_flags(struct cbw *c, int dir) 
 {
   BIT_SET_V_8(c->cbw_flags, 7, dir);

@@ -12,7 +12,17 @@
 #include <error.h>
 #include <delays.h>
 
-int dwc2_print_debug = 0;
+int dwc2_log_level = 0;
+
+int dwc2_set_log_level(int log_level)
+{
+  dwc2_log_level = log_level;
+}
+
+int dwc2_get_log_level()
+{
+  return dwc2_log_level;
+}
 
 static inline int dwc2_char_reg_to_string(int ch, char *buf, int bufsz)
 {
@@ -139,7 +149,7 @@ static inline uint32_t dwc2_make_tsize(int length, int low_speed, int pid, int m
 static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid)
 {
   char pipe_str_buf[256];
-  if (dwc2_print_debug) {
+  if (dwc2_log_level) {
     dwc2_pipe_desc_to_string(pipe, pipe_str_buf, sizeof(pipe_str_buf));
     DWCDEBUG("=======TRANSFER=====================================");
     DWCDEBUG("pipe:%s", pipe_str_buf);
@@ -159,8 +169,13 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch, int *pid_toggle)
       timeout = 0;
       break;
     }
+    if (USB_HOST_INTR_GET_NAK(intr)) {
+      timeout = 0;
+      break;
+    }
     wait_usec(100);
   }
+  SET_INTR();
 
   if (timeout)
     return DWC2_STATUS_TIMEOUT;
@@ -168,11 +183,14 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch, int *pid_toggle)
   if (USB_HOST_INTR_GET_XFER_COMPLETE(intr))
     return DWC2_STATUS_ACK;
 
-  if (USB_HOST_INTR_GET_ACK(intr))
+  if (USB_HOST_INTR_GET_ACK(intr)) {
     return DWC2_STATUS_ACK;
+  }
   
-  if (USB_HOST_INTR_GET_NAK(intr))
+  if (USB_HOST_INTR_GET_NAK(intr)) {
+    DWCERR("NAK");
     return DWC2_STATUS_NAK;
+  }
 
   if (USB_HOST_INTR_GET_NYET(intr)) {
     DWCWARN("NYET");
@@ -288,8 +306,11 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     wait_usec(100);
 
     status = dwc2_wait_halted(ch, pid_toggle);
-    if (status)
+    if (status) {
+      if (status == DWC2_STATUS_NAK)
+        DWCERR("exiting with NAK");
       goto out;
+    }
 
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
@@ -313,7 +334,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
 
     GET_INTR();
     GET_SIZ();
-    if (dwc2_print_debug > 1)
+    if (dwc2_log_level > 1)
       hexdump_memory(buf, bufsz);
 
     DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 

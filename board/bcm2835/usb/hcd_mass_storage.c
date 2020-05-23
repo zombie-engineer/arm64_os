@@ -3,6 +3,8 @@
 #include <drivers/usb/usb_dev_rq.h>
 #include "usb_mass_cbw.h"
 #include <scsi/scsi_opcode.h>
+#include <mem_access.h>
+#include <delays.h>
 
 #define __MASS_PREFIX "[USB_MASS: %d] "
 #define __MASS_ARGS 0
@@ -11,6 +13,60 @@
 #define MASS_REQUEST_GET_MAX_LUN 0xfe
 
 #define MASSLOG(__fmt, ...) printf(__MASS_PREFIX __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
+
+#define USB_HCTSIZ0_PID_DATA0 0
+#define USB_HCTSIZ0_PID_DATA1 2
+#define USB_HCTSIZ0_PID_DATA2 1
+#define USB_HCTSIZ0_PID_SETUP 3
+
+struct scsi_op_test_unit_ready {
+  uint8_t opcode          ;
+  uint8_t reserved[4]     ; // +1
+  uint8_t control         ; // +5
+} PACKED;
+
+struct scsi_op_log_select {
+  uint8_t opcode          ;
+  uint8_t sp           : 1; // +1
+  uint8_t pcr          : 1;
+  uint8_t reserved0    : 6;
+  uint8_t page_code    : 6; // +2
+  uint8_t pc           : 2;
+  uint8_t subpage_code    ; // +3
+  uint8_t reserved[3]     ; // +4
+  uint16_t param_list_len ; // +6
+  uint8_t control         ; // +9
+} PACKED;
+
+struct scsi_op_read_10 {
+  uint8_t opcode       ;
+  uint8_t obsolete0 : 2; // +1
+  uint8_t rarc      : 1;
+  uint8_t fua       : 1;
+  uint8_t dpo       : 1;
+  uint8_t rdprotect : 3;
+
+  uint32_t lba         ; // +2
+  uint8_t group_num : 5; // +6
+  uint8_t reserved  : 3;
+  uint16_t transfer_len; // +7
+  uint8_t control      ; // +9
+} PACKED;
+
+struct scsi_op_read_capacity_10 {
+  uint8_t opcode       ;
+  uint8_t obsolete0 : 2; // +1
+  uint8_t rarc      : 1;
+  uint8_t fua       : 1;
+  uint8_t dpo       : 1;
+  uint8_t rdprotect : 3;
+
+  uint32_t lba         ; // +2
+  uint8_t group_num : 5; // +6
+  uint8_t reserved  : 3;
+  uint16_t transfer_len; // +7
+  uint8_t control      ; // +9
+} PACKED;
 
 struct scsi_op_inquiry {
   uint8_t opcode;
@@ -63,9 +119,10 @@ struct scsi_response_inquiry {
 
 static inline void scsi_inquiry_data_to_string(char *buf, int bufsz, struct scsi_response_inquiry *data)
 {
-  snprintf(buf, bufsz, "version: %d, data_format: %d, vendor: %s, product: %s\n", 
+  snprintf(buf, bufsz, "version: %d, data_format: %d, add_length: %d, vendor: %s, product: %s\n", 
     data->version, 
     data->response_data_format,
+    data->additional_length,
     data->vendor_id,
     data->product_id);
 }
@@ -81,6 +138,13 @@ static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd,
   op->control = 0;
 }
 
+static inline void scsi_fill_cmd_test_unit_ready(struct scsi_op_inquiry *op)
+{
+  memset(op, 0, sizeof(*op));
+  op->opcode = SCSI_OPCODE_TEST_UNIT_READY;
+  op->control = 0;
+}
+
 static inline void csw_print(struct csw *s)
 {
   printf("CSW: %08x:%08x:data_residue:%d,status:%d" __endline,
@@ -90,17 +154,167 @@ static inline void csw_print(struct csw *s)
     s->csw_status);
 }
 
-int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
+int usb_mass_reset(struct usb_hcd_device *dev)
+{
+  int err;
+  int num_bytes;
+	struct usb_hcd_pipe_control pctl;
+  struct usb_hcd_interface *i;
+  struct usb_device_request rq = { 
+    .request_type = USB_RQ_TYPE_CLASS_SET_INTERFACE,
+    .request      = MASS_REQUEST_RESET,
+    .value        = 0,
+    .index        = 0,
+    .length       = 0,
+  };
+
+  MASSLOG("usb_mass_reset: %016x", rq.raw);
+
+  pctl.channel = 0;
+  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
+  pctl.direction = USB_DIRECTION_OUT;
+
+  err = hcd_transfer_control(&dev->pipe0, &pctl, 
+      NULL, 0, rq.raw, 1000, &num_bytes);
+  if (err) {
+    HCDERR("failed to send reset");
+    goto out_err;
+  }
+
+  if (!dev->num_interfaces) {
+    HCDERR("failed to clear HALT bit on device without intefaces");
+    err = ERR_GENERIC;
+    goto out_err;
+  }
+
+  i = &dev->interfaces[0];
+  if (hcd_interface_get_num_endpoints(i) < 2) {
+    HCDERR("failed to clear HALT bit on device without 2 endpoints");
+    err = ERR_GENERIC;
+    goto out_err;
+  }
+
+  err = hcd_endpoint_clear_feature(&i->endpoints[0], USB_ENDPOINT_FEATURE_HALT);
+  CHECK_ERR("failed to clear HALT feature on endpoint");
+
+  err = hcd_endpoint_clear_feature(&i->endpoints[1], USB_ENDPOINT_FEATURE_HALT);
+  CHECK_ERR("failed to clear HALT feature on endpoint");
+
+out_err:
+  MASSLOG("usb_mass_reset complete err: %d", err);
+  return err;
+}
+
+
+int usb_cbw_transfer(struct usb_hcd_device *dev, int tag, int lun, int direction, void *cmd, int cmdsz, void *data, int datasz)
+{
+  int err;
+  int num_bytes;
+  struct cbw cbw ALIGNED(4) = {
+    .cbw_signature   = CBW_SIGNATURE,
+    .cbw_tag         = tag,
+    .cbw_data_length = datasz,
+    .cbw_flags       = cbw_make_flags(direction),
+    .cbw_lun         = lun,
+    .cbw_length      = cmdsz
+  };
+
+  struct usb_hcd_pipe p ALIGNED(4) = {
+    .address = dev->pipe0.address,
+    .endpoint = 2,
+    .speed = dev->pipe0.speed,
+    .max_packet_size = 512,
+    .ls_hub_port = dev->pipe0.ls_hub_port,
+    .ls_hub_address = dev->pipe0.ls_hub_address
+  };
+
+  struct csw status ALIGNED(4);
+  char cmdbuf[31];
+  memset(cmdbuf, 0, sizeof(cmdbuf));
+  if (sizeof(cbw) + cmdsz > sizeof(cmdbuf))
+    kernel_panic("no way");
+
+  memcpy(cmdbuf, &cbw, sizeof(cbw));
+  memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
+
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  CHECK_ERR("failed to send CBW");
+  p.endpoint = 1;
+  if (data && datasz) {
+    err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, data, datasz, USB_HCTSIZ0_PID_DATA0, &num_bytes);
+    CHECK_ERR("failed to transfer data");
+  }
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), USB_HCTSIZ0_PID_DATA1, &num_bytes);
+  CHECK_ERR("failed to get CSW");
+  csw_print(&status);
+out_err:
+  return err;
+}
+
+int usb_mass_read_capacity10(struct usb_hcd_device *dev, int lun, void *buf, int bufsz)
+{
+  int err;
+  struct scsi_op_read_capacity_10 cmd ALIGNED(4) = { 0 };
+  cmd.opcode = SCSI_OPCODE_READ_10;
+  // set_unaligned_32_le(&cmd.lba, offset);
+  // set_unaligned_16_le(&cmd.transfer_len, size / 512);
+  printf("-");
+
+  while(1) {
+    err = usb_cbw_transfer(dev, 2, lun, USB_DIRECTION_IN, &cmd, sizeof(cmd), buf, bufsz);
+    if (err != ERR_RETRY)
+      break;
+  }
+  CHECK_ERR("+");
+out_err:
+  return err;
+}
+
+int usb_mass_read10(struct usb_hcd_device *dev, int lun, uint32_t offset, int size, void *buf)
+{
+  int err;
+  struct scsi_op_read_10 cmd ALIGNED(4) = { 0 };
+  cmd.opcode = SCSI_OPCODE_READ_10;
+  set_unaligned_32_le(&cmd.lba, offset);
+  set_unaligned_16_le(&cmd.transfer_len, size / 512);
+  printf("-");
+
+  memset(buf, 0, size);
+  while(1) {
+    wait_usec(200);
+    err = usb_cbw_transfer(dev, 2, lun, USB_DIRECTION_IN, &cmd, sizeof(cmd), buf, size);
+    if (err != ERR_RETRY)
+      break;
+  }
+  CHECK_ERR("+");
+out_err:
+  return err;
+}
+
+//int usb_mass_test_unit_ready(struct usb_hcd_device *dev, int lun)
+//{
+//  int err;
+//  struct scsi_op_test_unit_ready cmd ALIGNED(4) = { 0 };
+//  cmd.opcode = SCSI_OPCODE_TEST_UNIT_READY;
+//  err = usb_cbw_transfer(dev, 2, lun, USB_DIRECTION_OUT, &cmd, sizeof(cmd), NULL, 0);
+//  CHECK_ERR("+");
+//out_err:
+//  return err;
+//}
+
+int usb_mass_inquiry(struct usb_hcd_device *dev, int lun, int pid, int pid2)
 {
   int err;
   int num_bytes;
   const char SCSI_CMD_LENGTH = 6;
   char cbwbuf[31] ALIGNED(4);
-  char buf[128] ALIGNED(4);
-  struct scsi_response_inquiry response ALIGNED(4);
-  struct csw status ALIGNED(4);
   struct cbw *c = (struct cbw*) cbwbuf;
+  char buf[128] ALIGNED(4);
+
+  struct scsi_response_inquiry response ALIGNED(4);
   struct scsi_op_inquiry *op = (struct scsi_op_inquiry *)(cbwbuf + sizeof(*c));
+
+  struct csw status ALIGNED(4);
   struct usb_hcd_pipe p ALIGNED(4) = {
     .address = dev->pipe0.address,
     .endpoint = 2,
@@ -119,21 +333,18 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
 
   c->cbw_signature   = CBW_SIGNATURE;
   c->cbw_tag         = 1;
-  c->cbw_data_length = sizeof(response);
-  c->cbw_flags       = 0x80;// USB_DIRECTION_IN;
+  c->cbw_data_length = 95;
+  c->cbw_flags       = cbw_make_flags(USB_DIRECTION_IN);
   c->cbw_lun         = lun;
   c->cbw_length      = SCSI_CMD_LENGTH;
-  hexdump_memory(c, sizeof(cbwbuf));
-#define USB_HCTSIZ0_PID_DATA0 0
-#define USB_HCTSIZ0_PID_DATA1 2
-#define USB_HCTSIZ0_PID_DATA2 1
-#define USB_HCTSIZ0_PID_SETUP 3
 
-  scsi_fill_cmd_inquiry(op, 0, 0, sizeof(response));
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  scsi_fill_cmd_inquiry(op, 0, 0, 95);
+  MASSLOG("INQUIRY:SEND CBW");
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), pid, &num_bytes);
   CHECK_ERR("failed to send CBW");
   p.endpoint = 1;
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, sizeof(buf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  MASSLOG("INQUIRY:RECV DATA");
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, buf, 95/*sizeof(response)*/, pid, &num_bytes);
   CHECK_ERR("failed to recieve CBW");
   {
     char description[256];
@@ -142,10 +353,64 @@ int usb_mass_inquiry(struct usb_hcd_device *dev, int lun)
       (struct scsi_response_inquiry *)buf);
     printf("%s\r\n", description);
   }
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), USB_HCTSIZ0_PID_DATA1, &num_bytes);
+  MASSLOG("INQUIRY:RECV CSW size:%d", sizeof(status));
+  wait_usec(500);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), pid2, &num_bytes);
+  CHECK_ERR("failed to recieve CSW");
   csw_print(&status);
 out_err:
-  while(1);
+  if (err)
+    err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), pid, &num_bytes);
+  return err;
+}
+
+int usb_mass_test_unit_ready(
+  struct usb_hcd_endpoint *ep_out,
+  struct usb_hcd_endpoint *ep_in,
+  int lun)
+{
+  int err;
+  int num_bytes;
+  const char SCSI_CMD_LENGTH = 6;
+  char cbwbuf[31] ALIGNED(4);
+  struct cbw *c = (struct cbw*) cbwbuf;
+  char buf[128] ALIGNED(4);
+
+  struct scsi_response_inquiry response ALIGNED(4);
+  struct scsi_op_test_unit_ready *op = (struct scsi_op_inquiry *)(cbwbuf + sizeof(*c));
+
+  struct csw status ALIGNED(4);
+  struct usb_hcd_pipe p ALIGNED(4) = {
+    .address         = hcd_endpoint_get_address(ep_out),
+    .endpoint        = hcd_endpoint_get_number(ep_out),
+    .speed           = ep_out->device->pipe0.speed,
+    .max_packet_size = hcd_endpoint_get_max_packet_size(ep_out),
+    .ls_hub_port     = ep_out->device->pipe0.ls_hub_port,
+    .ls_hub_address  = ep_out->device->pipe0.ls_hub_address
+  };
+
+  if (sizeof(cbwbuf) != 31)
+    kernel_panic("should be 31 bytes");
+
+  memset(cbwbuf   , 0, sizeof(cbwbuf));
+  memset(&response, 0, sizeof(response));
+  memset(&status  , 0, sizeof(status));
+
+  c->cbw_signature   = CBW_SIGNATURE;
+  c->cbw_tag         = 1;
+  c->cbw_data_length = 0;
+  c->cbw_flags       = 0;
+  c->cbw_lun         = lun;
+  c->cbw_length      = SCSI_CMD_LENGTH;
+
+  MASSLOG("TEST_UNIT_READY: BULK_OUT");
+  scsi_fill_cmd_test_unit_ready(op);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cbwbuf, sizeof(cbwbuf), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  CHECK_ERR("failed to send CBW");
+  p.endpoint = hcd_endpoint_get_number(ep_in);
+  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), USB_HCTSIZ0_PID_DATA0, &num_bytes);
+  csw_print(&status);
+out_err:
   return err;
 }
 
@@ -192,54 +457,62 @@ int cbw_transfer(struct usb_hcd_pipe *d, int dir, void *buf, int bufsz)
   return 0;
 }
 
-int usb_mass_reset(struct usb_hcd_device *dev)
-{
-  int err;
-  int num_bytes;
-	struct usb_hcd_pipe_control pctl;
-  struct usb_device_request rq = { 
-    .request_type = USB_DEVICE_REQUEST_TYPE(HOST2DEV, CLASS, INTERFACE),
-    .request      = MASS_REQUEST_RESET,
-    .value        = 0,
-    .index        = 0,
-    .length       = 0,
-  };
-  rq.request_type = 0b00100001;
-  rq.request = 0xff;
-  rq.value = 0;
-  rq.index = 0;
-  rq.length = 0;
-
-  MASSLOG("usb_mass_reset: %016x", rq.raw);
-
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_IN;
-
-  err = hcd_transfer_control(&dev->pipe0, &pctl, 
-      NULL, 0, rq.raw, 1000, &num_bytes);
-  if (err) {
-    HCDERR("failed to read descriptor header");
-    goto out_err;
-  }
-out_err:
-  return err;
-}
-
-void usb_mass_storage_init(struct usb_hcd_device* dev)
+int usb_mass_storage_init(struct usb_hcd_device* dev)
 {
   int err;
   int max_lun = 0;
-extern int dwc2_print_debug;
-  dwc2_print_debug = 2;
-  MASSLOG("usb_mass_storage_init");
+  int lun = 0;
+  char readbuf[2048];
+  struct usb_hcd_interface *i;
+  struct usb_hcd_endpoint *ep_in = NULL;
+  struct usb_hcd_endpoint *ep_out = NULL;
+  struct usb_hcd_endpoint *ep_tmp = NULL;
+
+  i = hcd_device_get_interface(dev, 0);
+  if (IS_ERR(i)) {
+    MASSLOG("Failed to get inteface");
+    goto out_err;
+  }
+
+  ep_tmp = hcd_interface_get_endpoint(i, 0);
+  if (hcd_endpoint_get_direction(ep_tmp) == USB_DIRECTION_OUT)
+    ep_out = ep_tmp;
+  else
+    ep_in = ep_tmp;
+
+  ep_tmp = hcd_interface_get_endpoint(i, 1);
+  if (hcd_endpoint_get_direction(ep_tmp) == USB_DIRECTION_OUT)
+    ep_out = ep_tmp;
+  else
+    ep_in = ep_tmp;
+
+  MASSLOG("usb_mass_storage_init: OUT:ep%d, IN:ep%d", 
+    hcd_endpoint_get_number(ep_out),
+    hcd_endpoint_get_number(ep_in));
+
   err = usb_mass_reset(dev);
   CHECK_ERR("failed to reset mass storage device");
 
   err = usb_mass_get_max_lun(dev, &max_lun);
   CHECK_ERR("failed to get max lun");
-  err = usb_mass_inquiry(dev, 0);
+  dwc2_set_log_level(2);
+  err = usb_mass_test_unit_ready(ep_out, ep_in, lun);
+  err = usb_mass_inquiry(dev, 0, USB_HCTSIZ0_PID_DATA0, USB_HCTSIZ0_PID_DATA1);
   CHECK_ERR("failed to send INQUIRY request");
+  err = usb_mass_inquiry(dev, 0, USB_HCTSIZ0_PID_DATA1, USB_HCTSIZ0_PID_DATA0);
+  CHECK_ERR("failed to send INQUIRY request");
+  while(1);
+  CHECK_ERR("failed to test unit ready");
+  //err = usb_mass_read_capacity10(dev, 0, readbuf, 512);
+  // hexdump_memory(readbuf, 512);
+  while(1) {
+    memset(readbuf, 0, 2048);
+    err = usb_mass_read10(dev, 0, 0, 512, readbuf);
+    hexdump_memory(readbuf, 512);
+  }
+  memset(readbuf, 0, 2048);
+  err = usb_mass_read10(dev, 0, 1, 512, readbuf);
+  hexdump_memory(readbuf, 512);
 out_err:
   while(1);
   return err;

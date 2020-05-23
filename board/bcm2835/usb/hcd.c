@@ -319,7 +319,8 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
           break;
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
-        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d", 
+        ep->device = dev;
+        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d,int:%d", 
           dev->address, 
           i->descriptor.number, 
           ep->descriptor.endpoint_address & 0x7f,
@@ -328,7 +329,8 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
           usb_endpoint_type_to_string(ep->descriptor.attributes & 3),
           usb_endpoint_synch_type_to_string((ep->descriptor.attributes >> 2) & 3),
           usb_endpoint_usage_type_to_string((ep->descriptor.attributes >> 4) & 3),
-          ep->descriptor.max_packet_size
+          ep->descriptor.max_packet_size,
+          ep->descriptor.interval
         );
         ep++;
         break;
@@ -1058,4 +1060,58 @@ void usb_hcd_print_device(struct usb_hcd_device *dev)
   char buf[512];
   usb_hcd_device_to_string(dev, "  ", buf, sizeof(buf));
   printf("%s" __endline, buf);
+}
+
+int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature)
+{
+  int err;
+  int num_bytes;
+  struct usb_device_request rq = { 
+    .request_type = USB_RQ_TYPE_ENDPOINT_CLEAR_FEATURE,
+    .request      = USB_RQ_CLEAR_FEATURE,
+    .value        = feature,
+    .index        = hcd_endpoint_get_number(ep),
+    .length       = 0
+  };
+
+	struct usb_hcd_pipe_control pctl = {
+    .channel = 0,
+    .transfer_type = USB_ENDPOINT_TYPE_CONTROL,
+    .direction = USB_DIRECTION_OUT
+  };
+
+  struct usb_hcd_device *dev = ep->device;
+
+  err = hcd_transfer_control(&dev->pipe0, &pctl, NULL, 0, rq.raw, 1000, &num_bytes);
+  if (err) {
+    HCDERR("failed to clear halt on ep 1");
+  }
+  return err;
+}
+
+int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
+{
+  int err;
+  int num_bytes;
+  struct usb_device_request rq = { 
+    .request_type = USB_RQ_TYPE_ENDPOINT_SET_FEATURE,
+    .request      = USB_RQ_SET_FEATURE,
+    .value        = USB_ENDPOINT_FEATURE_HALT,
+    .index        = hcd_endpoint_get_number(ep),
+    .length       = 0
+  };
+
+	struct usb_hcd_pipe_control pctl = {
+    .channel = 0,
+    .transfer_type = USB_ENDPOINT_TYPE_CONTROL,
+    .direction = USB_DIRECTION_OUT
+  };
+
+  struct usb_hcd_device *dev = ep->device;
+
+  err = hcd_transfer_control(&dev->pipe0, &pctl, NULL, 0, rq.raw, 1000, &num_bytes);
+  if (err) {
+    HCDERR("failed to clear halt on ep 1");
+  }
+  return err;
 }

@@ -148,7 +148,7 @@ int hcd_transfer_bulk(
   int pid,
   int *out_num_bytes)
 {
-  int err;
+  int err = ERR_OK;
   dwc2_transfer_status_t status;
 
   dwc2_pipe_desc_t pipedesc = {
@@ -164,9 +164,14 @@ int hcd_transfer_bulk(
       .hub_port        = pipe->ls_hub_port
     }
   };
+  usb_hcd_print_debug = 3;
   status = dwc2_transfer(pipedesc, buf, buf_sz, pid, out_num_bytes);
-  if (status != DWC2_STATUS_ACK)
-    err = ERR_GENERIC;
+  if (status != DWC2_STATUS_ACK) {
+    if (status == DWC2_STATUS_NAK) {
+      err = ERR_RETRY;
+    } else
+      err = ERR_GENERIC;
+  }
   CHECK_ERR("a");
 out_err:
   return err;

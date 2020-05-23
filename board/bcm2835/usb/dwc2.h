@@ -36,3 +36,6 @@ typedef enum {
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, int pid, int *out_num_bytes);
 
 int dwc2_init_channels();
+
+int dwc2_set_log_level(int log_level);
+int dwc2_get_log_level();

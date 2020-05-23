@@ -41,3 +41,6 @@
 #define BF_CLEAR_AND_SET(val, set, offset, width) \
   BF_CLEAR(val, offset, width);\
   BF_ORR(val, set, offset, width);
+
+#define BYTE_EXTRACT(__v, __i) ((char)((__v >> (__i * 8)) & 0xff))
+

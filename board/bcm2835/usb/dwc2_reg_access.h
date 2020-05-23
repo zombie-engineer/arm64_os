@@ -16,14 +16,14 @@ static inline const char *reg_to_string(reg32_t reg)
 }
 typedef int (*reg_printer)(char *, int, uint32_t);
 
-void reg_printer_simple(char *buf, int bufsz, uint32_t val)
+static inline void reg_printer_simple(char *buf, int bufsz, uint32_t val)
 {
   snprintf(buf, bufsz, "%08x", val);
 }
 
 static inline void print_reg(reg32_t reg, uint32_t val, reg_printer p, int is_write_op)
 {
-  if (dwc2_print_debug > 1) {
+  if (dwc2_get_log_level() > 1) {
     char val_string[256];
     if (p)
       p(val_string, sizeof(val_string), val);
@@ -53,6 +53,7 @@ static inline void __write_ch_reg(reg32_t reg, int chan, uint32_t val, reg_print
 
 #define CLEAR_INTR()    __write_ch_reg(USB_HCINT0   , ch, 0xffffffff, usb_host_intr_to_string)
 #define CLEAR_INTRMSK() __write_ch_reg(USB_HCINTMSK0, ch, 0x00000000, usb_host_intr_to_string)
+#define SET_INTR()      __write_ch_reg(USB_HCINT0   , ch ,intr, usb_host_intr_to_string)
 #define SET_SPLT()      __write_ch_reg(USB_HCSPLT0  , ch, splt, usb_host_splt_to_string)
 #define SET_CHAR()      __write_ch_reg(USB_HCCHAR0  , ch, chr, usb_host_char_to_string)
 #define SET_SIZ()       __write_ch_reg(USB_HCTSIZ0  , ch, siz, usb_host_size_to_string)

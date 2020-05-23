@@ -63,13 +63,45 @@ struct usb_hcd_device_location {
 };
 
 struct usb_hcd_endpoint {
+  struct usb_hcd_device *device;
   struct usb_endpoint_descriptor descriptor ALIGNED(4);
 };
+
+static inline int hcd_endpoint_get_number(struct usb_hcd_endpoint *ep)
+{
+  return ep->descriptor.endpoint_address & 0x7f;
+} 
+
+static inline int hcd_endpoint_get_direction(struct usb_hcd_endpoint *ep)
+{
+  return ep->descriptor.endpoint_address & 0x80;
+}
+
+static inline int hcd_endpoint_get_max_packet_size(struct usb_hcd_endpoint *ep)
+{
+  return ep->descriptor.max_packet_size;
+}
+
+int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature);
+
+int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature);
 
 struct usb_hcd_interface {
   struct usb_interface_descriptor descriptor;
   struct usb_hcd_endpoint endpoints[USB_MAX_ENDPOINTS_PER_DEVICE] ALIGNED(4);
 };
+
+static int hcd_interface_get_num_endpoints(struct usb_hcd_interface *i)
+{
+  return i->descriptor.endpoint_count;
+}
+
+static struct usb_hcd_endpoint *hcd_interface_get_endpoint(struct usb_hcd_interface *i, int index)
+{
+  if (hcd_interface_get_num_endpoints(i) <= index)
+    return NULL;
+  return &i->endpoints[index];
+}
 
 struct usb_hcd_device {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_hcd_device);
@@ -112,11 +144,23 @@ struct usb_hcd_device {
   char string_configuration[64];
 };
 
+static inline int hcd_endpoint_get_address(struct usb_hcd_endpoint *ep)
+{
+  return ep->device->address;
+}
+
 static inline int usb_hcd_get_interface_class(struct usb_hcd_device *d, int interface_num)
 {
   if (interface_num >= d->num_interfaces)
     return -1;
   return d->interfaces[interface_num].descriptor.class;
+}
+
+static struct usb_hcd_interface *hcd_device_get_interface(struct usb_hcd_device *d, int index)
+{
+  if (d->num_interfaces <= index)
+    return NULL;
+  return &d->interfaces[index];
 }
 
 struct usb_hcd_device *usb_hcd_allocate_device();
@@ -187,3 +231,4 @@ int hcd_transfer_bulk(
 int usb_hcd_init();
 
 int usb_hcd_start();
+
