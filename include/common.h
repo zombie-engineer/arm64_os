@@ -1,6 +1,7 @@
 #pragma once
 #include <error.h>
 #include <kernel_panic.h>
+#include <bug.h>
 #include <cpu.h>
 #include <spinlock.h>
 #include <defs.h>

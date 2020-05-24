@@ -13,6 +13,8 @@
 #define MASS_REQUEST_GET_MAX_LUN 0xfe
 
 #define MASSLOG(__fmt, ...) printf(__MASS_PREFIX __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
+#define MASSDBG(__fmt, ...) if (usb_mass_log_level > 0)\
+  printf(__MASS_PREFIX __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
 
 #define USB_HCTSIZ0_PID_DATA0 0
 #define USB_HCTSIZ0_PID_DATA1 2
@@ -66,6 +68,11 @@ struct scsi_op_read_capacity_10 {
   uint8_t reserved  : 3;
   uint16_t transfer_len; // +7
   uint8_t control      ; // +9
+} PACKED;
+
+struct scsi_read_capacity_param {
+  uint32_t logic_address;
+  uint32_t block_length;
 } PACKED;
 
 struct scsi_op_inquiry {
@@ -154,6 +161,8 @@ static inline void csw_print(struct csw *s)
     s->csw_status);
 }
 
+static int usb_mass_log_level = 1;
+
 int usb_mass_reset(struct usb_hcd_device *dev)
 {
   int err;
@@ -205,6 +214,17 @@ out_err:
   return err;
 }
 
+static inline void usb_cbw_transfer_debug_send_cbw(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in,
+  int lun, const void *cmd, int cmdsz, int datasz, int data_direction)
+{
+  char cmd_string[256];
+  char data_string[256];
+  snprintf(cmd_string, sizeof(cmd_string), "opcode=%02xh,size=%d",
+    *(char *)cmd, cmdsz);
+  snprintf(data_string, sizeof(data_string), "size=%d,%s",
+    datasz, data_direction == USB_DIRECTION_OUT ? "out" : "in");
+  MASSDBG("sending CBW: lun:%d,command:'%s',data:'%s'", lun, cmd_string, data_string);
+}
 
 int usb_cbw_transfer(
   struct usb_hcd_endpoint *ep_out,
@@ -233,13 +253,15 @@ int usb_cbw_transfer(
     .ls_hub_address  = ep_out->device->pipe0.ls_hub_address
   };
 
-  char cmdbuf[31];
+  char cmdbuf[31] ALIGNED(4);
 
   usb_pid_t *next_pid = &ep_out->next_toggle_pid;
 
+  if (usb_mass_log_level)
+    usb_cbw_transfer_debug_send_cbw(ep_out, ep_in, lun, cmd, cmdsz, datasz, data_direction);
+
   memset(cmdbuf, 0, sizeof(cmdbuf));
-  if (sizeof(cbw) + cmdsz > sizeof(cmdbuf))
-    kernel_panic("no way");
+  BUG(sizeof(cbw) + cmdsz > sizeof(cmdbuf), "CBW packet must be exactly 31 bytes");
 
   memcpy(cmdbuf, &cbw, sizeof(cbw));
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
@@ -253,26 +275,32 @@ int usb_cbw_transfer(
     }
     err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
     CHECK_ERR("failed to transfer data");
+    if (usb_mass_log_level) {
+      MASSDBG("transfer complete: ");
+      hexdump_memory(data, datasz);
+    }
   }
 
   p.endpoint = hcd_endpoint_get_number(ep_in);
   next_pid = &ep_in->next_toggle_pid;
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_ERR("failed to get CSW");
-  csw_print(&status);
+  if (usb_mass_log_level)
+    csw_print(&status);
 out_err:
   return err;
 }
 
-int usb_mass_read_capacity10(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in, int lun, void *buf, int bufsz)
+int usb_mass_read_capacity10(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in, int lun)
 {
   int err;
   struct scsi_op_read_capacity_10 cmd ALIGNED(4) = { 0 };
-  cmd.opcode = SCSI_OPCODE_READ_10;
+  struct scsi_read_capacity_param param ALIGNED(4);
+  cmd.opcode = SCSI_OPCODE_READ_CAPACITY_10;
 
-  MASSLOG("READ CAPACITY");
-  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, bufsz);
-  CHECK_ERR("READ CAPACITY failed");
+  MASSLOG("READ CAPACITY(10)");
+  err = usb_cbw_transfer(ep_out, ep_in, 3, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, &param, sizeof(param));
+  CHECK_ERR("READ CAPACITY(10) failed");
 out_err:
   return err;
 }
@@ -312,20 +340,22 @@ out_err:
 int usb_mass_inquiry(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in, int lun)
 {
   int err;
-  int num_bytes;
-  const char SCSI_CMD_LENGTH = 6;
   char buf[128] ALIGNED(4);
   char description[256];
   struct scsi_op_inquiry cmd;
+  struct scsi_response_inquiry *info = (struct scsi_response_inquiry *)buf;
+  const int min_cmd_len = 5;
 
   memset(&cmd, 0, sizeof(cmd));
   memset(buf , 0, sizeof(buf));
 
-  scsi_fill_cmd_inquiry(&cmd, 0, 0, 95);
-  MASSLOG("INQUIRY:SEND CBW");
-  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, 95);
-  CHECK_ERR("INQUIRY CMD failed");
-  scsi_inquiry_data_to_string(description, sizeof(description), (struct scsi_response_inquiry *)buf);
+  scsi_fill_cmd_inquiry(&cmd, 0, 0, min_cmd_len);
+  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, min_cmd_len);
+  CHECK_ERR("Failed to get INQUIRY data length");
+  scsi_fill_cmd_inquiry(&cmd, 0, 0, info->additional_length);
+  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, info->additional_length);
+  CHECK_ERR("Failed to get full INQUIRY data");
+  scsi_inquiry_data_to_string(description, sizeof(description), info);
   MASSLOG("%s", description);
 out_err:
   return err;
@@ -369,7 +399,7 @@ out_err:
   return err;
 }
 
-int usb_mass_storage_init(struct usb_hcd_device* dev)
+int usb_mass_init(struct usb_hcd_device* dev)
 {
   int err;
   int max_lun = 0;
@@ -407,16 +437,16 @@ int usb_mass_storage_init(struct usb_hcd_device* dev)
 
   err = usb_mass_get_max_lun(dev, &max_lun);
   CHECK_ERR("failed to get max lun");
-  dwc2_set_log_level(2);
+ // dwc2_set_log_level(2);
+  usb_mass_set_log_level(1);
   err = usb_mass_test_unit_ready(ep_out, ep_in, lun);
-  err = usb_mass_inquiry(ep_out, ep_in, lun);
-  CHECK_ERR("failed to send INQUIRY request");
-  err = usb_mass_inquiry(ep_out, ep_in, lun);
-  CHECK_ERR("failed to send INQUIRY request");
-  while(1);
   CHECK_ERR("failed to test unit ready");
-  //err = usb_mass_read_capacity10(dev, 0, readbuf, 512);
-  // hexdump_memory(readbuf, 512);
+  err = usb_mass_inquiry(ep_out, ep_in, lun);
+  CHECK_ERR("failed to send INQUIRY request");
+  err = usb_mass_inquiry(ep_out, ep_in, lun);
+  CHECK_ERR("failed to send INQUIRY request");
+  err = usb_mass_read_capacity10(ep_out, ep_in, lun);
+  while(1);
   while(1) {
     memset(readbuf, 0, 2048);
     err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
@@ -428,4 +458,9 @@ int usb_mass_storage_init(struct usb_hcd_device* dev)
 out_err:
   while(1);
   return err;
+}
+
+int usb_mass_set_log_level(int level)
+{
+  usb_mass_log_level = level;
 }
