@@ -259,7 +259,7 @@ int usb_cbw_transfer(
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
 
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
-  CHECK_ERR("failed to send CBW");
+  CHECK_ERR("transfer failed CBW send");
   if (data && datasz) {
     if (data_direction == USB_DIRECTION_IN) {
       p.endpoint = hcd_endpoint_get_number(ep_in);
@@ -267,14 +267,19 @@ int usb_cbw_transfer(
     }
     int retries = 0;
     for (retries = 0; retries < 5; retries++) {
+      wait_usec(500);
       err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
       if (err == ERR_OK)
         break;
+      printf("ERR: %d\n", err);
 
-      if (err == ERR_RETRY)
+      if (err == ERR_RETRY) {
+        MASSERR("RETRYING");
+        wait_usec(900);
         continue;
+      }
 
-      MASSERR("failed to transfer data");
+      MASSERR("transfer failed at data stage");
       goto out_err;
     }
     if (usb_mass_log_level) {
@@ -286,10 +291,31 @@ int usb_cbw_transfer(
   p.endpoint = hcd_endpoint_get_number(ep_in);
   next_pid = &ep_in->next_toggle_pid;
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
-  CHECK_ERR("failed to get CSW");
+  CHECK_ERR("transfer failed to CSW recieve");
+
+  if (!is_csw_valid(&status, num_bytes, tag)) {
+    MASSERR("recieved CSW not valid");
+    goto out_reset_recovery;
+  }
+  if (!is_csw_meaningful(&status, datasz)) {
+    MASSERR("recieved CSW not meaningful");
+    goto out_reset_recovery;
+  }
+  if (status.csw_status == CSW_STATUS_PHASE_ERR) {
+    MASSERR("device responded with PHASE_ERROR");
+    goto out_reset_recovery;
+  }
+
   if (usb_mass_log_level)
     csw_print(&status);
+
 out_err:
+  return err;
+
+out_reset_recovery:
+  err = usb_mass_reset_recovery(ep_out, ep_in);
+  CHECK_ERR("Failed to perform reset recovery");
+  err = ERR_RETRY;
   return err;
 }
 
@@ -434,8 +460,8 @@ int usb_mass_init(struct usb_hcd_device* dev)
     hcd_endpoint_get_number(ep_out),
     hcd_endpoint_get_number(ep_in));
 
-  usb_hcd_set_log_level(1);
-  dwc2_set_log_level(2);
+  // usb_hcd_set_log_level(1);
+  // dwc2_set_log_level(2);
   err = usb_mass_reset(ep_out, ep_in);
   CHECK_ERR("failed to reset mass storage device");
 

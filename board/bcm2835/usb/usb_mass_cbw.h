@@ -52,4 +52,33 @@ struct csw {
   uint8_t  csw_status;
 } PACKED;
 
+/*
+ * According to USB Mass Device Spec there should be two different
+ * checks on the recieved CSW. First the host checks that
+ * CSW is VALID. Next the host checks that it is MEANINGFUL.
+ * Because they go one after another there is no reason to 
+ * check signature and tag in meaningful check.
+ * 
+ */
+static inline int is_csw_valid(void *buf, int size, int tag_in_cbw)
+{
+  struct csw *c = (struct csw *)buf;
+
+  if (size == sizeof(struct csw) && c->csw_signature == CSW_SIGNATURE &&
+    c->csw_tag == tag_in_cbw)
+    return 1;
+  return 0;
+}
+
+static inline int is_csw_meaningful(void *buf, int transfer_length)
+{
+  struct csw *c = (struct csw *)buf;
+  if ((c->csw_status == CSW_STATUS_GOOD || c->csw_status == CSW_STATUS_FAILED)
+    && c->csw_data_residue <= transfer_length)
+    return 1;
+  if (c->csw_status == CSW_STATUS_PHASE_ERR)
+    return 1;
+  return 0;
+}
+
 int cbw_transfer(struct usb_hcd_pipe *d, int dir, void *buf, int bufsz);
