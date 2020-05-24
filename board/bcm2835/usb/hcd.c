@@ -29,7 +29,14 @@
 //
 
 static int usb_hcd_unique_device_address = 1;
-int usb_hcd_print_debug = 0;
+int usb_hcd_log_level = 0;
+
+int usb_hcd_set_log_level(int level)
+{
+  int old_level = usb_hcd_log_level;
+  usb_hcd_log_level = level;
+  return old_level;
+}
 
 static inline const char *usb_hcd_device_state_to_string(int s)
 {
@@ -278,7 +285,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
   int err = ERR_OK;
   void *cfgbuf_end = (char *)cfgbuf + cfgbuf_sz;
   hdr = cfgbuf;
-  if (usb_hcd_print_debug)
+  if (usb_hcd_log_level)
     hexdump_memory(cfgbuf, cfgbuf_sz);
 
   while((void*)hdr < cfgbuf_end && should_continue) {
@@ -1063,6 +1070,35 @@ void usb_hcd_print_device(struct usb_hcd_device *dev)
   printf("%s" __endline, buf);
 }
 
+int hcd_endpoint_get_status(struct usb_hcd_endpoint *ep, void *status)
+{
+  int err;
+  int num_bytes;
+  struct usb_device_request rq = { 
+    .request_type = USB_RQ_TYPE_ENDPOINT_GET_STATUS,
+    .request      = USB_RQ_GET_STATUS,
+    .value        = 0,
+    .index        = hcd_endpoint_get_number(ep),
+    .length       = 2
+  };
+
+  HCDLOG("ENDPOINT GET_STATUS: ep%d", hcd_endpoint_get_number(ep));
+
+	struct usb_hcd_pipe_control pctl = {
+    .channel = 0,
+    .transfer_type = USB_ENDPOINT_TYPE_CONTROL,
+    .direction = USB_DIRECTION_IN
+  };
+
+  struct usb_hcd_device *dev = ep->device;
+
+  err = hcd_transfer_control(&dev->pipe0, &pctl, status, 2, rq.raw, 1000, &num_bytes);
+  if (err) {
+    HCDERR("failed to clear halt on ep 1");
+  }
+  return err;
+}
+
 int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature)
 {
   int err;
@@ -1074,6 +1110,7 @@ int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature)
     .index        = hcd_endpoint_get_number(ep),
     .length       = 0
   };
+  HCDLOG("clear feature: ep%d", hcd_endpoint_get_number(ep));
 
 	struct usb_hcd_pipe_control pctl = {
     .channel = 0,
@@ -1097,7 +1134,7 @@ int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
   struct usb_device_request rq = { 
     .request_type = USB_RQ_TYPE_ENDPOINT_SET_FEATURE,
     .request      = USB_RQ_SET_FEATURE,
-    .value        = USB_ENDPOINT_FEATURE_HALT,
+    .value        = feature,
     .index        = hcd_endpoint_get_number(ep),
     .length       = 0
   };

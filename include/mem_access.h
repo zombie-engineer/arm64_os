@@ -1,5 +1,6 @@
 #pragma once
 #include <types.h>
+#include <bits_api.h>
 
 #define __GET_BYTE(__addr, __i) (((char *)__addr)[__i])
 #define __SET_BYTE(__addr, __i, __v) ((char *)__addr)[__i] = __v

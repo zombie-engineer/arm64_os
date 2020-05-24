@@ -276,7 +276,6 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   }
 
   /* Clear all existing interrupts. */
-  GET_INTR();
   CLEAR_INTR();
   CLEAR_INTRMSK();
 
@@ -355,9 +354,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     }
 
     GET_INTR();
-    // GET_SIZ();
-
-    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d\r\n", 
+    GET_SIZ();
+    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d", 
       siz,
       USB_HOST_SIZE_GET_PACKET_COUNT(siz),
       USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);

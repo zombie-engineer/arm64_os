@@ -7,7 +7,7 @@
 static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
 {
   char rq_desc[256];
-  if (usb_hcd_print_debug) {
+  if (usb_hcd_log_level) {
     usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
     HCDDEBUG("SUBMIT: device_address:%d, max_packet:%d, ep:%d, req:%s", pipe->address, pipe->max_packet_size, pipe->endpoint, rq_desc);
   }
@@ -168,7 +168,6 @@ int hcd_transfer_bulk(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  usb_hcd_print_debug = 3;
   status = dwc2_transfer(pipedesc, buf, buf_sz, pid, out_num_bytes);
   if (status != DWC2_STATUS_ACK) {
     if (status == DWC2_STATUS_NAK) {

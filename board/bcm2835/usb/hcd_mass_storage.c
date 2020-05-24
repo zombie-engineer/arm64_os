@@ -6,20 +6,23 @@
 #include <mem_access.h>
 #include <delays.h>
 
-#define __MASS_PREFIX "[USB_MASS: %d] "
+#define __MASS_PREFIX(__l) "[USB_MASS: %d "__l"] "
 #define __MASS_ARGS 0
 
 #define MASS_REQUEST_RESET       0xff
 #define MASS_REQUEST_GET_MAX_LUN 0xfe
 
-#define MASSLOG(__fmt, ...) printf(__MASS_PREFIX __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
+#define MASSLOG(__fmt, ...) printf(__MASS_PREFIX("") __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
 #define MASSDBG(__fmt, ...) if (usb_mass_log_level > 0)\
-  printf(__MASS_PREFIX __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
+  printf(__MASS_PREFIX("DBG") __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
+#define MASSERR(__fmt, ...) printf(__MASS_PREFIX("ERR") __fmt __endline, __MASS_ARGS, ##__VA_ARGS__)
 
 #define USB_HCTSIZ0_PID_DATA0 0
 #define USB_HCTSIZ0_PID_DATA1 2
 #define USB_HCTSIZ0_PID_DATA2 1
 #define USB_HCTSIZ0_PID_SETUP 3
+
+extern int dwc2_set_log_level(int);
 
 struct scsi_op_test_unit_ready {
   uint8_t opcode          ;
@@ -163,12 +166,26 @@ static inline void csw_print(struct csw *s)
 
 static int usb_mass_log_level = 1;
 
-int usb_mass_reset(struct usb_hcd_device *dev)
+int usb_mass_reset_recovery(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in)
+{
+  int err;
+  MASSDBG("starting reset recovery");
+
+  err = hcd_endpoint_clear_feature(ep_in, USB_ENDPOINT_FEATURE_HALT);
+  CHECK_ERR("failed to clear feature HALT on Bulk-IN endpoint");
+
+  err = hcd_endpoint_clear_feature(ep_out, USB_ENDPOINT_FEATURE_HALT);
+  CHECK_ERR("failed to clear feature HALT on Bulk-OUT endpoint");
+  MASSDBG("reset recovery done");
+out_err:
+  return err;
+}
+
+int usb_mass_reset(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in)
 {
   int err;
   int num_bytes;
 	struct usb_hcd_pipe_control pctl;
-  struct usb_hcd_interface *i;
   struct usb_device_request rq = { 
     .request_type = USB_RQ_TYPE_CLASS_SET_INTERFACE,
     .request      = MASS_REQUEST_RESET,
@@ -177,39 +194,14 @@ int usb_mass_reset(struct usb_hcd_device *dev)
     .length       = 0,
   };
 
-  MASSLOG("usb_mass_reset: %016x", rq.raw);
+  MASSLOG("usb_mass_reset: request=t:%02x,r:%02x,v:%02x,i:%02x,l:%02x", rq.request_type, rq.request, rq.value, rq.index, rq.length);
 
   pctl.channel = 0;
   pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
   pctl.direction = USB_DIRECTION_OUT;
 
-  err = hcd_transfer_control(&dev->pipe0, &pctl, 
+  err = hcd_transfer_control(&ep_out->device->pipe0, &pctl, 
       NULL, 0, rq.raw, 1000, &num_bytes);
-  if (err) {
-    HCDERR("failed to send reset");
-    goto out_err;
-  }
-
-  if (!dev->num_interfaces) {
-    HCDERR("failed to clear HALT bit on device without intefaces");
-    err = ERR_GENERIC;
-    goto out_err;
-  }
-
-  i = &dev->interfaces[0];
-  if (hcd_interface_get_num_endpoints(i) < 2) {
-    HCDERR("failed to clear HALT bit on device without 2 endpoints");
-    err = ERR_GENERIC;
-    goto out_err;
-  }
-
-  err = hcd_endpoint_clear_feature(&i->endpoints[0], USB_ENDPOINT_FEATURE_HALT);
-  CHECK_ERR("failed to clear HALT feature on endpoint");
-
-  err = hcd_endpoint_clear_feature(&i->endpoints[1], USB_ENDPOINT_FEATURE_HALT);
-  CHECK_ERR("failed to clear HALT feature on endpoint");
-
-out_err:
   MASSLOG("usb_mass_reset complete err: %d", err);
   return err;
 }
@@ -273,8 +265,18 @@ int usb_cbw_transfer(
       p.endpoint = hcd_endpoint_get_number(ep_in);
       next_pid = &ep_in->next_toggle_pid;
     }
-    err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
-    CHECK_ERR("failed to transfer data");
+    int retries = 0;
+    for (retries = 0; retries < 5; retries++) {
+      err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
+      if (err == ERR_OK)
+        break;
+
+      if (err == ERR_RETRY)
+        continue;
+
+      MASSERR("failed to transfer data");
+      goto out_err;
+    }
     if (usb_mass_log_level) {
       MASSDBG("transfer complete: ");
       hexdump_memory(data, datasz);
@@ -432,12 +434,13 @@ int usb_mass_init(struct usb_hcd_device* dev)
     hcd_endpoint_get_number(ep_out),
     hcd_endpoint_get_number(ep_in));
 
-  err = usb_mass_reset(dev);
+  usb_hcd_set_log_level(1);
+  dwc2_set_log_level(2);
+  err = usb_mass_reset(ep_out, ep_in);
   CHECK_ERR("failed to reset mass storage device");
 
   err = usb_mass_get_max_lun(dev, &max_lun);
   CHECK_ERR("failed to get max lun");
- // dwc2_set_log_level(2);
   usb_mass_set_log_level(1);
   err = usb_mass_test_unit_ready(ep_out, ep_in, lun);
   CHECK_ERR("failed to test unit ready");
@@ -446,10 +449,10 @@ int usb_mass_init(struct usb_hcd_device* dev)
   err = usb_mass_inquiry(ep_out, ep_in, lun);
   CHECK_ERR("failed to send INQUIRY request");
   err = usb_mass_read_capacity10(ep_out, ep_in, lun);
-  while(1);
   while(1) {
     memset(readbuf, 0, 2048);
     err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
+    while(1);
     hexdump_memory(readbuf, 512);
   }
   memset(readbuf, 0, 2048);
@@ -462,5 +465,7 @@ out_err:
 
 int usb_mass_set_log_level(int level)
 {
+  int old_level = usb_mass_log_level;
   usb_mass_log_level = level;
+  return old_level;
 }

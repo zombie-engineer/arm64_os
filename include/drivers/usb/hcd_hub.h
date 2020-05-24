@@ -17,7 +17,7 @@
 #define _FMT_ARG_HUB_PORT      h->d->address, port
 #define _FMT_ARG_HUB_PORT_ERR  h->d->address, port, err
 
-#define IF_DBG if (usb_hcd_print_debug)
+#define IF_DBG if (usb_hcd_log_level)
 
 #define _PRNT(__t, __fmt, ...)\
   printf(_FMT_PREFIX_ ## __t __fmt __endline, _FMT_ARG_ ## __t, ## __VA_ARGS__)

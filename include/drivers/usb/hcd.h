@@ -20,7 +20,7 @@
 #define USB_MAX_INTERFACES_PER_DEVICE 8
 #define USB_MAX_ENDPOINTS_PER_DEVICE 16
 
-extern int usb_hcd_print_debug;
+extern int usb_hcd_log_level;
 struct usb_hcd_device;
 extern struct usb_hcd_device *root_hub;
 
@@ -28,7 +28,7 @@ extern struct usb_hcd_device *root_hub;
 
 #define HCDLOG(__fmt, ...)     printf(HCDLOGPREFIX(INFO) __fmt __endline, ##__VA_ARGS__)
 #define HCDERR(__fmt, ...)     logf(HCDLOGPREFIX(ERR), "err: %d: "__fmt, err, ##__VA_ARGS__)
-#define HCDDEBUG(__fmt, ...)   if (usb_hcd_print_debug)\
+#define HCDDEBUG(__fmt, ...)   if (usb_hcd_log_level)\
                                printf(HCDLOGPREFIX(DBG) __fmt __endline, ##__VA_ARGS__)
 #define HCDWARN(__fmt, ...)    logf(HCDLOGPREFIX(WARN), __fmt, ##__VA_ARGS__)
 
@@ -87,6 +87,8 @@ static inline int hcd_endpoint_get_max_packet_size(struct usb_hcd_endpoint *ep)
 int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature);
 
 int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature);
+
+int hcd_endpoint_get_status(struct usb_hcd_endpoint *ep, void *status);
 
 struct usb_hcd_interface {
   struct usb_interface_descriptor descriptor;
@@ -241,3 +243,4 @@ int usb_hcd_init();
 
 int usb_hcd_start();
 
+int usb_hcd_set_log_level(int);
