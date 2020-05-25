@@ -934,8 +934,10 @@ int usb_hcd_init()
   int err;
   uint32_t vendor_id, user_id;
   STATIC_SLOT_INIT_FREE(usb_hcd_device);
+
   usb_hcd_hub_init();
   usb_hcd_hid_init();
+  usb_hcd_mass_init();
 
   vendor_id = read_reg(USB_GSNPSID);
   user_id   = read_reg(USB_GUID);

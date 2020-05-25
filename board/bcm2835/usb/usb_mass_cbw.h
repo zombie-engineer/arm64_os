@@ -3,6 +3,8 @@
 #include <compiler.h>
 #include <bits_api.h>
 
+int cbw_set_log_level(int level);
+
 /*
  * Universal Serial Bus Mass Storage Class Bulk-Only Transport
  *
