@@ -58,6 +58,21 @@ struct scsi_op_read_10 {
   uint8_t control      ; // +9
 } PACKED;
 
+struct scsi_op_write_10 {
+  uint8_t opcode       ;
+
+  uint8_t obsolete0 : 2; // +1
+  uint8_t reserved0 : 1; // +1
+  uint8_t fua       : 1;
+  uint8_t dpo       : 1;
+  uint8_t wrprotect : 3;
+  uint32_t lba         ; // +2
+  uint8_t group_num : 5; // +6
+  uint8_t reserved  : 3;
+  uint16_t transfer_len; // +7
+  uint8_t control      ; // +9
+} PACKED;
+
 struct scsi_op_read_capacity_10 {
   uint8_t opcode       ;
   uint8_t obsolete0 : 2; // +1
@@ -257,6 +272,7 @@ int usb_cbw_transfer(
 
   memcpy(cmdbuf, &cbw, sizeof(cbw));
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
+  memcpy(&status, 0, sizeof(status));
 
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
   CHECK_ERR("transfer failed CBW send");
@@ -346,6 +362,21 @@ int usb_mass_read10(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep
   memset(data_dst, 0, data_sz);
   err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz);
   CHECK_ERR("READ(10) command failed");
+out_err:
+  return err;
+}
+
+int usb_mass_write10(struct usb_hcd_endpoint *ep_out, struct usb_hcd_endpoint *ep_in,
+  int lun, uint32_t offset, void *data_dst, int data_sz)
+{
+  int err;
+  struct scsi_op_write_10 cmd ALIGNED(4) = { 0 };
+  cmd.opcode = SCSI_OPCODE_WRITE_10;
+  set_unaligned_32_le(&cmd.lba, offset);
+  set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
+  MASSLOG("WRITE(10)");
+  err = usb_cbw_transfer(ep_out, ep_in, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_OUT, data_dst, data_sz);
+  CHECK_ERR("WRITE(10) command failed");
 out_err:
   return err;
 }
@@ -475,14 +506,16 @@ int usb_mass_init(struct usb_hcd_device* dev)
   err = usb_mass_inquiry(ep_out, ep_in, lun);
   CHECK_ERR("failed to send INQUIRY request");
   err = usb_mass_read_capacity10(ep_out, ep_in, lun);
-  while(1) {
-    memset(readbuf, 0, 2048);
-    err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
-    while(1);
-    hexdump_memory(readbuf, 512);
-  }
   memset(readbuf, 0, 2048);
-  err = usb_mass_read10(ep_out, ep_in, lun, 1, readbuf, 512);
+
+  err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
+  hexdump_memory(readbuf, 512);
+  memset(readbuf, 0xfc, 512);
+  memset(readbuf + 128, 0xee, 128);
+  memset(readbuf + 512 - 4, 0x55, 4);
+  err = usb_mass_write10(ep_out, ep_in, lun, 0, readbuf, 512);
+  memset(readbuf, 0, 512);
+  err = usb_mass_read10(ep_out, ep_in, lun, 0, readbuf, 512);
   hexdump_memory(readbuf, 512);
 out_err:
   while(1);
