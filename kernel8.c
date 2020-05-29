@@ -41,8 +41,15 @@
 #include <pwm.h>
 #include <drivers/servo/sg90.h>
 
-#define DISPLAY_WIDTH 1824
-#define DISPLAY_HEIGHT 984
+  // hexdump_addr(0x100);
+  // 0x0000000000001122
+  // PARange  2: 40 bits, 1TB 0x2
+  // ASIDBits 2: 16 bits
+  // BigEnd   1: Mixed-endian support
+  // SNSMem   1: Secure versus Non-secure Memory
+  // TGran16  0: 16KB granule not supported
+  // TGran64  0: 64KB granule is supported
+  // TGran4   0: 4KB granule is supported
 
 #ifdef CHECK_PRINTF
 void check_printf()
@@ -882,7 +889,7 @@ void main()
 
   font_init_lib();
 
-  vcanvas_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  vcanvas_init(CONFIG_DISPLAY_WIDTH, CONFIG_DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
@@ -949,16 +956,4 @@ void main()
   print_mmu_stats();
   // run_task();
 
-  // hexdump_addr(0x100);
-  // 0x0000000000001122
-  // PARange  2: 40 bits, 1TB 0x2
-  // ASIDBits 2: 16 bits
-  // BigEnd   1: Mixed-endian support
-  // SNSMem   1: Secure versus Non-secure Memory
-  // TGran16  0: 16KB granule not supported
-  // TGran64  0: 64KB granule is supported
-  // TGran4   0: 4KB granule is supported
-
-  // vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
-  // vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
 }

@@ -19,6 +19,30 @@ extern void __armv8_cpuctx_eret();
 #define STACK_SIZE (1024 * 1024 * 1)
 #define NUM_STACKS 10
 
+static struct scheduler __scheduler;
+
+void scheduler_add_to_runlist(struct scheduler *s, struct task *t)
+{
+  disable_irq();
+  list_del_init(&t->schedlist);
+  list_add_tail(&t->schedlist, &s->runlist);
+  enable_irq();
+}
+
+void scheduler_add_to_waitlist(struct scheduler *s, struct task *t)
+{
+  disable_irq();
+  list_add(&t->schedlist, &s->waitlist);
+  enable_irq();
+}
+
+void scheduler_rm_from_list(struct scheduler *s, struct task *t)
+{
+  disable_irq();
+  list_del_init(&t->schedlist);
+  enable_irq();
+}
+
 static task_t tasks[40];
 
 static int task_idx;
@@ -37,7 +61,8 @@ void dealloc_stack(void *s)
 }
 
 extern void __armv8_prep_context(uint64_t *, uint64_t, uint64_t, void *);
-extern void __armv8_pickup_context(void*);
+
+extern void __armv8_restore_ctx_from(void*);
 
 void prep_task_ctx(uint64_t *sp, uint64_t fn, uint64_t flags, void *cpuctx)
 {
@@ -46,7 +71,7 @@ void prep_task_ctx(uint64_t *sp, uint64_t fn, uint64_t flags, void *cpuctx)
 
 void start_task_from_ctx(void *cpuctx)
 {
-  __armv8_pickup_context(cpuctx);
+  __armv8_restore_ctx_from(cpuctx);
 }
 
 static char stacks[STACK_SIZE * NUM_STACKS];
@@ -84,7 +109,7 @@ task_t *task_create(task_fn fn, const char *task_name)
   if (!stack)
     goto out;
 
-  INIT_LIST_HEAD(&t->run_queue);
+  INIT_LIST_HEAD(&t->schedlist);
 
   asm volatile("mrs %0, daif\n" : "=r"(flags) );
   prep_task_ctx(stack, (uint64_t)fn, flags, t->cpuctx);
@@ -98,7 +123,7 @@ out:
     dealloc_stack(stack);
   if (t)
     dealloc_task(t);
-  return 0;
+  return ERR_PTR(ERR_GENERIC);
 }
 
 int run_cmdrunner_thread()
@@ -119,12 +144,13 @@ int run_uart_thread()
 
 void wait_on_timer_ms(uint64_t msec)
 {
+  yield();
 }
 
 int test_thread()
 {
   while(1) {
-    debug_event_1();
+    blink_led_2(2, 1000);
     wait_on_timer_ms(1000);
   }
 }
@@ -133,7 +159,9 @@ int run_test_thread()
 {
   task_t *t;
   t = task_create(test_thread, "test_thread");
-  if (t);
+  if (IS_ERR(t))
+    return PTR_ERR(t);
+  scheduler_add_to_runlist(&__scheduler, t);
   return ERR_OK;
 }
 
@@ -143,28 +171,45 @@ static void sched_timer_cb(void *arg)
   blink_led(1, 10);
 }
 
+void yield()
+{
+  asm volatile ("b __armv8_yield\n");
+}
+
 int init_task_fn(void)
 {
+  // run_uart_thread();
+  // run_cmdrunner_thread();
+  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
-  systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, sched_timer_cb, 0);
-  enable_irq();
-  run_uart_thread();
-  //run_cmdrunner_thread();
+  // systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, sched_timer_cb, 0);
+  // enable_irq();
 
   while(1) {
-    // disable_irq();
-    blink_led_2(3, 1000);
-    // enable_irq();
-    asm volatile("wfe");
+    blink_led(8, 200);
+    yield();
   }
   uart_puts("123456789");
 }
 
 
 
-task_t *scheduler_pick_next_task(task_t *ct)
+task_t *scheduler_pick_next_task(task_t *t)
 {
-  return container_of(ct->run_queue.next, task_t, run_queue);
+  list_del_init(&t->schedlist);
+  list_add_tail(&t->schedlist, &__scheduler.runlist);
+
+  /* 
+   * Put currently executing task to end of list
+   */
+  t = list_first_entry(&__scheduler.runlist, task_t, schedlist);
+  // list_add_tail(&t->schedlist, &__scheduler.runlist);
+
+  /*
+   * Return new next
+   */
+ //  t = list_first_entry(&__scheduler.runlist, task_t, schedlist);
+  return t;
 }
 
 static int sched_num_switches = 0;
@@ -178,7 +223,7 @@ void schedule_debug()
   }
 }
 
-void* schedule()
+void schedule()
 {
   task_t *current_task;
 
@@ -187,16 +232,9 @@ void* schedule()
   current_task = container_of(__current_cpuctx, task_t, cpuctx);
   current_task = scheduler_pick_next_task(current_task);
 
-  if (!current_task)
-    kernel_panic("scheduler logic failed.\n");
+  BUG(!current_task, "scheduler logic failed.");
 
   __current_cpuctx = current_task->cpuctx;
-  return NULL;
-}
-
-void yield()
-{
-  asm volatile ("b __armv8_yield\n");
 }
 
 
@@ -233,6 +271,9 @@ void jump_to_schedule()
 
 void scheduler_init()
 {
+  INIT_LIST_HEAD(&__scheduler.runlist);
+  INIT_LIST_HEAD(&__scheduler.waitlist);
+
   task_t *initial_task;
   puts("Starting task scheduler\n");
   task_idx = 0;
@@ -240,5 +281,6 @@ void scheduler_init()
   memset(&tasks, 0, sizeof(tasks));
 
   initial_task = task_create(init_task_fn, "init_task_fn");
+  scheduler_add_to_runlist(&__scheduler, initial_task);
   start_task_from_ctx(initial_task->cpuctx);
 }

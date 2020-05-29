@@ -129,7 +129,7 @@ FUNC(__armv8_prep_context):
   .unreq ctx
   ret
 
-FUNC(__armv8_pickup_context):
+FUNC(__armv8_restore_ctx_from):
   // x0 - cpu context to restore
   ldr x30, =__current_cpuctx
   str x0, [x30]
@@ -178,7 +178,7 @@ FUNC(__armv8_pickup_context):
   // make patched program counter, that
   // will point at end second part of yield
   // function for proper return
-  adr   x30, __return_from_yield_addr
+  adr   x30, __pc_resume_from_yield
   ldr   x30, [x30]
   mov   x30, #1
   mov   x30, #1
@@ -189,12 +189,12 @@ FUNC(__armv8_pickup_context):
 .endm
 
 .macro RESTORE_CONTEXT
-  ldr   x30, =__current_cpuctx
-  ldr   x0, [x30, #(31 << 3)]
+  ctx   .req x30
+  ldr   ctx, =__current_cpuctx
+  ldr   ctx, [ctx]
+  ldr   x0, [ctx, #(31 << 3)]
   mov   sp, x0
-  LOAD_REGS_X0_X30 x30
- // ldr   x30, [x30, ]
-  // restore daif
+  LOAD_REGS_X0_X30 ctx
 .endm
 
 /*
@@ -206,15 +206,10 @@ FUNC(__armv8_pickup_context):
  * 6. enable irq
  */
 FUNC(__armv8_yield):
-  // 1
-  IRQ_DISABLE
-  // 2,3
   STORE_CONTEXT
-  // 4
   bl schedule
-
 FUNC(__armv8_ret_to_task):
   RESTORE_CONTEXT
-__return_from_yield_addr:
+__pc_resume_from_yield:
   ret
 
