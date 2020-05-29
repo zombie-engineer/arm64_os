@@ -4,6 +4,7 @@
    // DDI0487E_a_armv8_arm.pdf
 
 #include <asm_macros.h>
+#include "armv8_asm_macros.h"
 
 #define DAIF_IRQ_BIT    (1 << 1)
 
@@ -43,11 +44,11 @@ FUNC(armv8_get_mpidr_el1):
   ret
 
 FUNC(enable_irq):
-  msr daifclr, #DAIF_IRQ_BIT
+  IRQ_ENABLE
   ret
 
 FUNC(disable_irq):
-  msr daifset, #DAIF_IRQ_BIT
+  IRQ_DISABLE
   ret
 
 FUNC(is_irq_enabled):

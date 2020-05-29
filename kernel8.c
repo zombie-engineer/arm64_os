@@ -877,7 +877,7 @@ void main()
 {
   debug_init();
   gpio_set_init();
-  spi_emulated_init();
+  // spi_emulated_init();
   init_unhandled_exception_reporters();
 
   font_init_lib();
@@ -887,47 +887,40 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
-  // UsbInitialise();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
-  usbd_init();
-  usbd_print_device_tree();
-  while(1);
-  pwm_bcm2835_init();
-  bcm2835_set_pwm_clk_freq(100000);
-  servo_sg90_init();
+  // pwm_bcm2835_init();
+  // bcm2835_set_pwm_clk_freq(100000);
+  // servo_sg90_init();
   print_mbox_props();
-  // self_test();
 #ifndef CONFIG_QEMU
-  init_nokia5110_display(1, 0);
-  nokia5110_draw_text("Display ready", 0, 0);
+  // usbd_init();
+  // usbd_print_device_tree();
+  // init_nokia5110_display(1, 0);
+  // nokia5110_draw_text("Display ready", 0, 0);
 #endif
   // nokia5110_test_draw();
-  init_atmega8a();
-  if (avr_update()) {
-    puts("halting\n");
-    while(1) asm volatile("wfe");
-  }
-  atmega8a_drop_spi();
-  spi_slave_test();
+  // init_atmega8a();
+  // if (avr_update()) {
+  //  puts("halting\n");
+  // }
+  // atmega8a_drop_spi();
+  // spi_slave_test();
   cm_print_clocks();
-  atmega8a_spi_master_test();
-  puts("halting\n");
-  while(1);
-  i2c_test();
+  // atmega8a_spi_master_test();
+  // i2c_test();
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);
 
   // wait_gpio();
   // i2c_init();
   // i2c_bitbang();
-//  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
-//    
-//    puts("Failed to init bsc_slave in I2C mode\n");
-//  } else
-//    bsc_slave_debug();
-//  while(1);
-  while(1);
+  //  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
+  //    
+  //    puts("Failed to init bsc_slave in I2C mode\n");
+  //  } else
+  //    bsc_slave_debug();
+  //  while(1);
 
   mmu_init();
   // nokia5110_draw_text("MMU OK!", 0, 0);
@@ -937,8 +930,8 @@ void main()
   print_current_ex_level();
   systimer_init();
 
-  gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
-  while(1);
+  // cmdrunner_init();
+  // cmdrunner_run_interactive_loop();
   scheduler_init();
   while(1);
 
@@ -968,6 +961,4 @@ void main()
 
   // vcanvas_fill_rect(10, 10, 100, 10, 0x00ffffff);
   // vcanvas_fill_rect(10, 20, 100, 10, 0x00ff0000);
-  cmdrunner_init();
-  cmdrunner_run_interactive_loop();
 }

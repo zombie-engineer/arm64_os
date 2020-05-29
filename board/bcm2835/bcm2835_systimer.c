@@ -1,5 +1,7 @@
 #include <timer.h>
 #include <board/bcm2835/bcm2835_systimer.h>
+#include <board/bcm2835/bcm2835_irq.h>
+
 #include <intr_ctl.h>
 #include <stringlib.h>
 #include <common.h>
@@ -80,7 +82,7 @@ int bcm2835_systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_a
 int bcm2835_systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg)
 {
   bcm2835_systimer_info_set(&bcm2835_systimer_info_1, cb, cb_arg, 0);
-  intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_SYSTIMER_1, bcm2835_systimer_cb_oneshot_timer_1);
+  // intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_SYSTIMER_1, bcm2835_systimer_cb_oneshot_timer_1);
   return bcm2835_systimer_set(usec);
 }
 
@@ -113,12 +115,19 @@ uint32_t bcm2835_systimer_get_min_set_time()
   return max_delta;
 }
 
+void irq_handler_systimer_1(void)
+{
+  puts("hello\n");
+  bcm2835_systimer_cb_oneshot_timer_1();
+}
+
 int bcm2835_systimer_init()
 {
   uint32_t min_timer_set;
   min_timer_set = bcm2835_systimer_get_min_set_time();
   printf("bcm2835_systimer_init: min timer_set value: %u\n", min_timer_set);
   bcm2835_systimer_info_reset(&bcm2835_systimer_info_1);
+  irq_set(ARM_IRQ1_SYSTIMER_1, irq_handler_systimer_1);
   return ERR_OK;
 }
 

@@ -6,7 +6,7 @@
 #include <time.h>
 
 // Generic callback triggered at timer event
-typedef void*(*timer_callback_t)(void*);
+typedef void(*timer_callback_t)(void*);
 
 int systimer_init();
 
