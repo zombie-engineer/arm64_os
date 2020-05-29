@@ -15,3 +15,6 @@
 #endif /* QEMU */
 
 #define CONFIG_DEBUG_LED_MBOX
+
+#define CONFIG_DEBUG_LED_1_GPIO_NUM 29
+#define CONFIG_DEBUG_LED_2_GPIO_NUM 21

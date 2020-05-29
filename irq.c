@@ -5,6 +5,7 @@
 
 static irq_desc_t irq_descriptors[NUM_IRQS];
 static int irq_log_level = 0;
+static irq_func irq_post_hook ALIGNED(8) = NULL;
 
 void __handle_irq(int irqnr)
 {
@@ -17,6 +18,13 @@ void __handle_irq(int irqnr)
   irq_desc_t *irqd = &irq_descriptors[irqnr];
   if (irqd->handler)
     irqd->handler();
+  if (irq_post_hook)
+    irq_post_hook();
+}
+
+void __irq_set_post_hook(irq_func hook)
+{
+  irq_post_hook = hook;
 }
 
 void irq_init(int log_level)

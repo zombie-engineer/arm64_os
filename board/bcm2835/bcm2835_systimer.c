@@ -24,7 +24,7 @@ typedef struct bcm2835_systimer {
   uint32_t period;
 } bcm2835_systimer_t;
 
-static bcm2835_systimer_t bcm2835_systimer_info_1;
+static bcm2835_systimer_t systimer1;
 
 static void bcm2835_systimer_clear_irq_1()
 {
@@ -56,8 +56,8 @@ static void bcm2835_systimer_info_set(bcm2835_systimer_t *t, timer_callback_t cb
 
 static void bcm2835_systimer_run_cb_1()
 {
-  if (bcm2835_systimer_info_1.cb)
-    bcm2835_systimer_info_1.cb(bcm2835_systimer_info_1.cb_arg);
+  if (systimer1.cb)
+    systimer1.cb(systimer1.cb_arg);
 }
 
 static void bcm2835_systimer_cb_periodic_timer_1()
@@ -74,14 +74,14 @@ static void bcm2835_systimer_cb_oneshot_timer_1()
 
 int bcm2835_systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_arg)
 {
-  bcm2835_systimer_info_set(&bcm2835_systimer_info_1, cb, cb_arg, usec);
+  bcm2835_systimer_info_set(&systimer1, cb, cb_arg, usec);
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_SYSTIMER_1, bcm2835_systimer_cb_periodic_timer_1);
   return bcm2835_systimer_set(usec);
 }
 
 int bcm2835_systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg)
 {
-  bcm2835_systimer_info_set(&bcm2835_systimer_info_1, cb, cb_arg, 0);
+  bcm2835_systimer_info_set(&systimer1, cb, cb_arg, 0);
   // intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_SYSTIMER_1, bcm2835_systimer_cb_oneshot_timer_1);
   return bcm2835_systimer_set(usec);
 }
@@ -117,8 +117,9 @@ uint32_t bcm2835_systimer_get_min_set_time()
 
 void irq_handler_systimer_1(void)
 {
-  puts("hello\n");
-  bcm2835_systimer_cb_oneshot_timer_1();
+  bcm2835_systimer_clear_irq_1();
+  if (systimer1.cb)
+    systimer1.cb(systimer1.cb_arg);
 }
 
 int bcm2835_systimer_init()
@@ -126,7 +127,7 @@ int bcm2835_systimer_init()
   uint32_t min_timer_set;
   min_timer_set = bcm2835_systimer_get_min_set_time();
   printf("bcm2835_systimer_init: min timer_set value: %u\n", min_timer_set);
-  bcm2835_systimer_info_reset(&bcm2835_systimer_info_1);
+  bcm2835_systimer_info_reset(&systimer1);
   irq_set(ARM_IRQ1_SYSTIMER_1, irq_handler_systimer_1);
   return ERR_OK;
 }

@@ -117,31 +117,43 @@ int run_uart_thread()
   return ERR_OK;
 }
 
-static void sched_timer_cb(void *arg)
+void wait_on_timer_ms(uint64_t msec)
 {
-  puts("sched_timer_cb");
-  systimer_set_oneshot(200000, sched_timer_cb, 0);
 }
 
-void post_irq_schedule()
+int test_thread()
 {
-  puts("post_irq_schedule");
-  while(1);
-  // schedule();
+  while(1) {
+    debug_event_1();
+    wait_on_timer_ms(1000);
+  }
+}
+
+int run_test_thread()
+{
+  task_t *t;
+  t = task_create(test_thread, "test_thread");
+  if (t);
+  return ERR_OK;
+}
+
+static void sched_timer_cb(void *arg)
+{
+  systimer_set_oneshot(100000, sched_timer_cb, 0);
+  blink_led(1, 10);
 }
 
 int init_task_fn(void)
 {
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
-  // __irq_set_post_hook(post_irq_schedule);
   systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, sched_timer_cb, 0);
   enable_irq();
-  //run_uart_thread();
+  run_uart_thread();
   //run_cmdrunner_thread();
 
   while(1) {
     // disable_irq();
-    blink_led(3, 1000);
+    blink_led_2(3, 1000);
     // enable_irq();
     asm volatile("wfe");
   }
