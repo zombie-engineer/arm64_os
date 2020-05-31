@@ -8,6 +8,8 @@
 // #define CONFIG_UART_MINI
 #define CONFIG_UART_PL011
 
+#define CONFI_DEBUG_LIST
+
 #ifdef QEMU
 #  define CONFIG_SCHED_INTERVAL_US 1000000
 #else

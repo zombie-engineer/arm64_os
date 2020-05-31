@@ -34,8 +34,9 @@ typedef struct aarch64_cpuctx {
       uint64_t x26;
       uint64_t x27;
       uint64_t x28;
+      /* x29 is a frame pointer */
       uint64_t x29;
-      /* x30 <=> link register */
+      /* x30 is a link register */
       uint64_t x30;
 
       uint64_t sp;   // +31 * 8

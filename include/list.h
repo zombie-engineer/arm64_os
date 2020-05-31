@@ -2,6 +2,10 @@
 #include <refs.h>
 #include <barriers.h>
 
+#ifdef CONFIG_DEBUG_LIST
+#include <bug.h>
+#endif
+
 struct list_head {
   struct list_head *next;
   struct list_head *prev;
@@ -24,10 +28,26 @@ static inline int list_empty(const struct list_head *head)
   return head->next == head;
 }
 
+/*
+ * Insert to list node between two linked nodes
+ *
+ * Was:
+ *    (prev)->(next)
+ *
+ * Need to insert:
+ *    (new)  
+ *        \
+ * Will:   \
+ * (prev)->(new)->(next)
+ */
 static inline void __list_add(struct list_head *new, 
-  struct list_head *prev,
-  struct list_head *next)
+  struct list_head *prev, struct list_head *next)
 {
+#ifdef CONFI_DEBUG_LIST
+  BUG(prev->next != next, "prev->next is not next");
+  BUG(next->prev != prev, "next->prev is not prev");
+  BUG(new->next != new || new->prev != new, "new not initialized to itself");
+#endif
   next->prev = new;
   new->next = next;
   new->prev = prev;
@@ -35,6 +55,18 @@ static inline void __list_add(struct list_head *new,
   prev->next = new;
 }
 
+/*
+ * Insert to head of list right after head
+ *
+ * Was:
+ *    (head)->(head->next)
+ *
+ * Need to insert:
+ *    (new)  
+ *        \
+ * Will:   \
+ * (head)->(new)->(head->next)
+ */
 static inline void list_add(struct list_head *new, struct list_head *head)
 {
   __list_add(new, head, head->next);

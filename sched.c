@@ -11,8 +11,111 @@
 #include <debug.h>
 #include <board/bcm2835/bcm2835_irq.h>
 #include <irq.h>
+#include <delays.h>
 
+/*
+ * Description of current scheduling algorithm:
+ *
+ * Scheduler maintains a list of tasks to run, a runlist.
+ * If the task needs to wait for something it's removed from a runlist
+ * and put into another list called the waitlist.
+ * 
+ * Scheduler is preemptive and manages time quantum for each task by
+ * means of system timer irqs. 
+ * The task has 2 ways of stopping exectution:
+ * 1. The task decides to wait for some event by calling one of waiting
+ *    functions, passing cpu to the next task.
+ * 2. By preemption. Any IRQ results in checking rescheduling conditions.
+ *    If current task has run out of it's cpu time it will be removed from
+ *    the head of the runlist and put into tail.
+ *
+ * Context switching:
+ * Each task's state is maintained in architecture-specific cpu context.
+ * Running task has all the state in it's registers, which includes
+ * all general purpose registers. 
+ * Note:FPU/NEON registers are not stored yet, but should be.
+ *
+ * Each task has a buffer big enough to store the whole context.
+ * When new task needs to run, previously running task will store all of it's 
+ * context into the buffer. After that new task reads state from it's buffer
+ * into cpu registers. After all context is read, cpu has enough state to
+ * start running the task.
+ *
+ * Low level code like IRQ handler should not know much about the task. It
+ * only cares about saving and restoring the context, that's why there is 
+ * a system-global variable '__current_cpuctx' to which most of the low-level
+ * code has access to.
+ *
+ * When interrupt happens, the handler stores all cpu state to where '__current_cpuctx'
+ * points to and at exit from interrupt the handler fully recovers state from
+ * where '__current_cpuctx' points to.
+ *
+ * Thus it is possible to switch one cpu context to another by rewriting the pointer
+ * to another location during interrupt execution, resulting in entering to interrupt
+ * from one task and exiting interrupt into another task.
+ *
+ * One other way of switching context is by putting the task to wait for some event.
+ * In that case the waiting task does not need CPU resource until the requested event
+ * happens. That's why it can give up the rest of it's CPU time to some other task.
+ * The waiting task will call 'yield', which will store the this task's state into
+ * buffer and request rescheduling. The scheduler chooses next task and loads
+ * this task's context into cpu registers. After cpu context is restored, the link
+ * register of the task contains the address of the instruction from where it should
+ * start execution, so the value of the program counter does not matter. 
+ * As soon as 'yield' reaches 'ret' instruction program counter will be set to
+ * address in the link register and return to task execution will take place as if
+ * the recovered task itself has called yield.
+ *
+ * Because 'yield' does not need to store valid value of program counter, all it's
+ * intstructions happen without switching to different execption level of the CPU.
+ * This has it's pros and cons. The good thing is that the context switch takes
+ * less time. CPU does not need to write to exception registers like SPSR ELR ESP
+ * The bad thing is that CPU exceptions also work as context synchronization
+ * event, meaning that memory access ordering should be done explicitly in some
+ * of the cases.
+ *
+ */
+
+/*
+ * Global variable pointing to cpuctx of a current task
+ */
 extern void *__current_cpuctx;
+
+static NOINLINE void yield()
+{
+  disable_irq();
+  // printf("yield" __endline);
+
+  /*
+   * __armv8_yield calls 'schedule()'
+   * 
+   * at enter yield function stores frame pointer x29 and link register x30
+   * stp  x29, x30, [sp, #-16]!
+   * mov  x29, sp 
+   *
+   * at exit yield function fetches x29/x30 from stack
+   * ldp     x29, x30, [sp], #16
+   *
+   * What this means is that 'bl' will set new link register to the next
+   * instruction. This x30 value will be written to stored context and
+   * later on context switch x30 will be restored. 
+   * The resulting scenario is:
+   * 1. yield stores current task state with link register pointing to 
+   * 'resume_point' below.
+   * 2. yield calls schedule to set __current_cpuctx to next task
+   * 3. yield restores cpu state from next task's info in __current_cpuctx
+   *    x30 register also pointing to 'resume_point' below, and sp pointing
+   *    to other tasks stack. On top of the stack registers x29 and x30 are
+   *    lying from next task's last yield call.
+   * 4. yield executes 'ldp x29, x30, [sp], #16' and is ready to return
+   *    to where the next task has called yield previously.
+   */
+  asm volatile ("bl __armv8_yield\n");
+/*
+ * this is a 'resume_point' for next executing task
+ */
+  enable_irq();
+}
 
 extern void __armv8_cpuctx_eret();
 
@@ -21,25 +124,31 @@ extern void __armv8_cpuctx_eret();
 
 static struct scheduler __scheduler;
 
-void scheduler_add_to_runlist(struct scheduler *s, struct task *t)
+void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
+{
+  list_del_init(&t->schedlist);
+  list_add_tail(&t->schedlist, &s->running);
+  t->task_state = TASK_STATE_SCHEDULED;
+}
+
+void sched_queue_runnable_task(struct scheduler *s, struct task *t)
 {
   disable_irq();
-  list_del_init(&t->schedlist);
-  list_add_tail(&t->schedlist, &s->runlist);
+  sched_queue_runnable_task_noirq(s, t);
   enable_irq();
 }
 
-void scheduler_add_to_waitlist(struct scheduler *s, struct task *t)
-{
-  disable_irq();
-  list_add(&t->schedlist, &s->waitlist);
-  enable_irq();
-}
-
-void scheduler_rm_from_list(struct scheduler *s, struct task *t)
+void sched_queue_timewait_task(struct scheduler *s, struct task *t)
 {
   disable_irq();
   list_del_init(&t->schedlist);
+  list_add_tail(&t->schedlist, &s->timer_waiting);
+  t->task_state = TASK_STATE_TIMER_WAIT;
+  {
+    struct list_head *l;
+    list_for_each(l, &s->timer_waiting)
+      printf("timer_waiting list:%p: %p\n", &s->timer_waiting, l);
+  }
   enable_irq();
 }
 
@@ -111,12 +220,12 @@ task_t *task_create(task_fn fn, const char *task_name)
 
   INIT_LIST_HEAD(&t->schedlist);
 
-  asm volatile("mrs %0, daif\n" : "=r"(flags) );
+  flags = 0;
+  // asm volatile("mrs %0, daif\n" : "=r"(flags) );
   prep_task_ctx(stack, (uint64_t)fn, flags, t->cpuctx);
 
-  t->fn = fn;
   t->stack_base = (uint64_t)stack;
-
+  t->task_state = TASK_STATE_STOPPED;
   return t;
 out:
   if (stack)
@@ -142,8 +251,19 @@ int run_uart_thread()
   return ERR_OK;
 }
 
+struct event_waiter {
+
+};
+
 void wait_on_timer_ms(uint64_t msec)
 {
+  uint64_t now = read_cpu_counter_64();
+  uint64_t cnt_per_sec = get_cpu_counter_64_freq();
+  uint64_t cnt_per_msec = cnt_per_sec / 1000;
+  uint64_t until = now + cnt_per_msec * msec;
+  get_current()->timer_wait_until = until;
+  printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
+  sched_queue_timewait_task(&__scheduler, get_current());
   yield();
 }
 
@@ -151,7 +271,9 @@ int test_thread()
 {
   while(1) {
     blink_led_2(2, 1000);
-    wait_on_timer_ms(1000);
+    puts("task_b\n");
+    wait_msec(500);
+    wait_on_timer_ms(3000);
   }
 }
 
@@ -161,54 +283,29 @@ int run_test_thread()
   t = task_create(test_thread, "test_thread");
   if (IS_ERR(t))
     return PTR_ERR(t);
-  scheduler_add_to_runlist(&__scheduler, t);
+  sched_queue_runnable_task(&__scheduler, t);
   return ERR_OK;
 }
 
-static void sched_timer_cb(void *arg)
-{
-  systimer_set_oneshot(100000, sched_timer_cb, 0);
-  blink_led(1, 10);
-}
-
-void yield()
-{
-  asm volatile ("b __armv8_yield\n");
-}
-
-int init_task_fn(void)
-{
-  // run_uart_thread();
-  // run_cmdrunner_thread();
-  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
-  intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
-  // systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US, sched_timer_cb, 0);
-  // enable_irq();
-
-  while(1) {
-    blink_led(8, 200);
-    yield();
-  }
-  uart_puts("123456789");
-}
-
-
-
 task_t *scheduler_pick_next_task(task_t *t)
 {
-  list_del_init(&t->schedlist);
-  list_add_tail(&t->schedlist, &__scheduler.runlist);
-
+  const int ticks_until_preempt = 10;
   /* 
    * Put currently executing task to end of list
    */
-  t = list_first_entry(&__scheduler.runlist, task_t, schedlist);
-  // list_add_tail(&t->schedlist, &__scheduler.runlist);
+  if (t->task_state == TASK_STATE_TIMER_WAIT) {
+    
+  } else {
+    list_del_init(&t->schedlist);
+    list_add_tail(&t->schedlist, &__scheduler.running);
+    t->ticks_total += ticks_until_preempt;
+  }
 
   /*
    * Return new next
    */
- //  t = list_first_entry(&__scheduler.runlist, task_t, schedlist);
+  t = list_first_entry(&__scheduler.running, task_t, schedlist);
+  t->ticks_left = ticks_until_preempt;
   return t;
 }
 
@@ -225,16 +322,118 @@ void schedule_debug()
 
 void schedule()
 {
-  task_t *current_task;
+  task_t *current_task, *old_task;
 
   schedule_debug();
 
-  current_task = container_of(__current_cpuctx, task_t, cpuctx);
+  current_task = get_current();
+  old_task = current_task;
   current_task = scheduler_pick_next_task(current_task);
+  current_task->task_state = TASK_STATE_RUNNING;
+  printf("schedule:'%s'->'%s'\r\n", old_task->name, current_task->name);
 
   BUG(!current_task, "scheduler logic failed.");
 
   __current_cpuctx = current_task->cpuctx;
+}
+
+bool needs_resched(task_t *t)
+{
+  if (t->ticks_left)
+    return false;
+  return true;
+}
+
+static inline void schedule_handle_timer_waiting()
+{
+  task_t *t, *tmp;
+  uint64_t now = read_cpu_counter_64();
+  list_for_each_entry_safe(t, tmp, &__scheduler.timer_waiting, schedlist) {
+    if (t->timer_wait_until <= now)
+      sched_queue_runnable_task_noirq(&__scheduler, t);
+  }
+}
+
+static inline void schedule_debug_info()
+{
+  task_t *t;
+  char buf[256];
+  int n = 0;
+  struct list_head *l;
+  n = snprintf(buf + n, sizeof(buf) - n, "IRQ:running: ");
+  list_for_each_entry(t, &__scheduler.running, schedlist) {
+    n += snprintf(buf + n, sizeof(buf) - n, "%s,%d, ", t->name, t->ticks_left);
+  }
+  n += snprintf(buf + n, sizeof(buf) - n, "::on_timer:list:%p: ", &__scheduler.timer_waiting);
+  list_for_each_entry(t, &__scheduler.timer_waiting, schedlist) {
+    putc('-');
+    n += snprintf(buf + n, sizeof(buf) - n, "%s, ", t->name);
+  }
+  list_for_each(l, &__scheduler.timer_waiting) {
+    putc('+');
+  }
+  puts(buf);
+  putc('\r');
+  putc('\n');
+}
+
+/*
+ * schedule_from_irq - is called from irq context with irq off
+ */
+static void schedule_from_irq()
+{
+  /*
+   * print debug info
+   */
+  schedule_debug_info();
+
+  /*
+   * handle tasks waiting on timers.
+   */
+  schedule_handle_timer_waiting();
+
+  /*
+   * decrease current task's cpu time
+   */
+  get_current()->ticks_left--;
+  printf("ticks_left:%d\n", get_current()->ticks_left);
+
+  /*
+   * decide do we need to preempt current task
+   */
+  if (needs_resched(get_current())) {
+    /*
+     * preempt current task
+     */
+    schedule();
+  }
+}
+
+#define SCHED_REARM_TIMER \
+  systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 1000, sched_timer_cb, 0)
+
+static void sched_timer_cb(void *arg)
+{
+  SCHED_REARM_TIMER;
+  blink_led(1, 10);
+  schedule_from_irq();
+}
+
+int init_task_fn(void)
+{
+  // run_uart_thread();
+  // run_cmdrunner_thread();
+  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
+  intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
+  SCHED_REARM_TIMER;
+  enable_irq();
+
+  while(1) {
+    puts("task_a\n");
+    blink_led(1, 10);
+    yield();
+  }
+  uart_puts("123456789");
 }
 
 
@@ -271,8 +470,10 @@ void jump_to_schedule()
 
 void scheduler_init()
 {
-  INIT_LIST_HEAD(&__scheduler.runlist);
-  INIT_LIST_HEAD(&__scheduler.waitlist);
+  const int ticks_until_preempt = 10;
+  INIT_LIST_HEAD(&__scheduler.running);
+  INIT_LIST_HEAD(&__scheduler.timer_waiting);
+  INIT_LIST_HEAD(&__scheduler.io_waiting);
 
   task_t *initial_task;
   puts("Starting task scheduler\n");
@@ -281,6 +482,7 @@ void scheduler_init()
   memset(&tasks, 0, sizeof(tasks));
 
   initial_task = task_create(init_task_fn, "init_task_fn");
-  scheduler_add_to_runlist(&__scheduler, initial_task);
+  initial_task->ticks_left = ticks_until_preempt;
+  sched_queue_runnable_task(&__scheduler, initial_task);
   start_task_from_ctx(initial_task->cpuctx);
 }
