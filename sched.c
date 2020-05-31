@@ -84,7 +84,7 @@ extern void *__current_cpuctx;
 static NOINLINE void yield()
 {
   disable_irq();
-  // printf("yield" __endline);
+  printf("'%s' yield start" __endline, get_current()->name);
 
   /*
    * __armv8_yield calls 'schedule()'
@@ -114,6 +114,7 @@ static NOINLINE void yield()
 /*
  * this is a 'resume_point' for next executing task
  */
+  printf("'%s' yield end" __endline, get_current()->name);
   enable_irq();
 }
 
@@ -126,6 +127,7 @@ static struct scheduler __scheduler;
 
 void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
 {
+  printf("sched_queue: %s" __endline, t->name);
   list_del_init(&t->schedlist);
   list_add_tail(&t->schedlist, &s->running);
   t->task_state = TASK_STATE_SCHEDULED;
@@ -141,6 +143,7 @@ void sched_queue_runnable_task(struct scheduler *s, struct task *t)
 void sched_queue_timewait_task(struct scheduler *s, struct task *t)
 {
   disable_irq();
+  printf("sched_queue_timewait: %s" __endline, t->name);
   list_del_init(&t->schedlist);
   list_add_tail(&t->schedlist, &s->timer_waiting);
   t->task_state = TASK_STATE_TIMER_WAIT;
@@ -270,10 +273,15 @@ void wait_on_timer_ms(uint64_t msec)
 int test_thread()
 {
   while(1) {
-    blink_led_2(2, 1000);
-    puts("task_b\n");
-    wait_msec(500);
+    puts("task_b_loop_start" __endline);
+    print_cpu_flags();
+    puts("task_b_wait_blocking_start" __endline);
+    wait_msec(20000);
+    puts("task_b_wait_blocking_end" __endline);
+    puts("task_b_wait_async_start" __endline);
     wait_on_timer_ms(3000);
+    puts("task_b_wait_async_end" __endline);
+    puts("task_b_loop_end" __endline);
   }
 }
 
@@ -296,9 +304,8 @@ task_t *scheduler_pick_next_task(task_t *t)
   if (t->task_state == TASK_STATE_TIMER_WAIT) {
     
   } else {
-    list_del_init(&t->schedlist);
-    list_add_tail(&t->schedlist, &__scheduler.running);
     t->ticks_total += ticks_until_preempt;
+    sched_queue_runnable_task_noirq(&__scheduler, t);
   }
 
   /*
@@ -330,7 +337,7 @@ void schedule()
   old_task = current_task;
   current_task = scheduler_pick_next_task(current_task);
   current_task->task_state = TASK_STATE_RUNNING;
-  printf("schedule:'%s'->'%s'\r\n", old_task->name, current_task->name);
+  printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
 
   BUG(!current_task, "scheduler logic failed.");
 
@@ -349,8 +356,10 @@ static inline void schedule_handle_timer_waiting()
   task_t *t, *tmp;
   uint64_t now = read_cpu_counter_64();
   list_for_each_entry_safe(t, tmp, &__scheduler.timer_waiting, schedlist) {
-    if (t->timer_wait_until <= now)
+    if (t->timer_wait_until <= now) {
+      printf("timeout: now: %llu, until: %llu\n", now, t->timer_wait_until);
       sched_queue_runnable_task_noirq(&__scheduler, t);
+    }
   }
 }
 
@@ -364,11 +373,12 @@ static inline void schedule_debug_info()
   list_for_each_entry(t, &__scheduler.running, schedlist) {
     n += snprintf(buf + n, sizeof(buf) - n, "%s,%d, ", t->name, t->ticks_left);
   }
-  n += snprintf(buf + n, sizeof(buf) - n, "::on_timer:list:%p: ", &__scheduler.timer_waiting);
+  n += snprintf(buf + n, sizeof(buf) - n, "::on_timer: ");
   list_for_each_entry(t, &__scheduler.timer_waiting, schedlist) {
     putc('-');
     n += snprintf(buf + n, sizeof(buf) - n, "%s, ", t->name);
   }
+
   list_for_each(l, &__scheduler.timer_waiting) {
     putc('+');
   }
@@ -385,7 +395,7 @@ static void schedule_from_irq()
   /*
    * print debug info
    */
-  schedule_debug_info();
+  // schedule_debug_info();
 
   /*
    * handle tasks waiting on timers.
@@ -396,12 +406,13 @@ static void schedule_from_irq()
    * decrease current task's cpu time
    */
   get_current()->ticks_left--;
-  printf("ticks_left:%d\n", get_current()->ticks_left);
+  // printf("task: %s, ticks_left:%d" __endline, get_current()->name, get_current()->ticks_left);
 
   /*
    * decide do we need to preempt current task
    */
   if (needs_resched(get_current())) {
+    printf("%s needs resched" __endline, get_current()->name);
     /*
      * preempt current task
      */
@@ -410,12 +421,15 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 1000, sched_timer_cb, 0)
+  systimer_set_oneshot(1000000 >> 2, sched_timer_cb, 0)
+  //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
 {
   SCHED_REARM_TIMER;
-  blink_led(1, 10);
+  blink_led_3(1, 10);
+  puts("sched_timer_cb" __endline);
+  print_cpu_flags();
   schedule_from_irq();
 }
 
@@ -429,8 +443,9 @@ int init_task_fn(void)
   enable_irq();
 
   while(1) {
-    puts("task_a\n");
-    blink_led(1, 10);
+    puts("task_a_loop_start" __endline);
+    blink_led(1, 100);
+    puts("task_a_loop_end" __endline);
     yield();
   }
   uart_puts("123456789");
