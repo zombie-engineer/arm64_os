@@ -58,6 +58,8 @@ struct scheduler {
 
 void scheduler_init();
 
+void schedule();
+
 void sched_queue_runnable_task(struct scheduler *s, struct task *t);
 
 void sched_queue_timewait_task(struct scheduler *s, struct task *t);

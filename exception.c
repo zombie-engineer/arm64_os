@@ -4,6 +4,7 @@
 #include <error.h>
 #include <syscall.h>
 #include <common.h>
+#include <sched.h>
 
 #define INTERRUPT_TYPE_SYNCHRONOUS 0
 #define INTERRUPT_TYPE_IRQ         1
@@ -170,13 +171,13 @@ static void __handle_svc_32(exception_info_t *e)
 {
 }
 
-#define get_syscall_id(esr) (esr & 0xffff)
+#define get_svc_id(esr) (esr & 0xffff)
 
 static void __handle_svc_64(exception_info_t *e)
 {
   char buf[512];
-  switch(get_syscall_id(e->esr)) {
-    case SYSCALL_KERNEL_PANIC:
+  switch(get_svc_id(e->esr)) {
+    case SVC_PANIC:
       // exec_kernel_panic_reporters(e, kernel_panic_msg);
       exec_fatal_exception_hooks(e);
 
@@ -184,8 +185,11 @@ static void __handle_svc_64(exception_info_t *e)
         asm volatile ("wfe");
 
       break;
+    case SVC_YIELD:
+      schedule();
+      break;
     default:
-      snprintf(buf, sizeof(buf), "Unknown syscall: %d", get_syscall_id(e->esr));
+      snprintf(buf, sizeof(buf), "Unknown svc: %d", get_svc_id(e->esr));
       // puts(buf, 10, 9);
       break;
   }
@@ -295,10 +299,10 @@ const char *get_synchr_exception_class_string(uint64_t esr)
 
 const char *get_svc_aarch64_string(int esr)
 {
-#define SWICASE(x) case SYSCALL_## x: return "SYSCALL64_" #x
+#define SWICASE(x) case SVC_## x: return "SVC_" #x
 
-  switch(get_syscall_id(esr)) {
-    SWICASE(KERNEL_PANIC);
+  switch(get_svc_id(esr)) {
+    SWICASE(PANIC);
   }
   return "SYSCALL64_UNKNOWN";
 #undef SWICASE

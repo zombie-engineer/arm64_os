@@ -12,6 +12,7 @@
 #include <board/bcm2835/bcm2835_irq.h>
 #include <irq.h>
 #include <delays.h>
+#include <syscall.h>
 
 /*
  * Description of current scheduling algorithm:
@@ -82,41 +83,11 @@
 extern void *__current_cpuctx;
 extern int aarch64_print_cpu_ctx(void *ctx);
 
-static NOINLINE void yield()
+static inline void yield()
 {
-  disable_irq();
-  printf("'%s' yield start" __endline, get_current()->name);
-
-  /*
-   * __armv8_yield calls 'schedule()'
-   * 
-   * at enter yield function stores frame pointer x29 and link register x30
-   * stp  x29, x30, [sp, #-16]!
-   * mov  x29, sp 
-   *
-   * at exit yield function fetches x29/x30 from stack
-   * ldp     x29, x30, [sp], #16
-   *
-   * What this means is that 'bl' will set new link register to the next
-   * instruction. This x30 value will be written to stored context and
-   * later on context switch x30 will be restored. 
-   * The resulting scenario is:
-   * 1. yield stores current task state with link register pointing to 
-   * 'resume_point' below.
-   * 2. yield calls schedule to set __current_cpuctx to next task
-   * 3. yield restores cpu state from next task's info in __current_cpuctx
-   *    x30 register also pointing to 'resume_point' below, and sp pointing
-   *    to other tasks stack. On top of the stack registers x29 and x30 are
-   *    lying from next task's last yield call.
-   * 4. yield executes 'ldp x29, x30, [sp], #16' and is ready to return
-   *    to where the next task has called yield previously.
-   */
-  asm volatile ("bl __armv8_yield\n");
-/*
- * this is a 'resume_point' for next executing task
- */
-  printf("'%s' yield end" __endline, get_current()->name);
-  enable_irq();
+  // printf("'%s' yield start" __endline, get_current()->name);
+  asm volatile ("svc %0"::"i"(SVC_YIELD));
+  // printf("'%s' yield return" __endline, get_current()->name);
 }
 
 extern void __armv8_cpuctx_eret();
@@ -182,7 +153,7 @@ void prep_task_ctx(uint64_t *sp, uint64_t fn, uint64_t flags, void *cpuctx)
 
 void start_task_from_ctx(void *cpuctx)
 {
-  aarch64_print_cpu_ctx(cpuctx);
+  // aarch64_print_cpu_ctx(cpuctx);
   __armv8_restore_ctx_from(cpuctx);
 }
 
@@ -218,7 +189,7 @@ task_t *task_create(task_fn fn, const char *task_name)
 
   INIT_LIST_HEAD(&t->schedlist);
 
-  flags = 0x3c0;
+  flags = 0;
   prep_task_ctx(stack, (uint64_t)fn, flags, t->cpuctx);
 
   t->stack_base = (uint64_t)stack;
@@ -259,7 +230,7 @@ void wait_on_timer_ms(uint64_t msec)
   uint64_t cnt_per_msec = cnt_per_sec / 1000;
   uint64_t until = now + cnt_per_msec * msec;
   get_current()->timer_wait_until = until;
-  printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
+  // printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
   sched_queue_timewait_task(&__scheduler, get_current());
   yield();
 }
@@ -267,16 +238,17 @@ void wait_on_timer_ms(uint64_t msec)
 int test_thread()
 {
   while(1) {
+    blink_led_2(12, 100);
     puts("task_b_loop_start" __endline);
     print_cpu_flags();
     puts("task_b_wait_blocking_start" __endline);
-    wait_msec(20000);
+    wait_msec(10000);
     puts("************************" __endline);
     puts("task_b_wait_blocking_end" __endline);
     puts("************************" __endline);
     puts("************************" __endline);
     puts("task_b_wait_async_start" __endline);
-    wait_on_timer_ms(3000);
+    wait_on_timer_ms(5000);
     puts("task_b_wait_async_end" __endline);
     puts("task_b_loop_end" __endline);
   }
@@ -334,13 +306,13 @@ void schedule()
   old_task = current_task;
   current_task = scheduler_pick_next_task(current_task);
   current_task->task_state = TASK_STATE_RUNNING;
-  aarch64_print_cpu_ctx(__current_cpuctx);
-  printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
+  // aarch64_print_cpu_ctx(__current_cpuctx);
+  // printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
 
   BUG(!current_task, "scheduler logic failed.");
 
   __current_cpuctx = current_task->cpuctx;
-  aarch64_print_cpu_ctx(__current_cpuctx);
+  // aarch64_print_cpu_ctx(__current_cpuctx);
 }
 
 bool needs_resched(task_t *t)
@@ -390,9 +362,8 @@ static void schedule_from_irq()
   /*
    * print debug info
    */
-  schedule_debug_info();
-  // puts("sched_timer_cb" __endline);
-  print_cpu_flags();
+  // schedule_debug_info();
+  // print_cpu_flags();
 
   /*
    * handle tasks waiting on timers.
@@ -409,7 +380,7 @@ static void schedule_from_irq()
    * decide do we need to preempt current task
    */
   if (needs_resched(get_current())) {
-    printf("%s needs resched" __endline, get_current()->name);
+    // printf("%s needs resched" __endline, get_current()->name);
     /*
      * preempt current task
      */
@@ -418,15 +389,15 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  puts("oneshot start"__endline);\
-  systimer_set_oneshot(1000000 >> 2, sched_timer_cb, 0)
+  /* puts("oneshot start"__endline); */\
+  systimer_set_oneshot(3000, sched_timer_cb, 0)
   //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
 {
-  puts("oneshot end"__endline);
+  // puts("oneshot end"__endline);
   SCHED_REARM_TIMER;
-  blink_led_3(1, 10);
+  blink_led_3(1, 2);
   schedule_from_irq();
 }
 
@@ -440,15 +411,12 @@ int init_task_fn(void)
   enable_irq();
 
   while(1) {
-    enable_irq();
-    puts("task_a_loop_start" __endline);
+    // puts("task_a_loop_start" __endline);
     blink_led(1, 100);
-    puts("task_a_loop_end" __endline);
-    // yield();
+    // puts("task_a_loop_end" __endline);
+    yield();
   }
-  // uart_puts("123456789");
 }
-
 
 #define ARM8_CPSR_M_USER       0
 #define ARM8_CPSR_M_FIQ        1
