@@ -123,6 +123,7 @@ FUNC(__armv8_prep_context):
   .unreq stack
   .unreq link
   // zero out pc, put flags in cpsr
+  adr   tmp, __pc_resume_from_yield
   stp   tmp, flags, [ctx], #16
   .unreq tmp
   .unreq flags
@@ -166,13 +167,15 @@ FUNC(__armv8_restore_ctx_from):
 
   STORE_REGS_X0_X29 x30
 
-  // switch writing register from x30 to x0
-  // and pickup x30 original value from the stack
+  /*
+   * x30 now points to x30, sp, pc, cpsr
+   * to write to x30 we need restore original x30
+   * from stack at sp - 8. Most of the GP regs
+   * are already stored, so we can use any (x0)
+   */
   mov   x0, x30
   ldr   x30, [sp, #-8]
   mov   x1, sp
-
-  // store x30(link register) and sp
   stp   x30, x1, [x0], #16
 
   // make patched program counter, that
@@ -197,18 +200,27 @@ FUNC(__armv8_restore_ctx_from):
   LOAD_REGS_X0_X30 ctx
 .endm
 
-/*
- * 1. disable irq
- * 2. save current cpu context
- * 3. patch stored cpu context pc to resume after scheduling
- * 4. choose next task
- * 5. restore next task cpu context
- * 6. enable irq
- */
 FUNC(__armv8_yield):
+/*
+ * 1. __current_cpuctx points to currently executing task.
+ * STORE_CONTEXT will write full execution state to
+ * this address.
+ */
   STORE_CONTEXT
+
+/*
+ * 2. goto schedule function to remove current task from
+ * runlist and pick next task. 'schedule' will overwrite
+ * __current_cpuctx with address of the next task's state
+ */
   bl schedule
-FUNC(__armv8_ret_to_task):
+
+/*
+ * __current_cpuctx now holds address of saved task state 
+ * of a task that will resume execution now. RESTORE_CONTEXT
+ * will fill cpu regs with needed values. PC will point to
+ * label __pc_resume_from_yield.
+ */
   RESTORE_CONTEXT
 __pc_resume_from_yield:
   ret

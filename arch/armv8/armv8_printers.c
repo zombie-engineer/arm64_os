@@ -1,6 +1,7 @@
 #include <common.h>
 #include <bits_api.h>
 #include <arch/armv8/cpsr.h>
+#include <arch/armv8/cpu_context.h>
 
 void print_cpu_flags()
 {
@@ -20,4 +21,31 @@ void print_cpu_flags()
     daif & BT(CPSR_A) ? "no-SError" : "",
     daif & BT(CPSR_D) ? "no-DBG" : "",
     current_el >> CPSR_EL_OFF, sp_sel);
+}
+
+typedef struct print_cpuctx_ctx {
+  int nr;
+} print_cpuctx_ctx_t;
+
+static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
+{
+  print_cpuctx_ctx_t *print_ctx = (print_cpuctx_ctx_t *)cb_priv;
+  if (print_ctx->nr) {
+    if (print_ctx->nr % 4 == 0) {
+      puts(__endline);
+    } else {
+      putc(',');
+      putc(' ');
+    }
+  }
+  puts(reg_str);
+  print_ctx->nr++;
+  return 0;
+}
+
+int aarch64_print_cpu_ctx(aarch64_cpuctx_t *ctx) 
+{
+  print_cpuctx_ctx_t print_ctx = { 0 };
+  cpuctx_print_regs(ctx, print_reg_cb, &print_ctx);
+  puts(__endline);
 }
