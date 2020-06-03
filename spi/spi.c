@@ -164,7 +164,7 @@ static int spi0_init_dma()
 }
 
 
-static int spi0_xmit_dma(const void *data_out, void *data_in, uint32_t bytelen)
+static int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in, uint32_t bytelen)
 {
   uint32_t stub_in, stub_out;
   // printf("spi0_xmit_dma: data_out: %08x\n", data_out);
@@ -238,7 +238,7 @@ static int spi0_xmit_dma(const void *data_out, void *data_in, uint32_t bytelen)
 }
 
 
-static int spi0_xmit_byte(char byte_in, char *byte_out)
+static int spi0_xmit_byte(struct spi_dev *d, char byte_in, char *byte_out)
 {
   int rx;
   *SPI_CS = SPI_CS_CLEAR;
@@ -252,7 +252,7 @@ static int spi0_xmit_byte(char byte_in, char *byte_out)
   return ERR_OK;
 }
 
-static int spi0_xmit(const char* bytes_in, char *bytes_out, uint32_t len)
+static int spi0_xmit(struct spi_dev *d, const char* bytes_in, char *bytes_out, uint32_t len)
 {
   int i, rx_data;
 

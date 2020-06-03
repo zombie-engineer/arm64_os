@@ -67,12 +67,6 @@ static void bcm2835_systimer_cb_periodic_timer_1()
   bcm2835_systimer_run_cb_1();
 }
 
-static void bcm2835_systimer_cb_oneshot_timer_1()
-{
-  bcm2835_systimer_clear_irq_1();
-  bcm2835_systimer_run_cb_1();
-}
-
 int bcm2835_systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_arg)
 {
   bcm2835_systimer_info_set(&systimer1, cb, cb_arg, usec);
@@ -83,7 +77,6 @@ int bcm2835_systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_a
 int bcm2835_systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg)
 {
   bcm2835_systimer_info_set(&systimer1, cb, cb_arg, 0);
-  // intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_SYSTIMER_1, bcm2835_systimer_cb_oneshot_timer_1);
   return bcm2835_systimer_set(usec);
 }
 

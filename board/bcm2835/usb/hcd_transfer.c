@@ -13,7 +13,7 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
-int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, const void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
+static int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
 {
   int err = ERR_OK;
   int num_bytes;

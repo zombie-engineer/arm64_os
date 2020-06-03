@@ -543,7 +543,6 @@ static inline char *__printf_strlcpy(char *dst, const char *src, int n)
 
 static void NOINLINE __print_fn_string(struct printf_ctx *c)
 {
-  int n;
   const char *src = (const char *)c->arg;
   c->dst = __printf_strlcpy(c->dst, src, c->dst_end - c->dst);
 

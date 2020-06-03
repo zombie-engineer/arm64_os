@@ -103,7 +103,7 @@ int bsc_slave_debug()
     debug_i2c = read_reg(BSC_SLAVE_DEBUG1);
     printf("dr:%08x,rsr:%08x,fr:%08x,", dr, rsr, fr);
     printf("ris:%08x,icr:%08x,debug:%08x\r\n", ris, icr, debug_i2c);
-    if (dr & 0xff == 0x66)
+    if ((dr & 0xff) == 0x66)
       break;
   } 
   return ERR_OK;

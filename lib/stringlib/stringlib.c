@@ -166,7 +166,7 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
 
   c = *sptr++;
   while (1) {
-    *sptr++;
+    sptr++;
     *dptr++ = c;
     if (dptr >= dend) {
       *(dptr - 1) = 0;

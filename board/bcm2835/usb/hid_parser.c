@@ -41,7 +41,7 @@ const char *hid_report_item_type_to_string(int type)
     case HID_REPORT_ITEM_TYPE_MAIN: return "MAIN";
     case HID_REPORT_ITEM_TYPE_GLOBAL: return "GLOBAL";
     case HID_REPORT_ITEM_TYPE_LOCAL: return "LOCAL";
-    return "UNKNOWN";
+    default: return "UNKNOWN";
   }
 }
 
@@ -111,7 +111,6 @@ void usb_hid_parse_report_descriptor(const void *buf, int bufsz)
   char item_desc;
   char item_type;
   char item_size;
-  char item_data;
   char item_tag;
   const char *ptr = buf;
   const char *end = ptr + bufsz;

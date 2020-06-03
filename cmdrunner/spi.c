@@ -60,7 +60,7 @@ static int command_spi_init_spi1(const string_tokens_t *args)
 
 static int command_spi_init_emulated(const string_tokens_t *args)
 {
-  int st, sclk, mosi, miso, ce0, ce1;
+  int sclk, mosi, miso, ce0, ce1;
   char *endptr;
   ASSERT_NUMARGS_EQ(5);
   GET_NUMERIC_PARAM(sclk, int, 0, "sclk");

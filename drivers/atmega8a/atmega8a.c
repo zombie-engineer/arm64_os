@@ -600,7 +600,7 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
 
 #define atm_recv2(spi, cmd2, dst) \
   _Static_assert(sizeof(dst) == 2, "atm_recv2 arg2 should be 2-bytes width");\
-  err = spi->xmit(spi, cmd2, (char *)&dst, sizeof(dst));\
+  err = spi->xmit(spi, (const char*)cmd2, (char *)&dst, sizeof(dst));\
   atm_err_check(err, "atm_recv2");
 
 DECL_GPIO_SET_KEY(pwm0_key, "PWM0_____KEY___");

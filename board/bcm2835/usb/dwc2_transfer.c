@@ -16,7 +16,9 @@ int dwc2_log_level = 0;
 
 int dwc2_set_log_level(int log_level)
 {
+  int old = dwc2_log_level;
   dwc2_log_level = log_level;
+  return old;
 }
 
 int dwc2_get_log_level()
@@ -252,7 +254,6 @@ usb_pid_t dwc_pid_to_usb_pid(int pid)
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes) 
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
-  int err;
   int i; 
   int ch = pipe.u.dwc_channel;
   int dwc_pid = usb_pid_to_dwc_pid(*pid);
@@ -263,7 +264,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
    */
   const int max_retries = 10;
 
-  uint32_t chr, splt, intr, siz, dma;
+  uint32_t intr UNUSED;
+  uint32_t chr, splt, siz, dma;
   uint64_t dma_dst;
 
   dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);

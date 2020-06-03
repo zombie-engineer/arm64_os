@@ -96,12 +96,12 @@ struct usb_hcd_interface {
   struct usb_hcd_endpoint endpoints[USB_MAX_ENDPOINTS_PER_DEVICE] ALIGNED(4);
 };
 
-static int hcd_interface_get_num_endpoints(struct usb_hcd_interface *i)
+static inline int hcd_interface_get_num_endpoints(struct usb_hcd_interface *i)
 {
   return i->descriptor.endpoint_count;
 }
 
-static struct usb_hcd_endpoint *hcd_interface_get_endpoint(struct usb_hcd_interface *i, int index)
+static inline struct usb_hcd_endpoint *hcd_interface_get_endpoint(struct usb_hcd_interface *i, int index)
 {
   if (hcd_interface_get_num_endpoints(i) <= index)
     return NULL;
@@ -161,7 +161,7 @@ static inline int usb_hcd_get_interface_class(struct usb_hcd_device *d, int inte
   return d->interfaces[interface_num].descriptor.class;
 }
 
-static struct usb_hcd_interface *hcd_device_get_interface(struct usb_hcd_device *d, int index)
+static inline struct usb_hcd_interface *hcd_device_get_interface(struct usb_hcd_device *d, int index)
 {
   if (d->num_interfaces <= index)
     return NULL;

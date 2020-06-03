@@ -130,7 +130,6 @@ int usb_hid_enumerate(struct usb_hcd_device *dev)
     }
     hid_index++;
   }
-out_err:
   return err;
 }
 

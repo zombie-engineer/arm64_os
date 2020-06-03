@@ -129,7 +129,7 @@ struct servo *servo_sg90_create(struct pwm *pwm, const char *id)
 
   s = servo_sg90_alloc();
   if (IS_ERR(s))
-    return s;
+    return (struct servo *)s;
 
   s->servo.set_angle = servo_sg90_set_angle;
   s->servo.destroy = servo_sg90_destroy;

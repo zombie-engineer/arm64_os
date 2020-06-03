@@ -60,13 +60,6 @@
 /* Page Domain Fault */
 #define DAT_ABRT_PAGE_DOMAIN                           0b111110
 
-/* Exception handling options */
-typedef struct e_hdl_opts {
-  int dump_ctx_to_uart;
-  int dump_stack;
-} e_hdl_opts_t;
-
-static e_hdl_opts_t e_hdl_opts = { 0 };
 static const char *kernel_panic_msg = 0;
 
 /* exception level to control nested entry to exception code */
@@ -117,10 +110,6 @@ static void exec_kernel_panic_reporters(exception_info_t *e, const char *msg)
   int i;
   for (i = 0; i < kernel_panic_reporters_count; ++i)
     kernel_panic_reporters[i](e, msg);
-
-  //    snprintf(buf, sizeof(buf), "Kernel panic: %s\n", panic_msg); 
-  //    puts(buf, 10, 9);
-  //    while(1);
 }
   
 
@@ -178,8 +167,8 @@ static void __handle_svc_64(exception_info_t *e)
   char buf[512];
   switch(get_svc_id(e->esr)) {
     case SVC_PANIC:
-      // exec_kernel_panic_reporters(e, kernel_panic_msg);
-      exec_fatal_exception_hooks(e);
+      exec_kernel_panic_reporters(e, kernel_panic_msg);
+      // exec_fatal_exception_hooks(e);
 
       while(1) 
         asm volatile ("wfe");
