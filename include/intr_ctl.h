@@ -45,3 +45,9 @@ int intr_ctl_arm_irq_disable(int irq_num);
 int intr_ctl_gpu_irq_disable(int irq_num);
 
 int intr_ctl_gpu_irq_enable(int irq_num);
+
+int intr_ctl_arm_interrupt_enable(int irq_num);
+
+int intr_ctl_arm_interrupt_disable(int irq_num);
+
+int intr_ctl_set_cb(int irq_type, int irq_num, intr_ctl_irq_cb cb);

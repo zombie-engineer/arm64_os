@@ -44,6 +44,7 @@ int intr_ctl_arm_irq_enable(int irq_num)
   if (irq_num > INTR_CTL_IRQ_ARM_MAX)
     return ERR_INVAL_ARG;
 
+  printf("intr_ctl_arm_irq_enable: %d\n", irq_num);
   write_reg(BCM2835_IC_ENABLE_BASIC, (1 << irq_num));
   return ERR_OK;
 }
@@ -59,7 +60,7 @@ int intr_ctl_arm_irq_disable(int irq_num)
 }
 
 
-#define ACCESS_GPU_IRQ(r, irq) \
+#define SET_GPU_IRQ(r, irq) \
   reg32_t dst;                        \
   if (irq_num > INTR_CTL_IRQ_GPU_MAX) \
     return ERR_INVAL_ARG;             \
@@ -68,19 +69,34 @@ int intr_ctl_arm_irq_disable(int irq_num)
     irq_num -= 32;                    \
     dst++;                            \
   }                                   \
-  write_reg(dst, (1 << irq_num));     \
+  write_reg(dst, BT(irq_num));        \
   return ERR_OK;
 
+#define SET_ARM_IRQ(r, irq) \
+  if (irq_num > INTR_CTL_IRQ_ARM_MAX) \
+    return ERR_INVAL_ARG;             \
+  write_reg(r, BT(irq_num));          \
+  return ERR_OK;
+
+int intr_ctl_arm_interrupt_enable(int irq_num)
+{
+  SET_ARM_IRQ(BCM2835_IC_ENABLE_BASIC, irq_num);
+}
+
+int intr_ctl_arm_interrupt_disable(int irq_num)
+{
+  SET_ARM_IRQ(BCM2835_IC_DISABLE_BASIC, irq_num);
+}
 
 int intr_ctl_gpu_irq_enable(int irq_num)
 {
-  ACCESS_GPU_IRQ(BCM2835_IC_ENABLE_GPU_1, irq_num);
+  SET_GPU_IRQ(BCM2835_IC_ENABLE_GPU_1, irq_num);
 }
 
 
 int intr_ctl_gpu_irq_disable(int irq_num)
 {
-  ACCESS_GPU_IRQ(BCM2835_IC_DISABLE_GPU_1, irq_num);
+  SET_GPU_IRQ(BCM2835_IC_DISABLE_GPU_1, irq_num);
 }
 
 
