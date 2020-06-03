@@ -11,6 +11,7 @@ OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
 CFLAGS = -Werror=implicit-function-declaration -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
+# CFLAGS += -mstrict-align
 LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
