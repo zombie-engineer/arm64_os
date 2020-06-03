@@ -5,6 +5,8 @@
 #include <spinlock.h>
 #include <cpu.h>
 #include <error.h>
+#include <config.h>
+#include <debug.h>
 
 static DECL_SPINLOCK(mbox_lock);
 
@@ -20,37 +22,19 @@ static DECL_SPINLOCK(mbox_lock);
 #define MBOX_EMPTY    0x40000000
 
 #ifdef CONFIG_DEBUG_MBOX
-static void print_mbox()
+static void debug_mbox()
 {
   int i;
-  printf("mbox addr = 0x%08x\n", (uint32_t)mbox_addr);
+  int dcache_width = (int)dcache_line_width();
+  printf("mbox addr = %p, dcache_line_sz: %d, dcache_addr: %p\n", 
+    mbox_buffer, dcache_width,
+    (uint64_t)mbox_buffer & ~(dcache_width - 1)
+  );
   for (i = 0; i < 8; ++i)
-    printf("mbox[%d] = 0x%08x\n", i, mbox[i]);
+    printf("mbox[%d] = 0x%08x\n", i, mbox_buffer[i]);
   puts("--------\n");
 }
 #endif // CONFIG_DEBUG_MBOX
-
-void flush_dcache_range(uint64_t start, uint64_t stop)
-{
-  asm volatile (
-  "mrs  x3, ctr_el0\n" // Cache Type Register
-  "lsr  x3, x3, #16\n" // 
-  "and  x3, x3, #0xf\n"// x3 = (x3 >> 16) & 0xf - DminLine - Log2 of number of words in the smallest cache line
-  "mov  x2, #4\n"      // x2 = 4
-  "lsl  x2, x2, x3\n"  /* cache line size */
-  /* x2 <- minimal cache line size in cache system */
-  "sub x3, x2, #1\n"   
-                       // x0 = aligned(start)
-                       // align address to cache line offset
-  "bic x0, x0, x3\n"   // x0 = start & ~(4^(DminLine) - 1)
-  "1:\n"
-  "dc  civac, x0\n"    // clean & invalidate data or unified cache
-  "add x0, x0, x2\n"   // x0 += DminLine
-  "cmp x0, x1\n"       // check end reached
-  "b.lo  1b\n"      
-  "dsb sy\n"
-  );
-}
 
 int mbox_prop_call_no_lock()
 {
@@ -75,16 +59,33 @@ int mbox_prop_call_no_lock()
   return ret;
 }
 
+static inline void flush_mbox_buffer_dcache()
+{
+  uint64_t addr = (uint64_t)mbox_buffer;
+  dcache_clean_and_invalidate_rng(addr, addr + sizeof(mbox_buffer));
+}
+
 int mbox_prop_call()
 {
   int ret, should_lock;
+
+#ifdef CONFIG_DEBUG_MBOX
+  debug_mbox();
+#endif
+
   should_lock = spinlocks_enabled && is_irq_enabled();
   if (should_lock)
     spinlock_lock(&mbox_lock);
 
+  flush_mbox_buffer_dcache();
   ret = mbox_prop_call_no_lock();
+  flush_mbox_buffer_dcache();
 
   if (should_lock)
     spinlock_unlock(&mbox_lock);
+
+#ifdef CONFIG_DEBUG_MBOX
+  debug_mbox();
+#endif
   return ret;
 }
