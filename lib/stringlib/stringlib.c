@@ -1,12 +1,12 @@
 #include <stringlib.h>
 #include <common.h>
 
-int _isprint(char ch)
+int isprint(char ch)
 {
   return (ch >= 0x20 && ch < 0x7f) || ch == '\n' || ch == ' ';
 }
 
-int _isdigit(char ch)
+int isdigit(char ch)
 {
   return ch >= '0' && ch <= '9';
 }
@@ -17,7 +17,7 @@ int isspace(char c) {
 }
 
 
-int _strcmp(const char *s1, const char *s2)
+int strcmp(const char *s1, const char *s2)
 {
   while (*s1 && *s2 && *s1 == *s2) {
     s1++;
@@ -26,7 +26,7 @@ int _strcmp(const char *s1, const char *s2)
   return *s1 - *s2;
 }
 
-int _memcmp(const void *a, const void *b, size_t n)
+int memcmp(const void *a, const void *b, size_t n)
 {
   const char *p1 = a;
   const char *p2 = b;
@@ -37,7 +37,7 @@ int _memcmp(const void *a, const void *b, size_t n)
   return 0;
 }
 
-int _strncmp(const char *s1, const char *s2, size_t n)
+int strncmp(const char *s1, const char *s2, size_t n)
 {
   while (n && *s1 && *s2 && *s1 == *s2) {
     s1++;
@@ -49,7 +49,7 @@ int _strncmp(const char *s1, const char *s2, size_t n)
   return *s1 - *s2;
 }
 
-int _strlen(const char* ptr)
+int strlen(const char* ptr)
 {
   int res;
   res = 0;
@@ -58,7 +58,7 @@ int _strlen(const char* ptr)
   return res;
 }
 
-int _strnlen(const char* ptr, size_t n)
+int strnlen(const char* ptr, size_t n)
 {
   int res;
   res = 0;
@@ -67,7 +67,7 @@ int _strnlen(const char* ptr, size_t n)
   return res;
 }
 
-char * _strcpy(char *dst, const char *src)
+char *strcpy(char *dst, const char *src)
 {
   char *res = dst;
   while(*src)
@@ -76,7 +76,7 @@ char * _strcpy(char *dst, const char *src)
   return res;
 }
 
-char * _strncpy(char *dst, const char *src, size_t n)
+char *strncpy(char *dst, const char *src, size_t n)
 {
   char *res = dst;
   char tmp;
@@ -92,7 +92,7 @@ char * _strncpy(char *dst, const char *src, size_t n)
   return res;
 }
 
-void * _memset(void *dst, char value, size_t n)
+void *memset(void *dst, char value, size_t n)
 {
   char *ptr = (char *)dst;
   while (n--) {
@@ -126,7 +126,7 @@ void * memcpy_8aligned(void *dst, const void *src, size_t n)
   return dst;
 }
 
-void * _memcpy(void *dst, const void *src, size_t n)
+void * memcpy(void *dst, const void *src, size_t n)
 {
   unsigned int i, imax;
   if (!IS_8_ALIGNED(dst) || !IS_8_ALIGNED(src)) {

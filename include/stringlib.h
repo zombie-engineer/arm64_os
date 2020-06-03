@@ -4,7 +4,7 @@
 
 
 // This trick helps testing scenarios on a host machine, when we should 
-#ifndef TEST_STRING
+#ifdef TEST_STRING
 #define strcmp     _strcmp
 #define strncmp    _strncmp
 #define strlen     _strlen
@@ -25,39 +25,39 @@
 #define isspace  _isspace
 
 
-int _strcmp(const char *s1, const char *s2);
+int strcmp(const char *s1, const char *s2);
 
-int _strncmp(const char *s1, const char *s2, size_t n);
+int strncmp(const char *s1, const char *s2, size_t n);
 
-int _strlen(const char* ptr);
+int strlen(const char* ptr);
 
-int _strnlen(const char*, size_t n);
+int strnlen(const char*, size_t n);
 
-char * _strcpy(char *, const char *);
+char *strcpy(char *, const char *);
 
-char * _strncpy(char *, const char *, size_t n);
+char *strncpy(char *, const char *, size_t n);
 
-void * _memset(void *dst, char value, size_t n);
+void *memset(void *dst, char value, size_t n);
 
-void * _memcpy(void *dst, const void *src, size_t n);
+void *memcpy(void *dst, const void *src, size_t n);
 
-int _memcmp(const void *a, const void *b, size_t n);
+int memcmp(const void *a, const void *b, size_t n);
 
-long long int _strtoll(const char *str, char **endptr, int basis);
+long long int strtoll(const char *str, char **endptr, int basis);
 
-int _vsprintf(char *dst, const char *fmt, __builtin_va_list *args);
+int vsprintf(char *dst, const char *fmt, __builtin_va_list *args);
 
-int _vsnprintf(char *dst, size_t n, const char *fmt, __builtin_va_list *args);
+int vsnprintf(char *dst, size_t n, const char *fmt, __builtin_va_list *args);
 
-int _sprintf(char *dst, const char *fmt, ...);
+int sprintf(char *dst, const char *fmt, ...);
 
-int _snprintf(char *dst, size_t n, const char *fmt, ...);
+int snprintf(char *dst, size_t n, const char *fmt, ...);
 
-int _isspace(char c);
+int isspace(char c);
 
-int _isprint(char c);
+int isprint(char c);
 
-int _isdigit(char c);
+int isdigit(char c);
 
 void wtomb(char *buf, size_t buf_sz, char *src, int src_sz);
 

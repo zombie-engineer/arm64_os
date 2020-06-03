@@ -556,7 +556,7 @@ static void NOINLINE __print_fn_string(struct printf_ctx *c)
 static void NOINLINE __print_fn_char(struct printf_ctx *c)
 {
   char ch = (char)c->arg;
-  if (!_isprint(ch))
+  if (!isprint(ch))
     ch = '.';
   if (c->dst < c->dst_end)
     *(c->dst++) = ch;
@@ -710,24 +710,24 @@ int /*optimized*/ __vsnprintf(char *dst, size_t dst_len, const char *fmt, __buil
   return c->dst_virt - dst;
 }
 
-int /*optimized*/ _vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list *args)
+int /*optimized*/ vsnprintf(char *dst, size_t dst_len, const char *fmt, __builtin_va_list *args)
 {
   return __vsnprintf(dst, dst_len, fmt, args);
 }
 
-int /*optimized*/ _vsprintf(char *dst, const char *fmt, __builtin_va_list *args)
+int /*optimized*/ vsprintf(char *dst, const char *fmt, __builtin_va_list *args)
 {
   return __vsnprintf(dst, 4096, fmt, args);
 }
 
-int _sprintf(char *dst, const char *fmt, ...)
+int sprintf(char *dst, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
   return __vsnprintf(dst, 4096, fmt, &args);
 }
 
-int _snprintf(char *dst, size_t dst_size, const char *fmt, ...)
+int snprintf(char *dst, size_t dst_size, const char *fmt, ...)
 {
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
