@@ -7,6 +7,7 @@
 #include <common.h>
 
 #include <reg_access.h>
+#include <irq.h>
 #include <error.h>
 
 #define SYSTEM_TIMER_BASE   (uint64_t)(PERIPHERAL_BASE_PHY + 0x3000)
