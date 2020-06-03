@@ -2,6 +2,8 @@
 #include <uart/uart.h>
 #include <uart/pl011_uart.h>
 #include <uart/mini_uart.h>
+#include <uart/uart.h>
+
 #include <error.h>
 
 #if defined UART_PL011 && defined UART_MINI
