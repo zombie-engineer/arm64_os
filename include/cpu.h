@@ -51,6 +51,21 @@ void enable_irq(void);
 void disable_irq(void);
 int is_irq_enabled(void);
 
+/*
+ * dcache_clean_and_invalidate_rng - cleans and invalidates
+ * all data cache lines that form whole virtual address range
+ * given by the arguments.
+ * vaddr_start - virtual address of first byte in range
+ * vaddr_end   - virtual address of end of range
+ */
+void dcache_clean_and_invalidate_rng(uint64_t vaddr_start, uint64_t vaddr_end);
+
+/*
+ * dcache_line_width - read cpu regs and returns data cache
+ * line width
+ */
+uint64_t dcache_line_width();
+
 #define WAIT_FOR_EVENT asm volatile("wfe" ::: "memory")
 
 /* 
