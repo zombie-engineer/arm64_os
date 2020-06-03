@@ -13,3 +13,5 @@ void pl011_uart_set_interrupt_mode();
 char pl011_uart_getc();
 
 int pl011_io_thread(void);
+
+int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg);

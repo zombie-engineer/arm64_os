@@ -35,3 +35,5 @@ int usb_mass_set_log_level(int level);
 struct usb_hcd_device_class_mass *usb_hcd_allocate_mass();
 
 void usb_hcd_deallocate_mass(struct usb_hcd_device_class_mass *h);
+
+void usb_hcd_mass_init();
