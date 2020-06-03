@@ -91,12 +91,10 @@ TARGET_PREFIX_QEMU := kernel8_qemu
 
 .PHONY: $(TARGET_PREFIX_QEMU).o
 $(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
-	echo $<
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
 %.o: %.c %.d
 	$(CC) $(CFLAGS) -c $< -o $@
-
 
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 

@@ -73,7 +73,6 @@
  * Global variable pointing to cpuctx of a current task
  */
 extern void *__current_cpuctx;
-extern int aarch64_print_cpu_ctx(void *ctx);
 
 static inline void yield()
 {
@@ -143,7 +142,6 @@ void prep_task_ctx(uint64_t *sp, uint64_t fn, uint64_t flags, void *cpuctx)
 
 void start_task_from_ctx(void *cpuctx)
 {
-  // aarch64_print_cpu_ctx(cpuctx);
   __armv8_restore_ctx_from(cpuctx);
 }
 
@@ -298,13 +296,11 @@ void schedule()
   // old_task = current_task;
   current_task = scheduler_pick_next_task(current_task);
   current_task->task_state = TASK_STATE_RUNNING;
-  // aarch64_print_cpu_ctx(__current_cpuctx);
   // printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
 
   BUG(!current_task, "scheduler logic failed.");
 
   __current_cpuctx = current_task->cpuctx;
-  // aarch64_print_cpu_ctx(__current_cpuctx);
 }
 
 static inline bool needs_resched(task_t *t)

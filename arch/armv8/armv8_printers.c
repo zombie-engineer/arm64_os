@@ -43,7 +43,7 @@ static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
   return 0;
 }
 
-int aarch64_print_cpu_ctx(aarch64_cpuctx_t *ctx) 
+void armv8_print_cpu_ctx(armv8_cpuctx_t *ctx) 
 {
   print_cpuctx_ctx_t print_ctx = { 0 };
   cpuctx_print_regs(ctx, print_reg_cb, &print_ctx);

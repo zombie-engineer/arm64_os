@@ -2,7 +2,7 @@
 #include <types.h>
 #include <cpu.h>
 
-typedef struct aarch64_cpuctx {
+typedef struct armv8_cpuctx {
   union {
     struct {
       uint64_t x0;
@@ -45,7 +45,7 @@ typedef struct aarch64_cpuctx {
     } n;
     uint64_t regs[34];
   } u;
-} aarch64_cpuctx_t;
+} armv8_cpuctx_t;
 
 /* dump cpu context to buffer */
-int aarch64_print_cpu_ctx(aarch64_cpuctx_t *ctx);
+void armv8_print_cpu_ctx(armv8_cpuctx_t *ctx);
