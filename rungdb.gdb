@@ -3,6 +3,10 @@ set pagination off
 target remote localhost:1234
 file kernel8.elf
 
+define dctx
+p/x *(aarch64_cpuctx_t *)__current_cpuctx
+end
+
 # b intr_ctl_set_cb
 # b intr_ctl_arm_irq_enable
 b __handle_interrupt
