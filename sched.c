@@ -10,6 +10,7 @@
 #include <cmdrunner.h>
 #include <debug.h>
 #include <board/bcm2835/bcm2835_irq.h>
+#include <board/bcm2835/bcm2835_arm_timer.h>
 #include <irq.h>
 #include <delays.h>
 #include <syscall.h>
@@ -66,15 +67,6 @@
  * As soon as 'yield' reaches 'ret' instruction program counter will be set to
  * address in the link register and return to task execution will take place as if
  * the recovered task itself has called yield.
- *
- * Because 'yield' does not need to store valid value of program counter, all it's
- * intstructions happen without switching to different execption level of the CPU.
- * This has it's pros and cons. The good thing is that the context switch takes
- * less time. CPU does not need to write to exception registers like SPSR ELR ESP
- * The bad thing is that CPU exceptions also work as context synchronization
- * event, meaning that memory access ordering should be done explicitly in some
- * of the cases.
- *
  */
 
 /*
@@ -85,9 +77,7 @@ extern int aarch64_print_cpu_ctx(void *ctx);
 
 static inline void yield()
 {
-  // printf("'%s' yield start" __endline, get_current()->name);
   asm volatile ("svc %0"::"i"(SVC_YIELD));
-  // printf("'%s' yield return" __endline, get_current()->name);
 }
 
 extern void __armv8_cpuctx_eret();
@@ -157,7 +147,7 @@ void start_task_from_ctx(void *cpuctx)
   __armv8_restore_ctx_from(cpuctx);
 }
 
-static char stacks[STACK_SIZE * NUM_STACKS];
+char stacks[STACK_SIZE * NUM_STACKS] ALIGNED(1024);
 
 static char stack_idx = 0;
 
@@ -184,6 +174,7 @@ task_t *task_create(task_fn fn, const char *task_name)
   strcpy(t->name, task_name);
 
   stack = alloc_stack();
+  printf("stack at %p"__endline, stack);
   if (!stack)
     goto out;
 
@@ -298,12 +289,13 @@ void schedule_debug()
 
 void schedule()
 {
-  task_t *current_task, *old_task;
+  task_t *current_task;
+  // task_t *old_task;
 
   schedule_debug();
 
   current_task = get_current();
-  old_task = current_task;
+  // old_task = current_task;
   current_task = scheduler_pick_next_task(current_task);
   current_task->task_state = TASK_STATE_RUNNING;
   // aarch64_print_cpu_ctx(__current_cpuctx);
@@ -315,7 +307,7 @@ void schedule()
   // aarch64_print_cpu_ctx(__current_cpuctx);
 }
 
-bool needs_resched(task_t *t)
+static inline bool needs_resched(task_t *t)
 {
   if (t->ticks_left)
     return false;
@@ -328,7 +320,7 @@ static inline void schedule_handle_timer_waiting()
   uint64_t now = read_cpu_counter_64();
   list_for_each_entry_safe(t, tmp, &__scheduler.timer_waiting, schedlist) {
     if (t->timer_wait_until <= now) {
-      printf("timeout: now: %llu, until: %llu\n", now, t->timer_wait_until);
+      // printf("timeout: now: %llu, until: %llu\n", now, t->timer_wait_until);
       sched_queue_runnable_task_noirq(&__scheduler, t);
     }
   }
@@ -339,7 +331,7 @@ static inline void schedule_debug_info()
   task_t *t;
   char buf[256];
   int n = 0;
-  struct list_head *l;
+  // struct list_head *l;
   n = snprintf(buf + n, sizeof(buf) - n, "runlist: ");
   list_for_each_entry(t, &__scheduler.running, schedlist) {
     n += snprintf(buf + n, sizeof(buf) - n, "%s(%d)->", t->name, t->ticks_left);
@@ -350,8 +342,8 @@ static inline void schedule_debug_info()
   }
 
   puts(buf);
-  putc('\r');
-  putc('\n');
+  puts(__endline);
+  print_cpu_flags();
 }
 
 /*
@@ -363,7 +355,6 @@ static void schedule_from_irq()
    * print debug info
    */
   // schedule_debug_info();
-  // print_cpu_flags();
 
   /*
    * handle tasks waiting on timers.
@@ -374,13 +365,11 @@ static void schedule_from_irq()
    * decrease current task's cpu time
    */
   get_current()->ticks_left--;
-  // printf("task: %s, ticks_left:%d" __endline, get_current()->name, get_current()->ticks_left);
 
   /*
    * decide do we need to preempt current task
    */
   if (needs_resched(get_current())) {
-    // printf("%s needs resched" __endline, get_current()->name);
     /*
      * preempt current task
      */
@@ -389,7 +378,6 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  /* puts("oneshot start"__endline); */\
   systimer_set_oneshot(3000, sched_timer_cb, 0)
   //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
@@ -407,46 +395,14 @@ int init_task_fn(void)
   // run_cmdrunner_thread();
   BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
+  intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
   SCHED_REARM_TIMER;
   enable_irq();
 
   while(1) {
-    // puts("task_a_loop_start" __endline);
     blink_led(1, 100);
-    // puts("task_a_loop_end" __endline);
     yield();
   }
-}
-
-#define ARM8_CPSR_M_USER       0
-#define ARM8_CPSR_M_FIQ        1
-#define ARM8_CPSR_M_IRQ        2
-#define ARM8_CPSR_M_SUPERVISOR 3
-#define ARM8_CPSR_M_ABORT      7
-#define ARM8_CPSR_M_UNDEFINED  11
-#define ARM8_CPSR_M_SYSTEM     15
-
-#define SPSEL_NORMAL    0
-#define SPSEL_EXCEPTION 1
-
-#define __stringify(__mode) #__mode
-
-#define armv8_set_mode(__mode)\
-  asm volatile (\
-      "mov x0, #"__stringify(__mode)"\n"\
-      "msr spsr_el1, x0\n" : : : )
-
-#define armv8_set_spsel(__sp_mode)\
-  asm volatile (\
-      "mov x0, #"__stringify(__sp_mode)"\n"\
-      "msr SPSel, x0\n" : : : )
-
-void jump_to_schedule()
-{
-  asm volatile ("bl __armv8_cpuctx_store\n");
-  armv8_set_spsel(SPSEL_EXCEPTION);
-  armv8_set_mode(ARM8_CPSR_M_IRQ);
-  asm volatile ( "b __armv8_cpuctx_eret\n");
 }
 
 void scheduler_init()
@@ -456,6 +412,7 @@ void scheduler_init()
   INIT_LIST_HEAD(&__scheduler.timer_waiting);
   INIT_LIST_HEAD(&__scheduler.io_waiting);
 
+  bcm2835_arm_timer_init();
   task_t *initial_task;
   puts("Starting task scheduler\n");
   task_idx = 0;

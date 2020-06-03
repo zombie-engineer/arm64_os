@@ -10,7 +10,7 @@ static irq_func irq_post_hook ALIGNED(8) = NULL;
 void __handle_irq(int irqnr)
 {
   if (irq_log_level > 1)
-    printf("__handle_irq: %d %x\n\r", irqnr, irqnr);
+    printf("__handle_irq: %d" __endline, irqnr);
 
   if (irqnr >= NUM_IRQS)
     return;
@@ -18,6 +18,7 @@ void __handle_irq(int irqnr)
   irq_desc_t *irqd = &irq_descriptors[irqnr];
   if (irqd->handler)
     irqd->handler();
+
   if (irq_post_hook)
     irq_post_hook();
 }
