@@ -221,14 +221,13 @@ static int __attribute__((optimize("O3"))) spi_emulated_slave_xmit_byte(spi_dev_
   uint32_t register gpio_level;
   uint32_t register mask_ce0 = 1<<d->ce0_gpio_pin ;
   uint32_t register mask_sclk = 1<<d->sclk_gpio_pin;
-  reg32_t  register gpio_lev_reg = (reg32_t)GPIO_REG_GPLEV0;
   uint32_t register state = STATE_WAIT_CE0;
   uint32_t register mosi_shift = d->mosi_gpio_pin;
   uint8_t  register byte = 0;
   int      register i = 0;
 
   while(1) {
-    gpio_level = read_reg(gpio_lev_reg);
+    gpio_level = gpio_read_level_reg(d->ce0_gpio_pin);
     if (gpio_level & mask_ce0) {
       if (i) {
         byte = 0;

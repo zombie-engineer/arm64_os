@@ -1,5 +1,5 @@
 #include <asm_macros.h>
-#include "armv8_asm_macros.h"
+#include <arch/armv8/armv8_asm_macros.h>
 
 .section ".text"
 

@@ -32,7 +32,7 @@ void hexdump_memory(const void *addr, size_t sz);
 
 #define print_reg32(regname) printf(#regname " %08x" __endline,  *regname)
 
-#define print_reg32_at(regname) printf(#regname " %08x" __endline,  *(reg32_t)regname)
+#define print_reg32_at(regname) printf(#regname " %08x" __endline,  *regname)
 
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)

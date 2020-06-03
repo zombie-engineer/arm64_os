@@ -178,16 +178,12 @@ void wait_gpio()
   enable_irq();
   gpio_set_function(20, GPIO_FUNC_IN);
   // gpio_set_detect_high(20);
-  // GPLEN0 |= 1 << 2;
   gpio_set_detect_falling_edge(2);
   
   intr_ctl_dump_regs("after set\n");
   while(1) {
     // f: 1111 b: 1011
     wait_cycles(0x300000);
-    // print_reg32(INT_CTRL_IRQ_PENDING_2);
-    print_reg32_at(GPIO_REG_GPLEV0);
-    print_reg32_at(GPIO_REG_GPEDS0);
   }
 }
 

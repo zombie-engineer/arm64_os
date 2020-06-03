@@ -20,8 +20,6 @@ OBJS := \
 	binblock.o\
 	console.o\
 	delays.o\
-	gpio.o\
-	gpio_access.o\
 	gpio_set.o\
 	power.o\
 	rectangle.o\

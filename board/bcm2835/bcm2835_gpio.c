@@ -1,6 +1,8 @@
 #include <gpio.h>
 #include <common.h>
 #include <compiler.h>
+#include "bcm2835_gpio_reg.h"
+
 
 #define GPIO_CHECK_GPIO_NUM(gpio_num) \
   if (gpio_num > GPIO_MAX_PIN_IDX) \
@@ -8,44 +10,18 @@
 
 #define GPIO_32PIN_SET_CHEKCED(gpio_num, reg0) \
   GPIO_CHECK_GPIO_NUM(gpio_num); \
-  *((reg32_t)reg0 + (gpio_num / 32)) = (1 << (gpio_num % 32)); \
-  return 0;
+  write_reg(reg0 + (gpio_num / 32), (1 << (gpio_num % 32))); \
+  return ERR_OK;
 
-#define GPIO_PIN_SELECT_REG(gpio_num) ((reg32_t)(GPIO_REG_GPFSEL0 + 4 * (gpio_num / 10)))
+#define GPIO_PIN_SELECT_REG(gpio_num) ((GPIO_REG_GPFSEL0 + 4 * (gpio_num / 10)))
 
 #define GPIO_PIN_SELECT_BIT(gpio_num) ((gpio_num % 10) * 3)
 
-uint32_t __attribute__((noinline,optimize("O3"))) div_by_10(uint32_t v)
-{
-  return v / 10;
-}
-
-uint32_t __attribute__((noinline,optimize("O3"))) mul_by_10(uint32_t v)
-{
-  return v * 10;
-}
-
 int OPTIMIZED gpio_set_function(uint32_t gpio_num, int func)
 {
-  uint32_t regval, bitpos;
-  reg32_t gpio_sel_reg = (reg32_t)(GPIO_REG_GPFSEL0 + div_by_10(gpio_num));
   GPIO_CHECK_GPIO_NUM(gpio_num);
   gpio_read_and_set_3(GPIO_REG_GPFSEL0, gpio_num, func);
-
-//  // gpio_sel_reg = GPIO_PIN_SELECT_REG(gpio_num);
-//  bitpos = GPIO_PIN_SELECT_BIT(gpio_num);
-//  regval = *gpio_sel_reg;
-//  regval &= ~(7 << bitpos);
-//  regval |= (func & 7) << bitpos;
-//  *gpio_sel_reg = regval;
-//
-  return 0;
-}
-
-int OPTIMIZED gpio_is_set(uint32_t gpio_num)
-{
-  GPIO_CHECK_GPIO_NUM(gpio_num);
-  return (*(reg32_t)(GPIO_REG_GPLEV0 + (gpio_num / 32)) & (1<<(gpio_num % 32))) ? 1 : 0;
+  return ERR_OK;
 }
 
 int OPTIMIZED gpio_set_on(uint32_t gpio_num)
@@ -96,7 +72,8 @@ int OPTIMIZED gpio_set_detect_async_falling_edge(uint32_t gpio_num)
   return 0;
 }
 
-#define GPIO_REG_ADDR(reg, pin) ((reg32_t)(((const char*)reg) + pin / 32))
+#define GPIO_REG_ADDR(reg, pin) (reg + (pin >> 5))
+
 #define GPIO_REG_BIT(pin) (pin % 32)
 int gpio_pin_status_triggered(uint32_t gpio_num)
 {
@@ -109,8 +86,8 @@ int gpio_pin_status_triggered(uint32_t gpio_num)
 int gpio_pin_status_clear(uint32_t gpio_num)
 {
   reg32_t regaddr = GPIO_REG_ADDR(GPIO_REG_GPEDS0, gpio_num);
-  *regaddr = 1 << GPIO_REG_BIT(gpio_num);
-  return 0;
+  write_reg(regaddr, 1 << GPIO_REG_BIT(gpio_num));
+  return ERR_OK;
 }
 
 int OPTIMIZED gpio_set_gppudclk(uint32_t gpio_num)
@@ -138,17 +115,17 @@ int OPTIMIZED gpio_set_pullupdown(uint32_t gpio_num, int pullupdown)
   register unsigned int r;
 
   GPIO_CHECK_GPIO_NUM(gpio_num);
-  *(reg32_t)GPIO_REG_GPPUD = pullupdown;
+  write_reg(GPIO_REG_GPPUD, pullupdown);
   r = 150;
   while(r--) { asm volatile("nop"); } 
   gpio_set_gppudclk(gpio_num);
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *(reg32_t)GPIO_REG_GPPUD = 0;
+  write_reg(GPIO_REG_GPPUD, 0);
 
-  *(reg32_t)GPIO_REG_GPPUDCLK0 = 0;
-  *(reg32_t)GPIO_REG_GPPUDCLK1 = 0;
-  return 0;
+  write_reg(GPIO_REG_GPPUDCLK0, 0);
+  write_reg(GPIO_REG_GPPUDCLK1, 0);
+  return ERR_OK;
 }
 
 void gpio_dump_select_regs(const char* tag)
@@ -167,20 +144,20 @@ void gpio_power_off(void)
 {
   register unsigned long r;
   // power off gpio pins
-  *(reg32_t)GPIO_REG_GPFSEL0 = 0;
-  *(reg32_t)GPIO_REG_GPFSEL1 = 0;
-  *(reg32_t)GPIO_REG_GPFSEL2 = 0;
-  *(reg32_t)GPIO_REG_GPFSEL3 = 0;
-  *(reg32_t)GPIO_REG_GPFSEL4 = 0;
-  *(reg32_t)GPIO_REG_GPFSEL5 = 0;
-  *(reg32_t)GPIO_REG_GPPUD = 0;
+  write_reg(GPIO_REG_GPFSEL0, 0);
+  write_reg(GPIO_REG_GPFSEL1, 0);
+  write_reg(GPIO_REG_GPFSEL2, 0);
+  write_reg(GPIO_REG_GPFSEL3, 0);
+  write_reg(GPIO_REG_GPFSEL4, 0);
+  write_reg(GPIO_REG_GPFSEL5, 0);
+  write_reg(GPIO_REG_GPPUD, 0);
   r = 150;
   while(r--) { asm volatile("nop"); } 
   // flush GPIO setup
-  *(reg32_t)GPIO_REG_GPPUDCLK0 = 0xffffffff;
-  *(reg32_t)GPIO_REG_GPPUDCLK1 = 0xffffffff;
+  write_reg(GPIO_REG_GPPUDCLK0, 0xffffffff);
+  write_reg(GPIO_REG_GPPUDCLK1, 0xffffffff);
   r = 150;
   while(r--) { asm volatile("nop"); } 
-  *(reg32_t)GPIO_REG_GPPUDCLK0 = 0;
+  write_reg(GPIO_REG_GPPUDCLK0, 0);
 }
 

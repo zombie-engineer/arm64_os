@@ -11,6 +11,8 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/root_hub \
 	usb/dwc2_transfer \
 	bcm2835_systimer \
+	bcm2835_gpio \
+	bcm2835_gpio_access \
 	i2c_master \
 	bsc_slave
 
