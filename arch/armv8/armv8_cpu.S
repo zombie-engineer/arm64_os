@@ -59,22 +59,45 @@
   stp   \__zero_reg, \__zero_reg, [\__ctx_reg], #16 // x28, x29
 .endm
 
+.macro GET_CURRENT_CTX dest, scratch
+  get_cpu_id \scratch
+  ldr   \dest, =__current_cpuctx
+  add   \dest, \dest, \scratch, lsl #6
+  ldr   \dest, [\dest]
+.endm
+
+FUNC(get_current_ctx):
+  GET_CURRENT_CTX x0, x1
+  ret
+
 FUNC(__armv8_cpuctx_store):
-  // of all general purpose registers
-  // x0 - x29 are uncorrupted and
-  // link register x30 is in [sp]
-  str   x30, [sp, #-8]
-  ldr   x30, =__current_cpuctx
-  ldr   x30, [x30]
+  /*
+   * x29 will be quickly used as a scratch register for finding per-cpu offset in __current_ctx
+   * x30 will be used for writing the context
+   * x29 is recovered after per-cpu __current_ctx is known
+   * x0 - x29 are then stored to per-cpu context with x30 acting as a destination cursor.
+   * x30 is then restored.
+   */
+  stp   x29, x30, [sp, #-16]
+  GET_CURRENT_CTX x30, x29
+  /*
+   * Immediately restore x29 from stack
+   */
+  ldr   x29, [sp, #-16]
 
   STORE_REGS_X0_X29 x30
 
-  // store original link register (x30)
-  // of the caller function
+  /*
+   * Link Register X30
+   * store original link register (x30)
+   * of the caller function
+   */
   ldr   x28, [sp] 
 
-  // store stack pointer from a task
-  // before exception happened
+  /* 
+   * store stack pointer from a task
+   * before exception happened
+   */
   mrs   x29, sp_el0
   stp   x28, x29, [x30], #16
   // store program counter and cpsr from a task
@@ -90,8 +113,7 @@ FUNC(__armv8_cpuctx_store):
 
 
 FUNC(__armv8_cpuctx_eret):
-  ldr   x30, =__current_cpuctx
-  ldr   x30, [x30]
+  GET_CURRENT_CTX x30, x29
   // restore elr and sp0 first 
   ldp   x0 , x1 , [x30, #(31 << 3)]
   msr   sp_el0, x0
@@ -132,7 +154,7 @@ FUNC(__armv8_prep_context):
 
 FUNC(__armv8_restore_ctx_from):
   // x0 - cpu context to restore
-  ldr x30, =__current_cpuctx
+  GET_CURRENT_CTX x30, x29
   str x0, [x30]
   mov x30, x0
   ctx .req x30
@@ -160,10 +182,12 @@ FUNC(__armv8_restore_ctx_from):
   // x30 - is a link register
   // at store context we will use x30 as a writing 
   // so we first stack it to later recover
-  str   x30, [sp, #-8]
-  // now let's write start of context to x30
-  ldr   x30, =__current_cpuctx
-  ldr   x30, [x30]
+  stp   x30, x29, [sp, #-8]
+  GET_CURRENT_CTX x30, x29
+  /*
+   * Immediately restore x29 from stack
+   */
+  ldr   x29, [sp, #-16]
 
   STORE_REGS_X0_X29 x30
 
@@ -193,8 +217,7 @@ FUNC(__armv8_restore_ctx_from):
 
 .macro RESTORE_CONTEXT
   ctx   .req x30
-  ldr   ctx, =__current_cpuctx
-  ldr   ctx, [ctx]
+  GET_CURRENT_CTX ctx, x29
   ldr   x0, [ctx, #(31 << 3)]
   mov   sp, x0
   LOAD_REGS_X0_X30 ctx

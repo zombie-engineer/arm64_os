@@ -4,7 +4,7 @@ target remote localhost:1234
 file kernel8.elf
 
 define dctx
-p/x *(aarch64_cpuctx_t *)__current_cpuctx
+p/x *(armv8_cpuctx_t *)__current_cpuctx
 end
 
 # b intr_ctl_set_cb

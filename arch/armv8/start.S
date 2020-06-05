@@ -1,4 +1,5 @@
 #include <asm_macros.h>
+#include <arch/armv8/armv8_asm_macros.h>
 #include "irq_macros.h"
 
 /*
@@ -82,16 +83,14 @@ _cores_checkin:
 
   /*
    * Get CPU core number
-   * mpidr_el1 & 3 = Aff1 for 4-core systems holds
-   * the core number
    */
-  mrs   x0, mpidr_el1
-  and   x1, x0, #3
+  get_cpu_id x1
 
   /*
    * Store mpidr_el1 to per-core data array, for debug.
    */
   ldr   x2, =__percore_data
+  mrs   x0, mpidr_el1
   str   x0, [x2, x1, lsl #3]
 
   /* Jump next if core number is 0 */
@@ -328,10 +327,16 @@ GLOBAL_VAR(__exception_info):
 .quad 0x00
 .endr
 
-// pointer to current cpu context
-.align 3
+/*
+ * pointer to current cpu context
+ */
+.align 6
 GLOBAL_VAR(__current_cpuctx):
+.rept 4
+.rept 8
 .quad 0
+.endr
+.endr
 
 GLOBAL_VAR(__aarch64_hcr_el2_init_value):
 .quad 0

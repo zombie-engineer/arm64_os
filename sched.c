@@ -420,3 +420,8 @@ void scheduler_init()
   sched_queue_runnable_task(&__scheduler, initial_task);
   start_task_from_ctx(initial_task->cpuctx);
 }
+
+
+int run_on_cpu(struct task *t, int cpu_num)
+{
+}

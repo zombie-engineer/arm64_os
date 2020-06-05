@@ -79,3 +79,5 @@ uint64_t get_cpu_counter_64_freq(void);
 uint64_t read_cpu_counter_64(void);
 
 void print_cpu_flags();
+
+int get_cpu_num();

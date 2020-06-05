@@ -48,7 +48,8 @@ typedef struct task {
   uint64_t timer_wait_until;
 } task_t;
 
-#define get_current() (container_of(__current_cpuctx, task_t, cpuctx))
+extern void *get_current_ctx();
+#define get_current() (container_of(get_current_ctx(), task_t, cpuctx))
 
 struct scheduler {
   struct list_head running;
@@ -63,3 +64,5 @@ void schedule();
 void sched_queue_runnable_task(struct scheduler *s, struct task *t);
 
 void sched_queue_timewait_task(struct scheduler *s, struct task *t);
+
+int run_on_cpu(struct task *t, int cpu_num);

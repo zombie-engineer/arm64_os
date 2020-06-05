@@ -17,3 +17,11 @@
   movk \dest, #(\value & 0xffff)
 .endm
 
+.macro get_cpu_id dest
+/*
+ * mpidr_el1 & 3 = Aff1 for 4-core systems holds
+ * the core number
+ */
+ mrs   \dest, mpidr_el1
+ and   \dest, \dest, #3
+.endm
