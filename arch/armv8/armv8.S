@@ -38,7 +38,7 @@ FUNC(__armv8_set_sp_el1):
 
 FUNC(armv8_get_mpidr_el1):
   # x0 - cpu core number 0-3
-  ldr x1, =__percore_data
+  ldr x1, =__percpu_data
   add x1, x1, x0, lsl #3
   ldr x0, [x1]
   ret

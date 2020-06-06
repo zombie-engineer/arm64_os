@@ -73,18 +73,23 @@ _start:
    * instruction.
    */
   mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
-  ldr   x1, =_cores_checkin
+  ldr   x1, =__cpu_parking
   str   x1, [x0, #8]
   str   x1, [x0, #16]
   str   x1, [x0, #24]
   sev
 
-_cores_checkin:
-  /*
-   * We need to read CPU ID for each core and stop non-0
-   * cores for now.
-   */
-
+/*
+ * CPU cores are going to park here, they will:
+ * - sleep most of the time.
+ * - when awake check if they've been assigned an instruction address to run
+ * - when instruction pointer recieved:
+ * - - also recieve stack pointer
+ * - - run through cpu configuration code
+ * - - zero out moset of CPU state
+ * - - branch to recieved instruction.
+ */
+__cpu_parking:
   /*
    * Get CPU core number
    */
@@ -93,7 +98,7 @@ _cores_checkin:
   /*
    * Store mpidr_el1 to per-core data array, for debug.
    */
-  ldr   x2, =__percore_data
+  ldr   x2, =__percpu_data
   mrs   x0, mpidr_el1
   str   x0, [x2, x1, lsl #3]
 
@@ -304,7 +309,7 @@ _set_stack:
   bl    main
 1:
   wfe
-  b 1b   
+  b 1b
 
 
 LFUNC(_cpu_wait_for_event):
@@ -312,11 +317,6 @@ LFUNC(_cpu_wait_for_event):
   b _cpu_wait_for_event
 
 .pushsection ".data"
-.align 3
-GLOBAL_VAR(__percore_data):
-.rept 4
-.quad 0x00
-.endr
 
 // 8 byte aligned cpu context
 .align 3
