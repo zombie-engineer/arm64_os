@@ -24,6 +24,6 @@ struct percpu_context {
   uint64_t padding[4];
 } PACKED;
 
-extern struct percpu_context percpu_context[NUM_ACTIVE_CORES];
+extern struct percpu_context percpu_context[NUM_CORES];
 
 struct percpu_context *get_percpu_context(int cpu_num);

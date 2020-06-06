@@ -1,6 +1,7 @@
 CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 
 CC      = $(CROSS_COMPILE)gcc
+CPP     = $(CROSS_COMPILE)cpp
 LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
@@ -10,9 +11,11 @@ INCLUDES := include firmware/atmega8a/include
 OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
+LINKSCRIPT = arch/armv8/link.ld
+
 CFLAGS = -Werror=implicit-function-declaration -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
-LDFLAGS = -nostdlib -nostartfiles -T arch/armv8/link.ld
+LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
@@ -65,11 +68,11 @@ include lib/stringlib/Makefile
 $(info INCLUDES = "$(INCLUDES)")
 INCLUDES_FLAGS = $(addprefix -I,$(INCLUDES))
 
-LIBS = 
-LIBS += $(OBJS_UART) 
-LIBS += $(OBJS_MBOX) 
-LIBS += $(OBJS_ARMV8) 
-LIBS += $(OBJS_CMDRUNNER) 
+LIBS =
+LIBS += $(OBJS_UART)
+LIBS += $(OBJS_MBOX)
+LIBS += $(OBJS_ARMV8)
+LIBS += $(OBJS_CMDRUNNER)
 LIBS += $(OBJS_MAX7219)
 LIBS += $(OBJS_F5161AH)
 LIBS += $(OBJS_SPI)
@@ -99,8 +102,11 @@ $(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
 
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
-%.elf: $(OBJS) $(BINOBJS) %.o
+%.elf: $(LINKSCRIPT) $(OBJS) $(BINOBJS) %.o
 	$(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
+
+$(LINKSCRIPT): $(LINKSCRIPT).cpp
+	$(CPP) -Iinclude $< | grep -v '^#' > $(LINKSCRIPT)
 
 TARGET_QEMU_IMG := $(TARGET_PREFIX_QEMU).img
 
@@ -165,6 +171,9 @@ $(info $(DEPS))
 %.d: %.S
 	cpp -M $(INCLUDES_FLAGS) $< > $@
 
+%.d: %.cpp
+	cpp -M $(INCLUDES_FLAGS) $< > $@
+
 -include $(DEPS)
 
 TARGETS := $(DEPS)\
@@ -172,6 +181,6 @@ TARGETS := $(DEPS)\
 	$(addprefix $(TARGET_PREFIX_QEMU)., img sym elf)
 
 $(info TARGETS: $(TARGETS))
-   
+
 .PHONY: all
 all: $(TARGETS)

@@ -14,3 +14,4 @@ uart_capture_*.bin
 *fontmaker
 *myfont.raw
 *.img.sym
+arch/armv8/link.ld
