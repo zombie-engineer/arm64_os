@@ -31,6 +31,7 @@ OBJS := \
 	cpuctx_generic.o\
 	dma.o\
 	intr_ctl.o\
+	percpu.o\
 	pwm.o\
 	ringbuf.o\
 	tags.o\
