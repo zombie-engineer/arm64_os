@@ -49,6 +49,7 @@ typedef struct task {
 } task_t;
 
 extern void *get_current_ctx();
+
 #define get_current() (container_of(get_current_ctx(), task_t, cpuctx))
 
 struct scheduler {
