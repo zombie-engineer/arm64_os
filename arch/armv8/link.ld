@@ -3,15 +3,15 @@ SECTIONS
 {
   . = 0x80000;
   __stack_base = .;
-  .text : 
-  { 
-    KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) 
+  .text :
+  {
+    KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*)
   }
 
   . = ALIGN(8);
-  .rodata : 
-  { 
-    *(.rodata .rodata.* .gnu.linkonce.r*) 
+  .rodata :
+  {
+    *(.rodata .rodata.* .gnu.linkonce.r*)
   }
 
   . = ALIGN(4096);
@@ -19,7 +19,7 @@ SECTIONS
   .data : {*(.data .gnu.linkonce.d*) }
   .data.bin ALIGN(4): SUBALIGN(4) { *(.data.*) }
 
-  .mybss (NOLOAD) : 
+  .mybss (NOLOAD) :
   {
     . = ALIGN(16);
     __bss_start = .;
