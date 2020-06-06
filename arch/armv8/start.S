@@ -269,44 +269,43 @@ _set_stack:
 
 2:
   // clear GP registers
-  mov x0, #0
-  mov x1, #0
-  mov x2, #0
-  mov x3, #0
-  mov x4, #0
-  mov x5, #0
-  mov x6, #0
-  mov x7, #0
-  mov x8, #0
-  mov x9, #0
-  mov x10, #0
-  mov x11, #0
-  mov x12, #0
-  mov x13, #0
-  mov x14, #0
-  mov x15, #0
-  mov x16, #0
-  mov x17, #0
-  mov x18, #0
-  mov x19, #0
-  mov x20, #0
-  mov x21, #0
-  mov x22, #0
-  mov x23, #0
-  mov x24, #0
-  mov x25, #0
-  mov x26, #0
-  mov x27, #0
-  mov x28, #0
-  mov x29, #0
-  mov x30, #0
+  mov x0, xzr
+  mov x1, xzr
+  mov x2, xzr
+  mov x3, xzr
+  mov x4, xzr
+  mov x5, xzr
+  mov x6, xzr
+  mov x7, xzr
+  mov x8, xzr
+  mov x9, xzr
+  mov x10, xzr
+  mov x11, xzr
+  mov x12, xzr
+  mov x13, xzr
+  mov x14, xzr
+  mov x15, xzr
+  mov x16, xzr
+  mov x17, xzr
+  mov x18, xzr
+  mov x19, xzr
+  mov x20, xzr
+  mov x21, xzr
+  mov x22, xzr
+  mov x23, xzr
+  mov x24, xzr
+  mov x25, xzr
+  mov x26, xzr
+  mov x27, xzr
+  mov x28, xzr
+  mov x29, xzr
+  mov x30, xzr
 
-  // Jump to main
   bl    main
-  // After main returns halt 
-  b     _cpu_wait_for_event
+1:
+  wfe
+  b 1b   
 
-// ******************************************************************************
 
 LFUNC(_cpu_wait_for_event):
   wfe
