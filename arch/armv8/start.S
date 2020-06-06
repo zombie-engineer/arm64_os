@@ -21,32 +21,36 @@
  */
 .equ PER_CORE_STARTUP_ADDRESSES_BASE, 0xd8
 
-// @ instructions at 0x00
-// @ d2a80000 @ b900001f @ 52b00001 @ b9000801
-// @ 58000400 @ d51be000 @ d51ce07f @ d2867fe0
-// @ d51e1140 @ d280b620 @ d51e1100 @ d2800800
-// @ d519f220 @ 58000320 @ d51c1000 @ d2807920
-// @ d51e4000 @ 10000060 @ d51e4020 @ d69f03e0
-// @ d53800a6 @ 924004c6 @ b40000e6 @ 100003e5
-// @ d503205f @ f86678a4 @ b4ffffc4 @ d2800000
-// @ 14000003 @ 18000444 @ 18000400 @ d2800001
-// @ d2800002 @ d2800003 @ d61f0080 @ 00000000
-// @ 0124f800 @ 00000000 @ 30c50830 @ 00000000
-// @ 
-// @ same, but singled lined 
+/*
+ * @ instructions at 0x00
+ * @ d2a80000 @ b900001f @ 52b00001 @ b9000801
+ * @ 58000400 @ d51be000 @ d51ce07f @ d2867fe0
+ * @ d51e1140 @ d280b620 @ d51e1100 @ d2800800
+ * @ d519f220 @ 58000320 @ d51c1000 @ d2807920
+ * @ d51e4000 @ 10000060 @ d51e4020 @ d69f03e0
+ * @ d53800a6 @ 924004c6 @ b40000e6 @ 100003e5
+ * @ d503205f @ f86678a4 @ b4ffffc4 @ d2800000
+ * @ 14000003 @ 18000444 @ 18000400 @ d2800001
+ * @ d2800002 @ d2800003 @ d61f0080 @ 00000000
+ * @ 0124f800 @ 00000000 @ 30c50830 @ 00000000
+ * @ 
+ * @ same, but singled lined 
+ */
 
 .section ".text.boot"
 .globl _start
 
-// Bootstap code at 0x0 first runs at EL3, it goes through the followind setup steps:
-// - Sets EL0, EL1 to Non-Secure mode, no access to Secure Memory
-// - Disables interrupt routing to EL3 from non-EL3
-// - Enables HYP call
-// - Sets EL2 to AArch64 state
-// - Sets SCTLR_EL2 to basic non-MMU non-cached state
-// - Sets SPSR_EL3: all exceptions masked, exception level EL2/SP_EL2
-// - ERETs from EL3 to EL2/SP_EL2
-// - Branches to _start
+/*
+ * Bootstap code at 0x0 first runs at EL3, it goes through the followind setup steps:
+ * - Sets EL0, EL1 to Non-Secure mode, no access to Secure Memory
+ * - Disables interrupt routing to EL3 from non-EL3
+ * - Enables HYP call
+ * - Sets EL2 to AArch64 state
+ * - Sets SCTLR_EL2 to basic non-MMU non-cached state
+ * - Sets SPSR_EL3: all exceptions masked, exception level EL2/SP_EL2
+ * - ERETs from EL3 to EL2/SP_EL2
+ * - Branches to _start
+ */
 _start:
   /*
    * Starting in EL2/SP_EL2, exceptions masked, non-MMU
@@ -246,11 +250,13 @@ _start_el1:
   ldr   x1, =__initial_cpuctx
   str   x1, [x0]
 
-  // Use sp_el0
-  // While catching exception from el1 to el1
-  // use sp_el0 to store stack pointer to 
-  // restore to after eret
-  // sp_el1 is not convenient to write/read
+  /*
+   * Use sp_el0
+   * While catching exception from el1 to el1
+   * use sp_el0 to store stack pointer to
+   * restore to after eret
+   * sp_el1 is not convenient to write/read
+   */
 _set_stack:
   mov   x0, #1
   msr   SPSel, x0
