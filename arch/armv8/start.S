@@ -1,5 +1,6 @@
 #include <asm_macros.h>
 #include <arch/armv8/armv8_asm_macros.h>
+#include <arch/armv8/percpu_asm_macros.h>
 #include "irq_macros.h"
 
 /*
@@ -22,19 +23,19 @@
 .equ PER_CORE_STARTUP_ADDRESSES_BASE, 0xd8
 
 /*
- * @ instructions at 0x00
- * @ d2a80000 @ b900001f @ 52b00001 @ b9000801
- * @ 58000400 @ d51be000 @ d51ce07f @ d2867fe0
- * @ d51e1140 @ d280b620 @ d51e1100 @ d2800800
- * @ d519f220 @ 58000320 @ d51c1000 @ d2807920
- * @ d51e4000 @ 10000060 @ d51e4020 @ d69f03e0
- * @ d53800a6 @ 924004c6 @ b40000e6 @ 100003e5
- * @ d503205f @ f86678a4 @ b4ffffc4 @ d2800000
- * @ 14000003 @ 18000444 @ 18000400 @ d2800001
- * @ d2800002 @ d2800003 @ d61f0080 @ 00000000
- * @ 0124f800 @ 00000000 @ 30c50830 @ 00000000
- * @ 
- * @ same, but singled lined 
+ * instructions at 0x00
+ * d2a80000 @ b900001f @ 52b00001 @ b9000801
+ * 58000400 @ d51be000 @ d51ce07f @ d2867fe0
+ * d51e1140 @ d280b620 @ d51e1100 @ d2800800
+ * d519f220 @ 58000320 @ d51c1000 @ d2807920
+ * d51e4000 @ 10000060 @ d51e4020 @ d69f03e0
+ * d53800a6 @ 924004c6 @ b40000e6 @ 100003e5
+ * d503205f @ f86678a4 @ b4ffffc4 @ d2800000
+ * 14000003 @ 18000444 @ 18000400 @ d2800001
+ * d2800002 @ d2800003 @ d61f0080 @ 00000000
+ * 0124f800 @ 00000000 @ 30c50830 @ 00000000
+ *
+ * same, but singled lined
  */
 
 .section ".text.boot"
@@ -72,12 +73,12 @@ _start:
    * wake them up by SEV (set event)
    * instruction.
    */
-  mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
-  ldr   x1, =__cpu_parking
-  str   x1, [x0, #8]
-  str   x1, [x0, #16]
-  str   x1, [x0, #24]
-  sev
+#  mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
+#  ldr   x1, =__cpu_parking
+#  str   x1, [x0, #8]
+#  str   x1, [x0, #16]
+#  str   x1, [x0, #24]
+#  sev
 
 /*
  * CPU cores are going to park here, they will:
@@ -91,30 +92,87 @@ _start:
  */
 __cpu_parking:
   /*
-   * Get CPU core number
+   * Find the number of running CPU core and fill
+   * percpu data with some values.
    */
-  get_cpu_id x1
+  cpu_id         .req x0
+  pcpu_stack_el0 .req x1
+  pcpu_stack_el1 .req x2
+  pcpu_mpidr_el1 .req x3
+  pcpu_jump_addr .req x4
+  pcpu_cpu_state .req x5
+  tmp            .req x6
+  tmp2           .req x7
+
+  get_cpu_id cpu_id
+
+ /*
+  * Deduce stacks for each cpu core
+  */
+.macro get_cpu_stack cpu, dest, el, tmp, tmp2
+  /* \()\el\() - is substitution with \() acting as separators that disabmiguate macro boundaries */
+  ldr \tmp, =__stack_size_el\()\el\()_log
+  mov \tmp2, \cpu
+  lsl \tmp, \tmp2, \tmp
+  ldr \dest, =__stacks_el\()\el\()_base
+  add \dest, \dest, tmp
+.endm
+
+  get_cpu_stack cpu_id, pcpu_stack_el1, 1, tmp, tmp2
+  get_cpu_stack cpu_id, pcpu_stack_el0, 0, tmp, tmp2
 
   /*
-   * Store mpidr_el1 to per-core data array, for debug.
+   * Set jump address. Only core 0 will have this set to non-zero value.
+   * other's will wait for it to be set latet from scheduler code.
    */
-  ldr   x2, =__percpu_data
-  mrs   x0, mpidr_el1
-  str   x0, [x2, x1, lsl #3]
-
-  /* Jump next if core number is 0 */
-  cbz   x1, _core0_exec
-_core_wait:
-  b _cpu_wait_for_event
-
-
-_core0_exec:
-  /* CPU ID == 0 */
+  cbz  cpu_id, 1f
   /*
-   * Set stack early for subroutine operations.
+   * non-0 cores jump_addr are set to zero.
    */
-  ldr   x0, =__el2_stack_base
-  mov   sp, x0
+  mov  pcpu_jump_addr, xzr
+  b 2f
+1:
+  /*
+   * core 0 jump set to proceed to main
+   */
+  adr pcpu_jump_addr, __jump_addr_core0
+2:
+  /*
+   * MPIDR_EL1 is saved for debug of cpu startup context.
+   */
+  mrs   pcpu_mpidr_el1, mpidr_el1
+
+  /*
+   * set initial cpu state address. This cpu state is the buffer,
+   * to where state is stored during exception before task scheduling
+   * starts up.
+   */
+  ldr  pcpu_cpu_state, =__init_cpu_state
+  ldr  tmp, =__init_cpu_state_max_size
+  mul  tmp, cpu_id, tmp
+  add  pcpu_cpu_state, pcpu_cpu_state, tmp
+
+  /*
+   * percpu_data is an array of $NUM_CORES structs
+   * each core has it's own cpu_id to access corresponding element
+   * in that array.
+   */
+  percpu_init cpu_id, \
+    pcpu_stack_el0, \
+    pcpu_stack_el1, \
+    pcpu_jump_addr, \
+    pcpu_mpidr_el1, \
+    pcpu_cpu_state, \
+    tmp
+
+  .unreq cpu_id
+  .unreq pcpu_stack_el0
+  .unreq pcpu_stack_el1
+  .unreq pcpu_mpidr_el1
+  .unreq pcpu_jump_addr
+  .unreq pcpu_cpu_state
+  .unreq tmp
+  .unreq tmp2
 
   /*
    * Get current exception level
@@ -129,29 +187,22 @@ _core0_exec:
   lsr   x0, x0, #2
   and   x0, x0, #3
 
-//  /*
-//   * Check if we are at EL3 now. If we are, goto error.
-//   * not sure if i need this code.
-//   */
-//  cmp   x0, #(3 << 2)
-//  bne   _check_el1
-
   /*
    * Check if we are in EL1 execution state. If not set it.
    * x0 = current el.
    */
   cmp   x0, #CURRENT_EL_EL1
-  beq   _start_el1
+  beq   __start_el1
 
   /*
    * Set up EL1.
    */
-  // ***************************************************************** // 
+  // ***************************************************************** //
   // enable CNTP for EL1
   // mrs   x0, cnthctl_el2
   // orr   x0, x0, #3
   // msr   cnthctl_el2, x0   // Hypervisor Configuration Register Enables second stage translation for execution in Non-secure EL1 and EL0.
-  // ***************************************************************** // 
+  // ***************************************************************** //
 
   msr   cntvoff_el2, xzr
 
@@ -164,9 +215,9 @@ _core0_exec:
    */
   mov   x0, #(1 << 31)
 
-  // HCW_EL2.SWIO   - 1 
-  // SWIO hardwired on Pi3 Set/Way Invalidation Override 
-  orr   x0, x0, #(1 << 1) 
+  // HCW_EL2.SWIO   - 1
+  // SWIO hardwired on Pi3 Set/Way Invalidation Override
+  orr   x0, x0, #(1 << 1)
   msr   hcr_el2, x0
 
   /*
@@ -204,9 +255,9 @@ _core0_exec:
   msr   spsr_el2, x0
 
   /*
-   * Set ELR_EL2 to point to _start_el1 from where it proceeds execution
+   * Set ELR_EL2 to point to __start_el1 from where it proceeds execution
    */
-  adr   x0, _start_el1
+  adr   x0, __start_el1
   msr   elr_el2, x0
 
   /*
@@ -236,25 +287,7 @@ __clear_bss:
 1:
   ret
 
-_start_el1:
-
-  /*
-   * Zero out .bss section
-   */
-  bl __clear_bss
-
-  /*
-   * Set initial value for __current_cpuctx.
-   * We need special memory region, that will hold cpu context during
-   * save/restore cpu context operations when exceptions are taken.
-   * After scheduling is enabled __current_cpuctx will point to this zone
-   * in struct task. Before scheduling is enabled we need some initial
-   * place to store cpu context.
-   */
-  ldr   x0, =__current_cpuctx
-  ldr   x1, =__initial_cpuctx
-  str   x1, [x0]
-
+__start_el1:
   /*
    * Use sp_el0
    * While catching exception from el1 to el1
@@ -263,15 +296,37 @@ _start_el1:
    * sp_el1 is not convenient to write/read
    */
 _set_stack:
-  mov   x0, #1
-  msr   SPSel, x0
-  ldr   x0, =__el1_stack_base
-  mov   sp, x0
-  mov   x0, #0
-  msr   SPSel, x0
-  ldr   x0, =_start
-  mov   sp, x0
+.macro cpu_set_stack_ptrs cpu_id, el, tmp
+  mov   \tmp, #\()\el
+  msr   SPSel, \tmp
+  percpu_data_get_stack \cpu_id \el \tmp \tmp
+  mov   sp, \tmp
+.endm
 
+  cpu_id      .req x0
+  tmp         .req x1
+
+  get_cpu_id cpu_id
+
+  cpu_set_stack_ptrs cpu_id, 0, tmp
+  cpu_set_stack_ptrs cpu_id, 1, tmp
+
+__parking_loop:
+  jump_addr .req x2
+  percpu_data_get_jmp cpu_id, jump_addr, tmp
+  cbz  jump_addr, __parking_loop_wait
+__parking_loop_exit:
+  br   jump_addr
+__parking_loop_wait:
+  wfe
+  b __parking_loop
+
+
+__jump_addr_core0:
+  /*
+   * Zero out .bss section
+   */
+  bl __clear_bss
 2:
   // clear GP registers
   mov x0, xzr
@@ -346,15 +401,6 @@ GLOBAL_VAR(__current_cpuctx):
 GLOBAL_VAR(__aarch64_hcr_el2_init_value):
 .quad 0
 
-.pushsection ".el1_stack", "a"
-.align 12
-/* 4Kb aligned address of EL1 exception stack area */
-.globl __el1_stack_top
-__el1_stack_top:
-
-.org  . + 0x4000
-.globl __el1_stack_base
-__el1_stack_base:
 .popsection
 
 .pushsection ".el2_stack", "a"
@@ -366,8 +412,6 @@ __el2_stack_top:
 .org  . + 0x4000
 .globl __el2_stack_base
 __el2_stack_base:
-.popsection
-
 .popsection
 
 LFUNC(__prep_exception_info):
@@ -392,7 +436,7 @@ LFUNC(__prep_exception_info):
 
 .macro __irq_handler type
 .align 7
-.globl __irq_handler_\()\type 
+.globl __irq_handler_\()\type
 __irq_handler_\()\type:
 /*
  * x19 to x29 are callee-saved registers, so
@@ -416,7 +460,7 @@ base_reg .req x19
 irqstat_reg .req w3
 
 /*
- * irqnr will be passed to handler, so it is 
+ * irqnr will be passed to handler, so it is
  * also corruptable. It's used as first argument,
  * so it has to be w0
  */
@@ -469,7 +513,7 @@ tmp_2_reg .req w5
   add   sp, sp, 8
   mov   x0, #\type
   mov   x1, sp
-  bl    __prep_exception_info  
+  bl    __prep_exception_info
   bl    \handler
   b     __armv8_cpuctx_eret
 .endm
@@ -500,7 +544,7 @@ __irq_handler low_el_spx
 vector_entry __interrupt_low_el_spx_fiq         2
 vector_entry __interrupt_low_el_spx_serror      3
 
-  
+
 _disable_coproc_traps:
   // Trap SVE , dont trap SIMD/Floating point instructions
 

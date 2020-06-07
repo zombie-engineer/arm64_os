@@ -44,11 +44,11 @@ GLOBAL_VAR(__percpu_data):
 .endr /* NUM_CORES */
 .endm
 
-.equ PERCPU_OFFSET_STACK_EL0    , 0
-.equ PERCPU_OFFSET_STACK_EL1    , 8
-.equ PERCPU_OFFSET_JUMP_ADDR    , 16
-.equ PERCPU_OFFSET_MPIDR_EL1    , 24
-.equ PERCPU_OFFSET_CPU_STATE    , 32
+.equ PERCPU_OFFSET_STACK_EL0, 0
+.equ PERCPU_OFFSET_STACK_EL1, 8
+.equ PERCPU_OFFSET_JUMP_ADDR, 16
+.equ PERCPU_OFFSET_MPIDR_EL1, 24
+.equ PERCPU_OFFSET_CPU_STATE, 32
 
 .macro get_percpu_data out, cpu_num
   ldr \out, =__percpu_data
@@ -56,41 +56,50 @@ GLOBAL_VAR(__percpu_data):
 .endm
 
 .macro percpu_data_set_stack cpu, el, val, tmp
-   get_percpu_data \tmp, \cpu
-   str \val, [\tmp, PERCPU_OFFSET_STACK_EL(\el)]
+  get_percpu_data \tmp, \cpu
+  str \val, [\tmp, #PERCPU_OFFSET_STACK_EL\()\el]
 .endm
 
 .macro percpu_data_get_stack cpu, el, out, tmp
-   get_percpu_data \tmp, \cpu
-   ldr \out, [\tmp, PERCPU_OFFSET_STACK_EL(\el)]
+  get_percpu_data \tmp, \cpu
+  ldr \out, [\tmp, PERCPU_OFFSET_STACK_EL\()\el]
 .endm
 
 .macro percpu_data_set_jmp cpu, val, tmp
-   get_percpu_data \tmp, \cpu
-   str \val, [\tmp, PERCPU_OFFSET_JUMP_ADDR]
+  get_percpu_data \tmp, \cpu
+  str \val, [\tmp, PERCPU_OFFSET_JUMP_ADDR]
 .endm
 
 .macro percpu_data_get_jmp cpu, out, tmp
-   get_percpu_data \tmp, \cpu
-   ldr \out, [\tmp, PERCPU_OFFSET_JUMP_ADDR]
+  get_percpu_data \tmp, \cpu
+  ldr \out, [\tmp, PERCPU_OFFSET_JUMP_ADDR]
 .endm
 
-.macro set_percpu_mpidr cpu, val, tmp
-   get_percpu_data \tmp, \cpu_num
-   str \val, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
+.macro percpu_data_set_mpidr cpu, val, tmp
+  get_percpu_data \tmp, \cpu
+  str \val, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
 .endm
 
-.macro get_percpu_mpidr cpu, out, tmp
-   get_percpu_data \tmp, \cpu_num
-   ldr \out, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
+.macro percpu_data_get_mpidr cpu, out, tmp
+  get_percpu_data \tmp, \cpu
+  ldr \out, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
 .endm
 
-.macro set_percpu_cpu_state cpu, val, tmp
-   get_percpu_data \tmp, \cpu_num
-   str \val, [\tmp, PERCPU_OFFSET_CPU_STATE]
+.macro percpu_data_set_cpu_state cpu, val, tmp
+  get_percpu_data \tmp, \cpu
+  str \val, [\tmp, PERCPU_OFFSET_CPU_STATE]
 .endm
 
-.macro get_percpu_cpu_state cpu, out, tmp
-   get_percpu_data \tmp, \cpu_num
-   ldr \out, [\tmp, PERCPU_OFFSET_CPU_STATE]
+.macro percpu_data_get_cpu_state cpu, out, tmp
+  get_percpu_data \tmp, \cpu
+  ldr \out, [\tmp, PERCPU_OFFSET_CPU_STATE]
+.endm
+
+.macro percpu_init cpu, stack_el0, stack_el1, jump_addr, mpidr_el1, cpu_state, tmp
+  get_percpu_data \tmp, \cpu
+  str \stack_el0, [\tmp, PERCPU_OFFSET_STACK_EL0]
+  str \stack_el1, [\tmp, PERCPU_OFFSET_STACK_EL1]
+  str \jump_addr, [\tmp, PERCPU_OFFSET_JUMP_ADDR]
+  str \mpidr_el1, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
+  str \cpu_state, [\tmp, PERCPU_OFFSET_CPU_STATE]
 .endm
