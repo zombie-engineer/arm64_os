@@ -27,5 +27,8 @@
 #define CONFIG_DISPLAY_WIDTH 1824
 #define CONFIG_DISPLAY_HEIGHT 984
 
-#define STACK_SIZE_EL0 1024 * 1024
-#define STACK_SIZE_EL1 1024 * 1024
+/* EL0 stack size is 1Mb */
+#define STACK_SIZE_EL0_LOG 20
+
+/* EL1 stack size is 1Mb */
+#define STACK_SIZE_EL1_LOG 20
