@@ -43,12 +43,12 @@ SECTIONS
   .mybss (NOLOAD) :
   {
     . = ALIGN(16);
-    __bss_start = .;
     *(COMMON)
     *(.bss)
     *(.bss.*)
-    __bss_end = .;
   }
+  __bss_start = ADDR(.mybss);
+  __bss_end = __bss_start + SIZEOF(.mybss);
   . = ALIGN(4096);
   _end = .;
   STACKS_SECTION(0)
