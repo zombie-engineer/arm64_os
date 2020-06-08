@@ -90,9 +90,9 @@ GLOBAL_VAR(__percpu_data):
   str \val, [\tmp, PERCPU_OFFSET_CPU_STATE]
 .endm
 
-.macro percpu_data_get_cpu_state cpu, out, tmp
-  get_percpu_data \tmp, \cpu
-  ldr \out, [\tmp, PERCPU_OFFSET_CPU_STATE]
+.macro percpu_data_get_cpu_state cpu, out
+  get_percpu_data \out, \cpu
+  ldr \out, [\out, PERCPU_OFFSET_CPU_STATE]
 .endm
 
 .macro percpu_init cpu, stack_el0, stack_el1, jump_addr, mpidr_el1, cpu_state, tmp

@@ -9,7 +9,10 @@
  * aligned to cache line width. This way writing to one will
  * not invalidate others.
  */
-struct percpu_context {
+struct percpu_data {
+  uint64_t stack_el0;
+  uint64_t stack_el1;
+  uint64_t jmp_addr;
   /*
    * MPIDR register value, learned at startup.
    */
@@ -18,12 +21,10 @@ struct percpu_context {
    * Execution context of a currently scheduled task on this
    * processing unit.
    */
-  void *__current_cpuctx;
-  void (*cpu_startup_fn)(struct percpu_context *);
-  uint64_t *el1_stack;
-  uint64_t padding[4];
+  uint64_t context_addr;
+  uint64_t padding[3];
 } PACKED;
 
-extern struct percpu_context percpu_context[NUM_CORES];
+// extern struct percpu_context percpu_context[NUM_CORES];
 
-struct percpu_context *get_percpu_context(int cpu_num);
+// struct percpu_context *get_percpu_context(int cpu_num);

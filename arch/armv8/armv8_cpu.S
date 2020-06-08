@@ -1,5 +1,6 @@
 #include <asm_macros.h>
 #include <arch/armv8/armv8_asm_macros.h>
+#include <arch/armv8/percpu_asm_macros.h>
 
 .section ".text"
 
@@ -59,11 +60,9 @@
   stp   \__zero_reg, \__zero_reg, [\__ctx_reg], #16 // x28, x29
 .endm
 
-.macro GET_CURRENT_CTX dest, scratch
-  get_cpu_id \scratch
-  ldr   \dest, =__current_cpuctx
-  add   \dest, \dest, \scratch, lsl #6
-  ldr   \dest, [\dest]
+.macro GET_CURRENT_CTX dest, tmp
+  get_cpu_id \tmp
+  percpu_data_get_cpu_state \tmp, \dest
 .endm
 
 FUNC(get_current_ctx):
@@ -153,13 +152,22 @@ FUNC(__armv8_prep_context):
   ret
 
 FUNC(__armv8_restore_ctx_from):
-  // x0 - cpu context to restore
-  GET_CURRENT_CTX x30, x29
-  str x0, [x30]
-  mov x30, x0
-  ctx .req x30
+  /*
+   * arg1 - x0 - cpu context to restore state from
+   */
+  ctx .req x0
+  cpu .req x1
+  tmp .req x2
+
+  get_cpu_id cpu
+  percpu_data_set_cpu_state cpu, ctx, tmp
+  mov x30, ctx
+  .unreq ctx
+  ctx   .req x30
   stack .req x0
-  // restore stack pointer
+  /*
+   * restore stack pointer
+   */
   ldr stack, [ctx, #(31 << 3)]
   mov sp, stack
   .unreq stack

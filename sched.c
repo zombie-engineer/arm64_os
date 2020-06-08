@@ -14,6 +14,7 @@
 #include <irq.h>
 #include <delays.h>
 #include <syscall.h>
+#include <percpu.h>
 
 /*
  * Description of current scheduling algorithm:
@@ -72,7 +73,7 @@
 /*
  * Global variable pointing to cpuctx of a current task
  */
-extern void *__current_cpuctx;
+extern struct percpu_data *__percpu_data;
 
 static inline void yield()
 {
@@ -300,7 +301,7 @@ void schedule()
 
   BUG(!current_task, "scheduler logic failed.");
 
-  __current_cpuctx = current_task->cpuctx;
+  __percpu_data[0].context_addr = current_task->cpuctx;
 }
 
 static inline bool needs_resched(task_t *t)
