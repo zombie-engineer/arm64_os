@@ -70,11 +70,6 @@
  * the recovered task itself has called yield.
  */
 
-/*
- * Global variable pointing to cpuctx of a current task
- */
-extern struct percpu_data *__percpu_data;
-
 static inline void yield()
 {
   asm volatile ("svc %0"::"i"(SVC_YIELD));

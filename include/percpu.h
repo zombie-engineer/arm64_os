@@ -25,6 +25,11 @@ struct percpu_data {
   uint64_t padding[3];
 } PACKED;
 
+/*
+ * Global variable pointing to cpuctx of a current task
+ */
+extern struct percpu_data __percpu_data[NUM_CORES];
+
 // extern struct percpu_context percpu_context[NUM_CORES];
 
 // struct percpu_context *get_percpu_context(int cpu_num);
