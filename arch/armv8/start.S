@@ -308,8 +308,8 @@ _set_stack:
 
   get_cpu_id cpu_id
 
-  cpu_set_stack_ptrs cpu_id, 0, tmp
   cpu_set_stack_ptrs cpu_id, 1, tmp
+  cpu_set_stack_ptrs cpu_id, 0, tmp
 
 __parking_loop:
   jump_addr .req x2
