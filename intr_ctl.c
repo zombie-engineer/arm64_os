@@ -44,7 +44,7 @@ int intr_ctl_arm_irq_enable(int irq_num)
   if (irq_num > INTR_CTL_IRQ_ARM_MAX)
     return ERR_INVAL_ARG;
 
-  printf("intr_ctl_arm_irq_enable: %d\n", irq_num);
+  // printf("intr_ctl_arm_irq_enable: %d\n", irq_num);
   write_reg(BCM2835_IC_ENABLE_BASIC, (1 << irq_num));
   return ERR_OK;
 }

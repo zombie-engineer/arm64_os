@@ -12,7 +12,7 @@
 struct percpu_data {
   uint64_t stack_el0;
   uint64_t stack_el1;
-  uint64_t jmp_addr;
+  void *jmp_addr;
   /*
    * MPIDR register value, learned at startup.
    */

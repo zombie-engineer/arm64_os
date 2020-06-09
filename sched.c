@@ -81,14 +81,18 @@ extern void __armv8_cpuctx_eret();
 #define STACK_SIZE (1024 * 1024 * 1)
 #define NUM_STACKS 10
 
-static struct scheduler pcpu_schedulers[NUM_CORES] ALIGNED(64);
+struct pcpu_scheduler_holder {
+  struct scheduler s;
+  char   padding[64 - sizeof(struct scheduler)];
+};
+static struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES] ALIGNED(64);
 
-#define get_scheduler_n(cpu) (&pcpu_schedulers[cpu])
-#define get_scheduler() (&pcpu_schedulers[get_cpu_num()])
+#define get_scheduler_n(cpu) (&pcpu_schedulers[cpu].s)
+#define get_scheduler() (get_scheduler_n(get_cpu_num()))
 
 static void pcpu_scheduler_init(struct scheduler *s)
 {
-  BUG(is_aligned(s, 64), "scheduler struct not aligned to cache line width");
+  BUG(!is_aligned(s, 64), "scheduler struct not aligned to cache line width");
   INIT_LIST_HEAD(&s->running);
   INIT_LIST_HEAD(&s->timer_waiting);
   INIT_LIST_HEAD(&s->io_waiting);
@@ -391,12 +395,30 @@ static void sched_timer_cb(void *arg)
 {
   // puts("oneshot end"__endline);
   SCHED_REARM_TIMER;
-  blink_led_3(1, 2);
+  // blink_led_3(1, 2);
   schedule_from_irq();
+}
+
+void cpu_test(void)
+{
+  while(1) {
+    blink_led_3(10, 100);
+    wait_msec(600);
+  }
+}
+
+void cpu_run(int cpu_num, void (*fn)(void))
+{
+  void **write_to = &__percpu_data[cpu_num].jmp_addr;
+  printf("setting %p to %p\n", write_to, fn);
+  *write_to = (void *)fn;
+  dcache_clean_and_invalidate_rng(write_to, (char *)write_to + 64);
+  asm volatile("sev");
 }
 
 int init_func(void)
 {
+  int i = 0;
   // run_uart_thread();
   // run_cmdrunner_thread();
   BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
@@ -404,6 +426,10 @@ int init_func(void)
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
   SCHED_REARM_TIMER;
   enable_irq();
+  cpu_run(1, cpu_test);
+//  for (i = 1; i < NUM_CORES; ++i) {
+//    cpu_run(i, cpu_test);
+//  }
 
   while(1) {
     blink_led(1, 100);
@@ -415,22 +441,19 @@ void scheduler_init()
 {
   const int ticks_until_preempt = 10;
   int i;
+  task_t *init_task;
+
   for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
     pcpu_scheduler_init(get_scheduler_n(i));
 
   bcm2835_arm_timer_init();
-  task_t *initial_task;
   puts("Starting task scheduler\n");
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
 
-  initial_task = task_create(init_func, "init_func");
-  initial_task->ticks_left = ticks_until_preempt;
-  sched_queue_runnable_task(get_scheduler(), initial_task);
-  start_task_from_ctx(initial_task->cpuctx);
-}
-
-int run_on_cpu(struct task *t, int cpu_num)
-{
+  init_task = task_create(init_func, "init_func");
+  init_task->ticks_left = ticks_until_preempt;
+  sched_queue_runnable_task(get_scheduler(), init_task);
+  start_task_from_ctx(init_task->cpuctx);
 }
