@@ -15,6 +15,7 @@
 #include <delays.h>
 #include <syscall.h>
 #include <percpu.h>
+#include <mem_access.h>
 
 /*
  * Description of current scheduling algorithm:
@@ -22,9 +23,9 @@
  * Scheduler maintains a list of tasks to run, a runlist.
  * If the task needs to wait for something it's removed from a runlist
  * and put into another list called the waitlist.
- * 
+ *
  * Scheduler is preemptive and manages time quantum for each task by
- * means of system timer irqs. 
+ * means of system timer irqs.
  * The task has 2 ways of stopping exectution:
  * 1. The task decides to wait for some event by calling one of waiting
  *    functions, passing cpu to the next task.
@@ -35,17 +36,17 @@
  * Context switching:
  * Each task's state is maintained in architecture-specific cpu context.
  * Running task has all the state in it's registers, which includes
- * all general purpose registers. 
+ * all general purpose registers.
  * Note:FPU/NEON registers are not stored yet, but should be.
  *
  * Each task has a buffer big enough to store the whole context.
- * When new task needs to run, previously running task will store all of it's 
+ * When new task needs to run, previously running task will store all of it's
  * context into the buffer. After that new task reads state from it's buffer
  * into cpu registers. After all context is read, cpu has enough state to
  * start running the task.
  *
  * Low level code like IRQ handler should not know much about the task. It
- * only cares about saving and restoring the context, that's why there is 
+ * only cares about saving and restoring the context, that's why there is
  * a system-global variable '__current_cpuctx' to which most of the low-level
  * code has access to.
  *
@@ -64,7 +65,7 @@
  * buffer and request rescheduling. The scheduler chooses next task and loads
  * this task's context into cpu registers. After cpu context is restored, the link
  * register of the task contains the address of the instruction from where it should
- * start execution, so the value of the program counter does not matter. 
+ * start execution, so the value of the program counter does not matter.
  * As soon as 'yield' reaches 'ret' instruction program counter will be set to
  * address in the link register and return to task execution will take place as if
  * the recovered task itself has called yield.
@@ -80,7 +81,18 @@ extern void __armv8_cpuctx_eret();
 #define STACK_SIZE (1024 * 1024 * 1)
 #define NUM_STACKS 10
 
-static struct scheduler __scheduler;
+static struct scheduler pcpu_schedulers[NUM_CORES] ALIGNED(64);
+
+#define get_scheduler_n(cpu) (&pcpu_schedulers[cpu])
+#define get_scheduler() (&pcpu_schedulers[get_cpu_num()])
+
+static void pcpu_scheduler_init(struct scheduler *s)
+{
+  BUG(is_aligned(s, 64), "scheduler struct not aligned to cache line width");
+  INIT_LIST_HEAD(&s->running);
+  INIT_LIST_HEAD(&s->timer_waiting);
+  INIT_LIST_HEAD(&s->io_waiting);
+}
 
 void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
 {
@@ -216,7 +228,7 @@ void wait_on_timer_ms(uint64_t msec)
   uint64_t until = now + cnt_per_msec * msec;
   get_current()->timer_wait_until = until;
   // printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
-  sched_queue_timewait_task(&__scheduler, get_current());
+  sched_queue_timewait_task(get_scheduler(), get_current());
   yield();
 }
 
@@ -245,27 +257,27 @@ int run_test_thread()
   t = task_create(test_thread, "test_thread");
   if (IS_ERR(t))
     return PTR_ERR(t);
-  sched_queue_runnable_task(&__scheduler, t);
+  sched_queue_runnable_task(get_scheduler(), t);
   return ERR_OK;
 }
 
-task_t *scheduler_pick_next_task(task_t *t)
+task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
 {
   const int ticks_until_preempt = 10;
-  /* 
+  /*
    * Put currently executing task to end of list
    */
   if (t->task_state == TASK_STATE_TIMER_WAIT) {
-    
+
   } else {
     t->ticks_total += ticks_until_preempt;
-    sched_queue_runnable_task_noirq(&__scheduler, t);
+    sched_queue_runnable_task_noirq(s, t);
   }
 
   /*
    * Return new next
    */
-  t = list_first_entry(&__scheduler.running, task_t, schedlist);
+  t = list_first_entry(&s->running, task_t, schedlist);
   t->ticks_left = ticks_until_preempt;
   return t;
 }
@@ -283,6 +295,7 @@ void schedule_debug()
 
 void schedule()
 {
+  struct scheduler *s = get_scheduler();
   task_t *current_task;
   // task_t *old_task;
 
@@ -290,7 +303,7 @@ void schedule()
 
   current_task = get_current();
   // old_task = current_task;
-  current_task = scheduler_pick_next_task(current_task);
+  current_task = scheduler_pick_next_task(s, current_task);
   current_task->task_state = TASK_STATE_RUNNING;
   // printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
 
@@ -306,30 +319,30 @@ static inline bool needs_resched(task_t *t)
   return true;
 }
 
-static inline void schedule_handle_timer_waiting()
+static inline void schedule_handle_timer_waiting(struct scheduler *s)
 {
   task_t *t, *tmp;
   uint64_t now = read_cpu_counter_64();
-  list_for_each_entry_safe(t, tmp, &__scheduler.timer_waiting, schedlist) {
+  list_for_each_entry_safe(t, tmp, &s->timer_waiting, schedlist) {
     if (t->timer_wait_until <= now) {
       // printf("timeout: now: %llu, until: %llu\n", now, t->timer_wait_until);
-      sched_queue_runnable_task_noirq(&__scheduler, t);
+      sched_queue_runnable_task_noirq(s, t);
     }
   }
 }
 
-static inline void schedule_debug_info()
+static inline void schedule_debug_info(struct scheduler *s)
 {
   task_t *t;
   char buf[256];
   int n = 0;
   // struct list_head *l;
   n = snprintf(buf + n, sizeof(buf) - n, "runlist: ");
-  list_for_each_entry(t, &__scheduler.running, schedlist) {
+  list_for_each_entry(t, &s->running, schedlist) {
     n += snprintf(buf + n, sizeof(buf) - n, "%s(%d)->", t->name, t->ticks_left);
   }
   n += snprintf(buf + n, sizeof(buf) - n, ", on_timer: ");
-  list_for_each_entry(t, &__scheduler.timer_waiting, schedlist) {
+  list_for_each_entry(t, &s->timer_waiting, schedlist) {
     n += snprintf(buf + n, sizeof(buf) - n, "%s(%llu)->", t->name, t->timer_wait_until);
   }
 
@@ -346,12 +359,13 @@ static void schedule_from_irq()
   /*
    * print debug info
    */
+  struct scheduler *s = get_scheduler();
   // schedule_debug_info();
 
   /*
    * handle tasks waiting on timers.
    */
-  schedule_handle_timer_waiting();
+  schedule_handle_timer_waiting(s);
 
   /*
    * decrease current task's cpu time
@@ -381,7 +395,7 @@ static void sched_timer_cb(void *arg)
   schedule_from_irq();
 }
 
-int init_task_fn(void)
+int init_func(void)
 {
   // run_uart_thread();
   // run_cmdrunner_thread();
@@ -400,9 +414,9 @@ int init_task_fn(void)
 void scheduler_init()
 {
   const int ticks_until_preempt = 10;
-  INIT_LIST_HEAD(&__scheduler.running);
-  INIT_LIST_HEAD(&__scheduler.timer_waiting);
-  INIT_LIST_HEAD(&__scheduler.io_waiting);
+  int i;
+  for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
+    pcpu_scheduler_init(get_scheduler_n(i));
 
   bcm2835_arm_timer_init();
   task_t *initial_task;
@@ -411,12 +425,11 @@ void scheduler_init()
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
 
-  initial_task = task_create(init_task_fn, "init_task_fn");
+  initial_task = task_create(init_func, "init_func");
   initial_task->ticks_left = ticks_until_preempt;
-  sched_queue_runnable_task(&__scheduler, initial_task);
+  sched_queue_runnable_task(get_scheduler(), initial_task);
   start_task_from_ctx(initial_task->cpuctx);
 }
-
 
 int run_on_cpu(struct task *t, int cpu_num)
 {

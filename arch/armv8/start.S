@@ -73,12 +73,12 @@ _start:
    * wake them up by SEV (set event)
    * instruction.
    */
-#  mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
-#  ldr   x1, =__cpu_parking
-#  str   x1, [x0, #8]
-#  str   x1, [x0, #16]
-#  str   x1, [x0, #24]
-#  sev
+  mov   x0, #PER_CORE_STARTUP_ADDRESSES_BASE
+  ldr   x1, =__cpu_parking
+  str   x1, [x0, #8]
+  str   x1, [x0, #16]
+  str   x1, [x0, #24]
+  sev
 
 /*
  * CPU cores are going to park here, they will:

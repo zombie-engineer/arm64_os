@@ -1,3 +1,4 @@
+#include <arch/armv8/percpu_asm_macros.h>
    // 
    // Arm Architecture Reference Manual
    // Armv8, for Armv8-A architecture profile
@@ -16,11 +17,11 @@
 //             - 0b10 EL2
 //             - 0b11 EL3
 
-.macro GET_CURRENT_EXCEPTION_LEVEL dreg 
+.macro GET_CURRENT_EXCEPTION_LEVEL dreg
   // dreg - destination register
   mrs \dreg, CurrentEl
   // clear reserved bits
-  and \dreg, \dreg, #0xc 
+  and \dreg, \dreg, #0xc
 .endm
 
 
@@ -55,9 +56,12 @@ FUNC(is_irq_enabled):
   mrs x0, daif
   lsr x0, x0, #1
   mvn x0, x0
-  and x0, x0, #1 
+  and x0, x0, #1
   ret
 
+FUNC(get_cpu_num):
+  get_cpu_id x0
+  ret
 
 // MEMORY MODEL -----------------------------------------------
 // CACHE ------------------------------------------------------

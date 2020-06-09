@@ -23,3 +23,7 @@ static inline void set_unaligned_32_le(void *a, uint32_t v)
   __SET_BYTE(a, 3, BYTE_EXTRACT(v, 0));
 }
 
+static inline bool is_aligned(void *a, int alignment)
+{
+  return ((uint64_t)a) & (alignment - 1) ? 0 : 1;
+}

@@ -188,7 +188,7 @@ FUNC(__armv8_restore_ctx_from):
 
 .macro STORE_CONTEXT
   // x30 - is a link register
-  // at store context we will use x30 as a writing 
+  // at store context we will use x30 as a writing
   // so we first stack it to later recover
   stp   x30, x29, [sp, #-8]
   GET_CURRENT_CTX x30, x29

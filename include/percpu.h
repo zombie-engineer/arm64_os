@@ -21,7 +21,7 @@ struct percpu_data {
    * Execution context of a currently scheduled task on this
    * processing unit.
    */
-  uint64_t context_addr;
+  void *context_addr;
   uint64_t padding[3];
 } PACKED;
 

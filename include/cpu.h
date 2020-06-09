@@ -68,7 +68,7 @@ uint64_t dcache_line_width();
 
 #define WAIT_FOR_EVENT asm volatile("wfe" ::: "memory")
 
-/* 
+/*
  * Returns system clock frequency in Hz
  */
 uint64_t get_cpu_counter_64_freq(void);
