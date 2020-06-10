@@ -259,32 +259,32 @@ typedef struct print_cpuctx_ctx {
   int nr;
 } print_cpuctx_ctx_t;
 
-static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
-{
-  print_cpuctx_ctx_t *print_ctx = (print_cpuctx_ctx_t *)cb_priv;
-  if (print_ctx->nr) {
-    if (print_ctx->nr % 4 == 0) {
-      uart_putc('\n');
-      uart_putc('\r');
-    } else {
-      uart_putc(',');
-      uart_putc(' ');
-    }
-  }
-  uart_puts(reg_str);
-  print_ctx->nr++;
-  return 0;
-}
+//static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
+//{
+//  print_cpuctx_ctx_t *print_ctx = (print_cpuctx_ctx_t *)cb_priv;
+//  if (print_ctx->nr) {
+//    if (print_ctx->nr % 4 == 0) {
+//      uart_putc('\n');
+//      uart_putc('\r');
+//    } else {
+//      uart_putc(',');
+//      uart_putc(' ');
+//    }
+//  }
+//  uart_puts(reg_str);
+//  print_ctx->nr++;
+//  return 0;
+//}
 
-extern void *__current_cpuctx;
+// extern void *__current_cpuctx;
 void gpio_handle_irq()
 {
   uint64_t elr;
   asm volatile ("mrs   %0, elr_el1": "=r"(elr));
-  print_cpuctx_ctx_t print_ctx = { 0 };
+  // print_cpuctx_ctx_t print_ctx = { 0 };
   printf("basic: %08x, gpu1: %08x, gpu2: %08x, elr: %016llx\n",
-      read_reg(0x3f00b200), 
-      read_reg(0x3f00b204), 
+      read_reg(0x3f00b200),
+      read_reg(0x3f00b204),
       read_reg(0x3f00b208), elr);
 
   //printf("__current_cpuctx at %016llx pointing at %016llx\n" , &__current_cpuctx, __current_cpuctx);
@@ -388,9 +388,9 @@ void gpio_i2c_test(int scl, int sda, int poll)
 
   intr_ctl_enable_gpio_irq();
 
-  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_i2c_irq);
+  irq_set(0, ARM_IRQ2_GPIO_1, gpio_handle_i2c_irq);
   enable_irq();
-  
+
   do {
 //    intr_ctl_dump_regs("waiting...\r\n");
     wait_msec(1000);
@@ -431,10 +431,10 @@ void gpio_irq_test(int pin1, int pin2, int poll)
   gpio_set_detect_falling_edge(pin1);
   gpio_set_detect_falling_edge(pin2);
 
-  irq_set(ARM_IRQ2_GPIO_1, gpio_handle_irq);
+  irq_set(0, ARM_IRQ2_GPIO_1, gpio_handle_irq);
   intr_ctl_enable_gpio_irq();
   enable_irq();
-  
+
   do {
    // intr_ctl_dump_regs("waiting...\r\n");
     wait_msec(1000);

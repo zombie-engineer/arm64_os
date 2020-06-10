@@ -122,7 +122,7 @@ int bcm2835_systimer_init()
   min_timer_set = bcm2835_systimer_get_min_set_time();
   printf("bcm2835_systimer_init: min timer_set value: %u\n", min_timer_set);
   bcm2835_systimer_info_reset(&systimer1);
-  irq_set(ARM_IRQ1_SYSTIMER_1, irq_handler_systimer_1);
+  irq_set(0, ARM_IRQ1_SYSTIMER_1, irq_handler_systimer_1);
   return ERR_OK;
 }
 

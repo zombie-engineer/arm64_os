@@ -97,7 +97,7 @@ int bcm2835_arm_timer_init()
   arm_timer_predivider_clock = read_reg(ARM_TIMER_PRE_DIVIDER_REG) & 0x3ff;
 
   printf("bcm2835_arm_timer_init"__endline);
-  irq_set(ARM_IRQ_TIMER, irq_handler_arm_timer);
+  irq_set(0, ARM_IRQ_TIMER, irq_handler_arm_timer);
   return ERR_OK;
 }
 

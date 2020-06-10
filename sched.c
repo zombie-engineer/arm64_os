@@ -171,7 +171,7 @@ task_t *task_create(task_fn fn, const char *task_name)
 {
   uint64_t flags;
   task_t *t = NULL;
-  uint64_t *stack = NULL; 
+  uint64_t *stack = NULL;
 
   t = alloc_task();
 
@@ -404,6 +404,7 @@ void cpu_test(void)
   while(1) {
     blink_led_3(10, 100);
     wait_msec(600);
+    printf("cpu_test" __endline);
   }
 }
 
