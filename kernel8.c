@@ -496,7 +496,7 @@ void init_uart(int report_exceptions)
   }
 }
 
-void spi_work() 
+void spi_work()
 {
   int i, old_i;
   int sclk, cs, mosi;
@@ -554,7 +554,7 @@ void max7219_work()
   spidev = spi_allocate_emulated("spi_max7219", gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, -1, -1,
    SPI_EMU_MODE_MASTER);
   if (IS_ERR(spidev)) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", 
+    printf("Failed to initialize emulated spi. Error code: %d\n",
        (int)PTR_ERR(spidev));
     return;
   }
@@ -614,7 +614,7 @@ void i2c_bitbang_check_line()
       GET_SCL;
     }
     printf("SDA/SCL up.\r\n");
-  
+
     // WAIT START
     while(!(!sda && scl)) {
       GET_SDA;
@@ -692,7 +692,7 @@ void i2c_bitbang_initialize()
   printf("Init complete\r\n");
 }
 
-void i2c_bitbang_wait_start() 
+void i2c_bitbang_wait_start()
 {
   while(gpio_is_set(PIN_SDA));
   printf("start recieved\r\n");
@@ -700,7 +700,6 @@ void i2c_bitbang_wait_start()
 
 void i2c_bitbang_send_ack()
 {
-  
 }
 
 void i2c_bitbang()
@@ -808,7 +807,7 @@ struct servo *prep_servo(int ch, int pwm_gpio_pin)
   snprintf(idbuf, sizeof(idbuf), "serv_%d_%d", ch, pwm_gpio_pin);
   pwm = pwm_bcm2835_create(pwm_gpio_pin, 1);
   if (IS_ERR(pwm)) {
-    printf("Failed to prepare pwm for servo with gpio_pin:%d,err:%d\r\n", 
+    printf("Failed to prepare pwm for servo with gpio_pin:%d,err:%d\r\n",
         pwm_gpio_pin, (int)PTR_ERR(pwm));
     return ERR_PTR(PTR_ERR(pwm));
   }
@@ -839,11 +838,11 @@ int spi_slave_test()
   const int gpio_pin_sclk  = 11;
 
   spi_dev_t *spidev;
-  spidev = spi_allocate_emulated("spi_avr_isp", 
+  spidev = spi_allocate_emulated("spi_avr_isp",
       gpio_pin_sclk, gpio_pin_mosi, -1, gpio_pin_cs0, -1,
       SPI_EMU_MODE_SLAVE);
   if (IS_ERR(spidev)) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", 
+    printf("Failed to initialize emulated spi. Error code: %d\n",
         PTR_ERR(spidev));
     return ERR_GENERIC;
   }
@@ -865,7 +864,7 @@ int spi_slave_test()
     value = *from_spi + (*(from_spi + 1) << 8);
     ch = (value >> 15) & 1;
     value &= 0x3ff;
-    
+
     if (ch)
       printf("            %d:%04x\r\n", ch, (int)value);
     else
@@ -919,7 +918,7 @@ void main()
   // i2c_init();
   // i2c_bitbang();
   //  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
-  //    
+  //
   //    puts("Failed to init bsc_slave in I2C mode\n");
   //  } else
   //    bsc_slave_debug();
