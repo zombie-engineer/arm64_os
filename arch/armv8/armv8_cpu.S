@@ -60,11 +60,6 @@
   stp   \__zero_reg, \__zero_reg, [\__ctx_reg], #16 // x28, x29
 .endm
 
-.macro GET_CURRENT_CTX dest, tmp
-  get_cpu_id \tmp
-  percpu_data_get_cpu_state \tmp, \dest
-.endm
-
 FUNC(get_current_ctx):
   GET_CURRENT_CTX x0, x1
   ret

@@ -287,9 +287,9 @@ void gpio_handle_irq()
       read_reg(0x3f00b204), 
       read_reg(0x3f00b208), elr);
 
-  printf("__current_cpuctx at %016llx pointing at %016llx\n" , &__current_cpuctx, __current_cpuctx);
+  //printf("__current_cpuctx at %016llx pointing at %016llx\n" , &__current_cpuctx, __current_cpuctx);
 
-  cpuctx_print_regs(__current_cpuctx, print_reg_cb, &print_ctx);
+  //cpuctx_print_regs(__current_cpuctx, print_reg_cb, &print_ctx);
 
   if (gpio_pin_status_triggered(current_pin1)) {
     gpio_pin_status_clear(current_pin1);

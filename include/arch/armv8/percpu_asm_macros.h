@@ -103,3 +103,9 @@ GLOBAL_VAR(__percpu_data):
   str \mpidr_el1, [\tmp, PERCPU_OFFSET_MPIDR_EL1]
   str \cpu_state, [\tmp, PERCPU_OFFSET_CPU_STATE]
 .endm
+
+.macro GET_CURRENT_CTX dest, tmp
+  get_cpu_id \tmp
+  percpu_data_get_cpu_state \tmp, \dest
+.endm
+
