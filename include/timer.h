@@ -15,3 +15,12 @@ int systimer_set_periodic(uint32_t usec, timer_callback_t cb, void *cb_arg);
 int systimer_set_oneshot(uint32_t usec, timer_callback_t cb, void *cb_arg);
 
 void timer_irq_callback();
+
+struct timer {
+  int flags;
+  int (*set_oneshot)(uint32_t usec, timer_callback_t cb, void *cb_arg);
+  int (*set_periodic)(uint32_t usec, timer_callback_t cb, void *cb_arg);
+};
+
+int timer_register(struct timer *t, int timer_id);
+struct timer *get_timer(int timer_id);
