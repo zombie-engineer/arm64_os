@@ -17,6 +17,8 @@
 #include <percpu.h>
 #include <mem_access.h>
 
+static struct timer *sched_timer = NULL;
+
 /*
  * Description of current scheduling algorithm:
  *
@@ -388,7 +390,7 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  systimer_set_oneshot(3000, sched_timer_cb, 0)
+  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
   //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
@@ -399,12 +401,42 @@ static void sched_timer_cb(void *arg)
   schedule_from_irq();
 }
 
+void other_cpu_timer_handler()
+{
+  puts("++"__endline);
+  asm volatile ("msr cntp_tval_el0, %0\n" : : "r"(0x400000));
+
+  // blink_led_3(10, 100);
+  //&__percpu_data[cpu_num].jmp_addr
+}
+
 void cpu_test(void)
 {
+  uint64_t cntp_ctl_el0;
+  uint64_t cntp_cval_el0;
+  uint64_t cntp_tval_el0;
+  uint64_t cntpct_el0;
+  asm volatile ("msr cntp_ctl_el0, %0\n" : : "r"(1));
+  asm volatile ("msr cntp_cval_el0, %0\n" : : "r"(0x6666666));
+  *(uint32_t *)0x40000044 = 0x0f;
+  enable_irq();
   while(1) {
-    blink_led_3(10, 100);
-    wait_msec(600);
-    printf("cpu_test" __endline);
+    irq_set(1, ARM_IRQ_TIMER, other_cpu_timer_handler);
+    wait_msec(1000);
+
+    asm volatile (
+        "mrs %0, cntp_ctl_el0\n"
+        "mrs %1, cntp_cval_el0\n"
+        "mrs %2, cntp_tval_el0\n"
+        "mrs %3, cntpct_el0\n"
+        :
+        "=r"(cntp_ctl_el0),
+        "=r"(cntp_cval_el0),
+        "=r"(cntp_tval_el0),
+        "=r"(cntpct_el0)
+        );
+    printf("cpu_test: cntp_ctl_el: %llx,cval:%llx,tval:%llx,ct:%llx" __endline, cntp_ctl_el0, cntp_cval_el0, cntp_tval_el0, cntpct_el0);
+    printf("src: %08x" __endline, *(uint32_t*)0x40000064);
   }
 }
 
@@ -447,11 +479,11 @@ void scheduler_init()
   for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
     pcpu_scheduler_init(get_scheduler_n(i));
 
-  bcm2835_arm_timer_init();
   puts("Starting task scheduler\n");
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
+  sched_timer = get_timer(TIMER_ID_ARM_TIMER);
 
   init_task = task_create(init_func, "init_func");
   init_task->ticks_left = ticks_until_preempt;

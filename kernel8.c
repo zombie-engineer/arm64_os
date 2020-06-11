@@ -34,6 +34,8 @@
 #include <unhandled_exception.h>
 #include <board/bcm2835/bcm2835.h>
 #include <board/bcm2835/bcm2835_irq.h>
+#include <board/bcm2835/bcm2835_arm_timer.h>
+#include <board/bcm2835/bcm2835_systimer.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -877,6 +879,7 @@ int spi_slave_test()
 
 void main()
 {
+  int ret;
   debug_init();
   gpio_set_init();
   // spi_emulated_init();
@@ -930,7 +933,10 @@ void main()
 
   print_cpu_info();
   print_current_ex_level();
-  systimer_init();
+  ret = bcm2835_arm_timer_init();
+  BUG(ret != ERR_OK, "Failed to init arm_timer");
+  ret = bcm2835_systimer_init();
+  BUG(ret != ERR_OK, "Failed to init system timer");
 
   // cmdrunner_init();
   // cmdrunner_run_interactive_loop();

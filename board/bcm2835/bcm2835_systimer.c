@@ -116,9 +116,21 @@ void irq_handler_systimer_1(void)
     systimer1.cb(systimer1.cb_arg);
 }
 
+struct timer bcm2835_system_timer = {
+  .set_oneshot = bcm2835_systimer_set_oneshot,
+  .set_periodic = bcm2835_systimer_set_periodic,
+  .flags = 0,
+  .name = "systimer"
+};
+
 int bcm2835_systimer_init()
 {
+  int ret;
   uint32_t min_timer_set;
+  ret = timer_register(&bcm2835_system_timer, TIMER_ID_SYSTIMER);
+  if (ret != ERR_OK)
+    return ret;
+
   min_timer_set = bcm2835_systimer_get_min_set_time();
   printf("bcm2835_systimer_init: min timer_set value: %u\n", min_timer_set);
   bcm2835_systimer_info_reset(&systimer1);
