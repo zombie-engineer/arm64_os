@@ -23,6 +23,7 @@ OBJS := \
 	binblock.o\
 	console.o\
 	delays.o\
+	exception_reporter.o\
 	gpio_set.o\
 	kernel_panic.o\
 	power.o\
