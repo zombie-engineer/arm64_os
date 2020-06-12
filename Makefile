@@ -24,6 +24,7 @@ OBJS := \
 	console.o\
 	delays.o\
 	gpio_set.o\
+	kernel_panic.o\
 	power.o\
 	rectangle.o\
 	shiftreg.o\

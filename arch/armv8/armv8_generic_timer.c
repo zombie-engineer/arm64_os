@@ -57,7 +57,7 @@ static struct armv8_generic_timer_data armv8_generic_timer_data = {
 
 static __percpu_func __irq_routine void irq_handler_arm_generic_timer(void)
 {
-  printf("irq_handler_arm_timer"__endline);
+  printf("irq_handler_arm_generic_timer %p, %x"__endline, timer_data, timer_data->is_oneshot);
   if (timer_data->is_oneshot) {
     armv8_generic_timer_interrupt_disable();
   }

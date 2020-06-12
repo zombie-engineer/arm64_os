@@ -414,14 +414,21 @@ void other_cpu_timer_handler(void *arg)
 void cpu_test(void *arg)
 {
   int err;
+  printf("cpu_test-" __endline);
   test_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  printf("cpu_test timer: %p" __endline, test_timer);
+  BUG(!test_timer, "Failed to get arm generic timer");
   if (test_timer->init) {
+    printf("cpu_test: ->init : %p" __endline, test_timer->init);
     err = test_timer->init();
     BUG(err != ERR_OK, "Failed to init timer");
   }
 
+  printf("cpu_test: before oneshot" __endline);
   test_timer->set_oneshot(100 * 1000, cpu_test, NULL);
+  printf("cpu_test: after oneshot" __endline);
   enable_irq();
+  printf("cpu_test: after irq" __endline);
   while(1) {
     // irq_set(1, ARM_IRQ_TIMER, other_cpu_timer_handler);
     wait_msec(1000);
@@ -442,12 +449,12 @@ int init_func(void)
   int i = 0;
   // run_uart_thread();
   // run_cmdrunner_thread();
-  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
+  // BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
   SCHED_REARM_TIMER;
   enable_irq();
-  cpu_run(1, cpu_test);
+  cpu_run(1, cpu_test); while(1);
 //  for (i = 1; i < NUM_CORES; ++i) {
 //    cpu_run(i, cpu_test);
 //  }

@@ -111,7 +111,6 @@ static void exec_kernel_panic_reporters(exception_info_t *e, const char *msg)
   for (i = 0; i < kernel_panic_reporters_count; ++i)
     kernel_panic_reporters[i](e, msg);
 }
-  
 
 int add_unhandled_exception_hook(exception_hook cb)
 {
@@ -170,7 +169,7 @@ static void __handle_svc_64(exception_info_t *e)
       exec_kernel_panic_reporters(e, kernel_panic_msg);
       // exec_fatal_exception_hooks(e);
 
-      while(1) 
+      while(1)
         asm volatile ("wfe");
 
       break;

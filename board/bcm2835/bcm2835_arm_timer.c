@@ -66,7 +66,7 @@ static inline void bcm2835_arm_timer_disable()
   control_reg &= ~ARM_TIMER_CONTROL_REG_ENABLE;
   write_reg(ARM_TIMER_CONTROL_REG, control_reg);
 }
- 
+
 static void bcm2835_arm_timer_disable_freerunning()
 {
   uint32_t control_reg;
@@ -77,7 +77,7 @@ static void bcm2835_arm_timer_disable_freerunning()
 
 static __percpu_func __irq_routine void irq_handler_arm_timer(void)
 {
-  printf("irq_handler_arm_timer"__endline);
+  // printf("irq_handler_arm_timer"__endline);
   write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 0xffffffff);
   if (bcm2835_arm_timer.cb)
     bcm2835_arm_timer.cb(bcm2835_arm_timer.cb_arg);

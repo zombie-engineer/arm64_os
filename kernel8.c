@@ -23,7 +23,6 @@
 #include <sched.h>
 #include <intr_ctl.h>
 #include <exception.h>
-#include <timer.h>
 #include <cmdrunner.h>
 #include <max7219.h>
 #include <drivers/atmega8a.h>
@@ -895,6 +894,7 @@ void main()
   init_consoles();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
+  add_kernel_panic_reporter(report_kernel_panic);
   // pwm_bcm2835_init();
   // bcm2835_set_pwm_clk_freq(100000);
   // servo_sg90_init();
