@@ -2,6 +2,12 @@
 
 #define NUM_IRQS 128
 
+/*
+ *  __irq_routine - a hint notice, that indicates the function is bound
+ *  to a particular IRQ number.
+ */
+#define __irq_routine
+
 typedef void(*irq_func)();
 
 typedef struct irq_desc {

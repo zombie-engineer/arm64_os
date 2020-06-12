@@ -30,7 +30,7 @@ int timer_register(struct timer *t, int timer_id)
   return ERR_OK;
 }
 
-struct timer *get_timer(int timer_id)
+struct timer *timer_get(int timer_id)
 {
   int i;
   for (i = 0; i < num_timers; ++i) {

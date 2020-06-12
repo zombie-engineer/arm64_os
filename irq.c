@@ -33,6 +33,7 @@ void __handle_irq_0(int irqnr)
 
 void __handle_irq_1(int irqnr)
 {
+  printf("-------%d-"__endline, irqnr);
   __handle_irq(irqnr, percpu_irq_tables[1]);
 }
 

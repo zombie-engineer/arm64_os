@@ -9,6 +9,7 @@
 #include <reg_access.h>
 #include <irq.h>
 #include <error.h>
+#include <percpu.h>
 
 #define SYSTEM_TIMER_BASE   (uint64_t)(PERIPHERAL_BASE_PHY + 0x3000)
 #define SYSTEM_TIMER_CS     (reg32_t)(SYSTEM_TIMER_BASE + 0x00)
@@ -109,7 +110,7 @@ uint32_t bcm2835_systimer_get_min_set_time()
   return max_delta;
 }
 
-void irq_handler_systimer_1(void)
+void __percpu_func __irq_routine irq_handler_systimer_1(void)
 {
   bcm2835_systimer_clear_irq_1();
   if (systimer1.cb)

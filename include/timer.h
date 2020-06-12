@@ -7,6 +7,7 @@
 
 #define TIMER_ID_SYSTIMER 1
 #define TIMER_ID_ARM_TIMER 2
+#define TIMER_ID_ARM_GENERIC_TIMER 3
 
 // Generic callback triggered at timer event
 typedef void(*timer_callback_t)(void*);
@@ -24,9 +25,10 @@ void timer_irq_callback();
 struct timer {
   char *name;
   int flags;
+  int (*init)(void);
   int (*set_oneshot)(uint32_t usec, timer_callback_t cb, void *cb_arg);
   int (*set_periodic)(uint32_t usec, timer_callback_t cb, void *cb_arg);
 };
 
 int timer_register(struct timer *t, int id);
-struct timer *get_timer(int timer_id);
+struct timer *timer_get(int timer_id);

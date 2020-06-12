@@ -401,42 +401,30 @@ static void sched_timer_cb(void *arg)
   schedule_from_irq();
 }
 
-void other_cpu_timer_handler()
+static struct timer *test_timer;
+
+void other_cpu_timer_handler(void *arg)
 {
   puts("++"__endline);
-  asm volatile ("msr cntp_tval_el0, %0\n" : : "r"(0x400000));
-
+  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
   // blink_led_3(10, 100);
   //&__percpu_data[cpu_num].jmp_addr
 }
 
-void cpu_test(void)
+void cpu_test(void *arg)
 {
-  uint64_t cntp_ctl_el0;
-  uint64_t cntp_cval_el0;
-  uint64_t cntp_tval_el0;
-  uint64_t cntpct_el0;
-  asm volatile ("msr cntp_ctl_el0, %0\n" : : "r"(1));
-  asm volatile ("msr cntp_cval_el0, %0\n" : : "r"(0x6666666));
-  *(uint32_t *)0x40000044 = 0x0f;
+  int err;
+  test_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  if (test_timer->init) {
+    err = test_timer->init();
+    BUG(err != ERR_OK, "Failed to init timer");
+  }
+
+  test_timer->set_oneshot(100 * 1000, cpu_test, NULL);
   enable_irq();
   while(1) {
-    irq_set(1, ARM_IRQ_TIMER, other_cpu_timer_handler);
+    // irq_set(1, ARM_IRQ_TIMER, other_cpu_timer_handler);
     wait_msec(1000);
-
-    asm volatile (
-        "mrs %0, cntp_ctl_el0\n"
-        "mrs %1, cntp_cval_el0\n"
-        "mrs %2, cntp_tval_el0\n"
-        "mrs %3, cntpct_el0\n"
-        :
-        "=r"(cntp_ctl_el0),
-        "=r"(cntp_cval_el0),
-        "=r"(cntp_tval_el0),
-        "=r"(cntpct_el0)
-        );
-    printf("cpu_test: cntp_ctl_el: %llx,cval:%llx,tval:%llx,ct:%llx" __endline, cntp_ctl_el0, cntp_cval_el0, cntp_tval_el0, cntpct_el0);
-    printf("src: %08x" __endline, *(uint32_t*)0x40000064);
   }
 }
 
@@ -483,7 +471,7 @@ void scheduler_init()
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
-  sched_timer = get_timer(TIMER_ID_ARM_TIMER);
+  sched_timer = timer_get(TIMER_ID_ARM_TIMER);
 
   init_task = task_create(init_func, "init_func");
   init_task->ticks_left = ticks_until_preempt;

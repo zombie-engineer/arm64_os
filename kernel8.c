@@ -36,6 +36,7 @@
 #include <board/bcm2835/bcm2835_irq.h>
 #include <board/bcm2835/bcm2835_arm_timer.h>
 #include <board/bcm2835/bcm2835_systimer.h>
+#include <arch/armv8/armv8_generic_timer.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -937,6 +938,8 @@ void main()
   BUG(ret != ERR_OK, "Failed to init arm_timer");
   ret = bcm2835_systimer_init();
   BUG(ret != ERR_OK, "Failed to init system timer");
+  ret = armv8_generic_timer_init();
+  BUG(ret != ERR_OK, "Failed to init armv8 generic timer");
 
   // cmdrunner_init();
   // cmdrunner_run_interactive_loop();

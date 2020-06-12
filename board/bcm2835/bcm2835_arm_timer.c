@@ -8,6 +8,7 @@
 #include <error.h>
 #include <board/bcm2835/bcm2835_irq.h>
 #include <irq.h>
+#include <percpu.h>
 
 #define ARM_TIMER_BASE                     (uint64_t)(PERIPHERAL_BASE_PHY + 0xb400)
 #define ARM_TIMER_LOAD_REG                 (reg32_t)(ARM_TIMER_BASE)
@@ -60,7 +61,7 @@ static bcm2835_timer_t bcm2835_arm_timer = {
 
 static inline void bcm2835_arm_timer_disable()
 {
-  uint32_t control_reg; 
+  uint32_t control_reg;
   control_reg = read_reg(ARM_TIMER_CONTROL_REG);
   control_reg &= ~ARM_TIMER_CONTROL_REG_ENABLE;
   write_reg(ARM_TIMER_CONTROL_REG, control_reg);
@@ -74,7 +75,7 @@ static void bcm2835_arm_timer_disable_freerunning()
   write_reg(ARM_TIMER_CONTROL_REG, control_reg);
 }
 
-static void irq_handler_arm_timer(void)
+static __percpu_func __irq_routine void irq_handler_arm_timer(void)
 {
   printf("irq_handler_arm_timer"__endline);
   write_reg(ARM_TIMER_IRQ_CLEAR_ACK_REG, 0xffffffff);
