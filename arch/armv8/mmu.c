@@ -291,7 +291,25 @@ extern char __mmu_table_base;
 
 uint64_t __shared_mem_start = 0;
 
-void mmu_init()
+void mmu_self_test(void)
+{
+  {
+#define check_translation(addr) {\
+    uint64_t from = addr;\
+    uint64_t to = 0xffffffff;\
+    asm volatile ("at s1e1r, %1\nmrs %0, PAR_EL1" : "=r"(to) : "r"(from));\
+    printf("----%llx -> %llx" __endline, from, to);\
+}
+    check_translation(0);
+    check_translation(0x80000);
+    check_translation(0x3f000000);
+    check_translation(0x3fffffff);
+    check_translation(0x40000000);
+    check_translation(0x40000040);
+  }
+}
+
+void mmu_init(void)
 {
   uint64_t va_start;
   mmu_caps_t mmu_caps;
@@ -349,4 +367,5 @@ void mmu_init()
   va_start = 0;
   map_linear_range(va_start, &mmu_caps, &pt_config);
   __armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
+  mmu_self_test();
 }
