@@ -25,10 +25,11 @@ void timer_irq_callback();
 struct timer {
   char *name;
   int flags;
-  int (*init)(void);
+  int (*enable_interrupt)(void);
   int (*set_oneshot)(uint32_t usec, timer_callback_t cb, void *cb_arg);
   int (*set_periodic)(uint32_t usec, timer_callback_t cb, void *cb_arg);
 };
 
 int timer_register(struct timer *t, int id);
 struct timer *timer_get(int timer_id);
+void list_timers();

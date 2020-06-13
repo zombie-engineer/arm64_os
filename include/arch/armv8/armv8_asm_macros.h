@@ -25,3 +25,8 @@
   mrs   \dest, mpidr_el1
   and   \dest, \dest, #3
 .endm
+
+.macro get_arm_timer_freq dest
+  mrs \dest, cntfrq_el0
+  ubfx \dest, \dest, #0, #32
+.endm

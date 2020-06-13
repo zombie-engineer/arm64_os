@@ -28,12 +28,13 @@ static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
 
 void __handle_irq_0(int irqnr)
 {
+  // printf("irq: %d, cpu:0"__endline, irqnr);
   __handle_irq(irqnr, percpu_irq_tables[0]);
 }
 
 void __handle_irq_1(int irqnr)
 {
-  printf("-------%d-"__endline, irqnr);
+  // printf("irq: %d, cpu:1"__endline, irqnr);
   __handle_irq(irqnr, percpu_irq_tables[1]);
 }
 
@@ -62,6 +63,7 @@ void irq_init(int log_level)
 
 int irq_set(int cpu, int irqnr, irq_func func)
 {
+  printf("irq_set: cpu:%d, irqnr: %d, irq_func: %p" __endline, cpu, irqnr, func);
   if (irqnr >= NUM_IRQS) {
     if (irq_log_level > 0)
       printf("irq_set: irq: %d, func: %p, irq number too high.\n", irqnr, func);

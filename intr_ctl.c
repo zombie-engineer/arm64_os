@@ -121,3 +121,15 @@ void intr_ctl_disable_gpio_irq(void)
 {
   write_reg(BCM2835_IC_DISABLE_GPU_2, 1 << IRQ_BIT_GPIO1);
 }
+
+void intr_ctl_arm_generic_timer_irq_enable(int cpu)
+{
+  printf("intr_ctl_arm_generic_timer_irq_enable: %p" __endline, BCM2835_CORE_TIMER_IRQ_CONTROL(cpu));
+  write_reg(BCM2835_CORE_TIMER_IRQ_CONTROL(cpu), 0x0f);
+}
+
+void intr_ctl_arm_generic_timer_irq_disable(int cpu)
+{
+  printf("%p" __endline, BCM2835_CORE_TIMER_IRQ_CONTROL(cpu));
+  write_reg(BCM2835_CORE_TIMER_IRQ_CONTROL(cpu), 0x00);
+}

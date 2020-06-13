@@ -406,32 +406,30 @@ static struct timer *test_timer;
 void other_cpu_timer_handler(void *arg)
 {
   puts("++"__endline);
-  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
+  test_timer->set_oneshot(1000 * 1000, other_cpu_timer_handler, NULL);
   // blink_led_3(10, 100);
   //&__percpu_data[cpu_num].jmp_addr
 }
 
+extern void armv8_generic_timer_print();
+
 void cpu_test(void *arg)
 {
   int err;
-  printf("cpu_test-" __endline);
+  list_timers();
   test_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
-  printf("cpu_test timer: %p" __endline, test_timer);
   BUG(!test_timer, "Failed to get arm generic timer");
-  if (test_timer->init) {
-    printf("cpu_test: ->init : %p" __endline, test_timer->init);
-    err = test_timer->init();
-    BUG(err != ERR_OK, "Failed to init timer");
+  if (test_timer->enable_interrupt) {
+    err = test_timer->enable_interrupt();
+    BUG(err != ERR_OK, "Failed to enable timer interrupt");
   }
+  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
 
-  printf("cpu_test: before oneshot" __endline);
-  test_timer->set_oneshot(100 * 1000, cpu_test, NULL);
-  printf("cpu_test: after oneshot" __endline);
   enable_irq();
-  printf("cpu_test: after irq" __endline);
+  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
   while(1) {
-    // irq_set(1, ARM_IRQ_TIMER, other_cpu_timer_handler);
-    wait_msec(1000);
+    wait_msec(500);
+    armv8_generic_timer_print();
   }
 }
 
@@ -446,15 +444,15 @@ void cpu_run(int cpu_num, void (*fn)(void))
 
 int init_func(void)
 {
-  int i = 0;
+  // int i = 0;
   // run_uart_thread();
   // run_cmdrunner_thread();
-  // BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
+  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
   SCHED_REARM_TIMER;
   enable_irq();
-  cpu_run(1, cpu_test); while(1);
+  cpu_run(1, cpu_test);
 //  for (i = 1; i < NUM_CORES; ++i) {
 //    cpu_run(i, cpu_test);
 //  }

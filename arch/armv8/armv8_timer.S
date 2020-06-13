@@ -1,9 +1,9 @@
 #include <asm_macros.h>
+#include <arch/armv8/armv8_asm_macros.h>
 
 
 FUNC(get_cpu_counter_64_freq):
-  mrs x0, cntfrq_el0 
-  ubfx x0, x0, #0, #32
+  get_arm_timer_freq x0
   ret
 
 
