@@ -19,11 +19,11 @@
  * - For each table level next 9 bits of VA are taken from the right to
  *   get index of table entry (one of 512 entries in table)
  * - Last table points
- * bit math: 
+ * bit math:
  * 4096 addresses from 0 to 4095 are covered by 12 bits
  * 512  addresses from 0 to 511  are covered by 9  bits
- * 
- *              L0      L1       L2       L3                           
+ *
+ *              L0      L1       L2       L3
  * VA [63 : 48][47 : 39][38 : 30][29 : 21][20 : 12][11 : 0]
  *             |        |        |        |                \
  *             |        |        |        |                 \_
@@ -45,8 +45,8 @@
  * 4096 - 2**12
  * OA[11:0] = IA[11:0]
  * 48 - 11 = 37
- * IA[47:12] 
- * 8-bytes sized descriptor may be addressed by index 
+ * IA[47:12]
+ * 8-bytes sized descriptor may be addressed by index
  * in page address   resolves IA[(n-1):0]        = IA[11:0]
  * last lookup level resolves IA[(2n-4):n]       = IA[20:12]
  * prev lookup level resolves IA[(3n-7):(2n-3)]  = IA[29:21]
@@ -160,12 +160,30 @@ typedef struct pt_config {
   // covered by this page table
   uint64_t pa_start;
   uint64_t pa_end;
-  
+
   // Memory ranges to map
   int num_ranges;
   pt_mem_range_t mem_ranges[64];
 } pt_config_t;
 
+void pt_config_print(pt_config_t *p)
+{
+  int i;
+  uint64_t total_l3_ptes = 0;
+  for (i = 0; i < p->num_ranges; ++i) {
+    pt_mem_range_t *r = &p->mem_ranges[i];
+    total_l3_ptes += r->num_pages;
+    printf("mmu range: [0x%016llx:0x%016llx]-[0x%08x:0x%08x], attr_idx:%d"__endline,
+      r->va_start_page * MMU_PAGE_GRANULE,
+      (r->va_start_page  + r->num_pages) * MMU_PAGE_GRANULE,
+      (uint32_t)(r->pa_start_page * MMU_PAGE_GRANULE),
+      (uint32_t)((r->pa_start_page  + r->num_pages) * MMU_PAGE_GRANULE),
+      r->mem_attr_idx);
+  }
+  printf("mmu_table at: [0x%08x:0x%08x] (%d ptes)" __endline,
+    p->base_address,
+    p->base_address + total_l3_ptes * 8, total_l3_ptes);
+}
 
 void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pages, int mem_attr_idx)
 {
@@ -175,14 +193,16 @@ void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pag
   up_attr = 0;
   lo_attr = MAKE_PAGE_PTE_LO_ATTR(
     mem_attr_idx,
-    1 /* ns */, 
-    0 /* ap */, 
-    3 /* sh */, 
-    1 /* af */, 
+    1 /* ns */,
+    0 /* ap */,
+    3 /* sh */,
+    1 /* af */,
     0 /* ng */);
 
   for (i = 0; i < num_pages; ++i) {
-    *(page_pte++) = MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr);
+    uint64_t pte = MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr);
+    // printf("map_page_ptes: %p = %llx"__endline, page_pte, pte);
+    *(page_pte++) = pte;
     phys_page_idx++;
   }
 }
@@ -214,24 +234,52 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
   mmu_pte_t *l1_pt;
   mmu_pte_t *l0_pt;
 
+#define div_round_up(val, by) ((val + by - 1) / by)
+  BUG(pt_config->pa_end % pt_config->page_size, "Unaligned memory translation range");
   l3_pte_count = max((pt_config->pa_end - pt_config->pa_start) / pt_config->page_size, 1);
-  l2_pte_count = max(l3_pte_count / pt_config->num_entries_per_pt, 1);
-  l1_pte_count = max(l2_pte_count / pt_config->num_entries_per_pt, 1);
-  l0_pte_count = max(l1_pte_count / pt_config->num_entries_per_pt, 1);
+  l2_pte_count = max(div_round_up(l3_pte_count, pt_config->num_entries_per_pt), 1);
+  l1_pte_count = max(div_round_up(l2_pte_count, pt_config->num_entries_per_pt), 1);
+  l0_pte_count = max(div_round_up(l1_pte_count, pt_config->num_entries_per_pt), 1);
+  printf("num_ptes:l0:%d,l1:%d,l2:%d,l3:%d"__endline,
+    l0_pte_count,
+    l1_pte_count,
+    l2_pte_count,
+    l3_pte_count);
 
   l0_pt = (mmu_pte_t *)(pt_config->base_address);
-  l1_pt = l0_pt + max(l0_pte_count, pt_config->num_entries_per_pt);
-  l2_pt = l1_pt + max(l1_pte_count, pt_config->num_entries_per_pt);
-  l3_pt = l2_pt + max(l2_pte_count, pt_config->num_entries_per_pt);
+#define round_up_to(val, to) (((val + to - 1) / to) * to)
+  l1_pt = l0_pt + round_up_to(l0_pte_count, pt_config->num_entries_per_pt);
+  l2_pt = l1_pt + round_up_to(l1_pte_count, pt_config->num_entries_per_pt);
+  l3_pt = l2_pt + round_up_to(l2_pte_count, pt_config->num_entries_per_pt);
+#define print_page_table_l(__l)\
+  printf("page_table: l"#__l": [0x%08x:0x%08x] (%d entries)" __endline,\
+    l## __l ## _pt,\
+    l## __l ## _pt + l0_pte_count * 8,\
+    l## __l ## _pte_count)
 
-  // Map level 0 page table entries to level 1 page tables 
+  print_page_table_l(0);
+  print_page_table_l(1);
+  print_page_table_l(2);
+  print_page_table_l(3);
+
+  /*
+   * Map level 0 page table entries to level 1 page tables
+   */
   map_table_ptes(l0_pt, l0_pte_count, l1_pt, pt_config);
-  // Map level 1 page table entries to level 2 page tables 
+
+  /*
+   * Map level 1 page table entries to level 2 page tables
+   */
   map_table_ptes(l2_pt, l2_pte_count, l3_pt, pt_config);
-  // Map level 2 page table entries to level 3 page tables 
+
+  /*
+   * Map level 2 page table entries to level 3 page tables
+   */
   map_table_ptes(l1_pt, l1_pte_count, l2_pt, pt_config);
 
-  // Map level 3 page table entries to actual pages
+  /*
+   * Map level 3 page table entries to actual pages
+   */
   for (i = 0; i < pt_config->num_ranges; ++i) {
     range = &pt_config->mem_ranges[i];
     map_page_ptes(l3_pt + range->va_start_page, range->pa_start_page, range->num_pages, range->mem_attr_idx);
@@ -257,7 +305,7 @@ void mmu_init()
   pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
   // Cover from 0 to 1GB of physical address space
   pt_config.pa_start = 0;
-  pt_config.pa_end = 1 * 1024 * 1024 * 1024; 
+  pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
   pt_config.mem_ranges[0].pa_start_page = 0;
   pt_config.mem_ranges[0].va_start_page = 0;
@@ -269,24 +317,31 @@ void mmu_init()
   pt_config.mem_ranges[1].num_pages     = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
   pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
 
-  pt_config.mem_ranges[2].pa_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[2].va_start_page = __shared_mem_start / MMU_PAGE_GRANULE;;
-  pt_config.mem_ranges[2].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[2].mem_attr_idx  = MEMATTR_IDX_NORMAL2;
+  pt_config.mem_ranges[2].pa_start_page = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[2].va_start_page = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[2].num_pages     = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[2].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
 
-  pt_config.num_ranges = 3;
+  pt_config.mem_ranges[3].pa_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[3].va_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[3].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
+  pt_config.mem_ranges[3].mem_attr_idx  = MEMATTR_IDX_NORMAL2;
+
+  pt_config.num_ranges = 4;
+
+  pt_config_print(&pt_config);
 
   memset(&mair_repr, 0, sizeof(mair_repr));
 
   // memory region attributes of 0xff enable stxr / ldxr operations
   mair_repr.memattrs[MEMATTR_IDX_NORMAL]   = MAKE_MEMATTR_NORMAL(
-      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA), 
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
   mair_repr.memattrs[MEMATTR_IDX_DEV_NGNRE] = MEMATTR_DEVICE_NGNRE;
   mair_repr.memattrs[MEMATTR_IDX_NORMAL2]   = MAKE_MEMATTR_NORMAL(
-      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA), 
+      MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
-  
+
   armv8_set_mair_el1(mair_repr_64_to_value(&mair_repr));
 
   // Number of entries (ptes) in a single page table
