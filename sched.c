@@ -413,14 +413,14 @@ void other_cpu_timer_handler(void *arg)
 
 extern void armv8_generic_timer_print();
 
-void cpu_test(void *arg)
+void cpu_test(void)
 {
   int err;
   list_timers();
   test_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
   BUG(!test_timer, "Failed to get arm generic timer");
-  if (test_timer->enable_interrupt) {
-    err = test_timer->enable_interrupt();
+  if (test_timer->interrupt_enable) {
+    err = test_timer->interrupt_enable();
     BUG(err != ERR_OK, "Failed to enable timer interrupt");
   }
   intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());

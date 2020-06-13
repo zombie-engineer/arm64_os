@@ -25,7 +25,7 @@ void timer_irq_callback();
 struct timer {
   char *name;
   int flags;
-  int (*enable_interrupt)(void);
+  int (*interrupt_enable)(void);
   int (*set_oneshot)(uint32_t usec, timer_callback_t cb, void *cb_arg);
   int (*set_periodic)(uint32_t usec, timer_callback_t cb, void *cb_arg);
 };
