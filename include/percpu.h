@@ -10,6 +10,19 @@
  */
 #define __percpu_func
 
+#define PCPU_ALIGN ALIGNED(64)
+#define PCPU_DATA_TYPE(name) struct pcpu_ ## name
+#define PCPU_DATA_NAME(name) pcpu_ ## name
+
+#define DECL_PCPU_DATA(type, name) \
+  PCPU_DATA_TYPE(name) { type __data PCPU_ALIGN; };\
+  PCPU_DATA_TYPE(name) PCPU_DATA_NAME(name)[NUM_CORES] PCPU_ALIGN
+
+#define get_pcpu_data_n(cpu_num, name) \
+  (&PCPU_DATA_NAME(name)[cpu_num].__data)
+
+#define get_pcpu_data(name) get_pcpu_data_n(get_cpu_num(), name)
+
 /*
  * Structure that stores information per processing unit.
  * For best cache performance each per-cpu context should be 
