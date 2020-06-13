@@ -299,23 +299,24 @@ void schedule_debug()
   }
 }
 
+#define set_current(__new_current)\
+  __percpu_data[get_cpu_num()].context_addr = __new_current->cpuctx;
+
 void schedule()
 {
   struct scheduler *s = get_scheduler();
-  task_t *current_task;
+  task_t *task;
   // task_t *old_task;
 
   schedule_debug();
 
-  current_task = get_current();
-  // old_task = current_task;
-  current_task = scheduler_pick_next_task(s, current_task);
-  current_task->task_state = TASK_STATE_RUNNING;
-  // printf("schedule:'%s'->'%s'" __endline, old_task->name, current_task->name);
-
-  BUG(!current_task, "scheduler logic failed.");
-
-  __percpu_data[0].context_addr = current_task->cpuctx;
+  task = get_current();
+  // old_task = task;
+  task = scheduler_pick_next_task(s, task);
+  task->task_state = TASK_STATE_RUNNING;
+  // printf("schedule:'%s'->'%s'" __endline, old_task->name, task->name);
+  BUG(!task, "scheduler logic failed.");
+  set_current(task);
 }
 
 static inline bool needs_resched(task_t *t)
@@ -390,12 +391,12 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
+  sched_timer->set_oneshot(6000, sched_timer_cb, 0)
   //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
 {
-  // puts("oneshot end"__endline);
+  puts("oneshot end"__endline);
   SCHED_REARM_TIMER;
   // blink_led_3(1, 2);
   schedule_from_irq();
@@ -438,27 +439,29 @@ void cpu_run(int cpu_num, void (*fn)(void))
   void **write_to = &__percpu_data[cpu_num].jmp_addr;
   printf("setting %p to %p\n", write_to, fn);
   *write_to = (void *)fn;
-  dcache_clean_and_invalidate_rng(write_to, (char *)write_to + 64);
+  dcache_clean_and_invalidate_rng((uint64_t)write_to, (uint64_t)(char *)write_to + 64);
   asm volatile("sev");
 }
 
 int init_func(void)
 {
+  printf("init_func start"__endline);
   // int i = 0;
   // run_uart_thread();
   // run_cmdrunner_thread();
-  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
+ // BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
   SCHED_REARM_TIMER;
   enable_irq();
-  cpu_run(1, cpu_test);
+//  cpu_run(1, cpu_test);
 //  for (i = 1; i < NUM_CORES; ++i) {
 //    cpu_run(i, cpu_test);
 //  }
 
   while(1) {
-    blink_led(1, 100);
+    printf("init_func iter"__endline);
+    // blink_led(1, 100);
     yield();
   }
 }
@@ -472,11 +475,15 @@ void scheduler_init()
   for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
     pcpu_scheduler_init(get_scheduler_n(i));
 
-  puts("Starting task scheduler\n");
+  // *(uint32_t *)0x40000040 = 0x0f;
+  puts("Starting task scheduler" __endline);
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
-  sched_timer = timer_get(TIMER_ID_ARM_TIMER);
+  sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  if (sched_timer->interrupt_enable)
+    BUG(sched_timer->interrupt_enable() != ERR_OK, "Failed to init scheduler timer");
+  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
 
   init_task = task_create(init_func, "init_func");
   init_task->ticks_left = ticks_until_preempt;
