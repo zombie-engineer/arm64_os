@@ -8,58 +8,52 @@
 #include <irq.h>
 #include <board/bcm2835/bcm2835_irq.h>
 
-
 struct armv8_generic_timer_data {
   timer_callback_t cb;
   void *cb_arg;
   bool is_oneshot;
 };
 
-static struct armv8_generic_timer_data armv8_generic_timer_data = {
-  .cb = NULL,
-  .cb_arg = NULL,
-  .is_oneshot = false
-};
+DECL_PCPU_DATA(struct armv8_generic_timer_data, armv8_generic_timer_data) = { 0 };
 
 /*
  * Taken from pdf "Arm Architecture Reference Manual Armv8"
  * See chapter D13.8.16
  */
-#define timer_data (&armv8_generic_timer_data)
+#define timer_data (get_pcpu_data(armv8_generic_timer_data))
 
-#define armv8_generic_timer_interrupt_disable() \
+#define armv8_timer_interrupt_disable() \
   asm volatile (\
       "mrs x0, cntp_ctl_el0\n"\
       "orr x0, x0, #2\n"\
       "msr cntp_ctl_el0, x0\n":::"x0")
 
-#define armv8_generic_timer_interrupt_enabled() \
+#define armv8_timer_interrupt_enabled() \
 {(bool res;\
   asm volatile (\
       "mrs %0, cntp_ctl_el0\n"\
       "lsr %0, #1\n" : "=r"*(res));\
  res;)}
 
-#define armv8_generic_timer_interrupt_enable() \
+#define armv8_timer_interrupt_enable() \
   asm volatile (\
       "mrs x0, cntp_ctl_el0\n"\
       "bic x0, x0, #2\n"\
       "msr cntp_ctl_el0, x0\n":::("x0"))
 
-#define armv8_generic_timer_enable() \
+#define armv8_timer_enable() \
   asm volatile (\
       "mrs x0, cntp_ctl_el0\n"\
       "orr x0, x0, #1\n"\
       "msr cntp_ctl_el0, x0\n":::("x0"))
 
-#define armv8_generic_timer_enable_with_interrupt() \
+#define armv8_timer_enable_with_interrupt() \
   asm volatile("msr cntp_ctl_el0, %0\n" : : "r"(1));
 
-#define armv8_generic_timer_set_timer_value(__value) \
+#define armv8_timer_set_timer_value(__value) \
   asm volatile("msr cntp_tval_el0, %0\n" : : "r"(__value))
 
-
-#define armv8_generic_timer_disable() \
+#define armv8_timer_disable() \
   asm volatile (\
       "mrs x0, cntp_ctl_el0\n"\
       "bic x0, x0, #1\n"\
@@ -69,7 +63,7 @@ static __percpu_func __irq_routine void irq_handler_arm_generic_timer(void)
 {
   printf("irq_handler_arm_generic_timer %p, %x"__endline, timer_data, timer_data->is_oneshot);
   if (timer_data->is_oneshot) {
-    armv8_generic_timer_interrupt_disable();
+    armv8_timer_interrupt_disable();
   }
   if (timer_data->cb)
     timer_data->cb(timer_data->cb_arg);
@@ -103,6 +97,7 @@ static int armv8_generic_timer_set_oneshot(uint32_t usec, timer_callback_t cb, v
   timer_data->cb = cb;
   timer_data->cb_arg = cb_arg;
   timer_data->is_oneshot = true;
+  putc('+');
 
   asm volatile(
     "mrs %0, cntfrq_el0\n"
@@ -111,14 +106,15 @@ static int armv8_generic_timer_set_oneshot(uint32_t usec, timer_callback_t cb, v
 
   wait_counts = ((float)counter_freq / USEC_PER_SEC) * usec;
 
-  // printf("set_oneshot: wait_usec: %d, freq: %d, wait_counts: %lld" __endline, 
+  // printf("set_oneshot: wait_usec: %d, freq: %d, wait_counts: %lld" __endline,
   //  usec, counter_freq, wait_counts);
 
-  armv8_generic_timer_set_timer_value(wait_counts);
-  armv8_generic_timer_enable_with_interrupt();
+  armv8_timer_set_timer_value(wait_counts);
+  armv8_timer_enable_with_interrupt();
   // asm volatile("msr cntp_ctl_el0, %0\n" : : "r"(1));
-  armv8_generic_timer_print();
-  armv8_generic_timer_print();
+  // armv8_generic_timer_print();
+  // armv8_generic_timer_print();
+  putc('-');
   return ERR_OK;
 }
 
@@ -127,18 +123,18 @@ static int armv8_generic_timer_set_periodic(uint32_t usec, timer_callback_t cb, 
   return ERR_OK;
 }
 
-static int armv8_generic_timer_enable_interrupt(void)
+static int armv8_generic_timer_interrupt_enable(void)
 {
-  printf("armv8_generic_timer_enable_interrupt" __endline);
+  printf("armv8_generic_timer_interrupt_enable" __endline);
   irq_set(get_cpu_num(), ARM_IRQ_TIMER, irq_handler_arm_generic_timer);
-  *(uint32_t *)0x40000044 = 0x0f;
+  // *(uint32_t *)0x40000044 = 0x0f;
   return ERR_OK;
 }
 
 static struct timer armv8_generic_timer = {
   .set_oneshot = armv8_generic_timer_set_oneshot,
   .set_periodic = armv8_generic_timer_set_periodic,
-  .enable_interrupt = armv8_generic_timer_enable_interrupt,
+  .interrupt_enable = armv8_generic_timer_interrupt_enable,
   .flags = 0,
   .name = "arm_generic_timer"
 };
