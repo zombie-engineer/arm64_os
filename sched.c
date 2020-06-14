@@ -393,12 +393,12 @@ static void schedule_from_irq()
 }
 
 #define SCHED_REARM_TIMER \
-  sched_timer->set_oneshot(6000, sched_timer_cb, 0)
+  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
   //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
 {
-  puts("oneshot end"__endline);
+  puts("sched_timer_cb"__endline);
   SCHED_REARM_TIMER;
   // blink_led_3(1, 2);
   schedule_from_irq();
@@ -429,6 +429,7 @@ void cpu_test(void)
   intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
 
   enable_irq();
+
   test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
   while(1) {
     wait_msec(500);
@@ -463,7 +464,7 @@ int init_func(void)
 
   while(1) {
     printf("init_func iter"__endline);
-    // blink_led(1, 100);
+    blink_led(1, 100);
     yield();
   }
 }
@@ -477,18 +478,21 @@ void scheduler_init()
   for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
     pcpu_scheduler_init(get_scheduler_n(i));
 
-  // *(uint32_t *)0x40000040 = 0x0f;
   puts("Starting task scheduler" __endline);
   task_idx = 0;
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
-  sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
-  if (sched_timer->interrupt_enable)
-    BUG(sched_timer->interrupt_enable() != ERR_OK, "Failed to init scheduler timer");
-  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
 
   init_task = task_create(init_func, "init_func");
   init_task->ticks_left = ticks_until_preempt;
   sched_queue_runnable_task(get_scheduler(), init_task);
+
+  sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  if (sched_timer->interrupt_enable) {
+    BUG(sched_timer->interrupt_enable() != ERR_OK, "Failed to init scheduler timer");
+  }
+  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
+  SCHED_REARM_TIMER;
+  enable_irq();
   start_task_from_ctx(init_task->cpuctx);
 }
