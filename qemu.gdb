@@ -26,6 +26,25 @@ printf "\n"
 c
 end
 
+b gt_ctl_write
+commands
+  b handle_msr_i
+  if value == 1
+    b arm_cpu_do_interrupt
+    b gen_helper_msr_i_daifclear
+    b arm_cpu_set_irq
+    commands
+      if level != 1
+        c
+      else
+        b cpu_handle_interrupt
+        c
+      end
+    end
+  end
+c
+end
+
 r
 
 # b arm_cpu_do_interrupt_aarch64
