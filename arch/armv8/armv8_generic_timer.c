@@ -57,7 +57,7 @@ DECL_PCPU_DATA(struct armv8_generic_timer_data, armv8_generic_timer_data) = { 0 
   asm volatile (\
       "mrs x0, cntp_ctl_el0\n"\
       "bic x0, x0, #1\n"\
-      "msr cntp_ctl_el0, x0\n":::("x0"))
+      "msr cntp_ctl_el0, x0\n":::"x0")
 
 static __percpu_func __irq_routine void irq_handler_arm_generic_timer(void)
 {
@@ -145,5 +145,6 @@ int armv8_generic_timer_init()
   ret = timer_register(&armv8_generic_timer, TIMER_ID_ARM_GENERIC_TIMER);
   if (ret != ERR_OK)
     return ret;
+  armv8_timer_disable();
   return ERR_OK;
 }
