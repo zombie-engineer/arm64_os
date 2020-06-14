@@ -60,6 +60,7 @@
 /* Page Domain Fault */
 #define DAT_ABRT_PAGE_DOMAIN                           0b111110
 
+static int exception_log_level = 0;
 static const char *kernel_panic_msg = 0;
 
 /* exception level to control nested entry to exception code */
@@ -364,6 +365,9 @@ int gen_exception_string_generic(exception_info_t *e, char *buf, size_t bufsz)
 
 void __handle_interrupt(exception_info_t *e)
 {
+  if (exception_log_level > 1)
+    printf("__handle_interrupt: "__endline);
+
   elevel++;
 
   switch (e->type) {

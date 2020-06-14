@@ -116,16 +116,18 @@ void sched_queue_timewait_task_noirq(struct scheduler *s, struct task *t)
 
 void sched_queue_runnable_task(struct scheduler *s, struct task *t)
 {
-  disable_irq();
+  int flags;
+  disable_irq_save_flags(flags);
   sched_queue_runnable_task_noirq(s, t);
-  enable_irq();
+  restore_irq_flags(flags);
 }
 
 void sched_queue_timewait_task(struct scheduler *s, struct task *t)
 {
-  disable_irq();
+  int flags;
+  disable_irq_save_flags(flags);
   sched_queue_timewait_task_noirq(s, t);
-  enable_irq();
+  restore_irq_flags(flags);
 }
 
 static task_t tasks[40];
