@@ -126,7 +126,7 @@ static int armv8_generic_timer_set_periodic(uint32_t usec, timer_callback_t cb, 
 static int armv8_generic_timer_interrupt_enable(void)
 {
   printf("armv8_generic_timer_interrupt_enable" __endline);
-  irq_set(get_cpu_num(), ARM_IRQ_TIMER, irq_handler_arm_generic_timer);
+  irq_local_set(get_cpu_num(), irq_handler_arm_generic_timer);
   // *(uint32_t *)0x40000044 = 0x0f;
   return ERR_OK;
 }

@@ -52,6 +52,7 @@ tmp_2_reg .req w5
   bl   __handle_irq_\cpu_num
   b    1b
 1:
+  bl   __handle_local_periph_irq_\cpu_num
   b     __armv8_cpuctx_eret
 .unreq base_reg
 .endm

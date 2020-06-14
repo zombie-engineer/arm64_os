@@ -24,3 +24,4 @@ void __irq_set_post_hook(irq_func);
 void irq_init(int log_level);
 
 int irq_set(int cpu, int irqnr, irq_func func);
+int irq_local_set(int cpu, irq_func func);

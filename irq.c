@@ -3,8 +3,11 @@
 #include <common.h>
 #include <stringlib.h>
 #include <config.h>
+#include <percpu.h>
 
 static irq_desc_t percpu_irq_tables[NUM_CORES][NUM_IRQS];
+
+DECL_PCPU_DATA(irq_desc_t, local_irq_tables);
 
 static int irq_log_level = 0;
 
@@ -13,7 +16,7 @@ static irq_func irq_post_hook ALIGNED(8) = NULL;
 static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
 {
   if (irq_log_level > 1)
-    printf("__handle_irq: %d" __endline, irqnr);
+    printf("__handle_irq: %d, irq_table: %p\n" __endline, irqnr, irq_table);
 
   if (irqnr >= NUM_IRQS)
     return;
@@ -26,15 +29,42 @@ static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
     irq_post_hook();
 }
 
+static inline void __handle_local_periph_irq(int cpu_num)
+{
+  irq_desc_t *irqd = get_pcpu_data_n(cpu_num, local_irq_tables);
+  if (irq_log_level > 1)
+    printf("__handle_local_periph_irq: %d, handler: %p" __endline, cpu_num, irqd->handler);
+  if (irqd->handler)
+    irqd->handler();
+}
+
+void __handle_local_periph_irq_0(void)
+{
+  __handle_local_periph_irq(0);
+}
+
+void __handle_local_periph_irq_1(void)
+{
+  __handle_local_periph_irq(1);
+}
+
+void __handle_local_periph_irq_2(void)
+{
+  __handle_local_periph_irq(2);
+}
+
+void __handle_local_periph_irq_3(void)
+{
+  __handle_local_periph_irq(3);
+}
+
 void __handle_irq_0(int irqnr)
 {
-  // printf("irq: %d, cpu:0"__endline, irqnr);
   __handle_irq(irqnr, percpu_irq_tables[0]);
 }
 
 void __handle_irq_1(int irqnr)
 {
-  // printf("irq: %d, cpu:1"__endline, irqnr);
   __handle_irq(irqnr, percpu_irq_tables[1]);
 }
 
@@ -81,5 +111,13 @@ int irq_set(int cpu, int irqnr, irq_func func)
 
   if (irq_log_level > 0)
     printf("irq_set: irq: %d, func: %p completed.\n", irqnr, func);
+  return ERR_OK;
+}
+
+int irq_local_set(int cpu, irq_func func)
+{
+  printf("irq_local_set: cpu:%d, irq_func: %p" __endline, cpu, func);
+  irq_desc_t *irqd = get_pcpu_data_n(cpu, local_irq_tables);
+  irqd->handler = func;
   return ERR_OK;
 }
