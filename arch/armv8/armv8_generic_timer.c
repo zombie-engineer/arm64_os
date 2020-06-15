@@ -61,7 +61,7 @@ DECL_PCPU_DATA(struct armv8_generic_timer_data, armv8_generic_timer_data) = { 0 
 
 static __percpu_func __irq_routine void irq_handler_arm_generic_timer(void)
 {
-  printf("irq_handler_arm_generic_timer %p, %x"__endline, timer_data, timer_data->is_oneshot);
+  // printf("irq_handler_arm_generic_timer %p, %x"__endline, timer_data, timer_data->is_oneshot);
   if (timer_data->is_oneshot) {
     armv8_timer_interrupt_disable();
   }
@@ -97,7 +97,6 @@ static int armv8_generic_timer_set_oneshot(uint32_t usec, timer_callback_t cb, v
   timer_data->cb = cb;
   timer_data->cb_arg = cb_arg;
   timer_data->is_oneshot = true;
-  putc('+');
 
   asm volatile(
     "mrs %0, cntfrq_el0\n"
@@ -114,7 +113,6 @@ static int armv8_generic_timer_set_oneshot(uint32_t usec, timer_callback_t cb, v
   // asm volatile("msr cntp_ctl_el0, %0\n" : : "r"(1));
   // armv8_generic_timer_print();
   // armv8_generic_timer_print();
-  putc('-');
   return ERR_OK;
 }
 
@@ -127,7 +125,6 @@ static int armv8_generic_timer_interrupt_enable(void)
 {
   printf("armv8_generic_timer_interrupt_enable" __endline);
   irq_local_set(get_cpu_num(), irq_handler_arm_generic_timer);
-  // *(uint32_t *)0x40000044 = 0x0f;
   return ERR_OK;
 }
 

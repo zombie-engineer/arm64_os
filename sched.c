@@ -394,11 +394,10 @@ static void schedule_from_irq()
 
 #define SCHED_REARM_TIMER \
   sched_timer->set_oneshot(3000, sched_timer_cb, 0)
-  //systimer_set_oneshot(CONFIG_SCHED_INTERVAL_US * 30, sched_timer_cb, 0)
 
 static void sched_timer_cb(void *arg)
 {
-  puts("sched_timer_cb"__endline);
+  // puts("sched_timer_cb"__endline);
   SCHED_REARM_TIMER;
   // blink_led_3(1, 2);
   schedule_from_irq();
@@ -409,9 +408,7 @@ static struct timer *test_timer;
 void other_cpu_timer_handler(void *arg)
 {
   puts("++"__endline);
-  test_timer->set_oneshot(1000 * 1000, other_cpu_timer_handler, NULL);
-  // blink_led_3(10, 100);
-  //&__percpu_data[cpu_num].jmp_addr
+  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
 }
 
 extern void armv8_generic_timer_print();
@@ -452,12 +449,10 @@ int init_func(void)
   // int i = 0;
   // run_uart_thread();
   // run_cmdrunner_thread();
- // BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
-  intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_SYSTIMER_1);
-  intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_TIMER);
+  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
   SCHED_REARM_TIMER;
   enable_irq();
-//  cpu_run(1, cpu_test);
+  cpu_run(1, cpu_test);
 //  for (i = 1; i < NUM_CORES; ++i) {
 //    cpu_run(i, cpu_test);
 //  }
