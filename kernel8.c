@@ -36,6 +36,7 @@
 #include <board/bcm2835/bcm2835_arm_timer.h>
 #include <board/bcm2835/bcm2835_systimer.h>
 #include <arch/armv8/armv8_generic_timer.h>
+#include <init_task.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -876,7 +877,6 @@ int spi_slave_test()
   return ERR_OK;
 }
 
-
 void main()
 {
   int ret;
@@ -943,7 +943,7 @@ void main()
 
   // cmdrunner_init();
   // cmdrunner_run_interactive_loop();
-  scheduler_init();
+  scheduler_init(init_func);
   while(1);
 
   print_mmu_features();

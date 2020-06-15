@@ -6,8 +6,6 @@
 #include <stringlib.h>
 #include <timer.h>
 #include <intr_ctl.h>
-#include <uart/pl011_uart.h>
-#include <cmdrunner.h>
 #include <debug.h>
 #include <board/bcm2835/bcm2835_irq.h>
 #include <board/bcm2835/bcm2835_arm_timer.h>
@@ -17,7 +15,7 @@
 #include <percpu.h>
 #include <mem_access.h>
 
-static struct timer *sched_timer = NULL;
+struct timer *sched_timer = NULL;
 
 /*
  * Description of current scheduling algorithm:
@@ -73,24 +71,10 @@ static struct timer *sched_timer = NULL;
  * the recovered task itself has called yield.
  */
 
-static inline void yield()
-{
-  asm volatile ("svc %0"::"i"(SVC_YIELD));
-}
-
-extern void __armv8_cpuctx_eret();
+struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES] ALIGNED(64);
 
 #define STACK_SIZE (1024 * 1024 * 1)
 #define NUM_STACKS 10
-
-struct pcpu_scheduler_holder {
-  struct scheduler s;
-  char   padding[64 - sizeof(struct scheduler)];
-};
-static struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES] ALIGNED(64);
-
-#define get_scheduler_n(cpu) (&pcpu_schedulers[cpu].s)
-#define get_scheduler() (get_scheduler_n(get_cpu_num()))
 
 static void pcpu_scheduler_init(struct scheduler *s)
 {
@@ -208,26 +192,6 @@ out:
   return ERR_PTR(ERR_GENERIC);
 }
 
-int run_cmdrunner_thread()
-{
-  task_t *t;
-  t = task_create(cmdrunner_process, "cmdrunner_process");
-  if (t);
-  return ERR_OK;
-}
-
-int run_uart_thread()
-{
-  task_t *t;
-  t = task_create(pl011_io_thread, "pl011_io_thread");
-  if (t);
-  return ERR_OK;
-}
-
-struct event_waiter {
-
-};
-
 void wait_on_timer_ms(uint64_t msec)
 {
   uint64_t now = read_cpu_counter_64();
@@ -238,35 +202,6 @@ void wait_on_timer_ms(uint64_t msec)
   // printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
   sched_queue_timewait_task(get_scheduler(), get_current());
   yield();
-}
-
-int test_thread()
-{
-  while(1) {
-    blink_led_2(12, 100);
-    puts("task_b_loop_start" __endline);
-    print_cpu_flags();
-    puts("task_b_wait_blocking_start" __endline);
-    wait_msec(10000);
-    puts("************************" __endline);
-    puts("task_b_wait_blocking_end" __endline);
-    puts("************************" __endline);
-    puts("************************" __endline);
-    puts("task_b_wait_async_start" __endline);
-    wait_on_timer_ms(5000);
-    puts("task_b_wait_async_end" __endline);
-    puts("task_b_loop_end" __endline);
-  }
-}
-
-int run_test_thread()
-{
-  task_t *t;
-  t = task_create(test_thread, "test_thread");
-  if (IS_ERR(t))
-    return PTR_ERR(t);
-  sched_queue_runnable_task(get_scheduler(), t);
-  return ERR_OK;
 }
 
 task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
@@ -392,79 +327,13 @@ static void schedule_from_irq()
   }
 }
 
-#define SCHED_REARM_TIMER \
-  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
-
-static void sched_timer_cb(void *arg)
+void sched_timer_cb(void *arg)
 {
-  // puts("sched_timer_cb"__endline);
   SCHED_REARM_TIMER;
-  // blink_led_3(1, 2);
   schedule_from_irq();
 }
 
-static struct timer *test_timer;
-
-void other_cpu_timer_handler(void *arg)
-{
-  puts("++"__endline);
-  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
-}
-
-extern void armv8_generic_timer_print();
-
-void cpu_test(void)
-{
-  int err;
-  list_timers();
-  test_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
-  BUG(!test_timer, "Failed to get arm generic timer");
-  if (test_timer->interrupt_enable) {
-    err = test_timer->interrupt_enable();
-    BUG(err != ERR_OK, "Failed to enable timer interrupt");
-  }
-  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
-
-  enable_irq();
-
-  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
-  while(1) {
-    wait_msec(500);
-    armv8_generic_timer_print();
-  }
-}
-
-void cpu_run(int cpu_num, void (*fn)(void))
-{
-  void **write_to = &__percpu_data[cpu_num].jmp_addr;
-  printf("setting %p to %p\n", write_to, fn);
-  *write_to = (void *)fn;
-  dcache_clean_and_invalidate_rng((uint64_t)write_to, (uint64_t)(char *)write_to + 64);
-  asm volatile("sev");
-}
-
-int init_func(void)
-{
-  printf("init_func start"__endline);
-  // int i = 0;
-  // run_uart_thread();
-  // run_cmdrunner_thread();
-  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
-  SCHED_REARM_TIMER;
-  enable_irq();
-  cpu_run(1, cpu_test);
-//  for (i = 1; i < NUM_CORES; ++i) {
-//    cpu_run(i, cpu_test);
-//  }
-
-  while(1) {
-    printf("init_func iter"__endline);
-    blink_led(1, 100);
-    yield();
-  }
-}
-
-void scheduler_init()
+void scheduler_init(task_fn init_func)
 {
   const int ticks_until_preempt = 10;
   int i;

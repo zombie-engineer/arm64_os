@@ -1,6 +1,8 @@
 #pragma once
 #include <list.h>
 #include <types.h>
+#include <syscall.h>
+#include <config.h>
 
 typedef int (*task_fn)(void);
 
@@ -58,7 +60,7 @@ struct scheduler {
   struct list_head io_waiting;
 };
 
-void scheduler_init();
+void scheduler_init(task_fn init_func);
 
 void schedule();
 
@@ -66,4 +68,31 @@ void sched_queue_runnable_task(struct scheduler *s, struct task *t);
 
 void sched_queue_timewait_task(struct scheduler *s, struct task *t);
 
+void wait_on_timer_ms(uint64_t msec);
+
 int run_on_cpu(struct task *t, int cpu_num);
+
+extern struct timer *sched_timer;
+
+void sched_timer_cb(void *arg);
+
+#define SCHED_REARM_TIMER \
+  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
+
+static inline void yield()
+{
+  asm volatile ("svc %0"::"i"(SVC_YIELD));
+}
+
+task_t *task_create(task_fn fn, const char *task_name);
+
+struct pcpu_scheduler_holder {
+  struct scheduler s;
+  char   padding[64 - sizeof(struct scheduler)];
+};
+
+extern struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES];
+
+#define get_scheduler_n(cpu) (&pcpu_schedulers[cpu].s)
+#define get_scheduler() (get_scheduler_n(get_cpu_num()))
+

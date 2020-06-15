@@ -25,6 +25,7 @@ OBJS := \
 	delays.o\
 	exception_reporter.o\
 	gpio_set.o\
+	init_task.o\
 	kernel_panic.o\
 	power.o\
 	rectangle.o\
