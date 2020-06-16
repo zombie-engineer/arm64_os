@@ -90,7 +90,7 @@ static void cpu_run(int cpu_num, void (*fn)(void))
   void **write_to = &__percpu_data[cpu_num].jmp_addr;
   printf("setting %p to %p\n", write_to, fn);
   *write_to = (void *)fn;
-  dcache_clean_and_invalidate_rng((uint64_t)write_to, (uint64_t)(char *)write_to + 64);
+  dcache_flush(write_to, 64);
   asm volatile("sev");
 }
 

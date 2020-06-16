@@ -66,6 +66,9 @@ int is_irq_enabled(void);
  */
 void dcache_clean_and_invalidate_rng(uint64_t vaddr_start, uint64_t vaddr_end);
 
+#define dcache_flush(addr, size)\
+  dcache_clean_and_invalidate_rng((uint64_t)(addr), (uint64_t)(addr) + (size))
+
 /*
  * dcache_line_width - read cpu regs and returns data cache
  * line width
