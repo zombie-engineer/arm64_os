@@ -11,7 +11,7 @@ INCLUDES := include firmware/atmega8a/include
 OPTIMIZATION_FLAGS = -O2
 OPTIMIZATION_FLAGS = -g
 
-LINKSCRIPT = arch/armv8/link.ld
+LINKSCRIPT = link.ld
 
 CFLAGS = -Werror=implicit-function-declaration -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
