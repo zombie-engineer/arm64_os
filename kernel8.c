@@ -877,6 +877,13 @@ int spi_slave_test()
   return ERR_OK;
 }
 
+static void print_memory_map(void)
+{
+  uint64_t dma_start = dma_area_get_start_addr();
+  uint64_t dma_end = dma_area_get_end_addr();
+  printf("dma range: [0x%016x:0x%016x]"__endline, dma_start, dma_end);
+}
+
 void main()
 {
   int ret;
@@ -930,6 +937,7 @@ void main()
   //  while(1);
 
   mmu_init();
+  print_memory_map();
   // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
 
