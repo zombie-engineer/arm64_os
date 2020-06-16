@@ -1,5 +1,6 @@
 #include <config.h>
 
+#define PAGE_SIZE 4096
 #define CPU_STATE_MAX_SIZE 512
 #define STACKS_TOP(__el) __stacks_el ## __el ## _top
 #define STACKS_BASE(__el) __stacks_el ## __el ## _base
@@ -15,10 +16,10 @@
 
 #define CPUSTATE_SECTION \
   . += 0x1000;\
-  . = ALIGN(0x1000);\
+  . = ALIGN(PAGE_SIZE);\
   .init.cpustate : {}\
-    __init_cpu_state = ADDR(.init.cpustate);\
-    . += (CPU_STATE_MAX_SIZE * NUM_CORES);\
+  __init_cpu_state = ADDR(.init.cpustate);\
+  . += (CPU_STATE_MAX_SIZE * NUM_CORES);\
 
 SECTIONS
 {
@@ -49,14 +50,9 @@ SECTIONS
   }
   __bss_start = ADDR(.mybss);
   __bss_end = __bss_start + SIZEOF(.mybss);
-  . = ALIGN(4096);
-  _end = .;
   STACKS_SECTION(0)
   STACKS_SECTION(1)
   CPUSTATE_SECTION
-
-  . = ALIGN(4096);
-  __bin_start = .;
 
   . = ALIGN(16384);
   __mmu_table_base = .;
