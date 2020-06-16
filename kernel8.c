@@ -488,7 +488,6 @@ void init_nokia5110_display(int report_exceptions, int run_test)
 #endif
 
 extern void pl011_uart_print_regs();
-extern uint64_t __shared_mem_start;
 
 void init_uart(int report_exceptions)
 {

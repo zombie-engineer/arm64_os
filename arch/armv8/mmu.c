@@ -289,8 +289,6 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
 extern void __armv8_enable_mmu(uint64_t, uint64_t);
 extern char __mmu_table_base;
 
-uint64_t __shared_mem_start = 0;
-
 void mmu_self_test(void)
 {
   {
@@ -331,8 +329,6 @@ void mmu_init(void)
   int pg_peri_num = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
   int pg_locl_off = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
   int pg_locl_num = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
-
-  __shared_mem_start = pg_shar_off * MMU_PAGE_GRANULE;
 
   pt_config.base_address = (uint64_t)&__mmu_table_base;
   pt_config.page_size = MMU_PAGE_GRANULE;
