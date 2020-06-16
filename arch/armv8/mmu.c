@@ -309,12 +309,20 @@ void mmu_self_test(void)
   }
 }
 
+#define DECL_RANGE(__start, __num, __memattr) \
+  pt_config.mem_ranges[num_ranges].pa_start_page = __start;\
+  pt_config.mem_ranges[num_ranges].va_start_page = __start;\
+  pt_config.mem_ranges[num_ranges].num_pages     = __num;\
+  pt_config.mem_ranges[num_ranges].mem_attr_idx  = MEMATTR_IDX_ ## __memattr;\
+  num_ranges++
+
 void mmu_init(void)
 {
   uint64_t va_start;
   mmu_caps_t mmu_caps;
   pt_config_t pt_config;
   mair_repr_64_t mair_repr;
+  int num_ranges = 0;
 
   __shared_mem_start = PERIPHERAL_ADDR_RANGE_START / 2;
 
@@ -325,27 +333,12 @@ void mmu_init(void)
   pt_config.pa_start = 0;
   pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
-  pt_config.mem_ranges[0].pa_start_page = 0;
-  pt_config.mem_ranges[0].va_start_page = 0;
-  pt_config.mem_ranges[0].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[0].mem_attr_idx  = MEMATTR_IDX_NORMAL;
+  DECL_RANGE(0, __shared_mem_start / MMU_PAGE_GRANULE, NORMAL);
+  DECL_RANGE(PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE, (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE, DEV_NGNRE);
+  DECL_RANGE(LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE, (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE, DEV_NGNRE);
+  DECL_RANGE(__shared_mem_start / MMU_PAGE_GRANULE, __shared_mem_start / MMU_PAGE_GRANULE, NORMAL2);
 
-  pt_config.mem_ranges[1].pa_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[1].va_start_page = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[1].num_pages     = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[1].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
-
-  pt_config.mem_ranges[2].pa_start_page = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[2].va_start_page = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[2].num_pages     = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[2].mem_attr_idx  = MEMATTR_IDX_DEV_NGNRE;
-
-  pt_config.mem_ranges[3].pa_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[3].va_start_page = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[3].num_pages     = __shared_mem_start / MMU_PAGE_GRANULE;
-  pt_config.mem_ranges[3].mem_attr_idx  = MEMATTR_IDX_NORMAL2;
-
-  pt_config.num_ranges = 4;
+  pt_config.num_ranges = num_ranges;
 
   pt_config_print(&pt_config);
 
