@@ -117,6 +117,16 @@ static inline struct chunk_area *chunk_area_get_by_sz(int sz)
   return &chunk_areas[logsize_to_area_idx[logsz]];
 }
 
+uint64_t dma_area_get_start_addr(void)
+{
+  return (uint64_t)dma_area_start;
+}
+
+uint64_t dma_area_get_end_addr(void)
+{
+  return (uint64_t)dma_area_end;
+}
+
 void *dma_alloc(int sz)
 {
   struct chunk *c;
@@ -149,4 +159,3 @@ void dma_area_init(void)
     INIT_LIST_HEAD(&d->busy_list);
   }
 }
-
