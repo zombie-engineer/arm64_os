@@ -323,8 +323,16 @@ void mmu_init(void)
   pt_config_t pt_config;
   mair_repr_64_t mair_repr;
   int num_ranges = 0;
+  int pg_norm_off = 0;
+  int pg_norm_num = (PERIPHERAL_ADDR_RANGE_START / 2) / MMU_PAGE_GRANULE;
+  int pg_shar_off = pg_norm_off + pg_norm_num;
+  int pg_shar_num = (PERIPHERAL_ADDR_RANGE_START / 2) / MMU_PAGE_GRANULE;
+  int pg_peri_off = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
+  int pg_peri_num = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
+  int pg_locl_off = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
+  int pg_locl_num = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
 
-  __shared_mem_start = PERIPHERAL_ADDR_RANGE_START / 2;
+  __shared_mem_start = pg_shar_off * MMU_PAGE_GRANULE;
 
   pt_config.base_address = (uint64_t)&__mmu_table_base;
   pt_config.page_size = MMU_PAGE_GRANULE;
@@ -333,10 +341,10 @@ void mmu_init(void)
   pt_config.pa_start = 0;
   pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
-  DECL_RANGE(0, __shared_mem_start / MMU_PAGE_GRANULE, NORMAL);
-  DECL_RANGE(PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE, (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE, DEV_NGNRE);
-  DECL_RANGE(LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE, (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE, DEV_NGNRE);
-  DECL_RANGE(__shared_mem_start / MMU_PAGE_GRANULE, __shared_mem_start / MMU_PAGE_GRANULE, NORMAL2);
+  DECL_RANGE(pg_norm_off, pg_norm_num, NORMAL);
+  DECL_RANGE(pg_shar_off, pg_shar_num, NORMAL2);
+  DECL_RANGE(pg_peri_off, pg_peri_num, DEV_NGNRE);
+  DECL_RANGE(pg_locl_off, pg_locl_num, DEV_NGNRE);
 
   pt_config.num_ranges = num_ranges;
 
