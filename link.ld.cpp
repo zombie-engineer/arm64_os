@@ -21,6 +21,14 @@
   __init_cpu_state = ADDR(.init.cpustate);\
   . += (CPU_STATE_MAX_SIZE * NUM_CORES);\
 
+#define DMA_AREA_SECTION\
+  . = ALIGN(PAGE_SIZE);\
+  .dma_area : {}\
+  __dma_area_start = ADDR(.dma_area);\
+  __dma_area_end = __dma_area_start + DMA_AREA_SIZE;\
+  . += DMA_AREA_SIZE;
+
+
 SECTIONS
 {
   . = 0x80000;
@@ -53,6 +61,7 @@ SECTIONS
   STACKS_SECTION(0)
   STACKS_SECTION(1)
   CPUSTATE_SECTION
+  DMA_AREA_SECTION
 
   . = ALIGN(16384);
   __mmu_table_base = .;

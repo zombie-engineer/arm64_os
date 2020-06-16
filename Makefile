@@ -21,34 +21,35 @@ QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 OBJS := \
 	avr_update.o\
 	binblock.o\
+	clock_manager.o\
+	common.o	\
 	console.o\
+	cpuctx_generic.o\
+	debug.o		 \
 	delays.o\
+	dma_area.o\
+	dma.o\
+	exception.o\
 	exception_reporter.o\
 	gpio_set.o\
 	init_task.o\
-	kernel_panic.o\
-	power.o\
-	rectangle.o\
-	shiftreg.o\
-	self_test.o\
-	unhandled_exception.o\
-	viewport_console.o\
-	clock_manager.o\
-	cpuctx_generic.o\
-	dma.o\
 	intr_ctl.o\
-	percpu.o\
-	pwm.o\
-	ringbuf.o\
-	tags.o\
-	vcanvas.o\
-	common.o	\
-	debug.o		 \
-	exception.o\
-	rand.o\
-	sched.o\
-	timer.o\
 	irq.o\
+	kernel_panic.o\
+	percpu.o\
+	power.o\
+	pwm.o\
+	rand.o\
+	rectangle.o\
+	ringbuf.o\
+	sched.o\
+	self_test.o\
+	shiftreg.o\
+	tags.o\
+	timer.o\
+	unhandled_exception.o\
+	vcanvas.o\
+	viewport_console.o\
 	video_console.o
 
 all: kernel8.img

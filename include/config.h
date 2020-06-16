@@ -33,4 +33,4 @@
 /* EL1 stack size is 1Mb */
 #define STACK_SIZE_EL1_LOG 20
 
-#define DMA_AREA_SIZE 4096
+#define DMA_AREA_SIZE 65536
