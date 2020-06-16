@@ -11,6 +11,7 @@
 #include "mmu_memattr.h"
 #include "mmu_lpdesc.h"
 #include <stringlib.h>
+#include <memory/dma_area.h>
 
 /* We setup 4096 bytes GRANULE.
  *
@@ -321,10 +322,13 @@ void mmu_init(void)
   pt_config_t pt_config;
   mair_repr_64_t mair_repr;
   int num_ranges = 0;
+
   int pg_norm_off = 0;
-  int pg_norm_num = (PERIPHERAL_ADDR_RANGE_START / 2) / MMU_PAGE_GRANULE;
-  int pg_shar_off = pg_norm_off + pg_norm_num;
-  int pg_shar_num = (PERIPHERAL_ADDR_RANGE_START / 2) / MMU_PAGE_GRANULE;
+  int pg_norm_num = dma_area_get_start_addr() / MMU_PAGE_GRANULE;
+  int pg_dma_off  = pg_norm_num;
+  int pg_dma_num  = dma_area_get_end_addr() / MMU_PAGE_GRANULE - pg_dma_off;
+  int pg_shar_off = pg_dma_off + pg_norm_num;
+  int pg_shar_num = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE - pg_shar_off;
   int pg_peri_off = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   int pg_peri_num = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
   int pg_locl_off = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
@@ -338,6 +342,7 @@ void mmu_init(void)
   pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
   DECL_RANGE(pg_norm_off, pg_norm_num, NORMAL);
+  DECL_RANGE(pg_dma_off , pg_dma_num , DEV_NGNRE);
   DECL_RANGE(pg_shar_off, pg_shar_num, NORMAL2);
   DECL_RANGE(pg_peri_off, pg_peri_num, DEV_NGNRE);
   DECL_RANGE(pg_locl_off, pg_locl_num, DEV_NGNRE);
