@@ -60,7 +60,7 @@ struct scheduler {
   struct list_head io_waiting;
 };
 
-void scheduler_init(task_fn init_func);
+void scheduler_init(int log_level, task_fn init_func);
 
 void schedule();
 

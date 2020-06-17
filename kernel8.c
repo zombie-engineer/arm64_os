@@ -963,7 +963,7 @@ void main()
 
   // cmdrunner_init();
   // cmdrunner_run_interactive_loop();
-  scheduler_init(init_func);
+  scheduler_init(0 /* log_level */, init_func);
   while(1);
 
   print_mmu_features();
