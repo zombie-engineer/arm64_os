@@ -86,7 +86,7 @@ static int usb_utmi_initialized = 0;
 static inline void print_usb_device(struct usb_hcd_device *dev)
 {
   printf("usb_device:parent:(%p:%d),pipe0:(max:%d,spd:%d,ep:%d,address:%d,hubaddr:%d,hubport:%d)",
-      dev->location.hub, 
+      dev->location.hub,
       dev->location.hub_port,
       dev->pipe0.max_packet_size,
       dev->pipe0.speed,
@@ -148,12 +148,12 @@ void usb_hcd_deallocate_device(struct usb_hcd_device *d)
   }
 
 int usb_hcd_get_descriptor(
-    struct usb_hcd_pipe *p, 
-    int desc_type, 
+    struct usb_hcd_pipe *p,
+    int desc_type,
     int desc_idx,
-    int lang_id, 
-    void *buf, 
-    int buf_sz, 
+    int lang_id,
+    void *buf,
+    int buf_sz,
     int *num_bytes)
 {
   int err;
@@ -171,7 +171,7 @@ int usb_hcd_get_descriptor(
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
 
 
-  err = hcd_transfer_control(p, &pctl, 
+  err = hcd_transfer_control(p, &pctl,
       &header, sizeof(header), rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
@@ -195,7 +195,7 @@ int usb_hcd_get_descriptor(
     rq = USB_DEV_HID_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, sizeof(header));
   else
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
-  err = hcd_transfer_control(p, &pctl, 
+  err = hcd_transfer_control(p, &pctl,
       buf, header.length, rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
   if (err)
     HCDERR("failed to read descriptor header");
@@ -247,7 +247,7 @@ static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_d
 
   if (dev->class->device_class != USB_HCD_DEVICE_CLASS_HID) {
     err = ERR_BUSY;
-    HCDERR("existring device type already identified as non-hid (%s)", 
+    HCDERR("existring device type already identified as non-hid (%s)",
       usb_hcd_device_class_to_string(dev->class->device_class));
     goto out_err;
   }
@@ -263,9 +263,9 @@ static int usb_hcd_parse_handle_hid(struct usb_hcd_device *dev, struct usb_hid_d
   memcpy(&i->descriptor, hid_desc, sizeof(struct usb_hid_descriptor));
 
   HCDLOG("hid: version:%04x, country:%d, desc_count:%d, type:%d, length:%d",
-    get_unaligned_16_le(&hid_desc->hid_version), 
+    get_unaligned_16_le(&hid_desc->hid_version),
     hid_desc->country_code,
-    hid_desc->descriptor_count, 
+    hid_desc->descriptor_count,
     hid_desc->type,
     get_unaligned_16_le(&hid_desc->length));
 out_err:
@@ -307,7 +307,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         ep = i->endpoints;
         end_ep = i->endpoints + USB_MAX_ENDPOINTS_PER_DEVICE;
 
-        HCDLOG("-- address:%d,interface:%d,num_endpoints:%d,class:%s(%d,%d,%d)", dev->address, 
+        HCDLOG("-- address:%d,interface:%d,num_endpoints:%d,class:%s(%d,%d,%d)", dev->address,
           i->descriptor.number,
           i->descriptor.endpoint_count,
           usb_full_class_to_string(i->descriptor.class, i->descriptor.subclass, i->descriptor.protocol),
@@ -316,21 +316,21 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
       case USB_DESCRIPTOR_TYPE_ENDPOINT:
         if (!ep) {
           err = ERR_GENERIC;
-          HCDERR("endpoint parsed before interface. Failing."); 
+          HCDERR("endpoint parsed before interface. Failing.");
           should_continue = 0;
           break;
         }
         if (ep >= end_ep) {
-          HCDERR("endpoint count reached limit %d for current interface", 
+          HCDERR("endpoint count reached limit %d for current interface",
               end_ep - i->endpoints);
           break;
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
         ep->device = dev;
         ep->next_toggle_pid = USB_PID_DATA0;
-        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d,int:%d", 
-          dev->address, 
-          i->descriptor.number, 
+        HCDLOG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d,int:%d",
+          dev->address,
+          i->descriptor.number,
           ep->descriptor.endpoint_address & 0x7f,
           usb_direction_to_string(ep->descriptor.endpoint_address >> 7),
           ep->descriptor.attributes,
@@ -350,7 +350,7 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         }
         break;
       case USB_DESCRIPTOR_TYPE_CONFIGURATION:
-        HCDLOG("---- configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value, 
+        HCDLOG("---- configuration:%d,num_interfaces:%d,string_index:%d", c->configuration_value,
           c->num_interfaces, c->iconfiguration);
         break;
       default:
@@ -395,23 +395,22 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
         prefix,
         desc->id_vendor,
         desc->id_product,
-        desc->bcd_usb, 
-        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
+        desc->bcd_usb,
+        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol),
         desc->device_class,
         desc->device_subclass,
-        desc->device_protocol, 
+        desc->device_protocol,
         desc->max_packet_size_0);
   else /* first half */
     HCDLOG("%s: bcd:%04x, class:%s(class:%d,subclass:%d,proto:%d), max_packet_size: %d",
         prefix,
-        desc->bcd_usb, 
-        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol), 
+        desc->bcd_usb,
+        usb_full_class_to_string(desc->device_class, desc->device_subclass, desc->device_protocol),
         desc->device_class,
         desc->device_subclass,
-        desc->device_protocol, 
+        desc->device_protocol,
         desc->max_packet_size_0);
 }
-   
 
 /*
  * At this point device's port has been:
@@ -431,7 +430,7 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
   struct usb_device_descriptor desc ALIGNED(64) = { 0 };
 
   if (dev->location.hub) {
-    HCDDEBUG("setting DEFAULT state for device at hub:%d.port:%d", 
+    HCDDEBUG("setting DEFAULT state for device at hub:%d.port:%d",
       dev->location.hub->address, dev->location.hub_port);
   } else {
     HCDDEBUG("setting DEFAULT state for root hub device");
@@ -444,7 +443,7 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
       to_transfer_size);
-  err = hcd_transfer_control(&dev->pipe0, pctl, 
+  err = hcd_transfer_control(&dev->pipe0, pctl,
       &desc, to_transfer_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
   CHECK_ERR_SILENT();
 
@@ -472,7 +471,7 @@ static inline int usb_hcd_allocate_device_address()
 static int usb_hcd_set_address(struct usb_hcd_pipe *p, uint8_t channel, int address)
 {
   int err;
-	struct usb_hcd_pipe_control pctl; 
+	struct usb_hcd_pipe_control pctl;
   uint64_t rq = USB_DEV_RQ_MAKE(SET_ADDRESS, SET_ADDRESS, address, 0, 0);
 
 	pctl.channel       = channel;
@@ -501,7 +500,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev, struct usb_hcd
    * last part of device descriptor, that we asked at DEFAULT state.
    */
   if (dev->location.hub) {
-    err = usb_hub_enumerate_port_reset(usb_hcd_device_to_hub(dev->location.hub), 
+    err = usb_hub_enumerate_port_reset(usb_hcd_device_to_hub(dev->location.hub),
         dev->location.hub_port);
     CHECK_ERR("failed to reset parent hub port");
   }
@@ -525,10 +524,10 @@ out_err:
 }
 
 /*
- * The device is reset, enabled and set to respond at it's own unique address 
- * Now we need to read and parse the whole DEVICE_DESCRIPTOR along with 
+ * The device is reset, enabled and set to respond at it's own unique address
+ * Now we need to read and parse the whole DEVICE_DESCRIPTOR along with
  * CONFIGURATION_DESCRIPTOR + interface and endpoint descriptors and parse
- * it all. After that we send SET_CONFIGURATION to it and put it in 
+ * it all. After that we send SET_CONFIGURATION to it and put it in
  * a final CONFIGURED state, and that will complete it's enumeration
  */
 static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hcd_pipe_control *pctl)
@@ -559,7 +558,7 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hc
 
   err = hcd_transfer_control(&dev->pipe0, pctl, config_buffer,
       config_desc.total_length, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
-  CHECK_ERR("failed to get full configuration %d with total_length = %d", 
+  CHECK_ERR("failed to get full configuration %d with total_length = %d",
       config_num, config_desc.total_length);
 
   if (num_bytes != config_desc.total_length) {
@@ -659,7 +658,7 @@ static int bcm2835_usb_recieve_fifo_flush()
   rst = read_reg(USB_GRSTCTL);
   USB_GRSTCTL_CLR_SET_RXF_FLSH(rst, 1);
   write_reg(USB_GRSTCTL, rst);
-  do { 
+  do {
     rst = read_reg(USB_GRSTCTL);
   } while(USB_GRSTCTL_GET_RXF_FLSH(rst));
   HCDDEBUG("bcm2835_usb_recieve_fifo_flush: completed\r\n");
@@ -674,7 +673,7 @@ static int bcm2835_usb_transmit_fifo_flush(int fifo)
   USB_GRSTCTL_CLR_SET_TXF_NUM(rst, fifo);
   USB_GRSTCTL_CLR_SET_TXF_FLSH(rst, 1);
   write_reg(USB_GRSTCTL, rst);
-  do { 
+  do {
     rst = read_reg(USB_GRSTCTL);
   } while(USB_GRSTCTL_GET_TXF_FLSH(rst));
   return ERR_OK;
@@ -773,21 +772,21 @@ int usb_hcd_start()
   ctl = read_reg(USB_GUSBCFG);
   switch(hwcfg2 & 7) {
     case 0:
-      printf("USB: HNP/SRP configuration: HNP,SRP\r\n");
+      HCDLOG("HNP/SRP configuration: HNP,SRP");
       BIT_SET_U32(ctl, USB_GUSBCFG_SRP_CAP);
       BIT_SET_U32(ctl, USB_GUSBCFG_HNP_CAP);
       break;
     case 1:
     case 3:
     case 5:
-      printf("USB: HNP/SRP configuration: SRP\r\n");
+      HCDLOG("HNP/SRP configuration: SRP");
       BIT_SET_U32(ctl, USB_GUSBCFG_SRP_CAP);
       BIT_CLEAR_U32(ctl, USB_GUSBCFG_HNP_CAP);
       break;
     case 2:
     case 4:
     case 6:
-      printf("USB: HNP/SRP configuration: none\r\n");
+      HCDLOG("HNP/SRP configuration: none");
       BIT_CLEAR_U32(ctl, USB_GUSBCFG_SRP_CAP);
       BIT_CLEAR_U32(ctl, USB_GUSBCFG_HNP_CAP);
       break;
@@ -796,7 +795,8 @@ int usb_hcd_start()
   HCDLOG("core started");
   write_reg(USB_PCGCR, 0);
   hostcfg = read_reg(USB_HCFG);
-  if (hs_phy_iface == HS_PHY_IFACE_ULPI && fs_phy_iface == FS_PHY_IFACE_DEDIC && BIT_IS_SET(ctl, USB_GUSBCFG_ULPI_FS_LS)) {
+  if (hs_phy_iface == HS_PHY_IFACE_ULPI &&
+    fs_phy_iface == FS_PHY_IFACE_DEDIC && BIT_IS_SET(ctl, USB_GUSBCFG_ULPI_FS_LS)) {
     HCDLOG("selecting host clock: 48MHz");
     USB_HCFG_CLR_SET_LS_PHY_CLK_SEL(hostcfg, USB_CLK_48MHZ);
   } else {
@@ -920,7 +920,7 @@ int usb_hcd_power_off()
 void print_usb_device_rq(uint64_t rq, const char *tag)
 {
   printf("usb_dev_rq:%s,type:%02x,rq:%02x,value:%04x,idx:%04x,len:%04x",
-      tag, 
+      tag,
       rq,
       USB_DEV_RQ_GET_TYPE(rq),
       USB_DEV_RQ_GET_RQ(rq),
@@ -974,7 +974,7 @@ usbregs:
 OTG     :001c0000, - 18,19,20 USB_GOTGCTL_A_SES_VLD, USB_GOTGCTL_B_SES_VLD
 ahbcfg  :00000000, - dma not ena
 usbcfg  :00001400, - 10,12 usbtrdtim
-rst     :80000000, - 
+rst     :80000000, -
 rxstsr  :10400240,
 rxstsp  :10400240,
 rxfsiz  :00001000,
@@ -991,8 +991,8 @@ usbregs:
 otg     :001c0000 - same
 ahbcfg  :0000000e - bits 123 Axi Bursts Len = 3
 usbcfg  :20002700 - 8,9,10,13,29 SRP CAP/HNP CAP/usbtrdtim/force_host_mode
-rst     :80000000 - 
-rxstsr  :00400040 - 
+rst     :80000000 -
+rxstsr  :00400040 -
 rxstsp  :00400040
 rxfsiz  :00001000
 nptxfsiz:01001000
@@ -1036,7 +1036,7 @@ static int usb_hcd_device_to_string_r(struct usb_hcd_device *dev, const char *pr
 
   n += snprintf(buf + n, bufsz - n, " %04x:%04x", dev->descriptor.id_vendor, dev->descriptor.id_product);
   n += snprintf(buf + n, bufsz - n, " %d:%d", (dev->descriptor.bcd_usb >> 8) & 0xff , dev->descriptor.bcd_usb & 0xff);
-  n += snprintf(buf + n, bufsz - n, " class:%s(%03x)", 
+  n += snprintf(buf + n, bufsz - n, " class:%s(%03x)",
       usb_device_class_to_string(dev->descriptor.device_class), dev->descriptor.device_class);
   n += snprintf(buf + n, bufsz - n, " %d", dev->descriptor.device_subclass);
   n += snprintf(buf + n, bufsz - n, " %d", dev->descriptor.bcd_device);
@@ -1076,7 +1076,7 @@ int hcd_endpoint_get_status(struct usb_hcd_endpoint *ep, void *status)
 {
   int err;
   int num_bytes;
-  struct usb_device_request rq = { 
+  struct usb_device_request rq = {
     .request_type = USB_RQ_TYPE_ENDPOINT_GET_STATUS,
     .request      = USB_RQ_GET_STATUS,
     .value        = 0,
@@ -1105,7 +1105,7 @@ int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature)
 {
   int err;
   int num_bytes;
-  struct usb_device_request rq = { 
+  struct usb_device_request rq = {
     .request_type = USB_RQ_TYPE_ENDPOINT_CLEAR_FEATURE,
     .request      = USB_RQ_CLEAR_FEATURE,
     .value        = feature,
@@ -1133,7 +1133,7 @@ int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
 {
   int err;
   int num_bytes;
-  struct usb_device_request rq = { 
+  struct usb_device_request rq = {
     .request_type = USB_RQ_TYPE_ENDPOINT_SET_FEATURE,
     .request      = USB_RQ_SET_FEATURE,
     .value        = feature,
