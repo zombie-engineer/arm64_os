@@ -28,7 +28,6 @@
 #include <drivers/atmega8a.h>
 #include <drivers/display/nokia5110.h>
 #include <drivers/display/nokia5110_console.h>
-#include <drivers/usb/usbd.h>
 #include <debug.h>
 #include <unhandled_exception.h>
 #include <board/bcm2835/bcm2835.h>
@@ -919,8 +918,6 @@ void main()
   // servo_sg90_init();
   print_mbox_props();
 #ifndef CONFIG_QEMU
-  // usbd_init();
-  // usbd_print_device_tree();
   // init_nokia5110_display(1, 0);
   // nokia5110_draw_text("Display ready", 0, 0);
 #endif
@@ -979,5 +976,4 @@ void main()
 
   print_mmu_stats();
   // run_task();
-
 }

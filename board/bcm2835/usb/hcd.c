@@ -706,8 +706,7 @@ int usb_hcd_start()
   }
 
   dwc2_port_reset();
-  // wait_on_timer_ms(60);
-  wait_msec(60);
+  wait_on_timer_ms(60);
   dwc2_port_reset_clear();
   HCDLOG("host controller device started");
   return err;
@@ -815,9 +814,7 @@ int usb_hcd_init()
   err = usb_hcd_power_on();
   CHECK_ERR("failed to power on");
 
-  printf("---------"__endline);
-  // wait_on_timer_ms(20);
-  wait_msec(20);
+  wait_on_timer_ms(20);
   powered_on = true;
   HCDLOG("Device powered on");
   dwc2_print_core_regs();

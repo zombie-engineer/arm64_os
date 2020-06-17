@@ -10,6 +10,7 @@
 #include <timer.h>
 #include <cmdrunner.h>
 #include <uart/pl011_uart.h>
+#include <drivers/usb/usbd.h>
 
 static struct timer *test_timer;
 
@@ -29,8 +30,14 @@ static int run_uart_thread()
   return ERR_OK;
 }
 
-int test_thread()
+int usb_init_func()
 {
+  int flags;
+  // disable_irq_save_flags(flags);
+  usbd_init();
+  usbd_print_device_tree();
+  // restore_irq_flags(flags);
+
   while(1) {
     blink_led_2(12, 100);
     puts("task_b_loop_start" __endline);
@@ -48,10 +55,10 @@ int test_thread()
   }
 }
 
-int run_test_thread()
+int run_usb_initialization()
 {
   task_t *t;
-  t = task_create(test_thread, "test_thread");
+  t = task_create(usb_init_func, "usb_init");
   if (IS_ERR(t))
     return PTR_ERR(t);
   sched_queue_runnable_task(get_scheduler(), t);
@@ -61,7 +68,7 @@ int run_test_thread()
 void other_cpu_timer_handler(void *arg)
 {
   puts("++"__endline);
-  test_timer->set_oneshot(100 * 1000, other_cpu_timer_handler, NULL);
+  test_timer->set_oneshot(1000 * 1000, other_cpu_timer_handler, NULL);
 }
 
 void cpu_test(void)
@@ -84,7 +91,6 @@ void cpu_test(void)
   }
 }
 
-
 static void cpu_run(int cpu_num, void (*fn)(void))
 {
   void **write_to = &__percpu_data[cpu_num].jmp_addr;
@@ -99,13 +105,14 @@ int init_func(void)
   printf("starting init function"__endline);
   // run_uart_thread();
   // run_cmdrunner_thread();
-  BUG(run_test_thread() != ERR_OK, "Failed to run test thread");
+  BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   SCHED_REARM_TIMER;
   enable_irq();
-  cpu_run(1, cpu_test);
+  // cpu_run(1, cpu_test);
 
-  while(1)
+  while(1) {
     asm volatile("wfe");
-    // yield();
+    yield();
+  }
 }
 
