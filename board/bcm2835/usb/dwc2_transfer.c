@@ -269,6 +269,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   uint64_t dma_dst;
 
   dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);
+  if (buf && bufsz && pipe.u.ep_direction == USB_DIRECTION_OUT)
+    dcache_flush(buf, bufsz);
 
   ch = pipe.u.dwc_channel = 6;
 
@@ -317,6 +319,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
     SET_SPLT();
 
+    dcache_flush(buf, bufsz);
     dma = RAM_PHY_TO_BUS_UNCACHED(dma_dst);
     SET_DMA();
 

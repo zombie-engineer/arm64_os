@@ -10,25 +10,24 @@
 #include <mbox/mbox_props.h>
 #include <bits_api.h>
 #include "dwc2.h"
-#include "dwc2_regs.h"
-#include "dwc2_printers.h"
-#include "dwc2_regs_bits.h"
 #include <usb/usb.h>
 #include <delays.h>
 #include <stringlib.h>
 #include "root_hub.h"
 #include <drivers/usb/usb_dev_rq.h>
 #include <drivers/usb/usb_mass_storage.h>
-#include "dwc2_reg_access.h"
 #include "dwc2_log.h"
 #include <mem_access.h>
-
+#include <sched.h>
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
 //
 
 static int usb_hcd_unique_device_address = 1;
+
+static bool powered_on = 0;
+
 int usb_hcd_log_level = 0;
 
 int usb_hcd_set_log_level(int level)
@@ -68,16 +67,6 @@ static inline const char *usb_hcd_device_state_to_string(int s)
 #define USB_CHANNEL_INTERRUPT_BUFFER_NOT_AVAIL       11
 #define USB_CHANNEL_INTERRUPT_EXCESSIVE_TRANSMISSION 12
 #define USB_CHANNEL_INTERRUPT_FRAMELIST_ROLLOVER     13
-
-#define HS_PHY_IFACE_UNSUP     0
-#define HS_PHY_IFACE_UTMI      1
-#define HS_PHY_IFACE_ULPI      2
-#define HS_PHY_IFACE_UTMI_ULPI 3
-
-#define FS_PHY_IFACE_PHY_0 0
-#define FS_PHY_IFACE_DEDIC 1
-#define FS_PHY_IFACE_PHY_2 2
-#define FS_PHY_IFACE_PHY_3 3
 
 DECL_STATIC_SLOT(struct usb_hcd_device, usb_hcd_device, 12)
 
@@ -133,19 +122,6 @@ void usb_hcd_deallocate_device(struct usb_hcd_device *d)
   }
   usb_hcd_device_release(d);
 }
-
-#define INT_FLAG(reg, flag)\
-  BIT_IS_SET(reg, USB_CHANNEL_INTERRUPT_ ## flag)
-
-#define PRINT_INTR(reg, flag)\
-  if (INT_FLAG(reg, flag))\
-    puts(#flag "-")
-
-#define RET_IF_INTR(reg, flag, err)\
-  if (INT_FLAG(reg, flag)) {\
-    puts(#flag"-");\
-    return err;\
-  }
 
 int usb_hcd_get_descriptor(
     struct usb_hcd_pipe *p,
@@ -635,211 +611,104 @@ out_err:
   return err;
 }
 
-void usb_hcd_reset()
+static int hcd_rx_fifo_flush()
 {
-  uint32_t rst;
-  do {
-    rst = read_reg(USB_GRSTCTL);
-  } while(!USB_GRSTCTL_GET_AHB_IDLE(rst));
-
-  USB_GRSTCTL_CLR_SET_C_SFT_RST(rst, 1)
-  write_reg(USB_GRSTCTL, rst);
-
-  do {
-    rst = read_reg(USB_GRSTCTL);
-  } while(!USB_GRSTCTL_GET_AHB_IDLE(rst) || USB_GRSTCTL_GET_C_SFT_RST(rst));
-  HCDLOG("reset done.");
-}
-
-static int bcm2835_usb_recieve_fifo_flush()
-{
-  uint32_t rst;
-  HCDDEBUG("bcm2835_usb_recieve_fifo_flush: started\r\n");
-  rst = read_reg(USB_GRSTCTL);
-  USB_GRSTCTL_CLR_SET_RXF_FLSH(rst, 1);
-  write_reg(USB_GRSTCTL, rst);
-  do {
-    rst = read_reg(USB_GRSTCTL);
-  } while(USB_GRSTCTL_GET_RXF_FLSH(rst));
-  HCDDEBUG("bcm2835_usb_recieve_fifo_flush: completed\r\n");
+  HCDDEBUG("started");
+  dwc2_rx_fifo_flush();
+  HCDDEBUG("completed");
   return ERR_OK;
 }
 
-static int bcm2835_usb_transmit_fifo_flush(int fifo)
+static int hcd_tx_fifo_flush(int fifo)
 {
-  uint32_t rst;
   HCDLOG("fifo:%d", fifo);
-  rst = read_reg(USB_GRSTCTL);
-  USB_GRSTCTL_CLR_SET_TXF_NUM(rst, fifo);
-  USB_GRSTCTL_CLR_SET_TXF_FLSH(rst, 1);
-  write_reg(USB_GRSTCTL, rst);
-  do {
-    rst = read_reg(USB_GRSTCTL);
-  } while(USB_GRSTCTL_GET_TXF_FLSH(rst));
+  dwc2_tx_fifo_flush(fifo);
   return ERR_OK;
-}
-
-static inline void usb_hcd_print_core_reg_description()
-{
-  char buf[1024];
-  dwc2_get_core_reg_description(buf, sizeof(buf));
-  HCDLOG("core registers:"__endline"%s",buf);
-}
-
-static const char *hwconfig_hs_iface_to_string(int hs)
-{
-  switch(hs) {
-    case 0: return "UNKNOWN0";
-    case 1: return "UTMI";
-    case 2: return "ULPI";
-    case 3: return "UTMI_ULPI";
-    default: return "UNKNOWN";
-  }
-}
-
-static const char *hwconfig_fs_iface_to_string(int fs)
-{
-  switch(fs) {
-    case 0: return "PHYSICAL0";
-    case 1: return "DEDICATED";
-    case 2: return "PHYSICAL2";
-    case 3: return "PHYSICAL3";
-    default: return "UNKNOWN";
-  }
-}
-
-void usb_hcd_start_vbus()
-{
-  uint32_t ctl;
-  ctl  = read_reg(USB_GUSBCFG);
-  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_EXT_VBUS_DRV);
-  BIT_CLEAR_U32(ctl, USB_GUSBCFG_TERM_SEL_DL_PULSE);
-  write_reg(USB_GUSBCFG, ctl);
 }
 
 int usb_hcd_start()
 {
   int err = ERR_OK;
-  uint32_t ctl;
-  uint32_t hwcfg2;
-  uint32_t hostcfg;
-  uint32_t ahb;
-  uint32_t otg;
-  uint32_t hostport;
-  int hs_phy_iface, fs_phy_iface;
+  dwc2_fs_iface fs_iface;
+  dwc2_hs_iface hs_iface;
+  dwc2_op_mode_t opmode;
+  int fsls_mode_ena = 0;
 
-  usb_hcd_start_vbus();
-  usb_hcd_reset();
+  dwc2_start_vbus();
+  dwc2_reset();
 
   if (!usb_utmi_initialized) {
     HCDLOG("initializing USB to UTMI+,no PHY");
-    ctl = read_reg(USB_GUSBCFG);
-    /* Set mode UTMI */
-    BIT_SET_U32(ctl, USB_GUSBCFG_ULPI_UTMI_SEL);
-    /* Disable PHY */
-    BIT_CLEAR_U32(ctl, USB_GUSBCFG_PHY_IF);
-    write_reg(USB_GUSBCFG, ctl);
-    usb_hcd_reset();
+    dwc2_set_ulpi_no_phy();
+    dwc2_reset();
     usb_utmi_initialized = 1;
   }
 
-  hwcfg2 = read_reg(USB_GHWCFG2);
-  ctl = read_reg(USB_GUSBCFG);
+  hs_iface = dwc2_get_hs_iface();
+  fs_iface = dwc2_get_fs_iface();
 
-  hs_phy_iface = USB_GHWCFG2_GET_HSPHY_INTERFACE(hwcfg2);
-  fs_phy_iface = USB_GHWCFG2_GET_FSPHY_INTERFACE(hwcfg2);
+  HCDLOG("HW config: high speed interface:%d(%s)", hs_iface, dwc2_hs_iface_to_string(hs_iface));
+  HCDLOG("HW config: full speed interface:%d(%s)", fs_iface, dwc2_fs_iface_to_string(fs_iface));
+  if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED)
+    fsls_mode_ena = 1;
 
-  HCDLOG("HW config: high speed interface:%d(%s)", hs_phy_iface,
-      hwconfig_hs_iface_to_string(hs_phy_iface));
-  HCDLOG("HW config: full speed interface:%d(%s)", fs_phy_iface,
-      hwconfig_fs_iface_to_string(fs_phy_iface));
-  if (hs_phy_iface == HS_PHY_IFACE_ULPI && fs_phy_iface == FS_PHY_IFACE_DEDIC) {
-    HCDLOG("ULPI: FSLS configuration enabled");
-    BIT_SET_U32(ctl, USB_GUSBCFG_ULPI_FS_LS);
-    BIT_SET_U32(ctl, USB_GUSBCFG_ULPI_CLK_SUS_M);
-  } else {
-    HCDLOG("ULPI: FSLS configuration disabled");
-    BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_FS_LS);
-    BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_CLK_SUS_M);
-  }
-  write_reg(USB_GUSBCFG, ctl);
+  dwc2_set_fsls_config(fsls_mode_ena);
+  HCDLOG("ULPI: setting FSLS configuration to %sabled", fsls_mode_ena ? "en" : "dis");
 
-  ahb = read_reg(USB_GAHBCFG);
-  BIT_SET_U32(ahb, USB_GAHBCFG_DMA_EN);
-  BIT_CLEAR_U32(ahb, USB_GAHBCFG_DMA_REM_MODE);
-  write_reg(USB_GAHBCFG, ahb);
+  dwc2_set_dma_mode();
 
-  ctl = read_reg(USB_GUSBCFG);
-  switch(hwcfg2 & 7) {
-    case 0:
-      HCDLOG("HNP/SRP configuration: HNP,SRP");
-      BIT_SET_U32(ctl, USB_GUSBCFG_SRP_CAP);
-      BIT_SET_U32(ctl, USB_GUSBCFG_HNP_CAP);
+  opmode = dwc2_get_op_mode();
+  HCDLOG("dwc2 op mode: %s", dwc2_op_mode_to_string(opmode));
+  switch(opmode) {
+    case DWC2_OP_MODE_HNP_SRP_CAPABLE:
+      dwc2_set_otg_cap(DWC2_OTG_CAP_HNP_SRP);
       break;
-    case 1:
-    case 3:
-    case 5:
-      HCDLOG("HNP/SRP configuration: SRP");
-      BIT_SET_U32(ctl, USB_GUSBCFG_SRP_CAP);
-      BIT_CLEAR_U32(ctl, USB_GUSBCFG_HNP_CAP);
+    case DWC2_OP_MODE_SRP_ONLY_CAPABLE:
+    case DWC2_OP_MODE_SRP_CAPABLE_DEVICE:
+    case DWC2_OP_MODE_SRP_CAPABLE_HOST:
+      dwc2_set_otg_cap(DWC2_OTG_CAP_SRP);
       break;
-    case 2:
-    case 4:
-    case 6:
-      HCDLOG("HNP/SRP configuration: none");
-      BIT_CLEAR_U32(ctl, USB_GUSBCFG_SRP_CAP);
-      BIT_CLEAR_U32(ctl, USB_GUSBCFG_HNP_CAP);
+    case DWC2_OP_MODE_NO_HNP_SRP_CAPABLE:
+    case DWC2_OP_MODE_NO_SRP_CAPABLE_DEVICE:
+    case DWC2_OP_MODE_NO_SRP_CAPABLE_HOST:
+      dwc2_set_otg_cap(DWC2_OTG_CAP_NONE);
       break;
   }
-  write_reg(USB_GUSBCFG, ctl);
   HCDLOG("core started");
-  write_reg(USB_PCGCR, 0);
-  hostcfg = read_reg(USB_HCFG);
-  if (hs_phy_iface == HS_PHY_IFACE_ULPI &&
-    fs_phy_iface == FS_PHY_IFACE_DEDIC && BIT_IS_SET(ctl, USB_GUSBCFG_ULPI_FS_LS)) {
+  dwc2_power_clock_off();
+  if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED && dwc2_is_ulpi_fs_ls_only()) {
+    dwc2_set_host_speed(DWC2_CLK_48MHZ);
     HCDLOG("selecting host clock: 48MHz");
-    USB_HCFG_CLR_SET_LS_PHY_CLK_SEL(hostcfg, USB_CLK_48MHZ);
   } else {
     HCDLOG("selecting host clock: 30-60MHz");
-    USB_HCFG_CLR_SET_LS_PHY_CLK_SEL(hostcfg, USB_CLK_30_60MHZ);
+    dwc2_set_host_speed(DWC2_CLK_30_60MHZ);
   }
 
-  USB_HCFG_CLR_SET_LS_SUPP(hostcfg, 1);
-  write_reg(USB_HCFG, hostcfg);
+  dwc2_set_host_ls_support();
 
-  write_reg(USB_GRXFSIZ  , USB_RECV_FIFO_SIZE);
-  write_reg(USB_GNPTXFSIZ, (USB_RECV_FIFO_SIZE<<16)|USB_NON_PERIODIC_FIFO_SIZE);
-  write_reg(USB_HPTXFSIZ, (USB_PERIODIC_FIFO_SIZE<<16)|(USB_RECV_FIFO_SIZE + USB_NON_PERIODIC_FIFO_SIZE));
+  dwc2_setup_fifo_sizes(
+    USB_RECV_FIFO_SIZE,
+    USB_NON_PERIODIC_FIFO_SIZE,
+    USB_PERIODIC_FIFO_SIZE);
 
-	HCDLOG("HNP enabled.");
+  dwc2_set_otg_hnp();
+	HCDLOG("OTG host is set with HNP enabled.");
 
-  otg = read_reg(USB_GOTGCTL);
-  BIT_SET_U32(otg, USB_GOTGCTL_HST_SET_HNP_EN);
-  write_reg(USB_GOTGCTL, otg);
-  HCDLOG("OTG host is set.");
+  hcd_tx_fifo_flush(16);
+  hcd_rx_fifo_flush();
 
-  bcm2835_usb_transmit_fifo_flush(16);
-  bcm2835_usb_recieve_fifo_flush();
-  if (!USB_HCFG_GET_DMA_DESC_ENA(hostcfg))
+  if (!dwc2_is_dma_enabled())
     dwc2_init_channels();
 
-  hostport = read_reg(USB_HPRT);
-  if (!USB_HPRT_GET_PWR(hostport)) {
+  if (!dwc2_is_port_pwr_enabled()) {
     HCDLOG("host port PWR not set");
-    hostport &= USB_HPRT_WRITE_MASK;
-    USB_HPRT_CLR_SET_PWR(hostport, 1);
-    write_reg(USB_HPRT, hostport);
+    dwc2_port_set_pwr_enabled(true);
   }
 
-  hostport = read_reg(USB_HPRT);
-  hostport &= USB_HPRT_WRITE_MASK;
-  USB_HPRT_CLR_SET_RST(hostport, 1);
-  write_reg(USB_HPRT, hostport);
+  dwc2_port_reset();
+  // wait_on_timer_ms(60);
   wait_msec(60);
-  hostport = read_reg(USB_HPRT);
-  hostport &= USB_HPRT_WRITE_MASK;
-  USB_HPRT_CLR_RST(hostport);
-  write_reg(USB_HPRT, hostport);
+  dwc2_port_reset_clear();
   HCDLOG("host controller device started");
   return err;
 }
@@ -877,7 +746,7 @@ out_err:
   return err;
 }
 
-int usb_device_power_on()
+static int usb_hcd_power_on()
 {
   int err;
   uint32_t exists = 0, power_on = 1;
@@ -939,33 +808,33 @@ int usb_hcd_init()
   usb_hcd_hid_init();
   usb_hcd_mass_init();
 
-  vendor_id = read_reg(USB_GSNPSID);
-  user_id   = read_reg(USB_GUID);
-  HCDLOG("USB CHIP: VENDOR:%08x USER:%08x", vendor_id, user_id);
+  vendor_id = dwc2_get_vendor_id();
+  user_id = dwc2_get_user_id();
+  HCDLOG("Initializing: usb chip info: vendor:%08x user:%08x", vendor_id, user_id);
 
-  err = usb_device_power_on();
-  if (err) {
-    goto err;
-  }
+  err = usb_hcd_power_on();
+  CHECK_ERR("failed to power on");
 
+  printf("---------"__endline);
+  // wait_on_timer_ms(20);
   wait_msec(20);
-  HCDLOG("device powered on");
-  usb_hcd_print_core_reg_description();
-  // return 0;
+  powered_on = true;
+  HCDLOG("Device powered on");
+  dwc2_print_core_regs();
 
   err = usb_hcd_start();
-  if (err)
-    goto err_power;
+  CHECK_ERR("hcd start failed");
 
   err = usb_hcd_attach_root_hub();
-  if (err)
-    goto err_power;
+  CHECK_ERR("attach root hub failed");
+
   return ERR_OK;
 
-err_power:
-  if (usb_hcd_power_off() != ERR_OK)
-    kernel_panic("Failed to shutdown usb");
-err:
+out_err:
+  if (powered_on) {
+    BUG(usb_hcd_power_off() != ERR_OK, "Failed to shutdown usb");
+    powered_on = false;
+  }
   return err;
 }
 

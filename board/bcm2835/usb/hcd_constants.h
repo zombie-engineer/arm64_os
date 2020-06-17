@@ -1,9 +1,5 @@
 #pragma once
 
-#define USB_CLK_30_60MHZ 0
-#define USB_CLK_48MHZ    1
-#define USB_CLK_6MHZ     2
-
 #define USB_DEVICE_ROOT_HUB_NUMBER 0
 
 #define USB_RECV_FIFO_SIZE         20480

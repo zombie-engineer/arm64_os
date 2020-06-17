@@ -2,6 +2,7 @@ board/bcm2835/usb/registers_bits.h: board/bcm2835/usb/registers.yaml
 	python3 tools/gen_reg_headers.py $^ > $?
 
 OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
+	usb/dwc2 \
 	usb/hcd \
 	usb/hid_parser \
 	usb/hcd_transfer \
