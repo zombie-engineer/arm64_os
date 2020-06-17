@@ -877,11 +877,22 @@ int spi_slave_test()
   return ERR_OK;
 }
 
+extern char __bss_start;
+extern char __bss_end;
+extern char __text_start;
+extern char __text_end;
+
 static void print_memory_map(void)
 {
   uint64_t dma_start = dma_area_get_start_addr();
   uint64_t dma_end = dma_area_get_end_addr();
-  printf("dma range: [0x%016x:0x%016x]"__endline, dma_start, dma_end);
+  uint64_t bss_start = (uint64_t)&__bss_start;
+  uint64_t bss_end   = (uint64_t)&__bss_end;
+  uint64_t text_start = (uint64_t)&__text_start;
+  uint64_t text_end   = (uint64_t)&__text_end;
+  printf(".text : [0x%016x:0x%016x]"__endline, text_start, text_end);
+  printf(".bss  : [0x%016x:0x%016x]"__endline, bss_start, bss_end);
+  printf("dma   : [0x%016x:0x%016x]"__endline, dma_start, dma_end);
 }
 
 void main()

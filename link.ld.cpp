@@ -56,8 +56,6 @@ SECTIONS
     *(.bss)
     *(.bss.*)
   }
-  __bss_start = ADDR(.mybss);
-  __bss_end = __bss_start + SIZEOF(.mybss);
   STACKS_SECTION(0)
   STACKS_SECTION(1)
   CPUSTATE_SECTION
@@ -68,7 +66,11 @@ SECTIONS
 
   /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }
-__bss_size = __bss_end - __bss_start;
 __stack_size_el0_log = STACK_SIZE_EL0_LOG;
 __stack_size_el1_log = STACK_SIZE_EL1_LOG;
 __init_cpu_state_max_size = CPU_STATE_MAX_SIZE;
+__bss_start = ADDR(.mybss);
+__bss_end = __bss_start + SIZEOF(.mybss);
+__text_start = ADDR(.text);
+__text_end = __text_start + SIZEOF(.text);
+__bss_size = __bss_end - __bss_start;
