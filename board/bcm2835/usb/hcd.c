@@ -19,6 +19,9 @@
 #include "dwc2_log.h"
 #include <mem_access.h>
 #include <sched.h>
+#include <intr_ctl.h>
+#include <board/bcm2835/bcm2835_irq.h>
+#include <irq.h>
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -470,6 +473,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev, struct usb_hcd
   int device_address;
 
   HCD_ASSERT_DEVICE_STATE_CHANGE(dev, DEFAULT, ADDRESSED);
+  dwc2_dump_int_registers();
 
   /*
    * Ritual routine to support devices that still want to give us
@@ -797,6 +801,12 @@ void print_usb_device_rq(uint64_t rq, const char *tag)
       USB_DEV_RQ_GET_LENGTH(rq));
 }
 
+void usb_irq_cb(void)
+{
+  puts("ppppppppppppppppppppppppppppppppppppppppppppppppppp" __endline);
+  puts("ppppppppppppppppppppppppppppppppppppppppppppppppppp" __endline);
+}
+
 int usb_hcd_init()
 {
   int err;
@@ -821,6 +831,12 @@ int usb_hcd_init()
 
   err = usb_hcd_start();
   CHECK_ERR("hcd start failed");
+
+  dwc2_enable_ahb_interrupts();
+  intr_ctl_usb_irq_enable();
+  dwc2_enable_interrupts();
+  err = irq_set(get_cpu_num(), ARM_IRQ1_USB, usb_irq_cb);
+  enable_irq();
 
   err = usb_hcd_attach_root_hub();
   CHECK_ERR("attach root hub failed");

@@ -55,3 +55,7 @@ int intr_ctl_set_cb(int irq_type, int irq_num, intr_ctl_irq_cb cb);
 void intr_ctl_arm_generic_timer_irq_enable(int cpu);
 
 void intr_ctl_arm_generic_timer_irq_disable(int cpu);
+
+void intr_ctl_usb_irq_enable(void);
+
+void intr_ctl_usb_irq_disable(void);

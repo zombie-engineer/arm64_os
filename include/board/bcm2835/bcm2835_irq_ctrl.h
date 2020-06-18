@@ -21,4 +21,6 @@
 #define BASIC_IRQ_ACCESS_ERR_TYPE_0 (1 << 6)
 #define BASIC_IRQ_ACCESS_ERR_TYPE_1 (1 << 7)
 
+#define BCM2835_GPU_IRQ_USB 9
+
 #define BCM2835_CORE_TIMER_IRQ_CONTROL(cpu) (reg32_t)(0x40000040ull + cpu * 4)

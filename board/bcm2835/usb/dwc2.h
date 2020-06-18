@@ -163,3 +163,11 @@ void dwc2_port_reset(void);
 void dwc2_port_reset_clear(void);
 
 void dwc2_setup_fifo_sizes(int rx_fifo_sz, int non_periodic_fifo_sz, int periodic_fifo_sz);
+
+void dwc2_enable_interrupts(void);
+
+void dwc2_enable_ahb_interrupts(void);
+
+void dwc2_dump_int_registers(void);
+
+void dwc2_disable_ahb_interrupts(void);

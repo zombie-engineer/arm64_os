@@ -32,12 +32,10 @@ void intr_ctl_dump_regs(const char* tag)
   printf("---------\n");
 }
 
-
 uint32_t intr_ctl_read_pending_gpu_1()
 {
   return read_reg(BCM2835_IC_PENDING_GPU_1);
 }
-
 
 int intr_ctl_arm_irq_enable(int irq_num)
 {
@@ -48,7 +46,6 @@ int intr_ctl_arm_irq_enable(int irq_num)
   write_reg(BCM2835_IC_ENABLE_BASIC, (1 << irq_num));
   return ERR_OK;
 }
-
 
 int intr_ctl_arm_irq_disable(int irq_num)
 {
@@ -99,7 +96,6 @@ int intr_ctl_gpu_irq_disable(int irq_num)
   SET_GPU_IRQ(BCM2835_IC_DISABLE_GPU_1, irq_num);
 }
 
-
 /*
  * For details see BCM2835 ARM Peripherals, page 113
  * there is an ARM Peripherals interrupts table, that
@@ -132,4 +128,14 @@ void intr_ctl_arm_generic_timer_irq_disable(int cpu)
 {
   printf("%p" __endline, BCM2835_CORE_TIMER_IRQ_CONTROL(cpu));
   write_reg(BCM2835_CORE_TIMER_IRQ_CONTROL(cpu), 0x00);
+}
+
+void intr_ctl_usb_irq_enable(void)
+{
+  intr_ctl_gpu_irq_enable(BCM2835_GPU_IRQ_USB);
+}
+
+void intr_ctl_usb_irq_disable(void)
+{
+  intr_ctl_gpu_irq_disable(BCM2835_GPU_IRQ_USB);
 }

@@ -216,3 +216,30 @@ void dwc2_port_reset_clear(void)
   USB_HPRT_CLR_RST(hostport);
   write_reg(USB_HPRT, hostport);
 }
+
+void dwc2_enable_ahb_interrupts(void)
+{
+  uint32_t ahb = read_reg(USB_GAHBCFG);
+  BIT_SET_U32(ahb, USB_GAHBCFG_GLBL_INTR_MSK);
+  write_reg(USB_GAHBCFG, ahb);
+}
+
+void dwc2_disable_ahb_interrupts(void)
+{
+  uint32_t ahb = read_reg(USB_GAHBCFG);
+  BIT_CLEAR_U32(ahb, USB_GAHBCFG_GLBL_INTR_MSK);
+  write_reg(USB_GAHBCFG, ahb);
+}
+
+void dwc2_enable_interrupts(void)
+{
+  write_reg(USB_GINTMSK, 0);
+}
+
+void dwc2_dump_int_registers(void)
+{
+  uint32_t intsts, otgint;
+  intsts = read_reg(USB_GINTSTS);
+  otgint = read_reg(USB_GOTGINT);
+  printf("intsts: %08x, otg: %08x" __endline, intsts, otgint);
+}
