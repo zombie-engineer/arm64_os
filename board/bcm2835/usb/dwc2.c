@@ -239,7 +239,11 @@ void dwc2_enable_interrupts(void)
 void dwc2_dump_int_registers(void)
 {
   uint32_t intsts, otgint;
+  char intsts_desc[512];
+  char otgint_desc[512];
   intsts = read_reg(USB_GINTSTS);
   otgint = read_reg(USB_GOTGINT);
-  printf("intsts: %08x, otg: %08x" __endline, intsts, otgint);
+  dwc2_print_intsts(intsts, intsts_desc, sizeof(intsts_desc));
+  dwc2_print_otgint(otgint, otgint_desc, sizeof(otgint_desc));
+  printf("otg:%08x(%s), intsts:%08x(%s)" __endline, otgint, otgint_desc, intsts, intsts_desc);
 }

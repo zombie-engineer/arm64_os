@@ -660,3 +660,34 @@ static inline int usb_gintsts_to_string(char *buf, int bufsz, uint32_t v)
     (int)USB_GINTSTS_GET_SESSREQINT(v),
     (int)USB_GINTSTS_GET_WKUPINT(v));
 }
+#define USB_GOTGINT_GET_DBNCE_DONE(v)            BF_EXTRACT(v, 19, 1 )
+#define USB_GOTGINT_GET_A_DEV_TOUT_CHG(v)        BF_EXTRACT(v, 18, 1 )
+#define USB_GOTGINT_GET_HST_NEG_DET(v)           BF_EXTRACT(v, 17, 1 )
+#define USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v)  BF_EXTRACT(v, 9 , 1 )
+#define USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v)  BF_EXTRACT(v, 8 , 1 )
+#define USB_GOTGINT_GET_SES_END_DET(v)           BF_EXTRACT(v, 2 , 1 )
+#define USB_GOTGINT_CLR_SET_DBNCE_DONE(v, set)           BF_CLEAR_AND_SET(v, set, 19, 1 )
+#define USB_GOTGINT_CLR_SET_A_DEV_TOUT_CHG(v, set)       BF_CLEAR_AND_SET(v, set, 18, 1 )
+#define USB_GOTGINT_CLR_SET_HST_NEG_DET(v, set)          BF_CLEAR_AND_SET(v, set, 17, 1 )
+#define USB_GOTGINT_CLR_SET_HST_NEG_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 9 , 1 )
+#define USB_GOTGINT_CLR_SET_SES_REQ_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 8 , 1 )
+#define USB_GOTGINT_CLR_SET_SES_END_DET(v, set)          BF_CLEAR_AND_SET(v, set, 2 , 1 )
+#define USB_GOTGINT_CLR_DBNCE_DONE(v)            BF_CLEAR(v, 19, 1 )
+#define USB_GOTGINT_CLR_A_DEV_TOUT_CHG(v)        BF_CLEAR(v, 18, 1 )
+#define USB_GOTGINT_CLR_HST_NEG_DET(v)           BF_CLEAR(v, 17, 1 )
+#define USB_GOTGINT_CLR_HST_NEG_SUC_STS_CHNG(v)  BF_CLEAR(v, 9 , 1 )
+#define USB_GOTGINT_CLR_SES_REQ_SUC_STS_CHNG(v)  BF_CLEAR(v, 8 , 1 )
+#define USB_GOTGINT_CLR_SES_END_DET(v)           BF_CLEAR(v, 2 , 1 )
+
+
+static inline int usb_gotgint_to_string(char *buf, int bufsz, uint32_t v)
+{
+  return snprintf(buf, bufsz, "%08x,DBNCE_DONE:%x,A_DEV_TOUT_CHG:%x,HST_NEG_DET:%x,HST_NEG_SUC_STS_CHNG:%x,SES_REQ_SUC_STS_CHNG:%x,SES_END_DET:%x",
+    v,
+    (int)USB_GOTGINT_GET_DBNCE_DONE(v),
+    (int)USB_GOTGINT_GET_A_DEV_TOUT_CHG(v),
+    (int)USB_GOTGINT_GET_HST_NEG_DET(v),
+    (int)USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v),
+    (int)USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v),
+    (int)USB_GOTGINT_GET_SES_END_DET(v));
+}

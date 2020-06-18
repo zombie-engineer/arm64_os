@@ -43,8 +43,8 @@ static inline int dwc2_print_intsts(uint32_t v, char *buf, int bufsz)
   int n = 0;
   int first = 1;
 #define __PRINT_BIT(__bit) \
-  if (BIT_IS_SET(v, USB_ ## __bit) {\
-    n += snprintf(buf + n, bufsz - n, "%s"#__bit,"__endline, first ? "" : ",");\
+  if (USB_GINTSTS_GET_ ## __bit(v)) {\
+    n += snprintf(buf + n, bufsz - n, "%s" #__bit, first ? "" : ",");\
     first = 0;\
   }
   __PRINT_BIT(CURMODE_HOST);
@@ -79,5 +79,25 @@ static inline int dwc2_print_intsts(uint32_t v, char *buf, int bufsz)
   __PRINT_BIT(DISCONNINT);
   __PRINT_BIT(SESSREQINT);
   __PRINT_BIT(WKUPINT);
+#undef __PRINT_BIT
  return n;
+}
+
+static inline int dwc2_print_otgint(uint32_t v, char *buf, int bufsz)
+{
+  int n = 0;
+  int first = 1;
+#define __PRINT_BIT(__bit) \
+  if (USB_GOTGINT_GET_ ## __bit(v)) {\
+    n += snprintf(buf + n, bufsz - n, "%s"#__bit, first ? "" : ",");\
+    first = 0;\
+  }
+  __PRINT_BIT(DBNCE_DONE);
+  __PRINT_BIT(A_DEV_TOUT_CHG);
+  __PRINT_BIT(HST_NEG_DET);
+  __PRINT_BIT(HST_NEG_SUC_STS_CHNG);
+  __PRINT_BIT(SES_REQ_SUC_STS_CHNG);
+  __PRINT_BIT(SES_END_DET);
+#undef __PRINT_BIT
+  return n;
 }
