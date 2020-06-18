@@ -525,3 +525,138 @@ static inline int usb_pcgcr_to_string(char *buf, int bufsz, uint32_t v)
     (int)USB_PCGCR_GET_PHY_SLEEPING(v),
     (int)USB_PCGCR_GET_DEEP_SLEEP(v));
 }
+#define USB_GINTSTS_GET_CURMODE_HOST(v)          BF_EXTRACT(v, 0 , 1 )
+#define USB_GINTSTS_GET_MODEMIS(v)               BF_EXTRACT(v, 1 , 1 )
+#define USB_GINTSTS_GET_OTGINT(v)                BF_EXTRACT(v, 2 , 1 )
+#define USB_GINTSTS_GET_SOF(v)                   BF_EXTRACT(v, 3 , 1 )
+#define USB_GINTSTS_GET_RXFLVL(v)                BF_EXTRACT(v, 4 , 1 )
+#define USB_GINTSTS_GET_NPTXFEMP(v)              BF_EXTRACT(v, 5 , 1 )
+#define USB_GINTSTS_GET_GINNAKEFF(v)             BF_EXTRACT(v, 6 , 1 )
+#define USB_GINTSTS_GET_GOUTNAKEFF(v)            BF_EXTRACT(v, 7 , 1 )
+#define USB_GINTSTS_GET_ULPI_CK_INT(v)           BF_EXTRACT(v, 8 , 1 )
+#define USB_GINTSTS_GET_I2CINT(v)                BF_EXTRACT(v, 9 , 1 )
+#define USB_GINTSTS_GET_ERLYSUSP(v)              BF_EXTRACT(v, 10, 1 )
+#define USB_GINTSTS_GET_USBSUSP(v)               BF_EXTRACT(v, 11, 1 )
+#define USB_GINTSTS_GET_USBRST(v)                BF_EXTRACT(v, 12, 1 )
+#define USB_GINTSTS_GET_ENUMDONE(v)              BF_EXTRACT(v, 13, 1 )
+#define USB_GINTSTS_GET_ISOUTDROP(v)             BF_EXTRACT(v, 14, 1 )
+#define USB_GINTSTS_GET_EOPF(v)                  BF_EXTRACT(v, 15, 1 )
+#define USB_GINTSTS_GET_RESTOREDONE(v)           BF_EXTRACT(v, 16, 1 )
+#define USB_GINTSTS_GET_EPMIS(v)                 BF_EXTRACT(v, 17, 1 )
+#define USB_GINTSTS_GET_IEPINT(v)                BF_EXTRACT(v, 18, 1 )
+#define USB_GINTSTS_GET_OEPINT(v)                BF_EXTRACT(v, 19, 1 )
+#define USB_GINTSTS_GET_INCOMPL_SOIN(v)          BF_EXTRACT(v, 20, 1 )
+#define USB_GINTSTS_GET_INCOMPL_SOOUT(v)         BF_EXTRACT(v, 21, 1 )
+#define USB_GINTSTS_GET_FET_SUSP(v)              BF_EXTRACT(v, 22, 1 )
+#define USB_GINTSTS_GET_RESETDET(v)              BF_EXTRACT(v, 23, 1 )
+#define USB_GINTSTS_GET_PRTINT(v)                BF_EXTRACT(v, 24, 1 )
+#define USB_GINTSTS_GET_HCHINT(v)                BF_EXTRACT(v, 25, 1 )
+#define USB_GINTSTS_GET_PTXFEMP(v)               BF_EXTRACT(v, 26, 1 )
+#define USB_GINTSTS_GET_LPMTRANRCVD(v)           BF_EXTRACT(v, 27, 1 )
+#define USB_GINTSTS_GET_CONIDSTSCHNG(v)          BF_EXTRACT(v, 28, 1 )
+#define USB_GINTSTS_GET_DISCONNINT(v)            BF_EXTRACT(v, 29, 1 )
+#define USB_GINTSTS_GET_SESSREQINT(v)            BF_EXTRACT(v, 30, 1 )
+#define USB_GINTSTS_GET_WKUPINT(v)               BF_EXTRACT(v, 31, 1 )
+#define USB_GINTSTS_CLR_SET_CURMODE_HOST(v, set)         BF_CLEAR_AND_SET(v, set, 0 , 1 )
+#define USB_GINTSTS_CLR_SET_MODEMIS(v, set)              BF_CLEAR_AND_SET(v, set, 1 , 1 )
+#define USB_GINTSTS_CLR_SET_OTGINT(v, set)               BF_CLEAR_AND_SET(v, set, 2 , 1 )
+#define USB_GINTSTS_CLR_SET_SOF(v, set)                  BF_CLEAR_AND_SET(v, set, 3 , 1 )
+#define USB_GINTSTS_CLR_SET_RXFLVL(v, set)               BF_CLEAR_AND_SET(v, set, 4 , 1 )
+#define USB_GINTSTS_CLR_SET_NPTXFEMP(v, set)             BF_CLEAR_AND_SET(v, set, 5 , 1 )
+#define USB_GINTSTS_CLR_SET_GINNAKEFF(v, set)            BF_CLEAR_AND_SET(v, set, 6 , 1 )
+#define USB_GINTSTS_CLR_SET_GOUTNAKEFF(v, set)           BF_CLEAR_AND_SET(v, set, 7 , 1 )
+#define USB_GINTSTS_CLR_SET_ULPI_CK_INT(v, set)          BF_CLEAR_AND_SET(v, set, 8 , 1 )
+#define USB_GINTSTS_CLR_SET_I2CINT(v, set)               BF_CLEAR_AND_SET(v, set, 9 , 1 )
+#define USB_GINTSTS_CLR_SET_ERLYSUSP(v, set)             BF_CLEAR_AND_SET(v, set, 10, 1 )
+#define USB_GINTSTS_CLR_SET_USBSUSP(v, set)              BF_CLEAR_AND_SET(v, set, 11, 1 )
+#define USB_GINTSTS_CLR_SET_USBRST(v, set)               BF_CLEAR_AND_SET(v, set, 12, 1 )
+#define USB_GINTSTS_CLR_SET_ENUMDONE(v, set)             BF_CLEAR_AND_SET(v, set, 13, 1 )
+#define USB_GINTSTS_CLR_SET_ISOUTDROP(v, set)            BF_CLEAR_AND_SET(v, set, 14, 1 )
+#define USB_GINTSTS_CLR_SET_EOPF(v, set)                 BF_CLEAR_AND_SET(v, set, 15, 1 )
+#define USB_GINTSTS_CLR_SET_RESTOREDONE(v, set)          BF_CLEAR_AND_SET(v, set, 16, 1 )
+#define USB_GINTSTS_CLR_SET_EPMIS(v, set)                BF_CLEAR_AND_SET(v, set, 17, 1 )
+#define USB_GINTSTS_CLR_SET_IEPINT(v, set)               BF_CLEAR_AND_SET(v, set, 18, 1 )
+#define USB_GINTSTS_CLR_SET_OEPINT(v, set)               BF_CLEAR_AND_SET(v, set, 19, 1 )
+#define USB_GINTSTS_CLR_SET_INCOMPL_SOIN(v, set)         BF_CLEAR_AND_SET(v, set, 20, 1 )
+#define USB_GINTSTS_CLR_SET_INCOMPL_SOOUT(v, set)        BF_CLEAR_AND_SET(v, set, 21, 1 )
+#define USB_GINTSTS_CLR_SET_FET_SUSP(v, set)             BF_CLEAR_AND_SET(v, set, 22, 1 )
+#define USB_GINTSTS_CLR_SET_RESETDET(v, set)             BF_CLEAR_AND_SET(v, set, 23, 1 )
+#define USB_GINTSTS_CLR_SET_PRTINT(v, set)               BF_CLEAR_AND_SET(v, set, 24, 1 )
+#define USB_GINTSTS_CLR_SET_HCHINT(v, set)               BF_CLEAR_AND_SET(v, set, 25, 1 )
+#define USB_GINTSTS_CLR_SET_PTXFEMP(v, set)              BF_CLEAR_AND_SET(v, set, 26, 1 )
+#define USB_GINTSTS_CLR_SET_LPMTRANRCVD(v, set)          BF_CLEAR_AND_SET(v, set, 27, 1 )
+#define USB_GINTSTS_CLR_SET_CONIDSTSCHNG(v, set)         BF_CLEAR_AND_SET(v, set, 28, 1 )
+#define USB_GINTSTS_CLR_SET_DISCONNINT(v, set)           BF_CLEAR_AND_SET(v, set, 29, 1 )
+#define USB_GINTSTS_CLR_SET_SESSREQINT(v, set)           BF_CLEAR_AND_SET(v, set, 30, 1 )
+#define USB_GINTSTS_CLR_SET_WKUPINT(v, set)              BF_CLEAR_AND_SET(v, set, 31, 1 )
+#define USB_GINTSTS_CLR_CURMODE_HOST(v)          BF_CLEAR(v, 0 , 1 )
+#define USB_GINTSTS_CLR_MODEMIS(v)               BF_CLEAR(v, 1 , 1 )
+#define USB_GINTSTS_CLR_OTGINT(v)                BF_CLEAR(v, 2 , 1 )
+#define USB_GINTSTS_CLR_SOF(v)                   BF_CLEAR(v, 3 , 1 )
+#define USB_GINTSTS_CLR_RXFLVL(v)                BF_CLEAR(v, 4 , 1 )
+#define USB_GINTSTS_CLR_NPTXFEMP(v)              BF_CLEAR(v, 5 , 1 )
+#define USB_GINTSTS_CLR_GINNAKEFF(v)             BF_CLEAR(v, 6 , 1 )
+#define USB_GINTSTS_CLR_GOUTNAKEFF(v)            BF_CLEAR(v, 7 , 1 )
+#define USB_GINTSTS_CLR_ULPI_CK_INT(v)           BF_CLEAR(v, 8 , 1 )
+#define USB_GINTSTS_CLR_I2CINT(v)                BF_CLEAR(v, 9 , 1 )
+#define USB_GINTSTS_CLR_ERLYSUSP(v)              BF_CLEAR(v, 10, 1 )
+#define USB_GINTSTS_CLR_USBSUSP(v)               BF_CLEAR(v, 11, 1 )
+#define USB_GINTSTS_CLR_USBRST(v)                BF_CLEAR(v, 12, 1 )
+#define USB_GINTSTS_CLR_ENUMDONE(v)              BF_CLEAR(v, 13, 1 )
+#define USB_GINTSTS_CLR_ISOUTDROP(v)             BF_CLEAR(v, 14, 1 )
+#define USB_GINTSTS_CLR_EOPF(v)                  BF_CLEAR(v, 15, 1 )
+#define USB_GINTSTS_CLR_RESTOREDONE(v)           BF_CLEAR(v, 16, 1 )
+#define USB_GINTSTS_CLR_EPMIS(v)                 BF_CLEAR(v, 17, 1 )
+#define USB_GINTSTS_CLR_IEPINT(v)                BF_CLEAR(v, 18, 1 )
+#define USB_GINTSTS_CLR_OEPINT(v)                BF_CLEAR(v, 19, 1 )
+#define USB_GINTSTS_CLR_INCOMPL_SOIN(v)          BF_CLEAR(v, 20, 1 )
+#define USB_GINTSTS_CLR_INCOMPL_SOOUT(v)         BF_CLEAR(v, 21, 1 )
+#define USB_GINTSTS_CLR_FET_SUSP(v)              BF_CLEAR(v, 22, 1 )
+#define USB_GINTSTS_CLR_RESETDET(v)              BF_CLEAR(v, 23, 1 )
+#define USB_GINTSTS_CLR_PRTINT(v)                BF_CLEAR(v, 24, 1 )
+#define USB_GINTSTS_CLR_HCHINT(v)                BF_CLEAR(v, 25, 1 )
+#define USB_GINTSTS_CLR_PTXFEMP(v)               BF_CLEAR(v, 26, 1 )
+#define USB_GINTSTS_CLR_LPMTRANRCVD(v)           BF_CLEAR(v, 27, 1 )
+#define USB_GINTSTS_CLR_CONIDSTSCHNG(v)          BF_CLEAR(v, 28, 1 )
+#define USB_GINTSTS_CLR_DISCONNINT(v)            BF_CLEAR(v, 29, 1 )
+#define USB_GINTSTS_CLR_SESSREQINT(v)            BF_CLEAR(v, 30, 1 )
+#define USB_GINTSTS_CLR_WKUPINT(v)               BF_CLEAR(v, 31, 1 )
+
+
+static inline int usb_gintsts_to_string(char *buf, int bufsz, uint32_t v)
+{
+  return snprintf(buf, bufsz, "%08x,CURMODE_HOST:%x,MODEMIS:%x,OTGINT:%x,SOF:%x,RXFLVL:%x,NPTXFEMP:%x,GINNAKEFF:%x,GOUTNAKEFF:%x,ULPI_CK_INT:%x,I2CINT:%x,ERLYSUSP:%x,USBSUSP:%x,USBRST:%x,ENUMDONE:%x,ISOUTDROP:%x,EOPF:%x,RESTOREDONE:%x,EPMIS:%x,IEPINT:%x,OEPINT:%x,INCOMPL_SOIN:%x,INCOMPL_SOOUT:%x,FET_SUSP:%x,RESETDET:%x,PRTINT:%x,HCHINT:%x,PTXFEMP:%x,LPMTRANRCVD:%x,CONIDSTSCHNG:%x,DISCONNINT:%x,SESSREQINT:%x,WKUPINT:%x",
+    v,
+    (int)USB_GINTSTS_GET_CURMODE_HOST(v),
+    (int)USB_GINTSTS_GET_MODEMIS(v),
+    (int)USB_GINTSTS_GET_OTGINT(v),
+    (int)USB_GINTSTS_GET_SOF(v),
+    (int)USB_GINTSTS_GET_RXFLVL(v),
+    (int)USB_GINTSTS_GET_NPTXFEMP(v),
+    (int)USB_GINTSTS_GET_GINNAKEFF(v),
+    (int)USB_GINTSTS_GET_GOUTNAKEFF(v),
+    (int)USB_GINTSTS_GET_ULPI_CK_INT(v),
+    (int)USB_GINTSTS_GET_I2CINT(v),
+    (int)USB_GINTSTS_GET_ERLYSUSP(v),
+    (int)USB_GINTSTS_GET_USBSUSP(v),
+    (int)USB_GINTSTS_GET_USBRST(v),
+    (int)USB_GINTSTS_GET_ENUMDONE(v),
+    (int)USB_GINTSTS_GET_ISOUTDROP(v),
+    (int)USB_GINTSTS_GET_EOPF(v),
+    (int)USB_GINTSTS_GET_RESTOREDONE(v),
+    (int)USB_GINTSTS_GET_EPMIS(v),
+    (int)USB_GINTSTS_GET_IEPINT(v),
+    (int)USB_GINTSTS_GET_OEPINT(v),
+    (int)USB_GINTSTS_GET_INCOMPL_SOIN(v),
+    (int)USB_GINTSTS_GET_INCOMPL_SOOUT(v),
+    (int)USB_GINTSTS_GET_FET_SUSP(v),
+    (int)USB_GINTSTS_GET_RESETDET(v),
+    (int)USB_GINTSTS_GET_PRTINT(v),
+    (int)USB_GINTSTS_GET_HCHINT(v),
+    (int)USB_GINTSTS_GET_PTXFEMP(v),
+    (int)USB_GINTSTS_GET_LPMTRANRCVD(v),
+    (int)USB_GINTSTS_GET_CONIDSTSCHNG(v),
+    (int)USB_GINTSTS_GET_DISCONNINT(v),
+    (int)USB_GINTSTS_GET_SESSREQINT(v),
+    (int)USB_GINTSTS_GET_WKUPINT(v));
+}
