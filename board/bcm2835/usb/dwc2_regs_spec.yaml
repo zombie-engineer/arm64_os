@@ -1,3 +1,13 @@
+USB_GAHBCFG:
+  - [ GLBL_INTR_EN     ,  0, 1]
+  - [ HBSTLEN          ,  1, 4]
+  - [ DMA_EN           ,  5, 1]
+  - [ NP_TXF_EMP_LVL   ,  7, 1]
+  - [ P_TXF_EMP_LVL    ,  8, 1]
+  - [ REM_MEM_SUPP     , 21, 1]
+  - [ NOTI_ALL_DMA_WRIT, 22, 1]
+  - [ AHB_SINGLE       , 23, 1]
+
 USB_HOST_CHAR:
   - [ MAX_PACK_SZ ,  0, 11]
   - [ EP          , 11,  4]

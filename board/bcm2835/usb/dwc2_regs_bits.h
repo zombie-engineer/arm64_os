@@ -1,5 +1,44 @@
 #pragma once
 
+#define USB_GAHBCFG_GET_GLBL_INTR_EN(v)          BF_EXTRACT(v, 0 , 1 )
+#define USB_GAHBCFG_GET_HBSTLEN(v)               BF_EXTRACT(v, 1 , 4 )
+#define USB_GAHBCFG_GET_DMA_EN(v)                BF_EXTRACT(v, 5 , 1 )
+#define USB_GAHBCFG_GET_NP_TXF_EMP_LVL(v)        BF_EXTRACT(v, 7 , 1 )
+#define USB_GAHBCFG_GET_P_TXF_EMP_LVL(v)         BF_EXTRACT(v, 8 , 1 )
+#define USB_GAHBCFG_GET_REM_MEM_SUPP(v)          BF_EXTRACT(v, 21, 1 )
+#define USB_GAHBCFG_GET_NOTI_ALL_DMA_WRIT(v)     BF_EXTRACT(v, 22, 1 )
+#define USB_GAHBCFG_GET_AHB_SINGLE(v)            BF_EXTRACT(v, 23, 1 )
+#define USB_GAHBCFG_CLR_SET_GLBL_INTR_EN(v, set)         BF_CLEAR_AND_SET(v, set, 0 , 1 )
+#define USB_GAHBCFG_CLR_SET_HBSTLEN(v, set)              BF_CLEAR_AND_SET(v, set, 1 , 4 )
+#define USB_GAHBCFG_CLR_SET_DMA_EN(v, set)               BF_CLEAR_AND_SET(v, set, 5 , 1 )
+#define USB_GAHBCFG_CLR_SET_NP_TXF_EMP_LVL(v, set)       BF_CLEAR_AND_SET(v, set, 7 , 1 )
+#define USB_GAHBCFG_CLR_SET_P_TXF_EMP_LVL(v, set)        BF_CLEAR_AND_SET(v, set, 8 , 1 )
+#define USB_GAHBCFG_CLR_SET_REM_MEM_SUPP(v, set)         BF_CLEAR_AND_SET(v, set, 21, 1 )
+#define USB_GAHBCFG_CLR_SET_NOTI_ALL_DMA_WRIT(v, set)    BF_CLEAR_AND_SET(v, set, 22, 1 )
+#define USB_GAHBCFG_CLR_SET_AHB_SINGLE(v, set)           BF_CLEAR_AND_SET(v, set, 23, 1 )
+#define USB_GAHBCFG_CLR_GLBL_INTR_EN(v)          BF_CLEAR(v, 0 , 1 )
+#define USB_GAHBCFG_CLR_HBSTLEN(v)               BF_CLEAR(v, 1 , 4 )
+#define USB_GAHBCFG_CLR_DMA_EN(v)                BF_CLEAR(v, 5 , 1 )
+#define USB_GAHBCFG_CLR_NP_TXF_EMP_LVL(v)        BF_CLEAR(v, 7 , 1 )
+#define USB_GAHBCFG_CLR_P_TXF_EMP_LVL(v)         BF_CLEAR(v, 8 , 1 )
+#define USB_GAHBCFG_CLR_REM_MEM_SUPP(v)          BF_CLEAR(v, 21, 1 )
+#define USB_GAHBCFG_CLR_NOTI_ALL_DMA_WRIT(v)     BF_CLEAR(v, 22, 1 )
+#define USB_GAHBCFG_CLR_AHB_SINGLE(v)            BF_CLEAR(v, 23, 1 )
+
+
+static inline int usb_gahbcfg_to_string(char *buf, int bufsz, uint32_t v)
+{
+  return snprintf(buf, bufsz, "%08x,GLBL_INTR_EN:%x,HBSTLEN:%x,DMA_EN:%x,NP_TXF_EMP_LVL:%x,P_TXF_EMP_LVL:%x,REM_MEM_SUPP:%x,NOTI_ALL_DMA_WRIT:%x,AHB_SINGLE:%x",
+    v,
+    (int)USB_GAHBCFG_GET_GLBL_INTR_EN(v),
+    (int)USB_GAHBCFG_GET_HBSTLEN(v),
+    (int)USB_GAHBCFG_GET_DMA_EN(v),
+    (int)USB_GAHBCFG_GET_NP_TXF_EMP_LVL(v),
+    (int)USB_GAHBCFG_GET_P_TXF_EMP_LVL(v),
+    (int)USB_GAHBCFG_GET_REM_MEM_SUPP(v),
+    (int)USB_GAHBCFG_GET_NOTI_ALL_DMA_WRIT(v),
+    (int)USB_GAHBCFG_GET_AHB_SINGLE(v));
+}
 #define USB_HOST_CHAR_GET_MAX_PACK_SZ(v)         BF_EXTRACT(v, 0 , 11)
 #define USB_HOST_CHAR_GET_EP(v)                  BF_EXTRACT(v, 11, 4 )
 #define USB_HOST_CHAR_GET_EP_DIR(v)              BF_EXTRACT(v, 15, 1 )

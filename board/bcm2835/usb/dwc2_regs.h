@@ -422,14 +422,6 @@
 #define USB_GUSBCFG_FORCE_DEV_MODE       30//  30 0x40000000 0xbfffffff 0x0
 #define USB_GUSBCFG_CORRUPT_TX           31//  31 0x80000000 0x7fffffff 0x0
 
-#define USB_GAHBCFG_GLBL_INTR_MSK             0//  0 0x00000001 0xfffffffe 0x0
-#define USB_GAHBCFG_H_BST_LEN                 1//  4 0x0000001e 0xffffffe1 0x0
-#define USB_GAHBCFG_DMA_EN                    5//  5 0x00000020 0xffffffdf 0x0
-#define USB_GAHBCFG_UNKNOWN                   6//  6 NA NA NA
-#define USB_GAHBCFG_NP_TXF_EMP_LVL            7//  7 0x00000080 0xffffff7f 0x0
-#define USB_GAHBCFG_P_TXF_EMP_LVL             8//  8 0x00000100 0xfffffeff 0x0
-#define USB_GAHBCFG_DMA_REM_MODE             23//  8 0x00000100 0xfffffeff 0x0
-
 #define USB_GNPTXFSIZ_NP_TXF_ST_ADDR          0//  15 0x0000ffff 0xffff0000 0x0
 #define USB_GNPTXFSIZ_IN_EP_TXF0_ST_ADDR      0//  15 0x0000ffff 0xffff0000 0x0
 #define USB_GNPTXFSIZ_IN_EP_TXF0_DEP         16//  31 0xffff0000 0x0000ffff 0x0

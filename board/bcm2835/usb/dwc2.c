@@ -90,8 +90,8 @@ void dwc2_set_fsls_config(int enabled)
 void dwc2_set_dma_mode(void)
 {
   uint32_t ahb = read_reg(USB_GAHBCFG);
-  BIT_SET_U32(ahb, USB_GAHBCFG_DMA_EN);
-  BIT_CLEAR_U32(ahb, USB_GAHBCFG_DMA_REM_MODE);
+  USB_GAHBCFG_CLR_SET_DMA_EN(ahb, 1);
+  USB_GAHBCFG_CLR_AHB_SINGLE(ahb);
   write_reg(USB_GAHBCFG, ahb);
 }
 
@@ -220,14 +220,16 @@ void dwc2_port_reset_clear(void)
 void dwc2_enable_ahb_interrupts(void)
 {
   uint32_t ahb = read_reg(USB_GAHBCFG);
-  BIT_SET_U32(ahb, USB_GAHBCFG_GLBL_INTR_MSK);
+  USB_GAHBCFG_CLR_SET_GLBL_INTR_EN(ahb, 1);
+  printf("enabling global ahb interrupts: %08x<-%08x" __endline, USB_GAHBCFG, ahb);
   write_reg(USB_GAHBCFG, ahb);
 }
 
 void dwc2_disable_ahb_interrupts(void)
 {
   uint32_t ahb = read_reg(USB_GAHBCFG);
-  BIT_CLEAR_U32(ahb, USB_GAHBCFG_GLBL_INTR_MSK);
+  USB_GAHBCFG_CLR_GLBL_INTR_EN(ahb);
+  printf("disabling global ahb interrupts: %08x<-%08x" __endline, USB_GAHBCFG, ahb);
   write_reg(USB_GAHBCFG, ahb);
 }
 
