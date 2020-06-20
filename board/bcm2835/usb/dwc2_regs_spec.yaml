@@ -190,3 +190,19 @@ USB_GOTGINT:
   - [ HST_NEG_SUC_STS_CHNG, 9, 1]
   - [ SES_REQ_SUC_STS_CHNG, 8, 1]
   - [ SES_END_DET,          2, 1]
+
+USB_GRXSTSP:
+  - [ CHNUM,          0, 4]
+  - [ BYTECNT,        4, 11]
+  - [ DPID,           15, 2]
+  - [ PKTSTS,         17, 4]
+  - [ FN,             25, 7]
+
+USB_GOTGINT:
+  - [ SES_END_DET,          2, 1]
+  - [ SES_REQ_SUC_STS_CHNG, 8, 1]
+  - [ HST_NEG_SUC_STS_CHNG, 9, 1]
+  - [ HST_NEG_DET,         17, 1]
+  - [ A_DEV_TOUT_CHG,      18, 1]
+  - [ DBNCE_DONE,          19, 1]
+

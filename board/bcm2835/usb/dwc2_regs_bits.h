@@ -699,34 +699,61 @@ static inline int usb_gintsts_to_string(char *buf, int bufsz, uint32_t v)
     (int)USB_GINTSTS_GET_SESSREQINT(v),
     (int)USB_GINTSTS_GET_WKUPINT(v));
 }
-#define USB_GOTGINT_GET_DBNCE_DONE(v)            BF_EXTRACT(v, 19, 1 )
-#define USB_GOTGINT_GET_A_DEV_TOUT_CHG(v)        BF_EXTRACT(v, 18, 1 )
-#define USB_GOTGINT_GET_HST_NEG_DET(v)           BF_EXTRACT(v, 17, 1 )
-#define USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v)  BF_EXTRACT(v, 9 , 1 )
-#define USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v)  BF_EXTRACT(v, 8 , 1 )
 #define USB_GOTGINT_GET_SES_END_DET(v)           BF_EXTRACT(v, 2 , 1 )
-#define USB_GOTGINT_CLR_SET_DBNCE_DONE(v, set)           BF_CLEAR_AND_SET(v, set, 19, 1 )
-#define USB_GOTGINT_CLR_SET_A_DEV_TOUT_CHG(v, set)       BF_CLEAR_AND_SET(v, set, 18, 1 )
-#define USB_GOTGINT_CLR_SET_HST_NEG_DET(v, set)          BF_CLEAR_AND_SET(v, set, 17, 1 )
-#define USB_GOTGINT_CLR_SET_HST_NEG_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 9 , 1 )
-#define USB_GOTGINT_CLR_SET_SES_REQ_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 8 , 1 )
+#define USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v)  BF_EXTRACT(v, 8 , 1 )
+#define USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v)  BF_EXTRACT(v, 9 , 1 )
+#define USB_GOTGINT_GET_HST_NEG_DET(v)           BF_EXTRACT(v, 17, 1 )
+#define USB_GOTGINT_GET_A_DEV_TOUT_CHG(v)        BF_EXTRACT(v, 18, 1 )
+#define USB_GOTGINT_GET_DBNCE_DONE(v)            BF_EXTRACT(v, 19, 1 )
 #define USB_GOTGINT_CLR_SET_SES_END_DET(v, set)          BF_CLEAR_AND_SET(v, set, 2 , 1 )
-#define USB_GOTGINT_CLR_DBNCE_DONE(v)            BF_CLEAR(v, 19, 1 )
-#define USB_GOTGINT_CLR_A_DEV_TOUT_CHG(v)        BF_CLEAR(v, 18, 1 )
-#define USB_GOTGINT_CLR_HST_NEG_DET(v)           BF_CLEAR(v, 17, 1 )
-#define USB_GOTGINT_CLR_HST_NEG_SUC_STS_CHNG(v)  BF_CLEAR(v, 9 , 1 )
-#define USB_GOTGINT_CLR_SES_REQ_SUC_STS_CHNG(v)  BF_CLEAR(v, 8 , 1 )
+#define USB_GOTGINT_CLR_SET_SES_REQ_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 8 , 1 )
+#define USB_GOTGINT_CLR_SET_HST_NEG_SUC_STS_CHNG(v, set) BF_CLEAR_AND_SET(v, set, 9 , 1 )
+#define USB_GOTGINT_CLR_SET_HST_NEG_DET(v, set)          BF_CLEAR_AND_SET(v, set, 17, 1 )
+#define USB_GOTGINT_CLR_SET_A_DEV_TOUT_CHG(v, set)       BF_CLEAR_AND_SET(v, set, 18, 1 )
+#define USB_GOTGINT_CLR_SET_DBNCE_DONE(v, set)           BF_CLEAR_AND_SET(v, set, 19, 1 )
 #define USB_GOTGINT_CLR_SES_END_DET(v)           BF_CLEAR(v, 2 , 1 )
+#define USB_GOTGINT_CLR_SES_REQ_SUC_STS_CHNG(v)  BF_CLEAR(v, 8 , 1 )
+#define USB_GOTGINT_CLR_HST_NEG_SUC_STS_CHNG(v)  BF_CLEAR(v, 9 , 1 )
+#define USB_GOTGINT_CLR_HST_NEG_DET(v)           BF_CLEAR(v, 17, 1 )
+#define USB_GOTGINT_CLR_A_DEV_TOUT_CHG(v)        BF_CLEAR(v, 18, 1 )
+#define USB_GOTGINT_CLR_DBNCE_DONE(v)            BF_CLEAR(v, 19, 1 )
 
 
 static inline int usb_gotgint_to_string(char *buf, int bufsz, uint32_t v)
 {
-  return snprintf(buf, bufsz, "%08x,DBNCE_DONE:%x,A_DEV_TOUT_CHG:%x,HST_NEG_DET:%x,HST_NEG_SUC_STS_CHNG:%x,SES_REQ_SUC_STS_CHNG:%x,SES_END_DET:%x",
+  return snprintf(buf, bufsz, "%08x,SES_END_DET:%x,SES_REQ_SUC_STS_CHNG:%x,HST_NEG_SUC_STS_CHNG:%x,HST_NEG_DET:%x,A_DEV_TOUT_CHG:%x,DBNCE_DONE:%x",
     v,
-    (int)USB_GOTGINT_GET_DBNCE_DONE(v),
-    (int)USB_GOTGINT_GET_A_DEV_TOUT_CHG(v),
-    (int)USB_GOTGINT_GET_HST_NEG_DET(v),
-    (int)USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v),
+    (int)USB_GOTGINT_GET_SES_END_DET(v),
     (int)USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v),
-    (int)USB_GOTGINT_GET_SES_END_DET(v));
+    (int)USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v),
+    (int)USB_GOTGINT_GET_HST_NEG_DET(v),
+    (int)USB_GOTGINT_GET_A_DEV_TOUT_CHG(v),
+    (int)USB_GOTGINT_GET_DBNCE_DONE(v));
+}
+#define USB_GRXSTSP_GET_CHNUM(v)                 BF_EXTRACT(v, 0 , 4 )
+#define USB_GRXSTSP_GET_BYTECNT(v)               BF_EXTRACT(v, 4 , 11)
+#define USB_GRXSTSP_GET_DPID(v)                  BF_EXTRACT(v, 15, 2 )
+#define USB_GRXSTSP_GET_PKTSTS(v)                BF_EXTRACT(v, 17, 4 )
+#define USB_GRXSTSP_GET_FN(v)                    BF_EXTRACT(v, 25, 7 )
+#define USB_GRXSTSP_CLR_SET_CHNUM(v, set)                BF_CLEAR_AND_SET(v, set, 0 , 4 )
+#define USB_GRXSTSP_CLR_SET_BYTECNT(v, set)              BF_CLEAR_AND_SET(v, set, 4 , 11)
+#define USB_GRXSTSP_CLR_SET_DPID(v, set)                 BF_CLEAR_AND_SET(v, set, 15, 2 )
+#define USB_GRXSTSP_CLR_SET_PKTSTS(v, set)               BF_CLEAR_AND_SET(v, set, 17, 4 )
+#define USB_GRXSTSP_CLR_SET_FN(v, set)                   BF_CLEAR_AND_SET(v, set, 25, 7 )
+#define USB_GRXSTSP_CLR_CHNUM(v)                 BF_CLEAR(v, 0 , 4 )
+#define USB_GRXSTSP_CLR_BYTECNT(v)               BF_CLEAR(v, 4 , 11)
+#define USB_GRXSTSP_CLR_DPID(v)                  BF_CLEAR(v, 15, 2 )
+#define USB_GRXSTSP_CLR_PKTSTS(v)                BF_CLEAR(v, 17, 4 )
+#define USB_GRXSTSP_CLR_FN(v)                    BF_CLEAR(v, 25, 7 )
+
+
+static inline int usb_grxstsp_to_string(char *buf, int bufsz, uint32_t v)
+{
+  return snprintf(buf, bufsz, "%08x,CHNUM:%x,BYTECNT:%x,DPID:%x,PKTSTS:%x,FN:%x",
+    v,
+    (int)USB_GRXSTSP_GET_CHNUM(v),
+    (int)USB_GRXSTSP_GET_BYTECNT(v),
+    (int)USB_GRXSTSP_GET_DPID(v),
+    (int)USB_GRXSTSP_GET_PKTSTS(v),
+    (int)USB_GRXSTSP_GET_FN(v));
 }
