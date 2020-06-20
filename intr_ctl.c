@@ -67,6 +67,7 @@ int intr_ctl_arm_irq_disable(int irq_num)
     dst++;                            \
   }                                   \
   write_reg(dst, BT(irq_num));        \
+  printf("intr_ctl: %08x<-%08x"__endline, dst, read_reg(dst));\
   return ERR_OK;
 
 #define SET_ARM_IRQ(r, irq) \
@@ -99,11 +100,11 @@ int intr_ctl_gpu_irq_disable(int irq_num)
 /*
  * For details see BCM2835 ARM Peripherals, page 113
  * there is an ARM Peripherals interrupts table, that
- * shows 64 possible IRQs, for gpio looks like we only 
+ * shows 64 possible IRQs, for gpio looks like we only
  * need gpio_int[0], which is bit 49 IRQ#49.
- * To access bits 32-64, we need to go to 
+ * To access bits 32-64, we need to go to
  * IRQ_PENDING_2/ENABLE_IRQS_2/DISABLE_IRQS_2 (second
- * half of this table) so IRQ 49 will be bit number 
+ * half of this table) so IRQ 49 will be bit number
  * 49-32=17
  */
 #define IRQ_BIT_GPIO1 17

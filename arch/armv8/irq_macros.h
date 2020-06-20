@@ -37,7 +37,14 @@
  * pending register, that means these IRQs won't set bits 8 or 9
  * for corresponding GPU pending reg. This is also an optimization,
  * so that we didn't have to check the whole 32bit GPU0 bit-space
- * if only IRQ 7 is set and signalled to us via bit 10 of BASIC_PENDING
+ * if only IRQ 7 is set and signalled to us via bit 10 of BASIC_PENDING.
+ *
+ * !!WARNING!!: BASIC IRQS 10..20 will be returned as IRQNR 64+10,64+11, 64+12, etc...
+ * for the same sake of optimization. For example USB irq is GPU1 bit 9, so you would
+ * want to see it arrived as irqnr==9, but for that we would need to maintain a mapping
+ * for converting bits 10 through 20 of basic pending register to real IRQ numbers.
+ * Because there is no visible need to do that right now, we instead accept that USB
+ * irq number is 64+11 = 75.
  * 
  * 'get_irqrn_preamble' is initialization macro-API that inits base register
  * address.
