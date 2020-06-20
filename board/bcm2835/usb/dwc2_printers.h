@@ -101,3 +101,30 @@ static inline int dwc2_print_otgint(uint32_t v, char *buf, int bufsz)
 #undef __PRINT_BIT
   return n;
 }
+
+static inline int dwc2_print_port_int(uint32_t v, char *buf, int bufsz)
+{
+  int n = 0;
+  int first = 1;
+#define __PRINT_BIT(__bit) \
+  if (USB_HOST_INTR_GET_ ## __bit(v)) {\
+    n += snprintf(buf + n, bufsz - n, "%s"#__bit, first ? "" : ",");\
+    first = 0;\
+  }
+  __PRINT_BIT(XFER_COMPLETE);
+  __PRINT_BIT(HALT);
+  __PRINT_BIT(AHB_ERR);
+  __PRINT_BIT(STALL);
+  __PRINT_BIT(NAK);
+  __PRINT_BIT(ACK);
+  __PRINT_BIT(NYET);
+  __PRINT_BIT(TRNSERR);
+  __PRINT_BIT(BABBLERR);
+  __PRINT_BIT(FRMOVRN);
+  __PRINT_BIT(DATTGGLERR);
+  __PRINT_BIT(BUFNOTAVAIL);
+  __PRINT_BIT(EXCESSXMIT);
+  __PRINT_BIT(FRMLISTROLL);
+#undef __PRINT_BIT
+  return n;
+}
