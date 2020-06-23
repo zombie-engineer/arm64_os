@@ -36,6 +36,8 @@ typedef enum {
 
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes);
 
+struct usb_hub_port_status;
+
 int dwc2_init_channels();
 
 int dwc2_set_log_level(int log_level);
@@ -168,6 +170,42 @@ void dwc2_enable_interrupts(void);
 
 void dwc2_enable_ahb_interrupts(void);
 
+void dwc2_unmask_all_interrupts(void);
+
+void dwc2_unmask_port_interrupts(void);
+
+void dwc2_enable_host_interrupts(void);
+
+void dwc2_clear_all_interrupts(void);
+
 void dwc2_dump_int_registers(void);
 
 void dwc2_disable_ahb_interrupts(void);
+
+void dwc2_dump_port_int(int port);
+
+void dwc2_dump_internal_status_reg(void);
+
+void dwc2_irq_cb(void);
+
+typedef void(*port_status_changed_cb_t)(struct usb_hub_port_status*);
+
+void dwc2_set_port_status_changed_cb(port_status_changed_cb_t cb);
+
+void dwc2_enable_channel(int ch);
+
+void dwc2_disable_channel(int ch);
+
+typedef int dwc2_chan_id_t;
+
+#define DWC2_INVALID_CHANNEL -1
+
+dwc2_chan_id_t dwc2_channel_alloc();
+
+void dwc2_channel_free(dwc2_chan_id_t);
+
+void dwc2_channel_set_priv(dwc2_chan_id_t ch, void *priv);
+
+void *dwc2_channel_get_priv(dwc2_chan_id_t ch);
+
+void dwc2_init(void);

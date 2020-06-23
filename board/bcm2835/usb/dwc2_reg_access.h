@@ -54,6 +54,7 @@ static inline void __write_ch_reg(reg32_t reg, int chan, uint32_t val, reg_print
 #define CLEAR_INTR()    __write_ch_reg(USB_HCINT0   , ch, 0xffffffff, usb_host_intr_to_string)
 #define CLEAR_INTRMSK() __write_ch_reg(USB_HCINTMSK0, ch, 0x00000000, usb_host_intr_to_string)
 #define SET_INTR()      __write_ch_reg(USB_HCINT0   , ch ,intr, usb_host_intr_to_string)
+#define SET_INTRMSK()   __write_ch_reg(USB_HCINTMSK0, ch ,intrmsk, usb_host_intr_to_string)
 #define SET_SPLT()      __write_ch_reg(USB_HCSPLT0  , ch, splt, usb_host_splt_to_string)
 #define SET_CHAR()      __write_ch_reg(USB_HCCHAR0  , ch, chr, usb_host_char_to_string)
 #define SET_SIZ()       __write_ch_reg(USB_HCTSIZ0  , ch, siz, usb_host_size_to_string)
