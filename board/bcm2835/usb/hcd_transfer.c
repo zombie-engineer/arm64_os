@@ -26,7 +26,7 @@ static int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, void *buf, int bufsz, 
       continue;
     if (status == DWC2_STATUS_NYET)
       continue;
-    err = ERR_GENERIC; 
+    err = ERR_GENERIC;
     break;
   }
   CHECK_ERR("dwc2_transfer failed");
@@ -48,12 +48,13 @@ int hcd_transfer_control(
   int *out_num_bytes)
 {
   int err;
+  int channel;
   int num_bytes = 0;
-  uint64_t rqbuf ALIGNED(4) = rq;
+  uint64_t rqbuf ALIGNED(8) = rq;
   usb_pid_t pid;
 
   dwc2_pipe_desc_t pipedesc = {
-    .u = { 
+    .u = {
       .device_address  = pipe->address,
       .ep_address      = pipe->endpoint,
       .ep_type         = USB_ENDPOINT_TYPE_CONTROL,
@@ -107,7 +108,7 @@ out_err:
     *out_num_bytes = num_bytes;
 
   HCDDEBUG("SUBMIT: completed with status: %d", err);
-  return ERR_OK;
+  return err;
 }
 
 int hcd_transfer_interrupt(
@@ -121,7 +122,7 @@ int hcd_transfer_interrupt(
   int err;
 
   dwc2_pipe_desc_t pipedesc = {
-    .u = { 
+    .u = {
       .device_address  = pipe->address,
       .ep_address      = pipe->endpoint,
       .ep_type         = USB_ENDPOINT_TYPE_INTERRUPT,
@@ -156,7 +157,7 @@ int hcd_transfer_bulk(
   dwc2_transfer_status_t status;
 
   dwc2_pipe_desc_t pipedesc = {
-    .u = { 
+    .u = {
       .device_address  = pipe->address,
       .ep_address      = pipe->endpoint,
       .ep_type         = USB_ENDPOINT_TYPE_BULK,
