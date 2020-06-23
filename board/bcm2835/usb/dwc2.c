@@ -359,15 +359,10 @@ void dwc2_dump_internal_status_reg(void)
 
 void dwc2_dump_int_registers(void)
 {
-  // uint32_t intsts, otgint;
-  // char otgint_desc[512];
-  // otgint = read_reg(USB_GOTGINT);
-  // dwc2_print_otgint(otgint, otgint_desc, sizeof(otgint_desc));
-  // DWCINFO("otg:%08x(%s)", otgint, otgint_desc);
-  DWCINFO("intsts:*%08x=%08x,intmsk:%08x,haint:*%08x=%08x,haintmsk:%08x,hprt:%08x",
-    USB_GINTSTS, read_reg(USB_GINTSTS),
+  DWCINFO("intsts:%08x,intmsk:%08x,haint:%08x,haintmsk:%08x,hprt:%08x",
+    read_reg(USB_GINTSTS),
     read_reg(USB_GINTMSK),
-    USB_HAINT, read_reg(USB_HAINT),
+    read_reg(USB_HAINT),
     read_reg(USB_HAINTMSK),
     read_reg(USB_HPRT)
   );

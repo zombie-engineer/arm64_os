@@ -43,6 +43,7 @@
 #include <self_test.h>
 #include <pwm.h>
 #include <drivers/servo/sg90.h>
+#include <drivers/usb/usbd.h>
 
   // hexdump_addr(0x100);
   // 0x0000000000001122
@@ -917,6 +918,10 @@ void main()
   // bcm2835_set_pwm_clk_freq(100000);
   // servo_sg90_init();
   print_mbox_props();
+  usbd_init();
+  printf("waiting\n");
+  usbd_print_device_tree();
+  while(1);
 #ifndef CONFIG_QEMU
   // init_nokia5110_display(1, 0);
   // nokia5110_draw_text("Display ready", 0, 0);

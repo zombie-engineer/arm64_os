@@ -3,6 +3,7 @@
 #include "root_hub.h"
 #include "dwc2.h"
 #include "dwc2_regs.h"
+#include <delays.h>
 
 static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint64_t rq)
 {
@@ -61,11 +62,19 @@ int hcd_transfer_control(
       .ep_direction    = USB_DIRECTION_OUT,
       .speed           = pipe->speed,
       .max_packet_size = pipe->max_packet_size,
-      .dwc_channel     = pctl->channel,
       .hub_address     = pipe->ls_hub_address,
       .hub_port        = pipe->ls_hub_port
     }
   };
+
+  channel = dwc2_channel_alloc();
+  if (channel == DWC2_INVALID_CHANNEL) {
+    HCDERR("channel not allocated. Retry");
+    err = ERR_RETRY;
+    goto out_err;
+  }
+
+  pipedesc.u.dwc_channel = channel;
 
   hcd_transfer_control_prologue(pipe, rq);
 
@@ -79,6 +88,10 @@ int hcd_transfer_control(
    */
   pid = USB_PID_SETUP;
   err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), &pid, "SETUP", NULL);
+  while(1) {
+    wait_msec(1000);
+    printf("waiting\n");
+  }
   CHECK_ERR_SILENT();
 
   /*
@@ -104,6 +117,8 @@ int hcd_transfer_control(
   CHECK_ERR_SILENT();
 
 out_err:
+  if (channel != DWC2_INVALID_CHANNEL)
+    dwc2_channel_free(pipedesc.u.dwc_channel);
   if (out_num_bytes)
     *out_num_bytes = num_bytes;
 

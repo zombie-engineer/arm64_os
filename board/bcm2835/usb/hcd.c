@@ -31,7 +31,7 @@ static int usb_hcd_unique_device_address = 1;
 
 static bool powered_on = 0;
 
-int usb_hcd_log_level = 0;
+int usb_hcd_log_level = 10;
 
 int usb_hcd_set_log_level(int level)
 {
@@ -638,6 +638,14 @@ int usb_hcd_start()
   dwc2_op_mode_t opmode;
   int fsls_mode_ena = 0;
 
+  err = irq_set(get_cpu_num(), ARM_BASIC_USB, dwc2_irq_cb);
+  dwc2_enable_ahb_interrupts();
+  dwc2_clear_all_interrupts();
+
+  intr_ctl_usb_irq_enable();
+  HCDLOG("before IRQ enable");
+  enable_irq();
+
   dwc2_start_vbus();
   dwc2_reset();
 
@@ -679,18 +687,27 @@ int usb_hcd_start()
       break;
   }
   HCDLOG("core started");
+  dwc2_unmask_all_interrupts();
+  dwc2_enable_host_interrupts();
+
+  HCDLOG("setting host clock...");
   dwc2_power_clock_off();
   if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED && dwc2_is_ulpi_fs_ls_only()) {
     dwc2_set_host_speed(DWC2_CLK_48MHZ);
-    HCDLOG("selecting host clock: 48MHz");
+    HCDLOG("host clock set to 48MHz");
   } else {
-    HCDLOG("selecting host clock: 30-60MHz");
+    HCDLOG("host clock set to 30-60MHz");
     dwc2_set_host_speed(DWC2_CLK_30_60MHZ);
   }
 
   dwc2_set_host_ls_support();
+  HCDLOG("enabled host low-speed support");
 
   dwc2_setup_fifo_sizes(
+    USB_RECV_FIFO_SIZE,
+    USB_NON_PERIODIC_FIFO_SIZE,
+    USB_PERIODIC_FIFO_SIZE);
+  HCDLOG("fifos set to recv:%d non-peridic:%d periodic:%d",
     USB_RECV_FIFO_SIZE,
     USB_NON_PERIODIC_FIFO_SIZE,
     USB_PERIODIC_FIFO_SIZE);
@@ -705,13 +722,20 @@ int usb_hcd_start()
     dwc2_init_channels();
 
   if (!dwc2_is_port_pwr_enabled()) {
-    HCDLOG("host port PWR not set");
     dwc2_port_set_pwr_enabled(true);
+    HCDLOG("host power enabled");
   }
 
   dwc2_port_reset();
-  wait_on_timer_ms(60);
+  wait_msec(60);
+  dwc2_dump_int_registers();
   dwc2_port_reset_clear();
+  HCDLOG("host reset done");
+
+  HCDLOG("host interrupts enabled: haint:%08x, haintmsk:%08x",
+    read_reg(0x3f980414),
+    read_reg(0x3f980418));
+
   HCDLOG("host controller device started");
   return err;
 }
@@ -725,6 +749,7 @@ static int usb_hcd_attach_root_hub()
     HCDERR("root_hub already attached");
     goto out_err;
   }
+  dwc2_set_port_status_changed_cb(usb_root_hub_set_port_status);
 
   root_hub = usb_hcd_allocate_device();
   if (IS_ERR(root_hub)) {
@@ -801,12 +826,6 @@ void print_usb_device_rq(uint64_t rq, const char *tag)
       USB_DEV_RQ_GET_LENGTH(rq));
 }
 
-void usb_irq_cb(void)
-{
-  puts("ppppppppppppppppppppppppppppppppppppppppppppppppppp" __endline);
-  puts("ppppppppppppppppppppppppppppppppppppppppppppppppppp" __endline);
-}
-
 int usb_hcd_init()
 {
   int err;
@@ -817,6 +836,7 @@ int usb_hcd_init()
   usb_hcd_hid_init();
   usb_hcd_mass_init();
 
+
   vendor_id = dwc2_get_vendor_id();
   user_id = dwc2_get_user_id();
   HCDLOG("Initializing: usb chip info: vendor:%08x user:%08x", vendor_id, user_id);
@@ -824,7 +844,8 @@ int usb_hcd_init()
   err = usb_hcd_power_on();
   CHECK_ERR("failed to power on");
 
-  wait_on_timer_ms(20);
+  wait_msec(20);
+  // wait_on_timer_ms(20);
   powered_on = true;
   HCDLOG("Device powered on");
   dwc2_print_core_regs();
@@ -832,11 +853,6 @@ int usb_hcd_init()
   err = usb_hcd_start();
   CHECK_ERR("hcd start failed");
 
-  dwc2_enable_ahb_interrupts();
-  intr_ctl_usb_irq_enable();
-  dwc2_enable_interrupts();
-  err = irq_set(get_cpu_num(), ARM_IRQ1_USB, usb_irq_cb);
-  enable_irq();
 
   err = usb_hcd_attach_root_hub();
   CHECK_ERR("attach root hub failed");

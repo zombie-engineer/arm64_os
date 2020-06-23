@@ -15,3 +15,5 @@ struct usb_root_hub_string_descriptor0 {
 } PACKED;
 
 int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes);
+
+void usb_root_hub_set_port_status(struct usb_hub_port_status *status);

@@ -1,6 +1,7 @@
 #include <drivers/usb/hcd_hub.h>
 #include <delays.h>
 #include <bits_api.h>
+#include "dwc2.h"
 
 DECL_STATIC_SLOT(struct usb_hcd_device_class_hub, usb_hcd_device_class_hub, 12)
 
@@ -207,9 +208,12 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   CHECK_ERR("failed to read hub port status. Enumeration will not continue");
 
 	HUBDBG("powering on all %d ports", h->descriptor.port_count);
+
   for (port = 0; port < h->descriptor.port_count; ++port) {
 	  HUBPORTDBG("powering on port");
+    dwc2_dump_int_registers();
     err = usb_hub_port_power_on(h, port);
+    dwc2_dump_int_registers();
     if (err != ERR_OK) {
       HUBPORTERR("failed to power on, skipping");
       continue;
