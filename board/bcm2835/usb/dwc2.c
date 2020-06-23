@@ -7,6 +7,86 @@
 #include "dwc2_regs_bits.h"
 #include "dwc2_reg_access.h"
 #include "dwc2_printers.h"
+#include <usb/usb.h>
+#include <spinlock.h>
+
+static port_status_changed_cb_t port_status_changed_cb = NULL;
+
+/*
+ * DWC2 USB interrupt model.
+ * USB_GAHBCFG.GLBL_INTR_EN should be enabled to channel all local interrupts to interrupt controller chip.
+ * USB_GINTMSK - should be written to 0xffffffff or something more precise to unmask interrupt.
+ * Set bit 9 to 0x3f00b210 "Enable IRQs 1" register in bcm2835_interrupt_controller.
+ *
+ * There multiple interrupt domens channeled to USB_GINTSTS
+ * OTGINT - interrupts related to USB-OTG protocol - like session requests etc, check USB_OTGCTL for status
+ * PRTINT - port interrupts, check USB_HPRT for statuses that trigger it, like connection detection, reset change, enabled, etc
+ * HCHINT - host channel interrupts, if this is triggered, then USB_HAINT is also triggered, HAINT in turn - is a bitmask of
+ * N channels each having it's own bit to indicate which channel exactly has triggered interrupt. So HAINT = 0x00000020 has
+ * interrupts pending on channel 5 (1<<5 = 0x20). HAINT is coupled with HAINTMSK register which is used for masking out
+ * exactl channels. HAINTMSK = 0x000000ff - means that any events on channels 0 to 7 will trigger interrupt.
+ * HAINTMSK = 0x00000002 means only channel 1 will trigger interrupts.
+ * For interrupt to propagate to HAINT register yuo should set up per-channel interrupt registers USB_HCINTn and USB_HCINTMSKn,
+ * where 'n' is the channel index.
+ * Channel interrupt summary:
+ *   USB_HCINTn/USB_HCINTMSKn->USB_HAINT/USB_HAINTMSK->USB_GINTSTS/USB_GINTMSK
+ *   USB_HCINTn - per-channel interrupt register
+ *   USB_HCINTMSK - per-channel interrupt mask/unmask register
+ *   USB_HAINT - bitmask, where bit represent number of channel, bit=1 - channel is the source of interrupt, bit=0 channel is silent.
+ *   USB_HAINTMSK - mask away all interrupts from the channel you don't want to be triggered.
+ *
+ * Monitor 0x3f00b204 "IRQ pending 1" and 0x3f00b200 "IRQ basic pending".
+ * "IRQ Basic pending" register will expose bit 9 (gpu1 interrupt bank pending).
+ * "IRQ pending 1" register will expose bit 9 (USB irq bit).
+ * Enable IRQ bit via function enable_irq() or "msr DAIFSet, #2"
+ *
+ * Overall interrupt hierarch summary:
+ *
+ *                                                   ARM CPU IRQ/FIQ
+ *                                                            \
+ *                                                            | \ enable by "msr daifset, #2" 2 = IRQ
+ *                                                            | \ disable by "msr daifclr, #2"
+ *                                                            |
+ *                                                            |
+ *                                                  BCM2835_INTERRUPT_CONTROLLER
+ *                                                    | | | | | | | | | | | | | \
+ *                                                        |                      \
+ *                                                        |                       \ enable by write to IRQ1_enable/IRQ2_enable regs
+ *                                                        |                        \ monitor by read from irq_basic_pending/irq1_pending/irq2_pending regs
+ *                                                        |
+ *                                                        |
+ *                                                  USB_AHB_CONFIG.GLOBAL_INT_ENABLE bit
+ *                                                        |                            \
+ *                                                        |                             \ set bit 0 in USB_AHBCFG to enable interrupts from USB
+ *                                                        |
+ *                                                  USB_GINTSTS/USB_GINTMSK
+ *                           OTG        _________/  /     |             \   \
+ *                         interrupts /            /      |              \    \ mask/unmask/monitor port / channel / otg / core interrupts here
+ *                        USB_GOTGCTL             /       |               \
+ *                                          core        port           channel
+ *                                        interrups   interrupts     interrupts
+ *                                     (USB_GINTSTS)  (USB_HPRT)   (USB_HAINT/USB_HAINTMSK)
+ *                                                                        |               \
+ *                                                                        |                \ mask/unmask/monitor which channels are source of interrupts
+ *                                                                        |
+ *                                                                /   /   |   \    \
+ *                                                              ch0 ch1 ch2  ch3  ch..X
+ *                                                             /               \
+ *                                                        (USB_HCINT0/) ..   ..(USB_HCINT3/)
+ *                                                       (USB_HCINTMSK)   ... (USB_HCINTMSK3)
+ *                                                                                           \
+ *                                                                                            \ mask/unmask/monitor per-channel interrupts here
+ *
+ */
+
+void dwc2_dump_port_int(int port)
+{
+  uint32_t portval;
+  char port_desc[512];
+  portval = read_reg(USB_HCINT0 + port * 0x20);
+  dwc2_print_port_int(portval, port_desc, sizeof(port_desc));
+  DWCINFO("port_int:%08x(%s)", portval, port_desc);
+}
 
 void dwc2_start_vbus(void)
 {
