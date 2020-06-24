@@ -165,23 +165,6 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
 {
   int intr, intrmsk;
   int timeout = 1;
- //  while(1) {
- //    uint32_t haintmsk, haint;
- //    haint = read_reg(USB_HAINT);
- //    haintmsk = read_reg(USB_HAINTMSK);
- //    GET_INTR();
- //    GET_INTRMSK();
- //    printf("dwc2_transfer_waiting... ahb_intr:%08x intsts:%08x intmsk:%08x intr:%08x intrmsk:%08x haint:%08x haintmsk:%08x\n",
- //      read_reg(USB_GAHBCFG),
- //      read_reg(USB_GINTSTS),
- //      read_reg(USB_GINTMSK),
- //      intr,
- //      intrmsk,
- //      haint,
- //      haintmsk
- //    );
- //    wait_msec(700);
- //  }
   while(1) {
     GET_INTR();
     if (USB_HOST_INTR_GET_HALT(intr)) {
@@ -268,6 +251,110 @@ usb_pid_t dwc_pid_to_usb_pid(int pid)
   }
 }
 
+static inline void dwc2_channel_program_char(dwc2_pipe_desc_t pipe)
+{
+  uint32_t chr;
+  int ch = pipe.u.dwc_channel;
+  /* Program the channel. */
+  chr = 0;
+  USB_HOST_CHAR_CLR_SET_MAX_PACK_SZ(chr, pipe.u.max_packet_size);
+  USB_HOST_CHAR_CLR_SET_EP(chr, pipe.u.ep_address);
+  USB_HOST_CHAR_CLR_SET_EP_DIR(chr, pipe.u.ep_direction);
+  USB_HOST_CHAR_CLR_SET_IS_LOW(chr, pipe.u.speed == USB_SPEED_LOW ? 1 : 0);
+  USB_HOST_CHAR_CLR_SET_EP_TYPE(chr, pipe.u.ep_type);
+  USB_HOST_CHAR_CLR_SET_DEV_ADDR(chr, pipe.u.device_address);
+  USB_HOST_CHAR_CLR_SET_PACK_PER_FRM(chr, 1);
+  SET_CHAR();
+}
+
+static inline void dwc2_channel_program_split(dwc2_pipe_desc_t pipe)
+{
+  uint32_t splt;
+  int ch = pipe.u.dwc_channel;
+  /* Clear and setup split control to low speed devices */
+  splt = 0;
+  if (pipe.u.speed != USB_SPEED_HIGH) {
+    USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
+    USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, pipe.u.hub_address);
+    USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, pipe.u.hub_port);
+    DWCDEBUG("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
+  }
+  SET_SPLT();
+}
+
+static inline void dwc2_channel_program_tsize(dwc2_pipe_desc_t pipe, int transfer_size, int pid)
+{
+  uint32_t siz;
+  int ch = pipe.u.dwc_channel;
+  /* Set transfer size. */
+  siz = dwc2_make_tsize(transfer_size, pipe.u.speed == USB_SPEED_LOW, pid, pipe.u.max_packet_size);
+  SET_SIZ();
+}
+
+static inline void dwc2_channel_set_split_start(int ch)
+{
+  uint32_t splt;
+  GET_SPLT();
+  USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
+  SET_SPLT();
+}
+
+static inline void dwc2_channel_set_dma_addr(int ch, uint64_t dma_addr, int sz)
+{
+  uint32_t dma;
+  BUG(dma_addr & 3, "UNALIGNED DMA address");
+  dcache_flush(dma_addr, sz);
+  dma = RAM_PHY_TO_BUS_UNCACHED(dma_addr);
+  SET_DMA();
+}
+
+static inline void dwc2_channel_set_split_complete(int ch)
+{
+  uint32_t splt;
+  GET_SPLT();
+  DWCDEBUG("SPLT ENA: %08x", splt);
+  USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
+  SET_SPLT();
+}
+
+static inline void dwc2_channel_start_transmit(int ch)
+{
+  uint32_t chr;
+  GET_CHAR();
+  USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
+  USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
+  SET_CHAR();
+}
+
+int dwc2_start_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid)
+{
+  int dwc_pid = usb_pid_to_dwc_pid(*pid);
+  struct dwc2_channel *c;
+  struct dwc2_transfer_ctl *tc;
+  c = dwc2_channel_get(pipe.u.dwc_channel);
+  tc = c->tc;
+  tc->status = DWC2_TRANSFER_STATUS_STARTED;
+  tc->to_transfer_size = bufsz;
+
+  dwc2_channel_program_char(pipe);
+  dwc2_channel_program_split(pipe);
+  dwc2_channel_program_tsize(pipe, bufsz, dwc_pid);
+  return ERR_OK;
+}
+
+static inline void dwc2_channel_clear_intr(int ch)
+{
+  CLEAR_INTR();
+  CLEAR_INTRMSK();
+}
+
+static inline bool dwc2_is_split_enabled(int ch)
+{
+  uint32_t splt;
+  GET_SPLT();
+  return USB_HOST_SPLT_GET_SPLT_ENABLE(splt) ? true : false;
+}
+
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes)
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
@@ -284,73 +371,29 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   uint32_t intr UNUSED;
   uint32_t chr, splt, siz, dma;
   uint64_t dma_dst;
-  // while(1);
 
   dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);
   if (buf && bufsz && pipe.u.ep_direction == USB_DIRECTION_OUT)
     dcache_flush(buf, bufsz);
-
-  ch = pipe.u.dwc_channel = 6;
 
   if ((uint64_t)buf & 3) {
     DWCERR("dwc2_transfer:buffer not aligned to 4 bytes\r\n");
     return DWC2_STATUS_ERR;
   }
 
-  // dwc2_enable_host_interrupts();
-
-  /* Clear all existing interrupts. */
-  CLEAR_INTR();
-  CLEAR_INTRMSK();
-
-  /* Program the channel. */
-  chr = 0;
-  USB_HOST_CHAR_CLR_SET_MAX_PACK_SZ(chr, pipe.u.max_packet_size);
-  USB_HOST_CHAR_CLR_SET_EP(chr, pipe.u.ep_address);
-  USB_HOST_CHAR_CLR_SET_EP_DIR(chr, pipe.u.ep_direction);
-  USB_HOST_CHAR_CLR_SET_IS_LOW(chr, pipe.u.speed == USB_SPEED_LOW ? 1 : 0);
-  USB_HOST_CHAR_CLR_SET_EP_TYPE(chr, pipe.u.ep_type);
-  USB_HOST_CHAR_CLR_SET_DEV_ADDR(chr, pipe.u.device_address);
-  SET_CHAR();
-
-  /* Clear and setup split control to low speed devices */
-  splt = 0;
-  if (pipe.u.speed != USB_SPEED_HIGH) {
-    USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
-    USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, pipe.u.hub_address);
-    USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, pipe.u.hub_port);
-    DWCDEBUG("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
-  }
-  SET_SPLT();
-
-  /* Set transfer size. */
-  siz = dwc2_make_tsize(bufsz, pipe.u.speed == USB_SPEED_LOW, dwc_pid, pipe.u.max_packet_size);
-  SET_SIZ();
+  dwc2_channel_clear_intr(ch);
+  dwc2_channel_program_char(pipe);
+  dwc2_channel_program_split(pipe);
+  dwc2_channel_program_tsize(pipe, bufsz, dwc_pid);
 
   dma_dst = (uint64_t)buf;
   for (i = 0; i < max_retries; ++i) {
     DWCDEBUG2("transfer: iteration:%d", i);
-    if (dma_dst & 3)
-      kernel_panic("UNALIGNED DMA address");
-    // dwc2_dump_int_registers();
-    // dwc2_dump_port_int(0);
 
-    CLEAR_INTR();
-    CLEAR_INTRMSK();
-    GET_SPLT();
-    USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
-    SET_SPLT();
-
-    dcache_flush(buf, bufsz);
-    dma = RAM_PHY_TO_BUS_UNCACHED(dma_dst);
-    SET_DMA();
-
-    /* launch transmission */
-    GET_CHAR();
-    USB_HOST_CHAR_CLR_SET_PACK_PER_FRM(chr, 1);
-    USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
-    USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
-    SET_CHAR();
+    dwc2_channel_clear_intr(ch);
+    dwc2_channel_set_split_start(ch);
+    dwc2_channel_set_dma_addr(ch, dma_dst, bufsz);
+    dwc2_channel_start_transmit(ch);
 
     status = dwc2_wait_halted(ch);
     if (status) {
@@ -359,17 +402,10 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       goto out;
     }
 
-    GET_SPLT();
-    if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
-      DWCDEBUG("SPLT ENA: %08x", splt);
-      CLEAR_INTR();
-      CLEAR_INTRMSK();
-      USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
-      SET_SPLT();
-      GET_CHAR();
-      USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
-      USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
-      SET_CHAR();
+    if (dwc2_is_split_enabled(ch)) {
+      dwc2_channel_clear_intr(ch);
+      dwc2_channel_set_split_complete(ch);
+      dwc2_channel_start_transmit(ch);
       wait_usec(100);
       status = dwc2_wait_halted(ch);
       if (status)
@@ -381,7 +417,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
 
     GET_INTR();
     GET_SIZ();
-    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d", 
+    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d",
       siz,
       USB_HOST_SIZE_GET_PACKET_COUNT(siz),
       USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
@@ -390,10 +426,10 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       hexdump_memory(buf, bufsz);
     if (pipe.u.ep_direction == USB_DIRECTION_OUT) {
     if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-  //  if (USB_HOST_SIZE_GET_SIZE(siz)) {
+      // if (USB_HOST_SIZE_GET_SIZE(siz)) {
       dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-      /* 
-       * packet was successfully retrieved, so we reset number of 
+      /*
+       * packet was successfully retrieved, so we reset number of
        * retries before failure
        */
       i = 0;

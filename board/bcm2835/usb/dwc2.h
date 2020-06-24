@@ -3,6 +3,18 @@
 #include <types.h>
 #include <usb/usb_pid.h>
 
+#define DWC2_TRANSFER_STATUS_STARTED 0
+
+struct dwc2_transfer_ctl {
+  int status;
+  int to_transfer_size;
+};
+
+struct dwc2_channel {
+  struct dwc2_transfer_ctl *tc;
+};
+
+
 typedef struct dwc2_pipe_desc {
   union {
     struct {
@@ -35,6 +47,8 @@ typedef enum {
 } dwc2_transfer_status_t;
 
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes);
+
+int dwc2_start_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid);
 
 struct usb_hub_port_status;
 
@@ -203,6 +217,8 @@ typedef int dwc2_chan_id_t;
 dwc2_chan_id_t dwc2_channel_alloc();
 
 void dwc2_channel_free(dwc2_chan_id_t);
+
+struct dwc2_channel *dwc2_channel_get(dwc2_chan_id_t ch);
 
 void dwc2_channel_set_priv(dwc2_chan_id_t ch, void *priv);
 

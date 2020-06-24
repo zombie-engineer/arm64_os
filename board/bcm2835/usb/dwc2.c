@@ -629,20 +629,15 @@ void dwc2_disable_channel(int ch)
   dwc2_disable_channel_int(ch);
 }
 
-struct dwc2_channel_desc {
-  void *priv;
-};
-
 static DECL_SPINLOCK(dwc2_channels_lock);
 static uint8_t channels_bitmap = 0;
-static struct dwc2_channel_desc dwc2_channels[6] = { 0 };
+static struct dwc2_channel dwc2_channels[6] = { 0 };
 
 dwc2_chan_id_t dwc2_channel_alloc()
 {
   uint8_t bitmap;
   int ch;
   int num_channels = 6;
-  printf("-------------------");
   if (spinlocks_enabled)
     spinlock_lock(&dwc2_channels_lock);
   bitmap = channels_bitmap;
@@ -678,32 +673,19 @@ void dwc2_channel_free(dwc2_chan_id_t ch)
   DWCINFO("channel %d freed", ch);
 }
 
-void dwc2_channel_set_priv(dwc2_chan_id_t ch, void *priv)
+struct dwc2_channel *dwc2_channel_get(dwc2_chan_id_t ch)
 {
   uint8_t bitmap;
+  struct dwc2_channel *channel = NULL;
   if (spinlocks_enabled)
     spinlock_lock(&dwc2_channels_lock);
   bitmap = channels_bitmap;
-  BUG(!(bitmap & (1<<ch)), "Trying to access channel that's not allocated");
-  struct dwc2_channel_desc *d = &dwc2_channels[ch];
-  d->priv = priv;
-  if (spinlocks_enabled)
-    spinlock_unlock(&dwc2_channels_lock);
-}
+  if (bitmap & (1<<ch))
+    channel = &dwc2_channels[ch];
 
-void *dwc2_channel_get_priv(dwc2_chan_id_t ch)
-{
-  uint8_t bitmap;
-  void *priv;
-  if (spinlocks_enabled)
-    spinlock_lock(&dwc2_channels_lock);
-  bitmap = channels_bitmap;
-  BUG(!(bitmap & (1<<ch)), "Trying to access channel that's not allocated");
-  struct dwc2_channel_desc *d = &dwc2_channels[ch];
-  priv = d->priv;
   if (spinlocks_enabled)
     spinlock_unlock(&dwc2_channels_lock);
-  return priv;
+  return channel;
 }
 
 void dwc2_init(void)
