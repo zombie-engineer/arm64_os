@@ -268,32 +268,6 @@ usb_pid_t dwc_pid_to_usb_pid(int pid)
   }
 }
 
-void report_intr(int ch)
-{
-  uint32_t intr, intrmsk, ena_irq1, irq_route, basic_pending, gpu1_pending, local_pending;
-  uint64_t daif;
-  asm volatile("mrs %0, daif\n" : "=r"(daif));
-  GET_INTR();
-  GET_INTRMSK();
-  ena_irq1 = read_reg(0x3f00b210);
-  irq_route = read_reg(0x4000000c);
-  basic_pending = read_reg(0x3f00b200);
-  gpu1_pending = read_reg(0x3f00b204);
-  local_pending = read_reg(0x40000070);
-
-
-  // *(uint32_t*)0x3f00b210 = 0x3ff;
-  // *(uint32_t*)0x4000000c = 0,
-  printf("pending:local:%08x,basic:%08x,gpu1:%08x\n", local_pending, basic_pending, gpu1_pending);
-  printf("intr: %08x, intrmsk: %08x, intctl_pending1:%08x, ahb:%08x, irq_ena1:%d\n", 
-      intr, 
-      intrmsk, 
-      read_reg(0x3f00b204), 
-      read_reg(0x3f980008), 
-      is_irq_enabled());
-  printf("gint:%08x,gintmsk:%08x\n", read_reg(0x3f980014), read_reg(0x3f980018));
-}
-
 dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes)
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
@@ -377,10 +351,6 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
     USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
- //    while(1) {
- //    wait_usec(100);
- //      report_intr(0);
- //    }
 
     status = dwc2_wait_halted(ch);
     if (status) {
@@ -415,7 +385,6 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       siz,
       USB_HOST_SIZE_GET_PACKET_COUNT(siz),
       USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
-    // while(1);
 
     if (dwc2_log_level > 1)
       hexdump_memory(buf, bufsz);
