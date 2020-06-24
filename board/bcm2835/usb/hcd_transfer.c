@@ -49,7 +49,7 @@ int hcd_transfer_control(
   int *out_num_bytes)
 {
   int err;
-  int channel;
+ // int channel;
   int num_bytes = 0;
   uint64_t rqbuf ALIGNED(8) = rq;
   usb_pid_t pid;
@@ -67,14 +67,14 @@ int hcd_transfer_control(
     }
   };
 
-  channel = dwc2_channel_alloc();
-  if (channel == DWC2_INVALID_CHANNEL) {
-    HCDERR("channel not allocated. Retry");
-    err = ERR_RETRY;
-    goto out_err;
-  }
-
-  pipedesc.u.dwc_channel = channel;
+//  channel = dwc2_channel_alloc();
+//  if (channel == DWC2_INVALID_CHANNEL) {
+//    HCDERR("channel not allocated. Retry");
+//    err = ERR_RETRY;
+//    goto out_err;
+//  }
+//
+//  pipedesc.u.dwc_channel = channel;
 
   hcd_transfer_control_prologue(pipe, rq);
 
@@ -88,10 +88,6 @@ int hcd_transfer_control(
    */
   pid = USB_PID_SETUP;
   err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), &pid, "SETUP", NULL);
-  while(1) {
-    wait_msec(1000);
-    printf("waiting\n");
-  }
   CHECK_ERR_SILENT();
 
   /*
@@ -117,8 +113,8 @@ int hcd_transfer_control(
   CHECK_ERR_SILENT();
 
 out_err:
-  if (channel != DWC2_INVALID_CHANNEL)
-    dwc2_channel_free(pipedesc.u.dwc_channel);
+//  if (channel != DWC2_INVALID_CHANNEL)
+//    dwc2_channel_free(pipedesc.u.dwc_channel);
   if (out_num_bytes)
     *out_num_bytes = num_bytes;
 

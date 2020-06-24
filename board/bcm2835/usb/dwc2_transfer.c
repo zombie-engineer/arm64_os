@@ -12,7 +12,7 @@
 #include <error.h>
 #include <delays.h>
 
-int dwc2_log_level = 10;
+int dwc2_log_level = 0;
 
 int dwc2_set_log_level(int log_level)
 {
@@ -165,23 +165,23 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
 {
   int intr, intrmsk;
   int timeout = 1;
-  while(1) {
-    uint32_t haintmsk, haint;
-    haint = read_reg(USB_HAINT);
-    haintmsk = read_reg(USB_HAINTMSK);
-    GET_INTR();
-    GET_INTRMSK();
-    printf("dwc2_transfer_waiting... ahb_intr:%08x intsts:%08x intmsk:%08x intr:%08x intrmsk:%08x haint:%08x haintmsk:%08x\n",
-      read_reg(USB_GAHBCFG),
-      read_reg(USB_GINTSTS),
-      read_reg(USB_GINTMSK),
-      intr,
-      intrmsk,
-      haint,
-      haintmsk
-    );
-    wait_msec(700);
-  }
+ //  while(1) {
+ //    uint32_t haintmsk, haint;
+ //    haint = read_reg(USB_HAINT);
+ //    haintmsk = read_reg(USB_HAINTMSK);
+ //    GET_INTR();
+ //    GET_INTRMSK();
+ //    printf("dwc2_transfer_waiting... ahb_intr:%08x intsts:%08x intmsk:%08x intr:%08x intrmsk:%08x haint:%08x haintmsk:%08x\n",
+ //      read_reg(USB_GAHBCFG),
+ //      read_reg(USB_GINTSTS),
+ //      read_reg(USB_GINTMSK),
+ //      intr,
+ //      intrmsk,
+ //      haint,
+ //      haintmsk
+ //    );
+ //    wait_msec(700);
+ //  }
   while(1) {
     GET_INTR();
     if (USB_HOST_INTR_GET_HALT(intr)) {
@@ -194,7 +194,7 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
     }
     wait_usec(100);
   }
-  // SET_INTR();
+  SET_INTR();
 
   if (timeout)
     return DWC2_STATUS_TIMEOUT;
@@ -310,12 +310,13 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   uint32_t intr UNUSED;
   uint32_t chr, splt, siz, dma;
   uint64_t dma_dst;
+  // while(1);
 
   dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);
   if (buf && bufsz && pipe.u.ep_direction == USB_DIRECTION_OUT)
     dcache_flush(buf, bufsz);
 
-  // ch = pipe.u.dwc_channel = 6;
+  ch = pipe.u.dwc_channel = 6;
 
   if ((uint64_t)buf & 3) {
     DWCERR("dwc2_transfer:buffer not aligned to 4 bytes\r\n");
@@ -326,7 +327,7 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
 
   /* Clear all existing interrupts. */
   CLEAR_INTR();
-  // CLEAR_INTRMSK();
+  CLEAR_INTRMSK();
 
   /* Program the channel. */
   chr = 0;
@@ -360,8 +361,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     // dwc2_dump_int_registers();
     // dwc2_dump_port_int(0);
 
-    // CLEAR_INTR();
-    // CLEAR_INTRMSK();
+    CLEAR_INTR();
+    CLEAR_INTRMSK();
     GET_SPLT();
     USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
     SET_SPLT();
@@ -376,10 +377,10 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
     USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
     SET_CHAR();
-    while(1) {
-    wait_usec(100);
-      report_intr(0);
-    }
+ //    while(1) {
+ //    wait_usec(100);
+ //      report_intr(0);
+ //    }
 
     status = dwc2_wait_halted(ch);
     if (status) {
@@ -391,8 +392,8 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
     GET_SPLT();
     if (USB_HOST_SPLT_GET_SPLT_ENABLE(splt)) {
       DWCDEBUG("SPLT ENA: %08x", splt);
-      // CLEAR_INTR();
-      // CLEAR_INTRMSK();
+      CLEAR_INTR();
+      CLEAR_INTRMSK();
       USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
       SET_SPLT();
       GET_CHAR();
@@ -414,20 +415,21 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       siz,
       USB_HOST_SIZE_GET_PACKET_COUNT(siz),
       USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
+    // while(1);
 
     if (dwc2_log_level > 1)
       hexdump_memory(buf, bufsz);
-//    if (pipe.u.ep_direction == USB_DIRECTION_OUT) {
-//    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-//  //  if (USB_HOST_SIZE_GET_SIZE(siz)) {
-//      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-//      /* 
-//       * packet was successfully retrieved, so we reset number of 
-//       * retries before failure
-//       */
-//      i = 0;
-//      continue;
-//    }//}
+    if (pipe.u.ep_direction == USB_DIRECTION_OUT) {
+    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+  //  if (USB_HOST_SIZE_GET_SIZE(siz)) {
+      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+      /* 
+       * packet was successfully retrieved, so we reset number of 
+       * retries before failure
+       */
+      i = 0;
+      continue;
+    }}
     break;
   }
 out:

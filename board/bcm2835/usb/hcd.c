@@ -31,7 +31,7 @@ static int usb_hcd_unique_device_address = 1;
 
 static bool powered_on = 0;
 
-int usb_hcd_log_level = 10;
+int usb_hcd_log_level = 0;
 
 int usb_hcd_set_log_level(int level)
 {
@@ -687,8 +687,8 @@ int usb_hcd_start()
       break;
   }
   HCDLOG("core started");
-  dwc2_unmask_all_interrupts();
-  dwc2_enable_host_interrupts();
+  // dwc2_unmask_all_interrupts();
+  dwc2_enable_channel_interrupts();
 
   HCDLOG("setting host clock...");
   dwc2_power_clock_off();
@@ -749,7 +749,6 @@ static int usb_hcd_attach_root_hub()
     HCDERR("root_hub already attached");
     goto out_err;
   }
-  dwc2_set_port_status_changed_cb(usb_root_hub_set_port_status);
 
   root_hub = usb_hcd_allocate_device();
   if (IS_ERR(root_hub)) {

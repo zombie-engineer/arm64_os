@@ -309,7 +309,7 @@ void dwc2_unmask_all_interrupts(void)
   write_reg(USB_GINTMSK, mask);
 }
 
-void dwc2_enable_host_interrupts(void)
+void dwc2_enable_channel_interrupts(void)
 {
   uint32_t intmsk;
   write_reg(USB_HAINTMSK, 0);

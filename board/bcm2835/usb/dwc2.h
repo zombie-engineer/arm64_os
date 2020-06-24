@@ -174,7 +174,7 @@ void dwc2_unmask_all_interrupts(void);
 
 void dwc2_unmask_port_interrupts(void);
 
-void dwc2_enable_host_interrupts(void);
+void dwc2_enable_channel_interrupts(void);
 
 void dwc2_clear_all_interrupts(void);
 

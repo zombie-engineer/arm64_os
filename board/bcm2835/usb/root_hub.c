@@ -34,7 +34,7 @@
 
 
 int usb_root_hub_device_number = 0;
-int usb_root_hub_debug = 1;
+int usb_root_hub_debug = 0;
 struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
@@ -140,13 +140,6 @@ struct usb_string_descriptor usb_rh_string_serial = {
 	},
 	.data = USB_ROOT_HUB_STRING_SERIAL
 };
-
-static struct usb_hub_port_status last_port_status ALIGNED(4) = { 0 };
-
-void usb_root_hub_set_port_status(struct usb_hub_port_status *status)
-{
-  memcpy(&last_port_status, status, sizeof(last_port_status));
-}
 
 static inline void usb_root_hub_reply(void *dst, int dst_sz, void *reply, int reply_sz, int *out_num_bytes)
 {
@@ -258,8 +251,6 @@ static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_by
         hub_get_port_status(&port_status);
         reply = &port_status;
         reply_sz = sizeof(port_status);
-//        reply = &last_port_status;
-//        reply_sz = sizeof(last_port_status);
       } else
         RHERR("non existing port index %d requested for status", index);
       break;
