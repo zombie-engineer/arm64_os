@@ -505,14 +505,50 @@ static inline void dwc2_irq_handle_sess_req(void)
   write_reg(USB_GINTSTS, reg);
 }
 
+static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c, uint32_t intr)
+{
+  printf("ACK\n");
+  if (dwc2_is_split_enabled(c->pipe)) {
+     printf("SET_SPLIT\n");
+     dwc2_transfer_start(c->pipe);
+  } else {
+    printf("COMPLETED\n");
+    dwc2_transfer_completed_debug(c);
+    if (dwc2_transfer_recalc_next(c)) {
+      printf("-->\n");
+      dwc2_transfer_start(c->pipe);
+    }
+    else {
+      printf("else, c:%p, tc:%p, completion:%p\n", c, c->tc, c->tc->completion);
+      if (c->tc->completion) {
+        printf("-->copl\n");
+        c->tc->completion(c->tc->completion_data);
+      }
+    }
+  }
+  USB_HOST_INTR_CLR_SET_ACK(intr, 1);
+  USB_HOST_INTR_CLR_SET_XFER_COMPLETE(intr, 1)
+  SET_INTR();
+}
+
 static inline void dwc2_irq_handle_channel_int_one(int ch)
 {
   uint32_t intr, intrmsk;
+  struct dwc2_channel *c;
+  c = dwc2_channel_get(ch);
   GET_INTR();
-  intrmsk = 0xffffffff;
-  USB_HOST_INTR_CLR_HALT(intrmsk);
-  SET_INTRMSK();
   DWCINFO("handling interrupt on channel %d, int=%08x", ch, intr);
+  if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
+    if (USB_HOST_INTR_GET_ACK(intr)) {
+      dwc2_irq_handle_channel_ack(ch, c, intr);
+    }
+  }
+  // SET_INTR();
+
+  // intrmsk = 0xffffffff;
+  // USB_HOST_INTR_CLR_HALT(intrmsk);
+  // SET_INTRMSK();
+
 }
 
 static inline void dwc2_irq_handle_channel_int(void)

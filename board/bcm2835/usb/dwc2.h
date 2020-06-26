@@ -2,18 +2,10 @@
 #include <compiler.h>
 #include <types.h>
 #include <usb/usb_pid.h>
+#include <completion.h>
 
 #define DWC2_TRANSFER_STATUS_STARTED 0
-
-struct dwc2_transfer_ctl {
-  int status;
-  int to_transfer_size;
-};
-
-struct dwc2_channel {
-  struct dwc2_transfer_ctl *tc;
-};
-
+#define DWC2_TRANSFER_STATUS_SPLIT_HANDLED 1
 
 typedef struct dwc2_pipe_desc {
   union {
@@ -32,6 +24,38 @@ typedef struct dwc2_pipe_desc {
   } u;
 } dwc2_pipe_desc_t;
 
+#define PIPE_DESC_INIT(__hcd_pipe, __type, __dir) {\
+    .u = {\
+      .device_address  = __hcd_pipe->address, \
+      .ep_address      = __hcd_pipe->endpoint,\
+      .ep_type         = __type,\
+      .ep_direction    = __dir,\
+      .speed           = __hcd_pipe->speed,\
+      .max_packet_size = __hcd_pipe->max_packet_size,\
+      .hub_address     = __hcd_pipe->ls_hub_address,\
+      .hub_port        = __hcd_pipe->ls_hub_port\
+    }\
+  }
+
+#define DECL_PIPE_DESC(__name, __hcd_pipe, __type, __dir) \
+  dwc2_pipe_desc_t __name = PIPE_DESC_INIT(__hcd_pipe, __type, __dir)
+
+struct dwc2_transfer_ctl {
+  int status;
+  int transfer_size;
+  int split_start;
+  uint64_t dma_addr_base;
+  uint64_t dma_addr;
+  completion_fn completion;
+  void *completion_data;
+};
+
+struct dwc2_channel {
+  dwc2_pipe_desc_t pipe ALIGNED(8);
+  struct dwc2_transfer_ctl *tc;
+};
+
+
 /*
  * Return value: length of a printed string
  */
@@ -46,9 +70,13 @@ typedef enum {
   DWC2_STATUS_ERR,
 } dwc2_transfer_status_t;
 
-dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes);
+dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes);
 
-int dwc2_start_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid);
+bool dwc2_is_split_enabled(dwc2_pipe_desc_t pipe);
+void dwc2_transfer_completed_debug(struct dwc2_channel *c);
+void dwc2_transfer_prepare(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t *pid);
+int dwc2_transfer_start(dwc2_pipe_desc_t pipe);
+int dwc2_transfer_recalc_next(struct dwc2_channel *c);
 
 struct usb_hub_port_status;
 

@@ -163,7 +163,7 @@ static inline void dwc2_transfer_prologue(dwc2_pipe_desc_t pipe, void *buf, int 
 
 static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
 {
-  int intr, intrmsk;
+  int intr;
   int timeout = 1;
   while(1) {
     GET_INTR();
@@ -188,7 +188,7 @@ static inline dwc2_transfer_status_t dwc2_wait_halted(int ch)
   if (USB_HOST_INTR_GET_ACK(intr)) {
     return DWC2_STATUS_ACK;
   }
-  
+
   if (USB_HOST_INTR_GET_NAK(intr)) {
     DWCERR("NAK");
     return DWC2_STATUS_NAK;
@@ -267,17 +267,17 @@ static inline void dwc2_channel_program_char(dwc2_pipe_desc_t pipe)
   SET_CHAR();
 }
 
-static inline void dwc2_channel_program_split(dwc2_pipe_desc_t pipe)
+static inline void dwc2_channel_program_split(struct dwc2_channel *c)
 {
   uint32_t splt;
-  int ch = pipe.u.dwc_channel;
+  int ch = c->pipe.u.dwc_channel;
   /* Clear and setup split control to low speed devices */
   splt = 0;
-  if (pipe.u.speed != USB_SPEED_HIGH) {
+  if (c->pipe.u.speed != USB_SPEED_HIGH) {
     USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
-    USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, pipe.u.hub_address);
-    USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, pipe.u.hub_port);
-    DWCDEBUG("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, pipe.u.hub_address, pipe.u.hub_port);
+    USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, c->pipe.u.hub_address);
+    USB_HOST_SPLT_CLR_SET_PORT_ADDR(splt, c->pipe.u.hub_port);
+    DWCDEBUG("LOW/FULL_SPEED:split: %08x, hub:%d, port:%d\r\n", splt, c->pipe.u.hub_address, c->pipe.u.hub_port);
   }
   SET_SPLT();
 }
@@ -291,76 +291,163 @@ static inline void dwc2_channel_program_tsize(dwc2_pipe_desc_t pipe, int transfe
   SET_SIZ();
 }
 
-static inline void dwc2_channel_set_split_start(int ch)
+static inline void dwc2_channel_set_split_start(dwc2_pipe_desc_t pipe)
 {
   uint32_t splt;
+  int ch = pipe.u.dwc_channel;
   GET_SPLT();
   USB_HOST_SPLT_CLR_COMPLETE_SPLIT(splt);
   SET_SPLT();
 }
 
-static inline void dwc2_channel_set_dma_addr(int ch, uint64_t dma_addr, int sz)
+static inline void dwc2_channel_set_dma_addr(dwc2_pipe_desc_t pipe, uint64_t dma_addr, int transfer_size)
 {
   uint32_t dma;
+  int ch = pipe.u.dwc_channel;
   BUG(dma_addr & 3, "UNALIGNED DMA address");
-  dcache_flush(dma_addr, sz);
+
+  if (dma_addr && transfer_size && pipe.u.ep_direction == USB_DIRECTION_OUT)
+    dcache_flush(dma_addr, transfer_size);
+
+  dcache_flush(dma_addr, transfer_size);
   dma = RAM_PHY_TO_BUS_UNCACHED(dma_addr);
   SET_DMA();
 }
 
-static inline void dwc2_channel_set_split_complete(int ch)
+static inline void dwc2_channel_set_split_complete(dwc2_pipe_desc_t pipe)
 {
   uint32_t splt;
+  int ch = pipe.u.dwc_channel;
   GET_SPLT();
   DWCDEBUG("SPLT ENA: %08x", splt);
   USB_HOST_SPLT_CLR_SET_COMPLETE_SPLIT(splt, 1);
   SET_SPLT();
 }
 
-static inline void dwc2_channel_start_transmit(int ch)
+static inline void dwc2_channel_start_transmit(dwc2_pipe_desc_t pipe)
 {
   uint32_t chr;
+  int ch = pipe.u.dwc_channel;
   GET_CHAR();
   USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
   USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
   SET_CHAR();
 }
 
-int dwc2_start_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid)
-{
-  int dwc_pid = usb_pid_to_dwc_pid(*pid);
-  struct dwc2_channel *c;
-  struct dwc2_transfer_ctl *tc;
-  c = dwc2_channel_get(pipe.u.dwc_channel);
-  tc = c->tc;
-  tc->status = DWC2_TRANSFER_STATUS_STARTED;
-  tc->to_transfer_size = bufsz;
-
-  dwc2_channel_program_char(pipe);
-  dwc2_channel_program_split(pipe);
-  dwc2_channel_program_tsize(pipe, bufsz, dwc_pid);
-  return ERR_OK;
-}
-
-static inline void dwc2_channel_clear_intr(int ch)
-{
-  CLEAR_INTR();
-  CLEAR_INTRMSK();
-}
-
-static inline bool dwc2_is_split_enabled(int ch)
+bool dwc2_is_split_enabled(dwc2_pipe_desc_t pipe)
 {
   uint32_t splt;
+  int ch = pipe.u.dwc_channel;
   GET_SPLT();
   return USB_HOST_SPLT_GET_SPLT_ENABLE(splt) ? true : false;
 }
 
-dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes)
+static inline void dwc2_channel_clear_intr(dwc2_pipe_desc_t pipe)
+{
+  int ch = pipe.u.dwc_channel;
+  CLEAR_INTR();
+  CLEAR_INTRMSK();
+}
+
+void dwc2_transfer_continue(dwc2_pipe_desc_t pipe)
+{
+  if (dwc2_is_split_enabled(pipe)) {
+    dwc2_channel_clear_intr(pipe);
+    dwc2_channel_set_split_complete(pipe);
+    dwc2_channel_start_transmit(pipe);
+  }
+}
+
+void dwc2_transfer_prepare(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t *pid)
+{
+  int dwc_pid = usb_pid_to_dwc_pid(*pid);
+  struct dwc2_channel *c;
+  struct dwc2_transfer_ctl *tc;
+
+  BUG((uint64_t)addr & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
+
+  // if (addr && transfer_size && pipe.u.ep_direction == USB_DIRECTION_OUT)
+  //  dcache_flush(addr, transfer_size);
+
+  c = dwc2_channel_get(pipe.u.dwc_channel);
+  c->pipe.u.raw = pipe.u.raw;
+  c->tc->split_start = true;
+  tc = c->tc;
+  tc->status = DWC2_TRANSFER_STATUS_STARTED;
+  tc->transfer_size = transfer_size;
+  dwc2_channel_program_char(pipe);
+  dwc2_channel_program_split(c);
+  dwc2_channel_program_tsize(pipe, transfer_size, dwc_pid);
+  c->tc->dma_addr = c->tc->dma_addr_base = (uint64_t)addr;
+}
+
+int dwc2_transfer_start(dwc2_pipe_desc_t pipe)
+{
+  uint32_t UNUSED intr, intrmsk;
+  struct dwc2_channel *c;
+  int ch = pipe.u.dwc_channel;
+  c = dwc2_channel_get(pipe.u.dwc_channel);
+
+  if (c->tc->split_start) {
+    dwc2_channel_set_split_start(pipe);
+    dwc2_channel_set_dma_addr(pipe, c->tc->dma_addr, c->tc->transfer_size);
+    c->tc->split_start = false;
+  } else {
+    dwc2_channel_set_split_complete(pipe);
+    c->tc->split_start = true;
+  }
+
+  dwc2_channel_start_transmit(pipe);
+
+  GET_INTR();
+  intrmsk = 0xffffffff;
+  USB_HOST_INTR_CLR_HALT(intrmsk);
+  SET_INTRMSK();
+  return ERR_OK;
+}
+
+int dwc2_transfer_recalc_next(struct dwc2_channel *c)
+{
+  uint32_t siz;
+  int ch = c->pipe.u.dwc_channel;
+  if (c->pipe.u.ep_direction == USB_DIRECTION_OUT) {
+    GET_SIZ();
+    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
+      c->tc->dma_addr = c->tc->dma_addr_base + c->tc->transfer_size - USB_HOST_SIZE_GET_SIZE(siz);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void dwc2_transfer_completed_debug(struct dwc2_channel *c)
+{
+  uint32_t intr, siz, splt;
+  int ch = c->pipe.u.dwc_channel;
+  if (dwc2_log_level > 1) {
+    GET_SPLT();
+    GET_INTR();
+    GET_SIZ();
+    DWCDEBUG("siz:%08x(packets:%d, size:%d), intr:%08x, dma_addr:%p, transfer_size:%d, split:%08x",
+      siz,
+      USB_HOST_SIZE_GET_PACKET_COUNT(siz),
+      USB_HOST_SIZE_GET_SIZE(siz),
+      intr,
+      c->tc->dma_addr,
+      c->tc->transfer_size,
+      splt);
+
+   if (dwc2_log_level > 2)
+     hexdump_memory((void*)c->tc->dma_addr, c->tc->transfer_size);
+  }
+}
+
+dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t *pid, int *out_num_bytes)
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
   int i;
   int ch = pipe.u.dwc_channel;
-  int dwc_pid = usb_pid_to_dwc_pid(*pid);
+  struct dwc2_channel *c = dwc2_channel_get(ch);
 
   /*
    * Randomly chose number of retryable failures before exiting with
@@ -369,31 +456,18 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
   const int max_retries = 10;
 
   uint32_t intr UNUSED;
-  uint32_t chr, splt, siz, dma;
-  uint64_t dma_dst;
+  uint32_t siz;
 
-  dwc2_transfer_prologue(pipe, buf, bufsz, dwc_pid);
-  if (buf && bufsz && pipe.u.ep_direction == USB_DIRECTION_OUT)
-    dcache_flush(buf, bufsz);
+  dwc2_transfer_prologue(pipe, addr, transfer_size, *pid);
 
-  if ((uint64_t)buf & 3) {
-    DWCERR("dwc2_transfer:buffer not aligned to 4 bytes\r\n");
-    return DWC2_STATUS_ERR;
-  }
+  dwc2_channel_clear_intr(pipe);
+  dwc2_transfer_prepare(pipe, addr, transfer_size, pid);
 
-  dwc2_channel_clear_intr(ch);
-  dwc2_channel_program_char(pipe);
-  dwc2_channel_program_split(pipe);
-  dwc2_channel_program_tsize(pipe, bufsz, dwc_pid);
-
-  dma_dst = (uint64_t)buf;
-  for (i = 0; i < max_retries; ++i) {
+  while(1) {
     DWCDEBUG2("transfer: iteration:%d", i);
 
-    dwc2_channel_clear_intr(ch);
-    dwc2_channel_set_split_start(ch);
-    dwc2_channel_set_dma_addr(ch, dma_dst, bufsz);
-    dwc2_channel_start_transmit(ch);
+    dwc2_channel_clear_intr(pipe);
+    dwc2_transfer_start(pipe);
 
     status = dwc2_wait_halted(ch);
     if (status) {
@@ -402,48 +476,25 @@ dwc2_transfer_status_t dwc2_transfer(dwc2_pipe_desc_t pipe, void *buf, int bufsz
       goto out;
     }
 
-    if (dwc2_is_split_enabled(ch)) {
-      dwc2_channel_clear_intr(ch);
-      dwc2_channel_set_split_complete(ch);
-      dwc2_channel_start_transmit(ch);
+    if (dwc2_is_split_enabled(pipe)) {
+      dwc2_channel_clear_intr(pipe);
+      dwc2_transfer_start(pipe);
       wait_usec(100);
       status = dwc2_wait_halted(ch);
-      if (status)
+      if (status != DWC2_STATUS_ACK)
         goto out;
-
-      GET_SPLT();
-      DWCDEBUG("SPLT ENA: %08x", splt);
     }
-
-    GET_INTR();
-    GET_SIZ();
-    DWCDEBUG("sz:%08x, packets:%d, size:%d, next_dma_addr:%p, bufsz:%d",
-      siz,
-      USB_HOST_SIZE_GET_PACKET_COUNT(siz),
-      USB_HOST_SIZE_GET_SIZE(siz), dma_dst, bufsz);
-
-    if (dwc2_log_level > 1)
-      hexdump_memory(buf, bufsz);
-    if (pipe.u.ep_direction == USB_DIRECTION_OUT) {
-    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-      // if (USB_HOST_SIZE_GET_SIZE(siz)) {
-      dma_dst = (uint64_t)buf + bufsz - USB_HOST_SIZE_GET_SIZE(siz);
-      /*
-       * packet was successfully retrieved, so we reset number of
-       * retries before failure
-       */
-      i = 0;
-      continue;
-    }}
-    break;
+    dwc2_transfer_completed_debug(c);
+    if (!dwc2_transfer_recalc_next(c))
+      break;
   }
 out:
+  GET_SIZ();
   if (out_num_bytes) {
-    GET_SIZ();
-    *out_num_bytes = bufsz - USB_HOST_SIZE_GET_SIZE(siz);
+    *out_num_bytes = transfer_size - USB_HOST_SIZE_GET_SIZE(siz);
   }
   *pid = dwc_pid_to_usb_pid(USB_HOST_SIZE_GET_PID(siz));
-  
+
   DWCDEBUG("=======TRANSFER END=tsz:%08x========================", siz);
 	return status;
 }

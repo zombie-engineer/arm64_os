@@ -14,13 +14,13 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
-static int __hcd_dwc2_transfer(dwc2_pipe_desc_t pipedesc, void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
+static int hcd_transfer_packet_blocking(dwc2_pipe_desc_t pipedesc, void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
 {
   int err = ERR_OK;
   int num_bytes;
   dwc2_transfer_status_t status;
   while(1) {
-    status = dwc2_transfer(pipedesc, buf, bufsz, pid, &num_bytes);
+    status = dwc2_transfer_blocking(pipedesc, buf, bufsz, pid, &num_bytes);
     if (status == DWC2_STATUS_ACK)
       break;
     if (status == DWC2_STATUS_NAK)
@@ -44,55 +44,57 @@ void hcd_transfer_completed(void *arg)
   printf("hcd_transfer_completed\n");
 }
 
-int hcd_transfer_control(
-  struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
-  void *addr,
-  int transfer_size,
-  uint64_t rq,
-  int timeout,
-  int *out_num_bytes)
-{
-  int channel_id = DWC2_INVALID_CHANNEL;
-  struct dwc2_channel *channel;
-  usb_pid_t pid;
-  /*
-   * Channel setup
-   */
-  memset(&tc, 0, sizeof(tc));
-  tc.completion = hcd_transfer_completed;
-  tc.completion_data = 0;
+#define HCD_TRANSFER_COMMON \
+  int err; \
+  int num_bytes = 0;\
+  uint64_t rqbuf ALIGNED(8) = rq;\
+  usb_pid_t pid;\
+  int channel_id = DWC2_INVALID_CHANNEL;\
+  DECL_PIPE_DESC(pipedesc, pipe, USB_ENDPOINT_TYPE_CONTROL, USB_DIRECTION_OUT);\
+  hcd_transfer_control_prologue(pipe, rq);\
+  if (pipe->address == usb_root_hub_device_number) {\
+    err = usb_root_hub_process_req(rq, buf, bufsz, &num_bytes);\
+    goto out_err;\
+  }\
+  channel_id = dwc2_channel_alloc();\
+  if (channel_id == DWC2_INVALID_CHANNEL) {\
+    err = ERR_RETRY;\
+    HCDERR("channel not allocated. Retry");\
+    goto out_err;\
+  }\
 
-  channel_id = dwc2_channel_alloc();
-  if (channel_id == DWC2_INVALID_CHANNEL) {
-    HCDERR("channel not allocated. Retry");
-    err = ERR_RETRY;
-    goto out_err;
-  }
 
-  channel = dwc2_channel_get(channel_id);
-  channel->tc = &tc;
-  dwc2_enable_channel(channel_id);
-
-  pipedesc.u.dwc_channel = channel_id;
-  printf("prep, c:%p, tc:%p, completion:%p\n", channel, channel->tc, channel->tc->completion);
-  pid = USB_PID_SETUP;
-  dwc2_transfer_prepare(pipedesc, NULL, 0, &pid);
-  dwc2_transfer_start(pipedesc);
-}
-
-int hcd_transfer_control_entry(
-  struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
-  void *buf,
-  int bufsz,
-  uint64_t rq,
-  int timeout,
-  int *out_num_bytes)
-{
-
-}
-
+//int hcd_transfer_control(
+//  struct usb_hcd_pipe *pipe,
+//  struct usb_hcd_pipe_control *pctl,
+//  void *addr,
+//  int transfer_size,
+//  uint64_t rq,
+//  int timeout,
+//  int *out_num_bytes)
+//{
+//  HCD_TRANSFER_COMMON
+//  struct dwc2_channel *channel;
+//  usb_pid_t pid;
+//  /*
+//   * Channel setup
+//   */
+//  memset(&tc, 0, sizeof(tc));
+//  tc.completion = hcd_transfer_completed;
+//  tc.completion_data = 0;
+//
+//
+//  channel = dwc2_channel_get(channel_id);
+//  channel->tc = &tc;
+//  dwc2_enable_channel(channel_id);
+//
+//  pipedesc.u.dwc_channel = channel_id;
+//  printf("prep, c:%p, tc:%p, completion:%p\n", channel, channel->tc, channel->tc->completion);
+//  pid = USB_PID_SETUP;
+//  dwc2_transfer_prepare(pipedesc, NULL, 0, &pid);
+//  dwc2_transfer_start(pipedesc);
+//}
+//
 int hcd_transfer_control_blocking(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
@@ -102,36 +104,13 @@ int hcd_transfer_control_blocking(
   int timeout,
   int *out_num_bytes)
 {
-  int err;
-  int num_bytes = 0;
-  uint64_t rqbuf ALIGNED(8) = rq;
-  usb_pid_t pid;
-
-  dwc2_pipe_desc_t pipedesc = {
-    .u = {
-      .device_address  = pipe->address,
-      .ep_address      = pipe->endpoint,
-      .ep_type         = USB_ENDPOINT_TYPE_CONTROL,
-      .ep_direction    = USB_DIRECTION_OUT,
-      .speed           = pipe->speed,
-      .max_packet_size = pipe->max_packet_size,
-      .hub_address     = pipe->ls_hub_address,
-      .hub_port        = pipe->ls_hub_port
-    }
-  };
-
-  hcd_transfer_control_prologue(pipe, rq);
-
-  if (pipe->address == usb_root_hub_device_number) {
-    err = usb_root_hub_process_req(rq, buf, bufsz, &num_bytes);
-    goto out_err;
-  }
+  HCD_TRANSFER_COMMON
 
   /*
    * Send SETUP packet
    */
   pid = USB_PID_SETUP;
-  err = __hcd_dwc2_transfer(pipedesc, &rqbuf, sizeof(rqbuf), &pid, "SETUP", NULL);
+  err = hcd_transfer_packet_blocking(pipedesc, &rqbuf, sizeof(rqbuf), &pid, "SETUP", NULL);
   CHECK_ERR_SILENT();
 
   /*
@@ -140,7 +119,7 @@ int hcd_transfer_control_blocking(
   if (buf) {
     pid = USB_PID_DATA1;
     pipedesc.u.ep_direction = pctl->direction;
-    err = __hcd_dwc2_transfer(pipedesc, buf, bufsz, &pid, "DATA", &num_bytes);
+    err = hcd_transfer_packet_blocking(pipedesc, buf, bufsz, &pid, "DATA", &num_bytes);
     CHECK_ERR_SILENT();
   }
 
@@ -153,7 +132,7 @@ int hcd_transfer_control_blocking(
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
 
   pid = USB_PID_DATA1;
-  err = __hcd_dwc2_transfer(pipedesc, 0, 0, &pid, "ACK", NULL);
+  err = hcd_transfer_packet_blocking(pipedesc, 0, 0, &pid, "ACK", NULL);
   CHECK_ERR_SILENT();
 
 out_err:
@@ -189,7 +168,7 @@ int hcd_transfer_interrupt(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  status = dwc2_transfer(pipedesc, buf, buf_sz, USB_PID_DATA0, out_num_bytes);
+  status = dwc2_transfer_blocking(pipedesc, buf, buf_sz, USB_PID_DATA0, out_num_bytes);
   switch(status) {
     case DWC2_STATUS_ACK: err = ERR_OK; break;
     case DWC2_STATUS_NAK: err = ERR_RETRY; break;
@@ -224,7 +203,7 @@ int hcd_transfer_bulk(
       .hub_port        = pipe->ls_hub_port
     }
   };
-  status = dwc2_transfer(pipedesc, buf, buf_sz, pid, out_num_bytes);
+  status = dwc2_transfer_blocking(pipedesc, buf, buf_sz, pid, out_num_bytes);
   if (status != DWC2_STATUS_ACK) {
     if (status == DWC2_STATUS_NAK) {
       err = ERR_RETRY;

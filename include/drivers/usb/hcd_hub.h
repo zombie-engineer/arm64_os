@@ -64,7 +64,7 @@ int usb_hcd_hub_device_to_string(usb_hub_t *h, const char *prefix, char *buf, in
   int num_bytes;\
   DECL_PCTL(CONTROL, __direction, 0);\
   DECL_RQ(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
-	err = hcd_transfer_control(&h->d->pipe0, &pctl, __dst, __rq_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);\
+	err = hcd_transfer_control_blocking(&h->d->pipe0, &pctl, __dst, __rq_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);\
   if (err != ERR_OK) {\
     HUBERR("request '"#__rq_type "-" #__rq "' v:%d,i:%d,l:%d failed", __rq_value, __rq_index, __rq_size);\
     err = ERR_GENERIC;\
@@ -94,13 +94,13 @@ static inline int usb_hub_get_status(usb_hub_t *h, struct usb_hub_status *status
 }
 
 /*
- * Hub port transmission functions.  
+ * Hub port transmission functions.
  * These do the actual request transmissions.
  * Note that port indices are globally 0-based, but for transmission we need
  * 1-based port values, so we explicitly do the conversion here.
  * By design this should be the only place port numbers are converted.
  */
-#define BASE0_TO_BASE1(__port) (__port + 1) 
+#define BASE0_TO_BASE1(__port) (__port + 1)
 
 static inline int usb_hub_port_set_feature(usb_hub_t *h, int port, int feature)
 {
