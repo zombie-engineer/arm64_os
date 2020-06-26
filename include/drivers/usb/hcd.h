@@ -212,11 +212,23 @@ int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, 
 int hcd_transfer_control_blocking(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
-  void *buf,
-  int buf_sz,
+  void *addr,
+  int transfer_size,
   uint64_t rq,
   int timeout,
   int *out_num_bytes);
+
+int hcd_transfer_control(
+  struct usb_hcd_pipe *pipe,
+  struct usb_hcd_pipe_control *pctl,
+  void *addr,
+  int transfer_size,
+  uint64_t rq,
+  int timeout,
+  int *out_num_bytes);
+
+#define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __t, __o)\
+  hcd_transfer_control_blocking(__p, __pc, __a, __sz, __rq, __t, __o)
 
 int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,
