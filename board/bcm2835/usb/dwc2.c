@@ -79,6 +79,22 @@ static port_status_changed_cb_t port_status_changed_cb = NULL;
  *
  */
 
+
+DECL_STATIC_SLOT(struct dwc2_transfer_ctl, dwc2_transfer_ctl, 16);
+
+struct dwc2_transfer_ctl *dwc2_transfer_ctl_allocate()
+{
+  struct dwc2_transfer_ctl *res;
+  res = dwc2_transfer_ctl_alloc();
+  printf("alloc:%p\n", res);
+  return res;
+}
+
+void dwc2_transfer_ctl_deallocate(struct dwc2_transfer_ctl *ctl)
+{
+  dwc2_transfer_ctl_release(ctl);
+}
+
 void dwc2_dump_port_int(int port)
 {
   uint32_t portval;
@@ -370,10 +386,7 @@ void dwc2_dump_int_registers(void)
 
 static inline void dwc2_irq_handle_sof(void)
 {
-  uint32_t reg = 0;
-  USB_GINTSTS_CLR_SET_SOF(reg, 1);
-	write_reg(USB_GINTSTS, reg);
-  DWCINFO("handling sof, reg = %08x", reg);
+  DWCINFO("SOF");
 }
 
 static inline void dwc2_hprt_to_port_status(uint32_t hprt, struct usb_hub_port_status *s)
@@ -452,103 +465,78 @@ void dwc2_irq_handle_otgint()
 
 void dwc2_irq_handle_mode_mismatch(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("mode mismatch, clearing...");
-  USB_GINTSTS_CLR_SET_MODEMIS(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("mode mismatch");
 }
 
 static inline void dwc2_irq_handle_early_susp(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("early suspend, clearing...");
-  USB_GINTSTS_CLR_SET_ERLYSUSP(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("early suspend");
 }
 
 static inline void dwc2_irq_handle_usb_susp(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("usb suspend, clearing...");
-  USB_GINTSTS_CLR_SET_USBSUSP(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("usb suspend");
+}
 
-}static inline void dwc2_irq_handle_eopf(void)
+static inline void dwc2_irq_handle_eopf(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("eopf, clearing...");
-  USB_GINTSTS_CLR_SET_EOPF(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("EOPF");
 }
 
 static inline void dwc2_irq_handle_non_periodic_tx_fifo_empty(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("non-periodic tx fifo empty, clearing...");
-  USB_GINTSTS_CLR_SET_NPTXFEMP(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("non-periodic tx fifo empty");
 }
 
 static inline void dwc2_irq_handle_conn_id_sta_chng(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("connection id status changed, clearing...");
-  USB_GINTSTS_CLR_SET_CONIDSTSCHNG(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("connection id status changed");
 }
 
 static inline void dwc2_irq_handle_sess_req(void)
 {
-  uint32_t reg = 0;
-  DWCINFO("session req, clearing...");
-  USB_GINTSTS_CLR_SET_SESSREQINT(reg, 1);
-  write_reg(USB_GINTSTS, reg);
+  DWCINFO("session req");
 }
 
-static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c, uint32_t intr)
+static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c)
 {
-  printf("ACK\n");
+  DWCINFO("channel irq ack: %d", ch);
   if (dwc2_is_split_enabled(c->pipe)) {
-     printf("SET_SPLIT\n");
      dwc2_transfer_start(c->pipe);
-  } else {
-    printf("COMPLETED\n");
-    dwc2_transfer_completed_debug(c);
-    if (dwc2_transfer_recalc_next(c)) {
-      printf("-->\n");
-      dwc2_transfer_start(c->pipe);
-    }
-    else {
-      printf("else, c:%p, tc:%p, completion:%p\n", c, c->tc, c->tc->completion);
-      if (c->tc->completion) {
-        printf("-->copl\n");
-        c->tc->completion(c->tc->completion_data);
-      }
-    }
+     return;
   }
-  USB_HOST_INTR_CLR_SET_ACK(intr, 1);
-  USB_HOST_INTR_CLR_SET_XFER_COMPLETE(intr, 1)
-  SET_INTR();
+  dwc2_transfer_completed_debug(c);
+  if (dwc2_transfer_recalc_next(c)) {
+      dwc2_transfer_start(c->pipe);
+      return;
+  }
+  if (c->tc->completion)
+    c->tc->completion(c->tc->completion_data);
 }
 
 static inline void dwc2_irq_handle_channel_int_one(int ch)
 {
-  uint32_t intr, intrmsk;
+  uint32_t intr, intrmsk, raw_intr;
   struct dwc2_channel *c;
   c = dwc2_channel_get(ch);
   GET_INTR();
-  DWCINFO("handling interrupt on channel %d, int=%08x", ch, intr);
+  GET_INTRMSK();
+  raw_intr = intr;
+  intr &= intrmsk;
+  SET_INTR();
+
+  DWCINFO("channel irq ch:%d, %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
   if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
+    USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
     if (USB_HOST_INTR_GET_ACK(intr)) {
-      dwc2_irq_handle_channel_ack(ch, c, intr);
+      dwc2_irq_handle_channel_ack(ch, c);
+      USB_HOST_INTR_CLR_ACK(intr);
+      if (intr) {
+        printf("there's more %08x\n", intr);
+        while(1);
+      }
     }
   }
-  // SET_INTR();
-
-  // intrmsk = 0xffffffff;
-  // USB_HOST_INTR_CLR_HALT(intrmsk);
-  // SET_INTRMSK();
-
 }
 
 static inline void dwc2_irq_handle_channel_int(void)
@@ -556,70 +544,73 @@ static inline void dwc2_irq_handle_channel_int(void)
   int i;
   int num_channels = 6;
   uint32_t haint = read_reg(USB_HAINT);
-  DWCINFO("channel interrupt:%08x, handling...", haint);
+  uint32_t haintmsk = read_reg(USB_HAINTMSK);
+  uint32_t masked = haint & haintmsk;
+  write_reg(USB_HAINT, masked);
+  DWCINFO("channel interrupt:%08x&%08x=%08x, handling...", haint, haintmsk, masked);
   for (i = 0; i < num_channels; ++i) {
-    if ((1<<i) & haint)
+    if ((1<<i) & masked)
       dwc2_irq_handle_channel_int_one(i);
   }
-  write_reg(USB_HAINT, haint);
 }
 
 void dwc2_irq_cb(void)
 {
   uint32_t intsts = read_reg(USB_GINTSTS);
-  DWCINFO("IRQ: INTRSTS:%08x", intsts);
+  uint32_t intmsk = read_reg(USB_GINTMSK);
+  uint32_t masked = intsts & intmsk;
+  DWCINFO("IRQ: INTSTS:%08x,INTMSK:%08x = %08x", intsts, intmsk, masked);
+  write_reg(USB_GINTSTS, masked);
   dwc2_dump_int_registers();
-  if (USB_GINTSTS_GET_HCHINT(intsts)) {
+  if (USB_GINTSTS_GET_HCHINT(masked)) {
     dwc2_irq_handle_channel_int();
     USB_GINTSTS_CLR_HCHINT(intsts);
-    write_reg(USB_GINTSTS, intsts);
   }
-  if (USB_GINTSTS_GET_MODEMIS(intsts)) {
+  if (USB_GINTSTS_GET_MODEMIS(masked))
     dwc2_irq_handle_mode_mismatch();
-  }
-  if (USB_GINTSTS_GET_ERLYSUSP(intsts)) {
+
+  if (USB_GINTSTS_GET_ERLYSUSP(masked))
     dwc2_irq_handle_early_susp();
-  }
-  if (USB_GINTSTS_GET_EOPF(intsts)) {
+
+  if (USB_GINTSTS_GET_EOPF(masked))
     dwc2_irq_handle_eopf();
-  }
-  if (USB_GINTSTS_GET_CONIDSTSCHNG(intsts)) {
+
+  if (USB_GINTSTS_GET_CONIDSTSCHNG(masked))
     dwc2_irq_handle_conn_id_sta_chng();
-  }
-  if (USB_GINTSTS_GET_SESSREQINT(intsts)) {
+
+  if (USB_GINTSTS_GET_SESSREQINT(masked))
     dwc2_irq_handle_sess_req();
-  }
-  // if (USB_GINTSTS_GET_NPTXFEMP(intsts)) {
-  //  dwc2_irq_handle_non_periodic_tx_fifo_empty();
-  // }
-  if (USB_GINTSTS_GET_USBSUSP(intsts)) {
+
+  if (USB_GINTSTS_GET_NPTXFEMP(masked))
+    dwc2_irq_handle_non_periodic_tx_fifo_empty();
+
+  if (USB_GINTSTS_GET_USBSUSP(masked))
     dwc2_irq_handle_usb_susp();
-  }
-  if (USB_GINTSTS_GET_OTGINT(intsts)) {
+
+  if (USB_GINTSTS_GET_OTGINT(masked))
     dwc2_irq_handle_otgint();
-  }
-  if (USB_GINTSTS_GET_SOF(intsts)) {
+
+  if (USB_GINTSTS_GET_SOF(masked))
     dwc2_irq_handle_sof();
-  }
-  if (USB_GINTSTS_GET_RXFLVL(intsts)) {
+
+  if (USB_GINTSTS_GET_RXFLVL(masked))
     dwc2_irq_handle_rx_fifo_lvl_intr();
-  }
+
   /* non-periodic TX fifo empty */
-  // if (USB_GINTSTS_GET_NPTXFEMP(intsts)) {
+  // if (USB_GINTSTS_GET_NPTXFEMP(masked)) {
   //  DWCINFO("NPTXFEMP");
   // }
   /* port interrupts */
-  if (USB_GINTSTS_GET_PRTINT(intsts)) {
+  if (USB_GINTSTS_GET_PRTINT(masked))
     dwc2_irq_handle_port_intr();
-  }
+
   /* periodic TX fifo empty */
-  // if (USB_GINTSTS_GET_PTXFEMP(intsts)) {
+  // if (USB_GINTSTS_GET_PTXFEMP(masked)) {
   //  DWCINFO("PTXFEMP");
   // }
-  if (USB_GINTSTS_GET_LPMTRANRCVD(intsts)) {
+  if (USB_GINTSTS_GET_LPMTRANRCVD(masked)) {
     DWCINFO("LPMTRANRCVD");
   }
-  // write_reg(USB_GINTSTS, intsts);
 }
 
 void dwc2_set_port_status_changed_cb(port_status_changed_cb_t cb)
@@ -653,13 +644,13 @@ static inline void dwc2_deinit_channel_int(int ch)
   CLEAR_INTR();
 }
 
-void dwc2_enable_channel(int ch)
+void dwc2_channel_enable(int ch)
 {
   dwc2_init_channel_int(ch);
   dwc2_enable_channel_int(ch);
 }
 
-void dwc2_disable_channel(int ch)
+void dwc2_channel_disable(int ch)
 {
   dwc2_deinit_channel_int(ch);
   dwc2_disable_channel_int(ch);
@@ -702,7 +693,7 @@ void dwc2_channel_free(dwc2_chan_id_t ch)
     spinlock_lock(&dwc2_channels_lock);
   bitmap = channels_bitmap;
   BUG(!(bitmap & (1<<ch)), "Trying to release channel that's not busy");
-  bitmap &= ~(uint8_t)(1<<ch); 
+  bitmap &= ~(uint8_t)(1<<ch);
   channels_bitmap = bitmap;
   if (spinlocks_enabled)
     spinlock_unlock(&dwc2_channels_lock);
@@ -728,4 +719,5 @@ void dwc2_init(void)
 {
   spinlock_init(&dwc2_channels_lock);
   memset(dwc2_channels, 0, sizeof(dwc2_channels));
+  STATIC_SLOT_INIT_FREE(dwc2_transfer_ctl);
 }

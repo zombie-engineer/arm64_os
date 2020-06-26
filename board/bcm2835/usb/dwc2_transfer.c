@@ -445,15 +445,8 @@ void dwc2_transfer_completed_debug(struct dwc2_channel *c)
 dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t *pid, int *out_num_bytes)
 {
   dwc2_transfer_status_t status = DWC2_STATUS_ACK;
-  int i;
   int ch = pipe.u.dwc_channel;
   struct dwc2_channel *c = dwc2_channel_get(ch);
-
-  /*
-   * Randomly chose number of retryable failures before exiting with
-   * error.
-   */
-  const int max_retries = 10;
 
   uint32_t intr UNUSED;
   uint32_t siz;
@@ -464,8 +457,6 @@ dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr,
   dwc2_transfer_prepare(pipe, addr, transfer_size, pid);
 
   while(1) {
-    DWCDEBUG2("transfer: iteration:%d", i);
-
     dwc2_channel_clear_intr(pipe);
     dwc2_transfer_start(pipe);
 

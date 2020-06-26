@@ -3,6 +3,7 @@
 #include <types.h>
 #include <usb/usb_pid.h>
 #include <completion.h>
+#include <memory/static_slot.h>
 
 #define DWC2_TRANSFER_STATUS_STARTED 0
 #define DWC2_TRANSFER_STATUS_SPLIT_HANDLED 1
@@ -41,6 +42,7 @@ typedef struct dwc2_pipe_desc {
   dwc2_pipe_desc_t __name = PIPE_DESC_INIT(__hcd_pipe, __type, __dir)
 
 struct dwc2_transfer_ctl {
+  struct list_head STATIC_SLOT_OBJ_FIELD(dwc2_transfer_ctl);
   int status;
   int transfer_size;
   int split_start;
@@ -50,11 +52,13 @@ struct dwc2_transfer_ctl {
   void *completion_data;
 };
 
+struct dwc2_transfer_ctl *dwc2_transfer_ctl_allocate();
+void dwc2_transfer_ctl_deallocate(struct dwc2_transfer_ctl *);
+
 struct dwc2_channel {
   dwc2_pipe_desc_t pipe ALIGNED(8);
   struct dwc2_transfer_ctl *tc;
 };
-
 
 /*
  * Return value: length of a printed string
@@ -234,9 +238,9 @@ typedef void(*port_status_changed_cb_t)(struct usb_hub_port_status*);
 
 void dwc2_set_port_status_changed_cb(port_status_changed_cb_t cb);
 
-void dwc2_enable_channel(int ch);
+void dwc2_channel_enable(int ch);
 
-void dwc2_disable_channel(int ch);
+void dwc2_channel_disable(int ch);
 
 typedef int dwc2_chan_id_t;
 

@@ -218,6 +218,22 @@ int hcd_transfer_control_blocking(
   int timeout,
   int *out_num_bytes);
 
+typedef enum {
+  HCD_TRANSFER_STAGE_SETUP_PACKET = 0,
+  HCD_TRANSFER_STAGE_DATA_PACKET,
+  HCD_TRANSFER_STAGE_ACK_PACKET,
+  HCD_TRANSFER_STAGE_COMPLETED
+} hcd_tranfer_stage_t;
+
+struct hcd_transfer_status {
+  hcd_tranfer_stage_t stage;
+  int direction;
+  void *addr;
+  int transfer_size;
+  void *priv;
+  int err;
+};
+
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
@@ -228,7 +244,7 @@ int hcd_transfer_control(
   int *out_num_bytes);
 
 #define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __t, __o)\
-  hcd_transfer_control_blocking(__p, __pc, __a, __sz, __rq, __t, __o)
+  hcd_transfer_control(__p, __pc, __a, __sz, __rq, __t, __o)
 
 int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,

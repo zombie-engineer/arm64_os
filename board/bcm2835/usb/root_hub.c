@@ -34,7 +34,7 @@
 
 
 int usb_root_hub_device_number = 0;
-int usb_root_hub_debug = 0;
+int usb_root_hub_debug = 2;
 struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
@@ -393,6 +393,7 @@ int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_by
   int err;
   char rq_desc[256];
   int request = USB_DEV_RQ_GET_RQ(rq);
+  *out_num_bytes = 0;
   usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
   RHDEBUG("root_hub req:%s", rq_desc);
 
