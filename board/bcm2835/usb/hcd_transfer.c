@@ -39,7 +39,61 @@ out_err:
   return err;
 }
 
+void hcd_transfer_completed(void *arg)
+{
+  printf("hcd_transfer_completed\n");
+}
+
 int hcd_transfer_control(
+  struct usb_hcd_pipe *pipe,
+  struct usb_hcd_pipe_control *pctl,
+  void *addr,
+  int transfer_size,
+  uint64_t rq,
+  int timeout,
+  int *out_num_bytes)
+{
+  int channel_id = DWC2_INVALID_CHANNEL;
+  struct dwc2_channel *channel;
+  usb_pid_t pid;
+  /*
+   * Channel setup
+   */
+  memset(&tc, 0, sizeof(tc));
+  tc.completion = hcd_transfer_completed;
+  tc.completion_data = 0;
+
+  channel_id = dwc2_channel_alloc();
+  if (channel_id == DWC2_INVALID_CHANNEL) {
+    HCDERR("channel not allocated. Retry");
+    err = ERR_RETRY;
+    goto out_err;
+  }
+
+  channel = dwc2_channel_get(channel_id);
+  channel->tc = &tc;
+  dwc2_enable_channel(channel_id);
+
+  pipedesc.u.dwc_channel = channel_id;
+  printf("prep, c:%p, tc:%p, completion:%p\n", channel, channel->tc, channel->tc->completion);
+  pid = USB_PID_SETUP;
+  dwc2_transfer_prepare(pipedesc, NULL, 0, &pid);
+  dwc2_transfer_start(pipedesc);
+}
+
+int hcd_transfer_control_entry(
+  struct usb_hcd_pipe *pipe,
+  struct usb_hcd_pipe_control *pctl,
+  void *buf,
+  int bufsz,
+  uint64_t rq,
+  int timeout,
+  int *out_num_bytes)
+{
+
+}
+
+int hcd_transfer_control_blocking(
   struct usb_hcd_pipe *pipe,
   struct usb_hcd_pipe_control *pctl,
   void *buf,
@@ -49,8 +103,6 @@ int hcd_transfer_control(
   int *out_num_bytes)
 {
   int err;
-  int channel_id = DWC2_INVALID_CHANNEL;
-  struct dwc2_channel *channel;
   int num_bytes = 0;
   uint64_t rqbuf ALIGNED(8) = rq;
   usb_pid_t pid;
@@ -68,31 +120,12 @@ int hcd_transfer_control(
     }
   };
 
-  struct dwc2_transfer_ctl tc ALIGNED(8);
   hcd_transfer_control_prologue(pipe, rq);
 
   if (pipe->address == usb_root_hub_device_number) {
     err = usb_root_hub_process_req(rq, buf, bufsz, &num_bytes);
     goto out_err;
   }
-
-  /*
-   * Channel setup
-   */
-  memset(&tc, 0, sizeof(tc));
-
-  channel_id = dwc2_channel_alloc();
-  if (channel_id == DWC2_INVALID_CHANNEL) {
-    HCDERR("channel not allocated. Retry");
-    err = ERR_RETRY;
-    goto out_err;
-  }
-
-  channel = dwc2_channel_get(channel_id);
-  channel->tc = &tc;
-  dwc2_enable_channel(channel_id);
-
-  pipedesc.u.dwc_channel = channel;
 
   /*
    * Send SETUP packet
@@ -120,8 +153,6 @@ int hcd_transfer_control(
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
 
   pid = USB_PID_DATA1;
-  // dwc2_start_transfer(pipedesc, 0, 0, &pid);
-  // while(1);
   err = __hcd_dwc2_transfer(pipedesc, 0, 0, &pid, "ACK", NULL);
   CHECK_ERR_SILENT();
 
