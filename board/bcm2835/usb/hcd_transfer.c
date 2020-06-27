@@ -14,28 +14,32 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   }
 }
 
-static int hcd_transfer_packet_blocking(dwc2_pipe_desc_t pipedesc, void *buf, int bufsz, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
+static int hcd_transfer_packet_blocking(dwc2_pipe_desc_t pipedesc, void *addr, int transfer_size, usb_pid_t *pid, const char *debug_desc, int *out_num_bytes)
 {
   int err = ERR_OK;
   int num_bytes;
   dwc2_transfer_status_t status;
   while(1) {
-    status = dwc2_transfer_blocking(pipedesc, buf, bufsz, pid, &num_bytes);
+    status = dwc2_transfer_blocking(pipedesc, addr, transfer_size, pid, &num_bytes);
+    // printf(">>> status :%d, %d\n", status, num_bytes);
     if (status == DWC2_STATUS_ACK)
       break;
     if (status == DWC2_STATUS_NAK)
       continue;
-    if (status == DWC2_STATUS_NYET)
+    if (status == DWC2_STATUS_NYET) {
+      printf("NOT YET: addr = %p, transfer_size = %d\n", addr, transfer_size);
       continue;
+    }
     err = ERR_GENERIC;
     break;
   }
   CHECK_ERR("dwc2_transfer failed");
 
-  HCDDEBUG("%s:%s sent %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), debug_desc, num_bytes, bufsz);
+  HCDDEBUG("%s:%s transferred %d of %d bytes", usb_direction_to_string(pipedesc.u.ep_direction), debug_desc, num_bytes, transfer_size);
 out_err:
   if (out_num_bytes)
-    *out_num_bytes = bufsz;
+    *out_num_bytes = num_bytes;
+
   return err;
 }
 
@@ -103,8 +107,8 @@ void hcd_transfer_fsm(void *arg)
 #define HCD_TRANSFER_COMMON \
   struct dwc2_channel *c;\
   int err; \
-  uint64_t rqbuf ALIGNED(8) = rq;\
-  usb_pid_t pid;\
+  uint64_t rqbuf ALIGNED(64) = rq;\
+  usb_pid_t pid ALIGNED(64);\
   int channel_id = DWC2_INVALID_CHANNEL;\
   DECL_PIPE_DESC(pipedesc, pipe, USB_ENDPOINT_TYPE_CONTROL, USB_DIRECTION_OUT);\
   hcd_transfer_control_prologue(pipe, rq);\
@@ -152,7 +156,6 @@ int hcd_transfer_control(
   status.addr = addr;
   status.transfer_size = transfer_size;
 
-
   /*
    * Channel setup
    */
@@ -163,17 +166,16 @@ int hcd_transfer_control(
   dwc2_channel_enable(channel_id);
 
   pipedesc.u.dwc_channel = channel_id;
-  printf("prep, c:%p, tc:%p, completion:%p\n", c, c->tc, c->tc->completion);
+  HCDDEBUG("control transfer prepare, c:%p, tc:%p, completion:%p, addr:%p, size:%d", c, c->tc, c->tc->completion, addr, transfer_size);
   pid = USB_PID_SETUP;
   dwc2_transfer_prepare(pipedesc, &rqbuf, sizeof(rqbuf), &pid);
   dwc2_transfer_start(pipedesc);
   while(status.stage != HCD_TRANSFER_STAGE_COMPLETED)
     asm volatile("wfe");
   err = status.err;
-  printf("======================");
   *out_num_bytes = transfer_size;
-
 out_err:
+  HCDDEBUG("control transfer completed with, err = %d", err);
   return err;
 }
 
@@ -188,7 +190,7 @@ int hcd_transfer_control_blocking(
 {
   HCD_TRANSFER_COMMON
   if (out_num_bytes)
-    out_num_bytes = 0;
+    *out_num_bytes = 0;
 
   /*
    * Send SETUP packet
@@ -220,8 +222,15 @@ int hcd_transfer_control_blocking(
   CHECK_ERR_SILENT();
 
 out_err:
-  if (channel_id != DWC2_INVALID_CHANNEL)
+  if (channel_id != DWC2_INVALID_CHANNEL) {
+    if (c) {
+      if (c->tc) {
+        dwc2_transfer_ctl_deallocate(c->tc);
+      }
+    }
+    dwc2_channel_disable(pipedesc.u.dwc_channel);
     dwc2_channel_free(pipedesc.u.dwc_channel);
+  }
 
   HCDDEBUG("SUBMIT: completed with status: %d", err);
   return err;

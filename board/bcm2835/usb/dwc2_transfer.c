@@ -11,6 +11,7 @@
 #include <usb/usb_printers.h>
 #include <error.h>
 #include <delays.h>
+#include "dwc2_printers.h"
 
 int dwc2_log_level = 0;
 
@@ -304,6 +305,7 @@ static inline void dwc2_channel_set_dma_addr(dwc2_pipe_desc_t pipe, uint64_t dma
 {
   uint32_t dma;
   int ch = pipe.u.dwc_channel;
+  // printf("dma_addr:%016x transfer_size:%d\n", dma_addr, transfer_size);
   BUG(dma_addr & 3, "UNALIGNED DMA address");
 
   if (dma_addr && transfer_size && pipe.u.ep_direction == USB_DIRECTION_OUT)
@@ -409,14 +411,20 @@ int dwc2_transfer_start(dwc2_pipe_desc_t pipe)
 int dwc2_transfer_recalc_next(struct dwc2_channel *c)
 {
   uint32_t siz;
+  int packets_left;
+  int bytes_left;
   int ch = c->pipe.u.dwc_channel;
-  if (c->pipe.u.ep_direction == USB_DIRECTION_OUT) {
+  if (c->pipe.u.ep_direction == USB_DIRECTION_IN) {
     GET_SIZ();
-    if (USB_HOST_SIZE_GET_PACKET_COUNT(siz)) {
-      c->tc->dma_addr = c->tc->dma_addr_base + c->tc->transfer_size - USB_HOST_SIZE_GET_SIZE(siz);
+    bytes_left = USB_HOST_SIZE_GET_SIZE(siz);
+    packets_left = USB_HOST_SIZE_GET_PACKET_COUNT(siz);
+    if (packets_left) {
+      DWCDEBUG("################## packets_left: %d, bytes_left: %d", packets_left, bytes_left);
+      c->tc->dma_addr = c->tc->dma_addr_base + c->tc->transfer_size - bytes_left;
       return 1;
     }
-  }
+  } else
+    DWCDEBUG("################## out");
   return 0;
 }
 
@@ -461,9 +469,12 @@ dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr,
     dwc2_transfer_start(pipe);
 
     status = dwc2_wait_halted(ch);
-    if (status) {
-      if (status == DWC2_STATUS_NAK)
-        DWCERR("exiting with NAK");
+    if (status != DWC2_STATUS_ACK) {
+      DWCERR("status:%s\n", dwc2_transfer_status_to_string(status));
+      if (status == DWC2_STATUS_NYET)
+        continue;
+      if (status == DWC2_STATUS_ERR)
+        continue;
       goto out;
     }
 
@@ -472,8 +483,14 @@ dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr,
       dwc2_transfer_start(pipe);
       wait_usec(100);
       status = dwc2_wait_halted(ch);
-      if (status != DWC2_STATUS_ACK)
+      if (status != DWC2_STATUS_ACK) {
+        DWCERR("split status:%s\n", dwc2_transfer_status_to_string(status));
+        if (status == DWC2_STATUS_NYET)
+          continue;
+        if (status == DWC2_STATUS_ERR)
+          continue;
         goto out;
+      }
     }
     dwc2_transfer_completed_debug(c);
     if (!dwc2_transfer_recalc_next(c))
@@ -482,7 +499,10 @@ dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *addr,
 out:
   GET_SIZ();
   if (out_num_bytes) {
-    *out_num_bytes = transfer_size - USB_HOST_SIZE_GET_SIZE(siz);
+    if (pipe.u.ep_direction == USB_DIRECTION_IN)
+      *out_num_bytes = transfer_size - USB_HOST_SIZE_GET_SIZE(siz);
+    else
+      *out_num_bytes = transfer_size;
   }
   *pid = dwc_pid_to_usb_pid(USB_HOST_SIZE_GET_PID(siz));
 

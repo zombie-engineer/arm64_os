@@ -86,7 +86,7 @@ struct dwc2_transfer_ctl *dwc2_transfer_ctl_allocate()
 {
   struct dwc2_transfer_ctl *res;
   res = dwc2_transfer_ctl_alloc();
-  printf("alloc:%p\n", res);
+  DWCDEBUG("alloc:%p\n", res);
   return res;
 }
 
@@ -101,7 +101,7 @@ void dwc2_dump_port_int(int port)
   char port_desc[512];
   portval = read_reg(USB_HCINT0 + port * 0x20);
   dwc2_print_port_int(portval, port_desc, sizeof(port_desc));
-  DWCINFO("port_int:%08x(%s)", portval, port_desc);
+  DWCDEBUG("port_int:%08x(%s)", portval, port_desc);
 }
 
 void dwc2_start_vbus(void)
@@ -126,7 +126,7 @@ void dwc2_reset(void)
   do {
     rst = read_reg(USB_GRSTCTL);
   } while(!USB_GRSTCTL_GET_AHB_IDLE(rst) || USB_GRSTCTL_GET_C_SFT_RST(rst));
-  DWCINFO("reset done.");
+  DWCDEBUG("reset done.");
 }
 
 
@@ -302,7 +302,7 @@ void dwc2_port_reset(void)
   uint32_t hostport = read_reg(USB_HPRT);
   hostport &= USB_HPRT_WRITE_MASK;
   USB_HPRT_CLR_SET_RST(hostport, 1);
-  DWCINFO("resetting hprt: %08x", hostport);
+  DWCDEBUG("resetting hprt: %08x", hostport);
   write_reg(USB_HPRT, hostport);
 }
 
@@ -310,7 +310,7 @@ void dwc2_enable_ahb_interrupts(void)
 {
   uint32_t ahb = read_reg(USB_GAHBCFG);
   USB_GAHBCFG_CLR_SET_GLBL_INTR_EN(ahb, 1);
-  DWCINFO("enabling global ahb interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
+  DWCDEBUG("enabling global ahb interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
   write_reg(USB_GAHBCFG, ahb);
 }
 
@@ -352,7 +352,7 @@ void dwc2_disable_ahb_interrupts(void)
 {
   uint32_t ahb = read_reg(USB_GAHBCFG);
   USB_GAHBCFG_CLR_GLBL_INTR_EN(ahb);
-  DWCINFO("disabling global ahb interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
+  DWCDEBUG("disabling global ahb interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
   write_reg(USB_GAHBCFG, ahb);
 }
 
@@ -362,7 +362,7 @@ void dwc2_port_reset_clear(void)
   uint32_t hostport = read_reg(USB_HPRT);
   hostport &= USB_HPRT_WRITE_MASK;
   USB_HPRT_CLR_RST(hostport);
-  DWCINFO("reset clear: %08x", hostport);
+  DWCDEBUG("reset clear: %08x", hostport);
   write_reg(USB_HPRT, hostport);
 }
 
@@ -525,17 +525,17 @@ static inline void dwc2_irq_handle_channel_int_one(int ch)
   intr &= intrmsk;
   SET_INTR();
 
-  DWCINFO("channel irq ch:%d, %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
+  DWCINFO("channel %d irq(hcint): %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
   if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
     USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
     if (USB_HOST_INTR_GET_ACK(intr)) {
       dwc2_irq_handle_channel_ack(ch, c);
       USB_HOST_INTR_CLR_ACK(intr);
-      if (intr) {
-        printf("there's more %08x\n", intr);
-        while(1);
-      }
     }
+  }
+  if (intr) {
+    printf("there's more %08x\n", intr);
+    while(1);
   }
 }
 
@@ -547,7 +547,7 @@ static inline void dwc2_irq_handle_channel_int(void)
   uint32_t haintmsk = read_reg(USB_HAINTMSK);
   uint32_t masked = haint & haintmsk;
   write_reg(USB_HAINT, masked);
-  DWCINFO("channel interrupt:%08x&%08x=%08x, handling...", haint, haintmsk, masked);
+  DWCDEBUG("channels irq (haint): %08x & %08x = %08x", haint, haintmsk, masked);
   for (i = 0; i < num_channels; ++i) {
     if ((1<<i) & masked)
       dwc2_irq_handle_channel_int_one(i);
@@ -559,13 +559,12 @@ void dwc2_irq_cb(void)
   uint32_t intsts = read_reg(USB_GINTSTS);
   uint32_t intmsk = read_reg(USB_GINTMSK);
   uint32_t masked = intsts & intmsk;
-  DWCINFO("IRQ: INTSTS:%08x,INTMSK:%08x = %08x", intsts, intmsk, masked);
+  DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
   write_reg(USB_GINTSTS, masked);
   dwc2_dump_int_registers();
-  if (USB_GINTSTS_GET_HCHINT(masked)) {
+  if (USB_GINTSTS_GET_HCHINT(masked))
     dwc2_irq_handle_channel_int();
-    USB_GINTSTS_CLR_HCHINT(intsts);
-  }
+
   if (USB_GINTSTS_GET_MODEMIS(masked))
     dwc2_irq_handle_mode_mismatch();
 
@@ -679,10 +678,10 @@ dwc2_chan_id_t dwc2_channel_alloc()
   if (spinlocks_enabled)
     spinlock_unlock(&dwc2_channels_lock);
   if (ch == num_channels) {
-    DWCINFO("Failed to allocate channel");
+    DWCERR("Failed to allocate channel");
     return DWC2_INVALID_CHANNEL;
   }
-  DWCINFO("channel %d allocated", ch);
+  DWCDEBUG("channel %d allocated", ch);
   return ch;
 }
 
@@ -697,7 +696,7 @@ void dwc2_channel_free(dwc2_chan_id_t ch)
   channels_bitmap = bitmap;
   if (spinlocks_enabled)
     spinlock_unlock(&dwc2_channels_lock);
-  DWCINFO("channel %d freed", ch);
+  DWCDEBUG("channel %d freed", ch);
 }
 
 struct dwc2_channel *dwc2_channel_get(dwc2_chan_id_t ch)

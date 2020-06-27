@@ -128,3 +128,15 @@ static inline int dwc2_print_port_int(uint32_t v, char *buf, int bufsz)
 #undef __PRINT_BIT
   return n;
 }
+
+static inline const char *dwc2_transfer_status_to_string(dwc2_transfer_status_t s) {
+  switch(s) {
+  case DWC2_STATUS_ACK: return "DWC2_STATUS_ACK";
+  case DWC2_STATUS_NAK: return "DWC2_STATUS_NAK";
+  case DWC2_STATUS_NYET: return "DWC2_STATUS_NYET";
+  case DWC2_STATUS_STALL: return "DWC2_STATUS_STALL";
+  case DWC2_STATUS_TIMEOUT: return "DWC2_STATUS_TIMEOUT";
+  case DWC2_STATUS_ERR: return "DWC2_STATUS_ERR";
+  default: return "UNKNOWN";
+  }
+}

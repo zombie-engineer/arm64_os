@@ -34,7 +34,7 @@
 
 
 int usb_root_hub_device_number = 0;
-int usb_root_hub_debug = 2;
+int usb_root_hub_debug = 0;
 struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
@@ -43,7 +43,7 @@ static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
     .descriptor_type = USB_DESCRIPTOR_TYPE_HUB,
   },
 	.port_count = 1,
-  .attributes = { 
+  .attributes = {
     .raw16 = USB_HUB_MAKE_ATTR(
       USB_HUB_ATTR_POWER_SW_MODE_GANGED,
       USB_HUB_ATTR_NOT_COMPOUND,
