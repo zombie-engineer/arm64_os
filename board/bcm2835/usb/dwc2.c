@@ -387,7 +387,7 @@ void dwc2_dump_int_registers(void)
 
 static inline void dwc2_irq_handle_sof(void)
 {
-  DWCINFO("SOF");
+  DWCDEBUG("SOF");
 }
 
 static inline void dwc2_hprt_to_port_status(uint32_t hprt, struct usb_hub_port_status *s)
@@ -417,22 +417,21 @@ static inline void dwc2_irq_handle_port_intr(void)
   USB_HPRT_CLR_EN_CHNG(msk);
   USB_HPRT_CLR_OVR_CURR_CHNG(msk);
 
-  DWCINFO("port interrupt, hprt:%08x", hprt);
+  DWCDEBUG("port interrupt, hprt:%08x", hprt);
   if (USB_HPRT_GET_CONN_DET(hprt)) {
-    DWCINFO("CONN_DET");
-    if (USB_HPRT_GET_RST(hprt)) {
-      printf("reset bit");
-    }
+    DWCDEBUG("CONN_DET");
+    if (USB_HPRT_GET_RST(hprt))
+      DWCDEBUG("RST");
     USB_HPRT_CLR_SET_CONN_DET(msk, 1);
     write_reg(USB_HPRT, msk);
   }
   if (USB_HPRT_GET_EN_CHNG(hprt)) {
-    DWCINFO("ENA_CHNG");
+    DWCDEBUG("ENA_CHNG");
     USB_HPRT_CLR_SET_EN_CHNG(msk, 1);
     write_reg(USB_HPRT, msk);
   }
   if (USB_HPRT_GET_OVR_CURR_CHNG(hprt)) {
-    DWCINFO("OVR_CURR_CHNG");
+    DWCDEBUG("OVR_CURR_CHNG");
     USB_HPRT_CLR_SET_OVR_CURR_CHNG(msk, 1);
     write_reg(USB_HPRT, msk);
   }
@@ -458,56 +457,56 @@ void dwc2_irq_handle_otgint()
   uint32_t otgint, otgctl;
   otgint = read_reg(USB_GOTGINT);
   otgctl = read_reg(USB_GOTGCTL);
-  DWCINFO("otgint:%08x,otgctl:%08x", otgint, otgctl);
+  DWCDEBUG("otgint:%08x,otgctl:%08x", otgint, otgctl);
   if (USB_GOTGINT_GET_DBNCE_DONE(otgint))
-    DWCINFO("debounce done");
+    DWCDEBUG("debounce done");
   write_reg(USB_GOTGINT, otgint);
 }
 
 void dwc2_irq_handle_mode_mismatch(void)
 {
-  DWCINFO("mode mismatch");
+  DWCDEBUG("mode mismatch");
 }
 
 static inline void dwc2_irq_handle_early_susp(void)
 {
-  DWCINFO("early suspend");
+  DWCDEBUG("early suspend");
 }
 
 static inline void dwc2_irq_handle_usb_susp(void)
 {
-  DWCINFO("usb suspend");
+  DWCDEBUG("usb suspend");
 }
 
 static inline void dwc2_irq_handle_eopf(void)
 {
-  DWCINFO("EOPF");
+  DWCDEBUG("EOPF");
 }
 
 static inline void dwc2_irq_handle_non_periodic_tx_fifo_empty(void)
 {
-  DWCINFO("non-periodic tx fifo empty");
+  DWCDEBUG("non-periodic tx fifo empty");
 }
 
 static inline void dwc2_irq_handle_conn_id_sta_chng(void)
 {
-  DWCINFO("connection id status changed");
+  DWCDEBUG("connection id status changed");
 }
 
 static inline void dwc2_irq_handle_sess_req(void)
 {
-  DWCINFO("session req");
+  DWCDEBUG("session req");
 }
 
 static inline void dwc2_irq_handle_channel_ahb_err(int ch, struct dwc2_channel *c)
 {
   dwc2_transfer_start(c->pipe);
-  DWCINFO("AHB ERR");
+  DWCDEBUG("AHB ERR");
 }
 
 static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c, bool xfer_complete)
 {
-  DWCINFO("channel irq ack: %d", ch);
+  DWCDEBUG("channel irq ack: %d", ch);
   if (!xfer_complete) {
     BUG(!dwc2_is_split_enabled(c->pipe), "dwc2_ack_interrupt logic error");
     dwc2_transfer_start(c->pipe);
@@ -534,8 +533,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch)
   GET_INTRMSK();
   raw_intr = intr;
   // intr &= intrmsk;
-  DWCINFO("channel %d irq(hcint): %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
-  printf("=== %08x\n", intr);
+  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -549,11 +547,11 @@ static inline void dwc2_irq_handle_channel_int_one(int ch)
     USB_HOST_INTR_CLR_AHB_ERR(intr);
   }
   if (intr & ~(uint32_t)0x23) {
-    printf("there's more %08x\n", intr);
+    DWCERR("there's more %08x\n", intr);
     while(1) {
       wait_msec(500);
       GET_INTR();
-      printf("+++ %08x\n", intr);
+      DWCERR("+++ %08x\n", intr);
     }
   }
 }
@@ -580,7 +578,9 @@ void dwc2_irq_cb(void)
   uint32_t masked = intsts & intmsk;
   DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
   write_reg(USB_GINTSTS, masked);
-  dwc2_dump_int_registers();
+  if (dwc2_log_level > 0)
+    dwc2_dump_int_registers();
+
   if (USB_GINTSTS_GET_HCHINT(masked))
     dwc2_irq_handle_channel_int();
 
@@ -627,7 +627,7 @@ void dwc2_irq_cb(void)
   //  DWCINFO("PTXFEMP");
   // }
   if (USB_GINTSTS_GET_LPMTRANRCVD(masked)) {
-    DWCINFO("LPMTRANRCVD");
+    DWCDEBUG("LPMTRANRCVD");
   }
 }
 

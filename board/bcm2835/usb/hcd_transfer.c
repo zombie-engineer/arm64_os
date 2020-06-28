@@ -47,7 +47,7 @@ void hcd_transfer_fsm(void *arg)
 {
   struct hcd_transfer_status *s = arg;
   struct dwc2_channel *c = s->priv;
-  printf("hcd_transfer_fsm: %p, stage: %d\n", c, s->stage);
+  HCDDEBUG("hcd_transfer_fsm: %p, stage: %d\n", c, s->stage);
 
   /*
    * Read current stage, decide on what the next stage is.
@@ -74,7 +74,7 @@ void hcd_transfer_fsm(void *arg)
       BUG(1, "Logic hcd transfer logic error");
       break;
   }
-  printf("hcd_transfer_fsm: %p, stage now: %d\n", c, s->stage);
+  HCDDEBUG("hcd_transfer_fsm: %p, stage now: %d\n", c, s->stage);
 
   /*
    * Next stage figured out, now set it up
@@ -109,8 +109,8 @@ void hcd_transfer_fsm(void *arg)
   int channel_id = DWC2_INVALID_CHANNEL;\
   DECL_PIPE_DESC(pipedesc, pipe, USB_ENDPOINT_TYPE_CONTROL, USB_DIRECTION_OUT);\
   hcd_transfer_control_prologue(pipe, rq);\
-  if (pipe->address == usb_root_hub_device_number) { printf("--"); \
-    return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes); }\
+  if (pipe->address == usb_root_hub_device_number) \
+    return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);\
   channel_id = dwc2_channel_alloc();\
   if (channel_id == DWC2_INVALID_CHANNEL) {\
     err = ERR_RETRY;\

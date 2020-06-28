@@ -728,7 +728,8 @@ int usb_hcd_start()
 
   dwc2_port_reset();
   wait_msec(60);
-  dwc2_dump_int_registers();
+  if (usb_hcd_log_level > 0)
+    dwc2_dump_int_registers();
   dwc2_port_reset_clear();
   HCDLOG("host reset done");
 
