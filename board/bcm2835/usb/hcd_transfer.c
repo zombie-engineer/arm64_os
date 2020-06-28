@@ -137,7 +137,6 @@ int hcd_transfer_control(
   void *addr,
   int transfer_size,
   uint64_t rq,
-  int timeout,
   int *out_num_bytes)
 {
   struct hcd_transfer_status status ALIGNED(8);
@@ -182,7 +181,6 @@ int hcd_transfer_control_blocking(
   void *addr,
   int transfer_size,
   uint64_t rq,
-  int timeout,
   int *out_num_bytes)
 {
   HCD_TRANSFER_COMMON
@@ -237,7 +235,6 @@ int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,
   void *buf,
   int buf_sz,
-  int timeout,
   int *out_num_bytes)
 {
   dwc2_transfer_status_t status;

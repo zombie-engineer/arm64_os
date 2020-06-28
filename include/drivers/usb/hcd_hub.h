@@ -5,8 +5,6 @@
 #include <memory/static_slot.h>
 #include "common.h"
 
-#define USB_CONTROL_MSG_TIMEOUT_MS 10
-
 #define _FMT_PREFIX_HUB          "[USB hub:%02d] "
 #define _FMT_PREFIX_HUB_ERR      "[USB hub:%02d err:%d] "
 #define _FMT_PREFIX_HUB_PORT     "[USB hub:%02d port:%02d] "
@@ -64,7 +62,7 @@ int usb_hcd_hub_device_to_string(usb_hub_t *h, const char *prefix, char *buf, in
   int num_bytes;\
   DECL_PCTL(CONTROL, __direction, 0);\
   DECL_RQ(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
-	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, &pctl, __dst, __rq_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);\
+	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, &pctl, __dst, __rq_size, rq, &num_bytes);\
   if (err != ERR_OK) {\
     HUBERR("request '"#__rq_type "-" #__rq "' v:%d,i:%d,l:%d failed", __rq_value, __rq_index, __rq_size);\
     err = ERR_GENERIC;\

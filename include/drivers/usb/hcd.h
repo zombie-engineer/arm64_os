@@ -215,7 +215,6 @@ int hcd_transfer_control_blocking(
   void *addr,
   int transfer_size,
   uint64_t rq,
-  int timeout,
   int *out_num_bytes);
 
 typedef enum {
@@ -240,17 +239,15 @@ int hcd_transfer_control(
   void *addr,
   int transfer_size,
   uint64_t rq,
-  int timeout,
   int *out_num_bytes);
 
-#define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __t, __o)\
-  hcd_transfer_control(__p, __pc, __a, __sz, __rq, __t, __o)
+#define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __o)\
+  hcd_transfer_control(__p, __pc, __a, __sz, __rq, __o)
 
 int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,
   void *buf,
   int buf_sz,
-  int timeout,
   int *out_num_bytes);
 
 /*

@@ -54,8 +54,7 @@ int usb_hid_get_desc(struct usb_hcd_device *dev, int hid_index, void *buf, int b
   rq = USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR, USB_DESCRIPTOR_TYPE_HID_REPORT << 8, hid_index, bufsz);
   memset(buf, 0xff, sizeof(buf));
 
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl,
-      buf, bufsz, rq, 1000, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, buf, bufsz, rq, &num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
     goto out_err;
@@ -77,7 +76,7 @@ int usb_hid_set_idle(struct usb_hcd_device *dev, int idx)
   pctl.direction = USB_DIRECTION_OUT;
 
   rq = USB_DEV_RQ_MAKE(CLASS_SET_INTERFACE, HID_SET_IDLE, 0, 0, 0);
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, 0, 0, rq, 1000, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, 0, 0, rq, &num_bytes);
   CHECK_ERR("failed to set idle");
 out_err:
   return err;
@@ -99,7 +98,7 @@ int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
   };
 
   memset(buf, 0x66, sizeof(buf));
-  err = hcd_transfer_interrupt(&pipe, buf, 7, 1000, &num_bytes);
+  err = hcd_transfer_interrupt(&pipe, buf, 7, &num_bytes);
   CHECK_ERR("a");
   hexdump_memory(buf, 8);
 out_err:

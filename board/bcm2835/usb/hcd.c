@@ -151,7 +151,7 @@ int usb_hcd_get_descriptor(
 
 
   err = HCD_TRANSFER_CONTROL(p, &pctl,
-      &header, sizeof(header), rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
+      &header, sizeof(header), rq, num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
     goto err;
@@ -175,7 +175,7 @@ int usb_hcd_get_descriptor(
   else
     rq = USB_DEV_HUB_RQ_MAKE_GET_DESCRIPTOR(desc_type, desc_idx, lang_id, header.length);
   err = HCD_TRANSFER_CONTROL(p, &pctl,
-      buf, header.length, rq, USB_CONTROL_MSG_TIMEOUT_MS, num_bytes);
+      buf, header.length, rq, num_bytes);
   if (err)
     HCDERR("failed to read descriptor header");
 err:
@@ -352,7 +352,7 @@ static int usb_hcd_set_configuration(struct usb_hcd_pipe *pipe, uint8_t channel,
 	};
 
   uint64_t rq = USB_DEV_RQ_MAKE(SET_CONFIGURATION, SET_CONFIGURATION, configuration, 0, 0);
-  err = HCD_TRANSFER_CONTROL(pipe, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  err = HCD_TRANSFER_CONTROL(pipe, &pctl, 0, 0, rq, 0);
   CHECK_ERR("failed to set configuration");
 
 out_err:
@@ -423,7 +423,7 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev, struct usb_hcd_p
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
       to_transfer_size);
   err = HCD_TRANSFER_CONTROL(&dev->pipe0, pctl,
-      &desc, to_transfer_size, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
+      &desc, to_transfer_size, rq, &num_bytes);
   CHECK_ERR_SILENT();
 
   if (num_bytes != to_transfer_size) {
@@ -457,7 +457,7 @@ static int usb_hcd_set_address(struct usb_hcd_pipe *p, uint8_t channel, int addr
 	pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
   pctl.direction     = USB_DIRECTION_OUT;
 
-  err = HCD_TRANSFER_CONTROL(p, &pctl, 0, 0, rq, USB_CONTROL_MSG_TIMEOUT_MS, 0);
+  err = HCD_TRANSFER_CONTROL(p, &pctl, 0, 0, rq, 0);
   CHECK_ERR("failed to set address");
 out_err:
   return err;
@@ -537,7 +537,7 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev, struct usb_hc
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, 0, config_desc.total_length);
 
   err = HCD_TRANSFER_CONTROL(&dev->pipe0, pctl, config_buffer,
-      config_desc.total_length, rq, USB_CONTROL_MSG_TIMEOUT_MS, &num_bytes);
+      config_desc.total_length, rq, &num_bytes);
   CHECK_ERR("failed to get full configuration %d with total_length = %d",
       config_num, config_desc.total_length);
 
@@ -993,7 +993,7 @@ int hcd_endpoint_get_status(struct usb_hcd_endpoint *ep, void *status)
 
   struct usb_hcd_device *dev = ep->device;
 
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, status, 2, rq.raw, 1000, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, status, 2, rq.raw, &num_bytes);
   if (err) {
     HCDERR("failed to clear halt on ep 1");
   }
@@ -1021,7 +1021,7 @@ int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature)
 
   struct usb_hcd_device *dev = ep->device;
 
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, NULL, 0, rq.raw, 1000, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, NULL, 0, rq.raw, &num_bytes);
   if (err) {
     HCDERR("failed to clear halt on ep 1");
   }
@@ -1048,7 +1048,7 @@ int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
 
   struct usb_hcd_device *dev = ep->device;
 
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, NULL, 0, rq.raw, 1000, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, NULL, 0, rq.raw, &num_bytes);
   if (err) {
     HCDERR("failed to clear halt on ep 1");
   }

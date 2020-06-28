@@ -140,7 +140,7 @@ int usb_mass_reset(hcd_mass_t *m)
   pctl.direction = USB_DIRECTION_OUT;
 
   err = HCD_TRANSFER_CONTROL(&m->d->pipe0, &pctl,
-      NULL, 0, rq.raw, 1000, &num_bytes);
+      NULL, 0, rq.raw, &num_bytes);
   MASSLOG("usb_mass_reset complete err: %d", err);
   return err;
 }
@@ -373,7 +373,7 @@ int usb_mass_get_max_lun(struct usb_hcd_device *dev, int *out_max_lun)
   pctl.direction = USB_DIRECTION_IN;
 
   err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl,
-      &max_lun, 1, rq.raw, 1000, &num_bytes);
+      &max_lun, 1, rq.raw, &num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
     goto out_err;
