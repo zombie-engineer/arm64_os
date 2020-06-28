@@ -244,7 +244,7 @@ int hcd_transfer_control(
   int *out_num_bytes);
 
 #define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __t, __o)\
-  hcd_transfer_control_blocking(__p, __pc, __a, __sz, __rq, __t, __o)
+  hcd_transfer_control(__p, __pc, __a, __sz, __rq, __t, __o)
 
 int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,

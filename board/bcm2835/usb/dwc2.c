@@ -9,6 +9,7 @@
 #include "dwc2_printers.h"
 #include <usb/usb.h>
 #include <spinlock.h>
+#include <delays.h>
 
 static port_status_changed_cb_t port_status_changed_cb = NULL;
 
@@ -498,44 +499,62 @@ static inline void dwc2_irq_handle_sess_req(void)
   DWCINFO("session req");
 }
 
-static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c)
+static inline void dwc2_irq_handle_channel_ahb_err(int ch, struct dwc2_channel *c)
+{
+  dwc2_transfer_start(c->pipe);
+  DWCINFO("AHB ERR");
+}
+
+static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c, bool xfer_complete)
 {
   DWCINFO("channel irq ack: %d", ch);
-  if (dwc2_is_split_enabled(c->pipe)) {
-     dwc2_transfer_start(c->pipe);
-     return;
+  if (!xfer_complete) {
+    BUG(!dwc2_is_split_enabled(c->pipe), "dwc2_ack_interrupt logic error");
+    dwc2_transfer_start(c->pipe);
+    return;
   }
+
   dwc2_transfer_completed_debug(c);
   if (dwc2_transfer_recalc_next(c)) {
       dwc2_transfer_start(c->pipe);
       return;
   }
+  // c->pid = dwc2_get_next_pid(ch);
   if (c->tc->completion)
     c->tc->completion(c->tc->completion_data);
 }
 
 static inline void dwc2_irq_handle_channel_int_one(int ch)
 {
+  bool xfer_complete;
   uint32_t intr, intrmsk, raw_intr;
   struct dwc2_channel *c;
   c = dwc2_channel_get(ch);
   GET_INTR();
   GET_INTRMSK();
   raw_intr = intr;
-  intr &= intrmsk;
-  SET_INTR();
-
+  // intr &= intrmsk;
   DWCINFO("channel %d irq(hcint): %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
-  if (USB_HOST_INTR_GET_XFER_COMPLETE(intr)) {
-    USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
-    if (USB_HOST_INTR_GET_ACK(intr)) {
-      dwc2_irq_handle_channel_ack(ch, c);
-      USB_HOST_INTR_CLR_ACK(intr);
-    }
+  printf("=== %08x\n", intr);
+  xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
+  SET_INTR();
+  USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
+
+  if (USB_HOST_INTR_GET_ACK(intr)) {
+    dwc2_irq_handle_channel_ack(ch, c, xfer_complete);
+    USB_HOST_INTR_CLR_ACK(intr);
   }
-  if (intr) {
+  if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
+    dwc2_irq_handle_channel_ahb_err(ch, c);
+    USB_HOST_INTR_CLR_AHB_ERR(intr);
+  }
+  if (intr & ~(uint32_t)0x23) {
     printf("there's more %08x\n", intr);
-    while(1);
+    while(1) {
+      wait_msec(500);
+      GET_INTR();
+      printf("+++ %08x\n", intr);
+    }
   }
 }
 

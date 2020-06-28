@@ -46,6 +46,7 @@ struct dwc2_transfer_ctl {
   int status;
   int transfer_size;
   int split_start;
+  bool use_split;
   uint64_t dma_addr_base;
   uint64_t dma_addr;
   completion_fn completion;
@@ -58,6 +59,7 @@ void dwc2_transfer_ctl_deallocate(struct dwc2_transfer_ctl *);
 struct dwc2_channel {
   dwc2_pipe_desc_t pipe ALIGNED(8);
   struct dwc2_transfer_ctl *tc;
+  usb_pid_t pid;
 };
 
 /*
@@ -78,7 +80,7 @@ dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *buf, 
 
 bool dwc2_is_split_enabled(dwc2_pipe_desc_t pipe);
 void dwc2_transfer_completed_debug(struct dwc2_channel *c);
-void dwc2_transfer_prepare(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t *pid);
+void dwc2_transfer_prepare(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t pid);
 int dwc2_transfer_start(dwc2_pipe_desc_t pipe);
 int dwc2_transfer_recalc_next(struct dwc2_channel *c);
 
@@ -257,3 +259,7 @@ void dwc2_channel_set_priv(dwc2_chan_id_t ch, void *priv);
 void *dwc2_channel_get_priv(dwc2_chan_id_t ch);
 
 void dwc2_init(void);
+
+void dwc2_channel_set_split_complete(dwc2_pipe_desc_t pipe);
+
+usb_pid_t dwc2_get_next_pid(int ch);

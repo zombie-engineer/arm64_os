@@ -47,7 +47,6 @@ void hcd_transfer_fsm(void *arg)
 {
   struct hcd_transfer_status *s = arg;
   struct dwc2_channel *c = s->priv;
-  usb_pid_t pid;
   printf("hcd_transfer_fsm: %p, stage: %d\n", c, s->stage);
 
   /*
@@ -85,9 +84,8 @@ void hcd_transfer_fsm(void *arg)
       /* can not be */
       break;
     case HCD_TRANSFER_STAGE_DATA_PACKET:
-      pid = USB_PID_DATA1;
       c->pipe.u.ep_direction = s->direction;
-      dwc2_transfer_prepare(c->pipe, s->addr, s->transfer_size, &pid);
+      dwc2_transfer_prepare(c->pipe, s->addr, s->transfer_size, USB_PID_DATA1);
       dwc2_transfer_start(c->pipe);
       break;
     case HCD_TRANSFER_STAGE_ACK_PACKET:
@@ -95,8 +93,7 @@ void hcd_transfer_fsm(void *arg)
         c->pipe.u.ep_direction = USB_DIRECTION_IN;
       else
         c->pipe.u.ep_direction = USB_DIRECTION_OUT;
-      pid = USB_PID_DATA1;
-      dwc2_transfer_prepare(c->pipe, NULL, 0, &pid);
+      dwc2_transfer_prepare(c->pipe, NULL, 0, USB_PID_DATA1);
       dwc2_transfer_start(c->pipe);
       break;
     default:
@@ -168,7 +165,7 @@ int hcd_transfer_control(
   pipedesc.u.dwc_channel = channel_id;
   HCDDEBUG("control transfer prepare, c:%p, tc:%p, completion:%p, addr:%p, size:%d", c, c->tc, c->tc->completion, addr, transfer_size);
   pid = USB_PID_SETUP;
-  dwc2_transfer_prepare(pipedesc, &rqbuf, sizeof(rqbuf), &pid);
+  dwc2_transfer_prepare(pipedesc, &rqbuf, sizeof(rqbuf), pid);
   dwc2_transfer_start(pipedesc);
   while(status.stage != HCD_TRANSFER_STAGE_COMPLETED)
     asm volatile("wfe");
