@@ -57,12 +57,12 @@ int usb_hcd_hub_device_to_string(usb_hub_t *h, const char *prefix, char *buf, in
 #define DECL_RQ(__type, __rq, __value, __index, __len)\
   uint64_t rq = USB_DEV_RQ_MAKE(__type, __rq, __value, __index, __len)
 
-#define HUBFN(__direction, __rq_type, __rq, __rq_value, __rq_index, __rq_size, __dst)\
+#define HUBFN(__dir, __rq_type, __rq, __rq_value, __rq_index, __rq_size, __addr)\
   int err;\
   int num_bytes;\
-  DECL_PCTL(CONTROL, __direction, 0);\
-  DECL_RQ(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
-	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, &pctl, __dst, __rq_size, rq, &num_bytes);\
+  uint64_t rq = USB_DEV_RQ_MAKE(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
+  DECL_PCTL(CONTROL, __dir, 0);\
+	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, &pctl, __addr, __rq_size, rq, &num_bytes);\
   if (err != ERR_OK) {\
     HUBERR("request '"#__rq_type "-" #__rq "' v:%d,i:%d,l:%d failed", __rq_value, __rq_index, __rq_size);\
     err = ERR_GENERIC;\

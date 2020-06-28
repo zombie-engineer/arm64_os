@@ -73,7 +73,7 @@ struct usb_hcd_endpoint {
 static inline int hcd_endpoint_get_number(struct usb_hcd_endpoint *ep)
 {
   return ep->descriptor.endpoint_address & 0x7f;
-} 
+}
 
 static inline int hcd_endpoint_get_direction(struct usb_hcd_endpoint *ep)
 {
@@ -111,7 +111,7 @@ static inline struct usb_hcd_endpoint *hcd_interface_get_endpoint(struct usb_hcd
 struct usb_hcd_device {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_hcd_device);
 
-  /* 
+  /*
    * unique address one of 127 addresses, assigned at transition
    * to ADDRESSED state
    * */
@@ -141,7 +141,7 @@ struct usb_hcd_device {
 
   int num_interfaces;
   struct usb_hcd_interface interfaces[USB_MAX_INTERFACES_PER_DEVICE] ALIGNED (4);
-  struct usb_hcd_device_class_base *class; 
+  struct usb_hcd_device_class_base *class;
 
   char string_manufacturer[64];
   char string_product[64];
@@ -180,9 +180,9 @@ const char *usb_hcd_device_class_to_string(int c);
 
 void usb_hcd_print_device(struct usb_hcd_device *dev);
 
-int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, int lang_id, 
-    void *buf, 
-    int buf_sz, 
+int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, int lang_id,
+    void *buf,
+    int buf_sz,
     int *num_bytes);
 
 #define CHECK_ERR_SILENT() if (err != ERR_OK) goto out_err
