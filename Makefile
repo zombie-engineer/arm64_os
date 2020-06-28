@@ -13,7 +13,7 @@ OPTIMIZATION_FLAGS = -g
 
 LINKSCRIPT = link.ld
 
-CFLAGS = -Werror=implicit-function-declaration -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
+CFLAGS = -Werror=unused-variable -Werror=int-conversion -Werror=implicit-function-declaration -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
 LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
 QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
