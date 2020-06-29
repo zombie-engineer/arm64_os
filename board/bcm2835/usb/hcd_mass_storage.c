@@ -124,7 +124,6 @@ int usb_mass_reset(hcd_mass_t *m)
 {
   int err;
   int num_bytes;
-	struct usb_hcd_pipe_control pctl;
   struct usb_device_request rq = {
     .request_type = USB_RQ_TYPE_CLASS_SET_INTERFACE,
     .request      = MASS_REQUEST_RESET,
@@ -135,12 +134,7 @@ int usb_mass_reset(hcd_mass_t *m)
 
   MASSLOG("usb_mass_reset: request=t:%02x,r:%02x,v:%02x,i:%02x,l:%02x", rq.request_type, rq.request, rq.value, rq.index, rq.length);
 
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_OUT;
-
-  err = HCD_TRANSFER_CONTROL(&m->d->pipe0, &pctl,
-      NULL, 0, rq.raw, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&m->d->pipe0, USB_DIRECTION_OUT, NULL, 0, rq.raw, &num_bytes);
   MASSLOG("usb_mass_reset complete err: %d", err);
   return err;
 }
@@ -176,7 +170,7 @@ int usb_cbw_transfer(hcd_mass_t *m,
 
   struct usb_hcd_pipe p ALIGNED(4) = {
     .address         = hcd_endpoint_get_address(m->ep_out),
-    .endpoint        = hcd_endpoint_get_number(m->ep_out),
+    .ep              = hcd_endpoint_get_number(m->ep_out),
     .speed           = m->d->pipe0.speed,
     .max_packet_size = hcd_endpoint_get_max_packet_size(m->ep_out),
     .ls_hub_port     = m->d->pipe0.ls_hub_port,
@@ -202,7 +196,7 @@ int usb_cbw_transfer(hcd_mass_t *m,
 
   if (data && datasz) {
     if (data_direction == USB_DIRECTION_IN) {
-      p.endpoint = hcd_endpoint_get_number(m->ep_in);
+      p.ep = hcd_endpoint_get_number(m->ep_in);
       next_pid = &m->ep_in->next_toggle_pid;
     }
     int retries = 0;
@@ -227,7 +221,7 @@ int usb_cbw_transfer(hcd_mass_t *m,
     }
   }
 
-  p.endpoint = hcd_endpoint_get_number(m->ep_in);
+  p.ep = hcd_endpoint_get_number(m->ep_in);
   next_pid = &m->ep_in->next_toggle_pid;
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CBW_CHECK_ERR("transfer failed to CSW recieve");
@@ -350,7 +344,6 @@ int usb_mass_get_max_lun(struct usb_hcd_device *dev, int *out_max_lun)
 {
   int err;
   int num_bytes;
-	struct usb_hcd_pipe_control pctl;
   struct usb_device_request rq = {
     .request_type = USB_DEVICE_REQUEST_TYPE(DEV2HOST, CLASS, INTERFACE),
     .request      = MASS_REQUEST_GET_MAX_LUN,
@@ -368,11 +361,7 @@ int usb_mass_get_max_lun(struct usb_hcd_device *dev, int *out_max_lun)
 
   MASSLOG("usb_mass_get_max_lun: %016x", rq.raw);
 
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_IN;
-
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl,
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, USB_DIRECTION_IN,
       &max_lun, 1, rq.raw, &num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");

@@ -10,7 +10,7 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   char rq_desc[256];
   if (usb_hcd_log_level) {
     usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
-    HCDDEBUG("SUBMIT: device_address:%d, max_packet:%d, ep:%d, req:%s", pipe->address, pipe->max_packet_size, pipe->endpoint, rq_desc);
+    HCDDEBUG("SUBMIT: device_address:%d, max_packet:%d, ep:%d, req:%s", pipe->address, pipe->max_packet_size, pipe->ep, rq_desc);
   }
 }
 
@@ -133,7 +133,7 @@ void hcd_transfer_fsm(void *arg)
 
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
+  int direction,
   void *addr,
   int transfer_size,
   uint64_t rq,
@@ -148,7 +148,7 @@ int hcd_transfer_control(
   memset(&status, 0, sizeof(status));
   status.priv = c;
   status.stage = HCD_TRANSFER_STAGE_SETUP_PACKET;
-  status.direction = pctl->direction;
+  status.direction = direction;
   status.addr = addr;
   status.transfer_size = transfer_size;
 
@@ -177,7 +177,7 @@ out_err:
 
 int hcd_transfer_control_blocking(
   struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
+  int direction,
   void *addr,
   int transfer_size,
   uint64_t rq,
@@ -199,7 +199,7 @@ int hcd_transfer_control_blocking(
    */
   if (addr) {
     pid = USB_PID_DATA1;
-    pipedesc.u.ep_direction = pctl->direction;
+    pipedesc.u.ep_direction = direction;
     err = hcd_transfer_packet_blocking(pipedesc, addr, transfer_size, &pid, "DATA", out_num_bytes);
     CHECK_ERR_SILENT();
   }
@@ -207,7 +207,7 @@ int hcd_transfer_control_blocking(
   /*
    * Transmit STATUS packet
    */
-  if (!addr || pctl->direction == USB_DIRECTION_OUT)
+  if (!addr || direction == USB_DIRECTION_OUT)
     pipedesc.u.ep_direction = USB_DIRECTION_IN;
   else
     pipedesc.u.ep_direction = USB_DIRECTION_OUT;
@@ -243,7 +243,7 @@ int hcd_transfer_interrupt(
   dwc2_pipe_desc_t pipedesc = {
     .u = {
       .device_address  = pipe->address,
-      .ep_address      = pipe->endpoint,
+      .ep_address      = pipe->ep,
       .ep_type         = USB_ENDPOINT_TYPE_INTERRUPT,
       .ep_direction    = USB_DIRECTION_IN,
       .speed           = pipe->speed,
@@ -278,7 +278,7 @@ int hcd_transfer_bulk(
   dwc2_pipe_desc_t pipedesc = {
     .u = {
       .device_address  = pipe->address,
-      .ep_address      = pipe->endpoint,
+      .ep_address      = pipe->ep,
       .ep_type         = USB_ENDPOINT_TYPE_BULK,
       .ep_direction    = direction,
       .speed           = pipe->speed,

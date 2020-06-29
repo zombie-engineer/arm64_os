@@ -61,8 +61,7 @@ int usb_hcd_hub_device_to_string(usb_hub_t *h, const char *prefix, char *buf, in
   int err;\
   int num_bytes;\
   uint64_t rq = USB_DEV_RQ_MAKE(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
-  DECL_PCTL(CONTROL, __dir, 0);\
-	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, &pctl, __addr, __rq_size, rq, &num_bytes);\
+	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, USB_DIRECTION_ ## __dir, __addr, __rq_size, rq, &num_bytes);\
   if (err != ERR_OK) {\
     HUBERR("request '"#__rq_type "-" #__rq "' v:%d,i:%d,l:%d failed", __rq_value, __rq_index, __rq_size);\
     err = ERR_GENERIC;\

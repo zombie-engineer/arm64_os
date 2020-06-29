@@ -28,7 +28,7 @@ typedef struct dwc2_pipe_desc {
 #define PIPE_DESC_INIT(__hcd_pipe, __type, __dir) {\
     .u = {\
       .device_address  = __hcd_pipe->address, \
-      .ep_address      = __hcd_pipe->endpoint,\
+      .ep_address      = __hcd_pipe->ep,\
       .ep_type         = __type,\
       .ep_direction    = __dir,\
       .speed           = __hcd_pipe->speed,\

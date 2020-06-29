@@ -35,25 +35,15 @@ extern struct usb_hcd_device *root_hub;
 
 struct usb_hcd_pipe {
   int address;
-  int endpoint;
+  int ep;
+  int ep_type;
+  int ep_dir;
   int speed;
   int max_packet_size;
   int ls_hub_port;
   int ls_hub_address;
-};
-
-struct usb_hcd_pipe_control {
-  int transfer_type;
   int channel;
-  int direction;
 };
-
-#define DECL_PCTL(__ep_type, __ep_dir, __channel)\
-	struct usb_hcd_pipe_control pctl = {\
-		.channel = __channel,\
-		.transfer_type = USB_ENDPOINT_TYPE_ ## __ep_type,\
-		.direction = USB_DIRECTION_ ## __ep_dir,\
-	};
 
 struct usb_hcd_device_class_base {
   int device_class;
@@ -130,7 +120,6 @@ struct usb_hcd_device {
   int configuration_string;
   struct usb_hcd_device_location location;
   struct usb_hcd_pipe pipe0;
-  struct usb_hcd_pipe_control pipe0_control;
 
   /*
    * This device is added to a parent's hub list of it's children
@@ -211,7 +200,7 @@ int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, 
 
 int hcd_transfer_control_blocking(
   struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
+  int direction,
   void *addr,
   int transfer_size,
   uint64_t rq,
@@ -235,14 +224,14 @@ struct hcd_transfer_status {
 
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
-  struct usb_hcd_pipe_control *pctl,
+  int direction,
   void *addr,
   int transfer_size,
   uint64_t rq,
   int *out_num_bytes);
 
-#define HCD_TRANSFER_CONTROL(__p, __pc, __a, __sz, __rq, __o)\
-  hcd_transfer_control(__p, __pc, __a, __sz, __rq, __o)
+#define HCD_TRANSFER_CONTROL(__p, __d, __a, __sz, __rq, __o)\
+  hcd_transfer_control(__p, __d, __a, __sz, __rq, __o)
 
 int hcd_transfer_interrupt(
   struct usb_hcd_pipe *pipe,

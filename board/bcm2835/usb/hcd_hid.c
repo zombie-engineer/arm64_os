@@ -43,18 +43,13 @@ int usb_hid_get_desc(struct usb_hcd_device *dev, int hid_index, void *buf, int b
 {
   int err;
   int num_bytes;
-	struct usb_hcd_pipe_control pctl;
   uint64_t rq;
   HCDLOG("usb_hid_get_desc: %d %d", hid_index, bufsz);
-
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_IN;
 
   rq = USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR, USB_DESCRIPTOR_TYPE_HID_REPORT << 8, hid_index, bufsz);
   memset(buf, 0xff, sizeof(buf));
 
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, buf, bufsz, rq, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, USB_DIRECTION_IN, buf, bufsz, rq, &num_bytes);
   if (err) {
     HCDERR("failed to read descriptor header");
     goto out_err;
@@ -67,16 +62,11 @@ int usb_hid_set_idle(struct usb_hcd_device *dev, int idx)
 {
   int err;
   int num_bytes;
-	struct usb_hcd_pipe_control pctl;
   uint64_t rq;
   HCDLOG("usb_hid_set_idle");
 
-  pctl.channel = 0;
-  pctl.transfer_type = USB_ENDPOINT_TYPE_CONTROL;
-  pctl.direction = USB_DIRECTION_OUT;
-
   rq = USB_DEV_RQ_MAKE(CLASS_SET_INTERFACE, HID_SET_IDLE, 0, 0, 0);
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, &pctl, 0, 0, rq, &num_bytes);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0, USB_DIRECTION_OUT, 0, 0, rq, &num_bytes);
   CHECK_ERR("failed to set idle");
 out_err:
   return err;
@@ -90,7 +80,7 @@ int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
 
   struct usb_hcd_pipe pipe = {
     .address = dev->pipe0.address,
-    .endpoint = ep,
+    .ep = ep,
     .speed = dev->pipe0.speed,
     .max_packet_size = dev->pipe0.max_packet_size,
     .ls_hub_port = dev->pipe0.ls_hub_port,
@@ -110,7 +100,7 @@ int usb_hid_enumerate(struct usb_hcd_device *dev)
   int err = 0;
   int hid_index = 0;
   int desc_length;
-  char buf[256] ALIGNED(4); 
+  char buf[256] ALIGNED(4);
   struct usb_hcd_device_class_hid *h;
   struct usb_hcd_hid_interface *i;
   h = usb_hcd_device_to_hid(dev);
