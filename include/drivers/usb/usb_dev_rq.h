@@ -105,16 +105,27 @@ static inline void usb_rq_get_description(uint64_t rq, char *buf, int buf_sz)
       break;
     default:
       break;
-  } 
+  }
 
   snprintf(buf, buf_sz, "%016x %s %s t:%02x r:%02x v:%04x(%d,%d) i:%04x l:%04x",
-    rq, 
+    rq,
     usb_req_to_string(req),
     subtype ? subtype : "",
-    type, 
+    type,
     req,
     value, value_hi, value_lo,
-    index, 
+    index,
     length);
 }
 
+static inline void usb_rq_print(uint64_t rq, const char *tag)
+{
+  printf("usb_device_request:%s,type:%02x,rq:%02x,value:%04x,idx:%04x,len:%04x",
+      tag,
+      rq,
+      USB_DEV_RQ_GET_TYPE(rq),
+      USB_DEV_RQ_GET_RQ(rq),
+      USB_DEV_RQ_GET_VALUE(rq),
+      USB_DEV_RQ_GET_INDEX(rq),
+      USB_DEV_RQ_GET_LENGTH(rq));
+}

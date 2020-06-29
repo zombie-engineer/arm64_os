@@ -792,18 +792,6 @@ int usb_hcd_power_off()
   return ERR_OK;
 }
 
-void print_usb_device_rq(uint64_t rq, const char *tag)
-{
-  printf("usb_dev_rq:%s,type:%02x,rq:%02x,value:%04x,idx:%04x,len:%04x",
-      tag,
-      rq,
-      USB_DEV_RQ_GET_TYPE(rq),
-      USB_DEV_RQ_GET_RQ(rq),
-      USB_DEV_RQ_GET_VALUE(rq),
-      USB_DEV_RQ_GET_INDEX(rq),
-      USB_DEV_RQ_GET_LENGTH(rq));
-}
-
 int usb_hcd_init()
 {
   int err;
