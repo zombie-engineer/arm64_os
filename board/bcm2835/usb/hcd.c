@@ -22,6 +22,7 @@
 #include <intr_ctl.h>
 #include <board/bcm2835/bcm2835_irq.h>
 #include <irq.h>
+#include <drivers/usb/usb_xfer_queue.h>
 
 //
 // https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Arm32_64_USB/rpi-usb.h
@@ -798,7 +799,7 @@ int usb_hcd_init()
   uint32_t vendor_id, user_id;
   STATIC_SLOT_INIT_FREE(usb_hcd_device);
   dwc2_init();
-
+  usb_xfer_queue_init();
   usb_hcd_hub_init();
   usb_hcd_hid_init();
   usb_hcd_mass_init();

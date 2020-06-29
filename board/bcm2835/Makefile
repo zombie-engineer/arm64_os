@@ -11,6 +11,7 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/hcd_hub \
 	usb/root_hub \
 	usb/dwc2_transfer \
+	usb/usb_xfer_queue \
 	bcm2835_systimer \
 	bcm2835_gpio \
 	bcm2835_gpio_access \

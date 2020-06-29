@@ -127,7 +127,7 @@ static inline void list_del_init(struct list_head *entry)
   entry->next = entry;
 }
 
-static inline void list_move(struct list_head *list, 
+static inline void list_move(struct list_head *list,
     struct list_head *head)
 {
   __list_del(list);
