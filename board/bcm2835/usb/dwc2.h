@@ -2,70 +2,8 @@
 #include <compiler.h>
 #include <types.h>
 #include <usb/usb_pid.h>
-#include <completion.h>
-#include <memory/static_slot.h>
-
-#define DWC2_TRANSFER_STATUS_STARTED 0
-#define DWC2_TRANSFER_STATUS_SPLIT_HANDLED 1
-
-typedef struct dwc2_pipe_desc {
-  union {
-    struct {
-      uint64_t device_address  :  7;
-      uint64_t ep_address      :  4;
-      uint64_t ep_type         :  2;
-      uint64_t ep_direction    :  1;
-      uint64_t speed           :  2;
-      uint64_t max_packet_size : 11;
-      uint64_t dwc_channel     :  3;
-      uint64_t hub_address     :  7;
-      uint64_t hub_port        :  7;
-    };
-    uint64_t raw;
-  } u;
-} dwc2_pipe_desc_t;
-
-#define PIPE_DESC_INIT(__hcd_pipe, __type, __dir) {\
-    .u = {\
-      .device_address  = __hcd_pipe->address, \
-      .ep_address      = __hcd_pipe->ep,\
-      .ep_type         = __type,\
-      .ep_direction    = __dir,\
-      .speed           = __hcd_pipe->speed,\
-      .max_packet_size = __hcd_pipe->max_packet_size,\
-      .hub_address     = __hcd_pipe->ls_hub_address,\
-      .hub_port        = __hcd_pipe->ls_hub_port\
-    }\
-  }
-
-#define DECL_PIPE_DESC(__name, __hcd_pipe, __type, __dir) \
-  dwc2_pipe_desc_t __name = PIPE_DESC_INIT(__hcd_pipe, __type, __dir)
-
-struct dwc2_transfer_ctl {
-  struct list_head STATIC_SLOT_OBJ_FIELD(dwc2_transfer_ctl);
-  int status;
-  int transfer_size;
-  int split_start;
-  bool use_split;
-  uint64_t dma_addr_base;
-  uint64_t dma_addr;
-  completion_fn completion;
-  void *completion_data;
-};
-
-struct dwc2_transfer_ctl *dwc2_transfer_ctl_allocate();
-void dwc2_transfer_ctl_deallocate(struct dwc2_transfer_ctl *);
-
-struct dwc2_channel {
-  dwc2_pipe_desc_t pipe ALIGNED(8);
-  struct dwc2_transfer_ctl *tc;
-  usb_pid_t pid;
-};
-
-/*
- * Return value: length of a printed string
- */
-int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz);
+#include <drivers/usb/usb_xfer_queue.h>
+#include "dwc2_xfer_control.h"
 
 typedef enum {
   DWC2_STATUS_ACK = 0,
@@ -76,13 +14,15 @@ typedef enum {
   DWC2_STATUS_ERR,
 } dwc2_transfer_status_t;
 
-dwc2_transfer_status_t dwc2_transfer_blocking(dwc2_pipe_desc_t pipe, void *buf, int bufsz, usb_pid_t *pid, int *out_num_bytes);
+int dwc2_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel *c);
 
-bool dwc2_is_split_enabled(dwc2_pipe_desc_t pipe);
+dwc2_transfer_status_t dwc2_transfer_blocking(struct dwc2_channel *c, int *out_num_bytes);
+
+bool dwc2_channel_is_split_enabled(struct dwc2_channel *c);
 void dwc2_transfer_completed_debug(struct dwc2_channel *c);
-void dwc2_transfer_prepare(dwc2_pipe_desc_t pipe, void *addr, int transfer_size, usb_pid_t pid);
-int dwc2_transfer_start(dwc2_pipe_desc_t pipe);
-int dwc2_transfer_recalc_next(struct dwc2_channel *c);
+void dwc2_transfer_prepare(struct dwc2_channel *c);
+int dwc2_transfer_start(struct dwc2_channel *c);
+int dwc2_transfer_recalc_next(struct dwc2_xfer_control *ctl);
 
 struct usb_hub_port_status;
 
@@ -240,26 +180,13 @@ typedef void(*port_status_changed_cb_t)(struct usb_hub_port_status*);
 
 void dwc2_set_port_status_changed_cb(port_status_changed_cb_t cb);
 
-void dwc2_channel_enable(int ch);
+void dwc2_channel_enable(int ch_id);
 
-void dwc2_channel_disable(int ch);
-
-typedef int dwc2_chan_id_t;
-
-#define DWC2_INVALID_CHANNEL -1
-
-dwc2_chan_id_t dwc2_channel_alloc();
-
-void dwc2_channel_free(dwc2_chan_id_t);
-
-struct dwc2_channel *dwc2_channel_get(dwc2_chan_id_t ch);
-
-void dwc2_channel_set_priv(dwc2_chan_id_t ch, void *priv);
-
-void *dwc2_channel_get_priv(dwc2_chan_id_t ch);
+void dwc2_channel_disable(int ch_id);
 
 void dwc2_init(void);
 
-void dwc2_channel_set_split_complete(dwc2_pipe_desc_t pipe);
+void dwc2_channel_set_split_complete(struct dwc2_channel *c);
 
-usb_pid_t dwc2_get_next_pid(int ch);
+usb_pid_t dwc2_channel_get_next_pid(struct dwc2_channel *c);
+

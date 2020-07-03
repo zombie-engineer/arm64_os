@@ -51,19 +51,19 @@ static inline void __write_ch_reg(reg32_t reg, int chan, uint32_t val, reg_print
   print_reg(reg, val, p, 1);
 }
 
-#define CLEAR_INTR()    __write_ch_reg(USB_HCINT0   , ch, 0xffffffff, usb_host_intr_to_string)
-#define CLEAR_INTRMSK() __write_ch_reg(USB_HCINTMSK0, ch, 0x00000000, usb_host_intr_to_string)
-#define SET_INTR()      __write_ch_reg(USB_HCINT0   , ch ,intr, usb_host_intr_to_string)
-#define SET_INTRMSK()   __write_ch_reg(USB_HCINTMSK0, ch ,intrmsk, usb_host_intr_to_string)
-#define SET_SPLT()      __write_ch_reg(USB_HCSPLT0  , ch, splt, usb_host_splt_to_string)
-#define SET_CHAR()      __write_ch_reg(USB_HCCHAR0  , ch, chr, usb_host_char_to_string)
-#define SET_SIZ()       __write_ch_reg(USB_HCTSIZ0  , ch, siz, usb_host_size_to_string)
-#define SET_DMA()       __write_ch_reg(USB_HCDMA0   , ch, dma, NULL)
+#define CLEAR_INTR()    __write_ch_reg(USB_HCINT0   , ch_id, 0xffffffff, usb_host_intr_to_string)
+#define CLEAR_INTRMSK() __write_ch_reg(USB_HCINTMSK0, ch_id, 0x00000000, usb_host_intr_to_string)
+#define SET_INTR()      __write_ch_reg(USB_HCINT0   , ch_id ,intr, usb_host_intr_to_string)
+#define SET_INTRMSK()   __write_ch_reg(USB_HCINTMSK0, ch_id ,intrmsk, usb_host_intr_to_string)
+#define SET_SPLT()      __write_ch_reg(USB_HCSPLT0  , ch_id, splt, usb_host_splt_to_string)
+#define SET_CHAR()      __write_ch_reg(USB_HCCHAR0  , ch_id, chr, usb_host_char_to_string)
+#define SET_SIZ()       __write_ch_reg(USB_HCTSIZ0  , ch_id, siz, usb_host_size_to_string)
+#define SET_DMA()       __write_ch_reg(USB_HCDMA0   , ch_id, dma, NULL)
 
-#define GET_CHAR()      chr     = __read_ch_reg(USB_HCCHAR0  , ch, usb_host_char_to_string)
-#define GET_SIZ()       siz     = __read_ch_reg(USB_HCTSIZ0  , ch, usb_host_size_to_string)
-#define GET_SPLT()      splt    = __read_ch_reg(USB_HCSPLT0  , ch, usb_host_splt_to_string)
-#define GET_INTR()      intr    = __read_ch_reg(USB_HCINT0   , ch, usb_host_intr_to_string)
-#define GET_INTRMSK()   intrmsk = __read_ch_reg(USB_HCINTMSK0, ch, usb_host_intr_to_string)
-#define GET_DMA()       dma     = __read_ch_reg(USB_HCDMA0   , ch, NULL)
+#define GET_CHAR()      chr     = __read_ch_reg(USB_HCCHAR0  , ch_id, usb_host_char_to_string)
+#define GET_SIZ()       siz     = __read_ch_reg(USB_HCTSIZ0  , ch_id, usb_host_size_to_string)
+#define GET_SPLT()      splt    = __read_ch_reg(USB_HCSPLT0  , ch_id, usb_host_splt_to_string)
+#define GET_INTR()      intr    = __read_ch_reg(USB_HCINT0   , ch_id, usb_host_intr_to_string)
+#define GET_INTRMSK()   intrmsk = __read_ch_reg(USB_HCINTMSK0, ch_id, usb_host_intr_to_string)
+#define GET_DMA()       dma     = __read_ch_reg(USB_HCDMA0   , ch_id, NULL)
 

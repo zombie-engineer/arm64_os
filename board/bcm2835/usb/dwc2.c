@@ -10,6 +10,7 @@
 #include <usb/usb.h>
 #include <spinlock.h>
 #include <delays.h>
+#include "dwc2_channel.h"
 
 static port_status_changed_cb_t port_status_changed_cb = NULL;
 
@@ -80,21 +81,6 @@ static port_status_changed_cb_t port_status_changed_cb = NULL;
  *
  */
 
-
-DECL_STATIC_SLOT(struct dwc2_transfer_ctl, dwc2_transfer_ctl, 16);
-
-struct dwc2_transfer_ctl *dwc2_transfer_ctl_allocate()
-{
-  struct dwc2_transfer_ctl *res;
-  res = dwc2_transfer_ctl_alloc();
-  DWCDEBUG("alloc:%p\n", res);
-  return res;
-}
-
-void dwc2_transfer_ctl_deallocate(struct dwc2_transfer_ctl *ctl)
-{
-  dwc2_transfer_ctl_release(ctl);
-}
 
 void dwc2_dump_port_int(int port)
 {
@@ -498,52 +484,52 @@ static inline void dwc2_irq_handle_sess_req(void)
   DWCDEBUG("session req");
 }
 
-static inline void dwc2_irq_handle_channel_ahb_err(int ch, struct dwc2_channel *c)
+static inline void dwc2_irq_handle_channel_ahb_err(struct dwc2_channel *c)
 {
-  dwc2_transfer_start(c->pipe);
+  dwc2_transfer_start(c);
   DWCDEBUG("AHB ERR");
 }
 
-static inline void dwc2_irq_handle_channel_ack(int ch, struct dwc2_channel *c, bool xfer_complete)
+static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer_complete)
 {
-  DWCDEBUG("channel irq ack: %d", ch);
+  DWCDEBUG("channel irq ack: %d", c->id);
   if (!xfer_complete) {
-    BUG(!dwc2_is_split_enabled(c->pipe), "dwc2_ack_interrupt logic error");
-    dwc2_transfer_start(c->pipe);
+    BUG(!dwc2_channel_is_split_enabled(c), "dwc2_ack_interrupt logic error");
+    dwc2_transfer_start(c);
     return;
   }
 
   dwc2_transfer_completed_debug(c);
-  if (dwc2_transfer_recalc_next(c)) {
-      dwc2_transfer_start(c->pipe);
+  if (dwc2_transfer_recalc_next(c->ctl)) {
+      dwc2_transfer_start(c);
       return;
   }
-  // c->pid = dwc2_get_next_pid(ch);
-  if (c->tc->completion)
-    c->tc->completion(c->tc->completion_data);
+  c->next_pid = dwc2_channel_get_next_pid(c);
+  if (c->ctl->completion)
+    c->ctl->completion(c->ctl->completion_arg);
 }
 
-static inline void dwc2_irq_handle_channel_int_one(int ch)
+static inline void dwc2_irq_handle_channel_int_one(int ch_id)
 {
   bool xfer_complete;
   uint32_t intr, intrmsk, raw_intr;
   struct dwc2_channel *c;
-  c = dwc2_channel_get(ch);
+  c = dwc2_channel_get_by_id(ch_id);
   GET_INTR();
   GET_INTRMSK();
   raw_intr = intr;
   // intr &= intrmsk;
-  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch, raw_intr, intrmsk, intr);
+  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch_id, raw_intr, intrmsk, intr);
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
 
   if (USB_HOST_INTR_GET_ACK(intr)) {
-    dwc2_irq_handle_channel_ack(ch, c, xfer_complete);
+    dwc2_irq_handle_channel_ack(c, xfer_complete);
     USB_HOST_INTR_CLR_ACK(intr);
   }
   if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
-    dwc2_irq_handle_channel_ahb_err(ch, c);
+    dwc2_irq_handle_channel_ahb_err(c);
     USB_HOST_INTR_CLR_AHB_ERR(intr);
   }
   if (intr & ~(uint32_t)0x23) {
@@ -636,106 +622,45 @@ void dwc2_set_port_status_changed_cb(port_status_changed_cb_t cb)
   port_status_changed_cb = cb;
 }
 
-static inline void dwc2_enable_channel_int(int ch)
+static inline void dwc2_enable_channel_int(int ch_id)
 {
   uint32_t haintmsk = read_reg(USB_HAINTMSK);
-  haintmsk |= 1<<ch;
+  haintmsk |= 1 << ch_id;
   write_reg(USB_HAINTMSK, haintmsk);
 }
 
-static inline void dwc2_disable_channel_int(int ch)
+static inline void dwc2_disable_channel_int(int ch_id)
 {
   uint32_t haintmsk = read_reg(USB_HAINTMSK);
-  haintmsk &= ~((uint32_t)(1<<ch));
+  haintmsk &= ~((uint32_t)(1<<ch_id));
   write_reg(USB_HAINTMSK, haintmsk);
 }
 
-static inline void dwc2_init_channel_int(int ch)
+static inline void dwc2_init_channel_int(int ch_id)
 {
   uint32_t intr = 0xffffffff;
-  USB_HOST_INTR_CLR_HALT(intr);
   SET_INTR();
 }
 
-static inline void dwc2_deinit_channel_int(int ch)
+static inline void dwc2_deinit_channel_int(int ch_id)
 {
   CLEAR_INTR();
 }
 
-void dwc2_channel_enable(int ch)
+void dwc2_channel_enable(int ch_id)
 {
-  dwc2_init_channel_int(ch);
-  dwc2_enable_channel_int(ch);
+  dwc2_init_channel_int(ch_id);
+  dwc2_enable_channel_int(ch_id);
 }
 
-void dwc2_channel_disable(int ch)
+void dwc2_channel_disable(int ch_id)
 {
-  dwc2_deinit_channel_int(ch);
-  dwc2_disable_channel_int(ch);
-}
-
-static DECL_SPINLOCK(dwc2_channels_lock);
-static uint8_t channels_bitmap = 0;
-static struct dwc2_channel dwc2_channels[6] = { 0 };
-
-dwc2_chan_id_t dwc2_channel_alloc()
-{
-  uint8_t bitmap;
-  int ch;
-  int num_channels = 6;
-  if (spinlocks_enabled)
-    spinlock_lock(&dwc2_channels_lock);
-  bitmap = channels_bitmap;
-  for (ch = 0; ch < num_channels; ++ch) {
-    if (!(bitmap & (1<<ch)))
-        break;
-  }
-  if (ch < num_channels) {
-    bitmap |= (1<<ch);
-    channels_bitmap = bitmap;
-  }
-  if (spinlocks_enabled)
-    spinlock_unlock(&dwc2_channels_lock);
-  if (ch == num_channels) {
-    DWCERR("Failed to allocate channel");
-    return DWC2_INVALID_CHANNEL;
-  }
-  DWCDEBUG("channel %d allocated", ch);
-  return ch;
-}
-
-void dwc2_channel_free(dwc2_chan_id_t ch)
-{
-  uint8_t bitmap;
-  if (spinlocks_enabled)
-    spinlock_lock(&dwc2_channels_lock);
-  bitmap = channels_bitmap;
-  BUG(!(bitmap & (1<<ch)), "Trying to release channel that's not busy");
-  bitmap &= ~(uint8_t)(1<<ch);
-  channels_bitmap = bitmap;
-  if (spinlocks_enabled)
-    spinlock_unlock(&dwc2_channels_lock);
-  DWCDEBUG("channel %d freed", ch);
-}
-
-struct dwc2_channel *dwc2_channel_get(dwc2_chan_id_t ch)
-{
-  uint8_t bitmap;
-  struct dwc2_channel *channel = NULL;
-  if (spinlocks_enabled)
-    spinlock_lock(&dwc2_channels_lock);
-  bitmap = channels_bitmap;
-  if (bitmap & (1<<ch))
-    channel = &dwc2_channels[ch];
-
-  if (spinlocks_enabled)
-    spinlock_unlock(&dwc2_channels_lock);
-  return channel;
+  dwc2_deinit_channel_int(ch_id);
+  dwc2_disable_channel_int(ch_id);
 }
 
 void dwc2_init(void)
 {
-  spinlock_init(&dwc2_channels_lock);
-  memset(dwc2_channels, 0, sizeof(dwc2_channels));
-  STATIC_SLOT_INIT_FREE(dwc2_transfer_ctl);
+  dwc2_channel_init();
+  dwc2_xfer_control_init();
 }

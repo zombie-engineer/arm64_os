@@ -3,6 +3,9 @@ board/bcm2835/usb/dwc2_regs_bits.h: board/bcm2835/usb/dwc2_regs_spec.yaml
 
 OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/dwc2 \
+	usb/dwc2_channel \
+	usb/dwc2_transfer \
+	usb/dwc2_xfer_control \
 	usb/hcd \
 	usb/hid_parser \
 	usb/hcd_transfer \
@@ -10,7 +13,6 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/hcd_hid \
 	usb/hcd_hub \
 	usb/root_hub \
-	usb/dwc2_transfer \
 	usb/usb_xfer_queue \
 	bcm2835_systimer \
 	bcm2835_gpio \
