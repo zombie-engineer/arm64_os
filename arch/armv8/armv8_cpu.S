@@ -169,7 +169,7 @@ FUNC(__armv8_restore_ctx_from):
   tmpdaif .req x0
   // do not restore pc
   // restore cpsr and put it on stack
-  ldr tmpdaif, [ctx, #(33 << 3)] 
+  ldr tmpdaif, [ctx, #(33 << 3)]
   str tmpdaif, [sp, #-8]
   .unreq tmpdaif
   LOAD_REGS_X0_X30 ctx
@@ -212,7 +212,7 @@ FUNC(__armv8_restore_ctx_from):
   ldr   x30, [x30]
   mov   x30, #1
   mov   x30, #1
-  
+
   // make cpsr
   mrs   x1, daif
   stp  x30, x1, [x0], #16
@@ -242,7 +242,7 @@ FUNC(__armv8_yield):
   bl schedule
 
 /*
- * __current_cpuctx now holds address of saved task state 
+ * __current_cpuctx now holds address of saved task state
  * of a task that will resume execution now. RESTORE_CONTEXT
  * will fill cpu regs with needed values. PC will point to
  * label __pc_resume_from_yield.
@@ -250,4 +250,119 @@ FUNC(__armv8_yield):
   RESTORE_CONTEXT
 __pc_resume_from_yield:
   ret
+
+
+FUNC(__armv8_self_test_irq_context):
+  /*
+   * save most registers on stack, except for x0,
+   * which is a return register
+   */
+  stp x1 , x2 , [sp, #-16]!
+  stp x3 , x4 , [sp, #-16]!
+  stp x5 , x6 , [sp, #-16]!
+  stp x7 , x8 , [sp, #-16]!
+  stp x9 , x10, [sp, #-16]!
+  stp x11, x12, [sp, #-16]!
+  stp x13, x14, [sp, #-16]!
+  stp x15, x16, [sp, #-16]!
+  stp x17, x18, [sp, #-16]!
+  stp x19, x20, [sp, #-16]!
+  stp x21, x22, [sp, #-16]!
+  stp x23, x24, [sp, #-16]!
+  stp x25, x26, [sp, #-16]!
+  stp x27, x28, [sp, #-16]!
+  stp x29, x30, [sp, #-16]!
+
+  /* set initial values for each register */
+  mov x0, #256
+  mov x1, #257
+  mov x2, #258
+  mov x3, #259
+  mov x4, #260
+  mov x5, #261
+  mov x6, #262
+  mov x7, #263
+  mov x8, #264
+  mov x9, #265
+  mov x10, #266
+  mov x11, #267
+  mov x12, #268
+  mov x13, #269
+  mov x14, #270
+  mov x15, #271
+  mov x16, #272
+  mov x17, #273
+  mov x18, #274
+  mov x19, #275
+  mov x20, #276
+  mov x21, #277
+  mov x22, #278
+  mov x23, #279
+  mov x24, #281
+  mov x25, #282
+  mov x26, #283
+  mov x27, #284
+  mov x28, #285
+  mov x29, #286
+  mov x30, #287
+  /* initialize cpsr with some arithmetic flags */
+  cmp x30, x29
+  svc #0x999
+  bne 1f
+  mov x0, #1
+  b 3f
+1:
+  bgt 2f
+  mov x0, #2
+  b 3f
+2:
+  add x0, x0, x1
+  add x0, x0, x2
+  add x0, x0, x3
+  add x0, x0, x4
+  add x0, x0, x5
+  add x0, x0, x6
+  add x0, x0, x7
+  add x0, x0, x8
+  add x0, x0, x9
+  add x0, x0, x10
+  add x0, x0, x11
+  add x0, x0, x12
+  add x0, x0, x13
+  add x0, x0, x14
+  add x0, x0, x15
+  add x0, x0, x16
+  add x0, x0, x17
+  add x0, x0, x18
+  add x0, x0, x19
+  add x0, x0, x20
+  add x0, x0, x21
+  add x0, x0, x22
+  add x0, x0, x23
+  add x0, x0, x24
+  add x0, x0, x25
+  add x0, x0, x26
+  add x0, x0, x27
+  add x0, x0, x28
+  add x0, x0, x29
+  add x0, x0, x30
+3:
+  /* return registers untouched from stack */
+  ldp x29, x30, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x19, x20, [sp], #16
+  ldp x17, x18, [sp], #16
+  ldp x15, x16, [sp], #16
+  ldp x13, x14, [sp], #16
+  ldp x11, x12, [sp], #16
+  ldp x9 , x10, [sp], #16
+  ldp x7 , x8 , [sp], #16
+  ldp x5 , x6 , [sp], #16
+  ldp x3 , x4 , [sp], #16
+  ldp x1 , x2 , [sp], #16
+  ret
+
 

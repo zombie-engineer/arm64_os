@@ -911,6 +911,7 @@ void main()
   vcanvas_set_bg_color(0x00000010);
   init_uart(1);
   init_consoles();
+  self_test();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);

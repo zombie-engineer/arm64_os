@@ -1,5 +1,6 @@
 #include <common.h>
 #include <stringlib.h>
+#include <types.h>
 
 #define FAIL() while(1);
 
@@ -76,10 +77,29 @@ void test_perf_sprintf()
   puts("Running test_perf_sprintf\n");
 }
 
+extern uint64_t __armv8_self_test_irq_context(void);
+
+void test_cpu_ctx(void)
+{
+  uint64_t result;
+  const uint64_t expected = 8408;
+  puts("Running cpu ctx self test.\n");
+  result = __armv8_self_test_irq_context();
+  if (result != expected) {
+    printf("cpu ctx self test failed. Expected result: %lld, but recieved: %lld\n", expected, result);
+    while(1) {
+      asm volatile ("wfe");
+    }
+  }
+  puts("cpu ctx self test completed.\n");
+}
+
 void self_test()
 {
   puts("Running self test.\n");
   test_sprintf();
   test_perf_sprintf();
+  test_cpu_ctx();
   printf("Self test complete.\n");
 }
+

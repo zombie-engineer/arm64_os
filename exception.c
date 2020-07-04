@@ -174,6 +174,8 @@ static void __handle_svc_64(exception_info_t *e)
         asm volatile ("wfe");
 
       break;
+    case SVC_DO_NOTHING:
+      break;
     case SVC_YIELD:
       schedule();
       break;
