@@ -4,6 +4,7 @@
 #include "dwc2.h"
 #include "dwc2_channel.h"
 #include "dwc2_xfer_control.h"
+#include <sched.h>
 
 DECL_STATIC_SLOT(struct usb_xfer_job, usb_xfer_jobs, 64);
 DECL_STATIC_SLOT(struct usb_xfer_jobchain, usb_xfer_jobchains, 64);
@@ -13,6 +14,7 @@ struct jobchain_queue {
 };
 
 static struct jobchain_queue per_channel_jobchains;
+static DECL_SPINLOCK(jc_list_lock);
 
 struct usb_xfer_job *usb_xfer_job_alloc(void)
 {
@@ -45,12 +47,27 @@ void usb_xfer_jobchain_free(struct usb_xfer_jobchain *jc)
 
 void usb_xfer_jobchain_enqueue(struct usb_xfer_jobchain *jc)
 {
+  int flags;
+
+  disable_irq_save_flags(flags);
+  spinlock_lock(&jc_list_lock);
+
   list_add_tail(&jc->list, &per_channel_jobchains.jc_list);
+
+  spinlock_unlock(&jc_list_lock);
+  restore_irq_flags(flags);
 }
 
 void usb_xfer_jobchain_dequeue(struct usb_xfer_jobchain *jc)
 {
+  int flags;
+  disable_irq_save_flags(flags);
+  spinlock_lock(&jc_list_lock);
+
   list_del_init(&jc->list);
+
+  spinlock_unlock(&jc_list_lock);
+  restore_irq_flags(flags);
 }
 
 static void usb_xfer_job_cb(void *arg)
@@ -62,7 +79,7 @@ static void usb_xfer_job_cb(void *arg)
 
 static inline void usb_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel *c)
 {
-  uxb_xfer_job_print(j, "usb_xfer_one_job");
+  usb_xfer_job_print(j, "usb_xfer_one_job");
   j->completion = usb_xfer_job_cb;
   j->completed = false;
   j->completion_arg = j;
@@ -85,9 +102,9 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
 {
   struct usb_xfer_job *j, *next_j;
   struct dwc2_channel *c = NULL;
-  printf("usb_xfer_one_jobchain: %p\n", jc);
-  uxb_xfer_jobchain_print(jc, "running");
   DECL_PIPE_DESC(dwc2_pipe, jc->hcd_pipe);
+  printf("usb_xfer_one_jobchain: %p, hcd_pipe:%p, hcd_pipe_speed:%d\n", jc, jc->hcd_pipe, jc->hcd_pipe->speed);
+  uxb_xfer_jobchain_print(jc, "running");
 
   while(!c) {
     printf(">");
@@ -118,22 +135,43 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
   dwc2_channel_free(c);
 }
 
-void usb_xfer_queue_run()
+static int usb_xfer_queue_run(void)
 {
-  struct usb_xfer_jobchain *jc, *tmp;
+  struct usb_xfer_jobchain *jc;
   struct list_head *h = &per_channel_jobchains.jc_list;
-  list_for_each_entry_safe(jc, tmp, h, list) {
-    printf("usb_xfer_queue_run:head->prev:%p, head->next:%p\n", h->prev, h->next);
-    printf("jc->list.prev:%p, next:%p\n", jc->list.prev, jc->list.next);
-    usb_xfer_one_jobchain(jc);
-    list_del(&jc->list);
-    usb_xfer_jobchain_free(jc);
+  int flags;
+  USBQ_INFO("starting usb_runqueue");
+  while(1) {
+    asm volatile ("wfe");
+    jc = NULL;
+    disable_irq_save_flags(flags);
+    spinlock_lock(&jc_list_lock);
+    if (!list_empty(h)) {
+      jc = list_first_entry(h, typeof(*jc), list);
+      list_del_init(&jc->list);
+    }
+    spinlock_unlock(&jc_list_lock);
+    restore_irq_flags(flags);
+
+    if (jc) {
+      USBQ_INFO("usb_xfer_queue_run:head->prev:%p, head->next:%p", h->prev, h->next);
+      USBQ_INFO("jc->list.prev:%p, next:%p", jc->list.prev, jc->list.next);
+      usb_xfer_one_jobchain(jc);
+      usb_xfer_jobchain_free(jc);
+    }
   }
+  return 0;
 }
 
 void usb_xfer_queue_init(void)
 {
+  task_t *usb_runqueue_task;
   STATIC_SLOT_INIT_FREE(usb_xfer_jobs);
   STATIC_SLOT_INIT_FREE(usb_xfer_jobchains);
   INIT_LIST_HEAD(&per_channel_jobchains.jc_list);
+  spinlock_init(&jc_list_lock);
+
+  usb_runqueue_task = task_create(usb_xfer_queue_run, "usb_runqueue");
+  BUG(IS_ERR(usb_runqueue_task), "Failed to initiazlie usb_runqueue_task");
+  sched_queue_runnable_task(get_scheduler(), usb_runqueue_task);
 }

@@ -173,7 +173,7 @@ task_t *task_create(task_fn fn, const char *task_name)
   strcpy(t->name, task_name);
 
   stack = alloc_stack();
-  printf("task_create: stack at %p"__endline, stack);
+  printf("task_create: name: %s, stack: %p"__endline, task_name, stack);
   if (!stack)
     goto out;
 

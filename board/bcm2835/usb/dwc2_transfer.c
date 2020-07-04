@@ -167,6 +167,7 @@ static inline void dwc2_channel_program_split(struct dwc2_channel *c)
   int ch_id = c->id;
   /* Clear and setup split control to low speed devices */
   splt = 0;
+  printf("\n%08x\n\n", c->pipe);
   if (dwc2_channel_split_mode(c)) {
     USB_HOST_SPLT_CLR_SET_SPLT_ENABLE(splt, 1);
     USB_HOST_SPLT_CLR_SET_HUB_ADDR(splt, c->pipe.u.hub_address);

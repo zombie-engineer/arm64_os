@@ -34,7 +34,7 @@
 
 
 int usb_root_hub_device_number = 0;
-int usb_root_hub_debug = 0;
+int usb_root_hub_debug = 1;
 struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {

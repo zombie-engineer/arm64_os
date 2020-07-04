@@ -803,6 +803,7 @@ int usb_hcd_init()
   usb_hcd_hub_init();
   usb_hcd_hid_init();
   usb_hcd_mass_init();
+  puts("---------\n");
 
 
   vendor_id = dwc2_get_vendor_id();

@@ -460,10 +460,10 @@ void init_nokia5110_display(int report_exceptions, int run_test)
 
   spidev = spi_allocate_emulated(
       "spi_nokia5110",
-      gpio_pin_sclk, 
-      gpio_pin_mosi, 
-      -1, 
-      gpio_pin_ce, 
+      gpio_pin_sclk,
+      gpio_pin_mosi,
+      -1,
+      gpio_pin_ce,
       -1,
       SPI_EMU_MODE_MASTER
   );
@@ -918,10 +918,8 @@ void main()
   // bcm2835_set_pwm_clk_freq(100000);
   // servo_sg90_init();
   print_mbox_props();
-  usbd_init();
-  printf("waiting\n");
-  usbd_print_device_tree();
-  while(1);
+  // usbd_init();
+  // usbd_print_device_tree();
 #ifndef CONFIG_QEMU
   // init_nokia5110_display(1, 0);
   // nokia5110_draw_text("Display ready", 0, 0);

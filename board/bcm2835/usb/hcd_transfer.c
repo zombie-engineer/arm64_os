@@ -138,7 +138,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     goto out_err;
   }
   jc->first = last_j = j;
-  uxb_xfer_job_print(last_j, "usb_xfer_job_prep SETUP");
+  usb_xfer_job_print(last_j, "usb_xfer_job_prep SETUP");
 
   /* DATA packet */
   if (addr) {
@@ -150,7 +150,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     last_j->next = j;
     last_j = j;
   }
-  uxb_xfer_job_print(last_j, "usb_xfer_job_prep DATA");
+  usb_xfer_job_print(last_j, "usb_xfer_job_prep DATA");
 
   /* STATUS packet */
   if (addr && direction == USB_DIRECTION_IN)
@@ -164,7 +164,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     goto out_err;
   }
   last_j->next = j;
-  uxb_xfer_job_print(last_j, "usb_xfer_job_prep ACK");
+  usb_xfer_job_print(last_j, "usb_xfer_job_prep ACK");
   return jc;
 
 out_err:
@@ -202,7 +202,7 @@ int hcd_transfer_control(
 
   if (pipe->address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
-  printf("hcd_transfer_control\n");
+  printf("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d\n", pipe, pipe->ls_hub_port, pipe->speed);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
   if (IS_ERR(jc)) {
@@ -215,9 +215,6 @@ int hcd_transfer_control(
   jc->hcd_pipe = pipe;
 
   usb_xfer_jobchain_enqueue(jc);
-
-  /* Code below should be substituted into a callback in scheduler mode */
-  usb_xfer_queue_run();
 
   while(!completed)
     asm volatile("wfe");
