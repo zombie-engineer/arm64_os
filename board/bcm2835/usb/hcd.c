@@ -773,6 +773,22 @@ static int usb_hcd_power_on()
   return ERR_OK;
 }
 
+static int usb_hcd_is_powered_on()
+{
+  int err;
+  uint32_t exists = 0, powered_on = 1;
+  err = mbox_get_power_state(MBOX_DEVICE_ID_USB, &powered_on, &exists);
+  if (err) {
+    HCDERR("mbox call failed");
+    return ERR_GENERIC;
+  }
+  if (!exists) {
+    HCDERR("after mbox call:device does not exist");
+    return ERR_GENERIC;
+  }
+  return powered_on;
+}
+
 int usb_hcd_power_off()
 {
   int err;
@@ -815,7 +831,9 @@ int usb_hcd_init()
 
   wait_msec(20);
   // wait_on_timer_ms(20);
-  powered_on = true;
+  powered_on = usb_hcd_is_powered_on();
+  BUG(powered_on < 0, "Failed to get USB power on state");
+  BUG(powered_on != 1, "USB failed to power on");
   HCDLOG("Device powered on");
   dwc2_print_core_regs();
 
