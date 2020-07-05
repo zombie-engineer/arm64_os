@@ -27,43 +27,36 @@
 #define _uart_subscribe_to_rx_event mini_uart_subscribe_to_rx_event
 #endif
 
-static DECL_SPINLOCK(uart_lock);
+static DECL_COND_SPINLOCK(uart_lock);
 void uart_init(int baudrate, int system_clock)
 {
   _uart_init(baudrate, system_clock);
-  spinlock_init(&uart_lock);
+  cond_spinlock_init(&uart_lock);
 }
 
 int uart_putc(char c)
 {
+  int irqflags;
+  cond_spinlock_lock_disable_irq(&uart_lock, irqflags);
   uart_send(c);
+  cond_spinlock_unlock_restore_irq(&uart_lock, irqflags);
   return ERR_OK;
 }
 
 char uart_getc()
 {
   char r;
-  bool locked = false;
-  if (spinlocks_enabled) {
-    spinlock_lock(&uart_lock);
-    locked = true;
-  }
+  int irqflags;
+  cond_spinlock_lock_disable_irq(&uart_lock, irqflags);
   r = uart_recv();
-
-  if (locked) {
-    spinlock_unlock(&uart_lock);
-    locked = false;
-  }
+  cond_spinlock_unlock_restore_irq(&uart_lock, irqflags);
   return r == '\r' ? '\n' : r;
 }
 
 int uart_puts(const char *s)
 {
-  bool locked = false;
-  if (spinlocks_enabled) {
-    spinlock_lock(&uart_lock);
-    locked = true;
-  }
+  int irqflags;
+  cond_spinlock_lock_disable_irq(&uart_lock, irqflags);
 
   while(*s)
   {
@@ -72,10 +65,7 @@ int uart_puts(const char *s)
     uart_send(*s++);
   }
 
-  if (locked) {
-    spinlock_unlock(&uart_lock);
-    locked = false;
-  }
+  cond_spinlock_unlock_restore_irq(&uart_lock, irqflags);
   return ERR_OK;
 }
 
