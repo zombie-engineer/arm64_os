@@ -48,7 +48,10 @@ struct usb_xfer_jobchain {
 static inline void uxb_xfer_jobchain_print(struct usb_xfer_jobchain *jc, const char *tag)
 {
   struct usb_xfer_job *j;
-  USBQ_INFO("jobchain [%s]: %p", tag, jc);
+  USBQ_INFO("jobchain [%s]: %p, pipe:%p, speed:%d, list.prev:%p,list.next:%p", tag, jc,
+    jc, jc->hcd_pipe, jc->hcd_pipe->speed,
+    jc->list.prev, jc->list.next);
+
   for (j = jc->first; j; j = j->next) {
     usb_xfer_job_print(j, tag);
   }
@@ -60,7 +63,7 @@ void usb_xfer_jobchain_free(struct usb_xfer_jobchain *jc);
 
 void usb_xfer_jobchain_enqueue(struct usb_xfer_jobchain *jc);
 
-void usb_xfer_jobchain_dequeue(struct usb_xfer_jobchain *jc);
+struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void);
 
 void usb_xfer_queue_init(void);
 
