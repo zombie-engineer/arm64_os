@@ -8,6 +8,16 @@
   msr daifclr, #DAIF_IRQ_BIT
 .endm
 
+.equ PSTATE_DAIF_OFFSET, 6
+.equ DAIF_IRQ_OFFSET, 1
+
+.macro IRQ_ENABLED tmp
+  mrs \tmp, daif
+  lsr \tmp, \tmp, #(PSTATE_DAIF_OFFSET + DAIF_IRQ_OFFSET)
+  mvn \tmp, \tmp
+  and \tmp, \tmp, #1
+.endm
+
 /*
  * Writes 32bit value to a register
  * this way we do not need load operation from literal pool

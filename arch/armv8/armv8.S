@@ -53,10 +53,7 @@ FUNC(disable_irq):
   ret
 
 FUNC(is_irq_enabled):
-  mrs x0, daif
-  lsr x0, x0, #1
-  mvn x0, x0
-  and x0, x0, #1
+  IRQ_ENABLED x0
   ret
 
 FUNC(get_cpu_num):

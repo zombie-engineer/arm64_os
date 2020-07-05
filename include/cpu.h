@@ -47,11 +47,25 @@ typedef struct binblock_cpuctx binblock_cpuctx_t;
 int cpuctx_binblock_fill_regs(const void *ctx, binblock_cpuctx_t *h);
 uint64_t cpuctx_get_sp(const void *ctx);
 
+#define irq_mask_all()\
+  asm volatile("msr daifset, #0xf")
+
 #define disable_irq_save_flags(__flags)\
-  asm volatile("mrs %0, daif\n" "msr daifset, #2\n": "=r"(__flags))
+  asm volatile(\
+      "mrs %0, daif\n"\
+      "msr daifset, #2\n"\
+      : "=r"(__flags)\
+      :\
+      : "memory")
 
 #define restore_irq_flags(__flags)\
-  asm volatile("msr daif, %0\n" : : "r"(__flags))
+  asm volatile("msr daif, %0\n"\
+      :\
+      : "r"(__flags)\
+      : "memory")
+
+#define get_daif(__daif)\
+  asm volatile("mrs %0, daif\n" : "=r"(__daif))
 
 void enable_irq(void);
 void disable_irq(void);
