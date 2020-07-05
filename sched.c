@@ -15,7 +15,7 @@
 #include <percpu.h>
 #include <mem_access.h>
 
-static int sched_log_level = 0;
+int sched_log_level = 0;
 struct timer *sched_timer = NULL;
 
 /*
@@ -173,7 +173,7 @@ task_t *task_create(task_fn fn, const char *task_name)
   strcpy(t->name, task_name);
 
   stack = alloc_stack();
-  printf("task_create: name: %s, stack: %p"__endline, task_name, stack);
+  SCHED_DEBUG("task_create: name: %s, stack: %p", task_name, stack);
   if (!stack)
     goto out;
 
@@ -200,8 +200,7 @@ void wait_on_timer_ms(uint64_t msec)
   uint64_t cnt_per_msec = cnt_per_sec / 1000;
   uint64_t until = now + cnt_per_msec * msec;
   get_current()->timer_wait_until = until;
-  if (sched_log_level > 0)
-    printf("wait_on_timer_ms: %llu, frq: %llu, until: %llu\n", now, cnt_per_sec, until);
+  SCHED_DEBUG("wait_on_timer_ms: %llu, frq: %llu, until: %llu", now, cnt_per_sec, until);
   sched_queue_timewait_task(get_scheduler(), get_current());
   yield();
 }
@@ -252,8 +251,7 @@ void schedule()
   prev_task = get_current();
   next_task = scheduler_pick_next_task(s, prev_task);
   next_task->task_state = TASK_STATE_RUNNING;
-  if (sched_log_level > 0)
-    printf("schedule:'%s'->'%s'" __endline, prev_task->name, next_task->name);
+  SCHED_DEBUG("schedule:'%s'->'%s'", prev_task->name, next_task->name);
   BUG(!next_task, "scheduler logic failed.");
   set_current(next_task);
 }
@@ -271,8 +269,7 @@ static inline void schedule_handle_timer_waiting(struct scheduler *s)
   uint64_t now = read_cpu_counter_64();
   list_for_each_entry_safe(t, tmp, &s->timer_waiting, schedlist) {
     if (t->timer_wait_until <= now) {
-      if (sched_log_level > 3)
-        printf("timeout: now: %llu, until: %llu\n", now, t->timer_wait_until);
+      SCHED_DEBUG3("timeout: now: %llu, until: %llu", now, t->timer_wait_until);
       sched_queue_runnable_task_noirq(s, t);
     }
   }
@@ -307,7 +304,7 @@ static void schedule_from_irq()
    * print debug info
    */
   struct scheduler *s = get_scheduler();
-  if (sched_log_level > 1)
+  if (sched_log_level > 3)
     schedule_debug_info(s);
 
   /*
@@ -325,12 +322,12 @@ static void schedule_from_irq()
    */
   if (needs_resched(get_current()))
     schedule();
+  SCHED_DEBUG2("returning to process %s", get_current()->name);
 }
 
 void sched_timer_cb(void *arg)
 {
-  if (sched_log_level > 2)
-    printf("sched_timer_cb"__endline);
+  SCHED_DEBUG2("sched_timer_cb");
   SCHED_REARM_TIMER;
   schedule_from_irq();
 }
@@ -360,6 +357,7 @@ void scheduler_init(int log_level, task_fn init_func)
   sched_log_level = log_level;
   intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
   SCHED_REARM_TIMER;
+  irq_mask_all();
   enable_irq();
   start_task_from_ctx(init_task->cpuctx);
 }

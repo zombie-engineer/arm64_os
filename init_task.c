@@ -94,7 +94,7 @@ void cpu_test(void)
 static void cpu_run(int cpu_num, void (*fn)(void))
 {
   void **write_to = &__percpu_data[cpu_num].jmp_addr;
-  printf("setting %p to %p\n", write_to, fn);
+  SCHED_DEBUG("setting %p to %p", write_to, fn);
   *write_to = (void *)fn;
   dcache_flush(write_to, 64);
   asm volatile("sev");
@@ -102,7 +102,7 @@ static void cpu_run(int cpu_num, void (*fn)(void))
 
 int init_func(void)
 {
-  printf("starting init function"__endline);
+  SCHED_DEBUG("starting init function");
   // run_uart_thread();
   // run_cmdrunner_thread();
   BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");

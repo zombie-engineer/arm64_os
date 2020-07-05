@@ -3,6 +3,20 @@
 #include <types.h>
 #include <syscall.h>
 #include <config.h>
+#include <common.h>
+
+extern int sched_log_level;
+
+#define SCHED_INFO(__fmt, ...) printf("[SCHED INFO] " __fmt __endline, ## __VA_ARGS__)
+#define __SCHED_DEBUG_N(__n, __fmt, ...) \
+  do {\
+    if (sched_log_level > 0) \
+      printf("[SCHED DEBUG] " __fmt __endline, ## __VA_ARGS__);\
+  } while(0)
+
+#define SCHED_DEBUG(__fmt, ...) __SCHED_DEBUG_N(0, __fmt, ## __VA_ARGS__)
+#define SCHED_DEBUG2(__fmt, ...) __SCHED_DEBUG_N(1, __fmt, ## __VA_ARGS__)
+#define SCHED_DEBUG3(__fmt, ...) __SCHED_DEBUG_N(2, __fmt, ## __VA_ARGS__)
 
 typedef int (*task_fn)(void);
 
