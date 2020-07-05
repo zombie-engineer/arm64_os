@@ -10,7 +10,7 @@ extern int sched_log_level;
 #define SCHED_INFO(__fmt, ...) printf("[SCHED INFO] " __fmt __endline, ## __VA_ARGS__)
 #define __SCHED_DEBUG_N(__n, __fmt, ...) \
   do {\
-    if (sched_log_level > 0) \
+    if (sched_log_level > __n) \
       printf("[SCHED DEBUG] " __fmt __endline, ## __VA_ARGS__);\
   } while(0)
 
@@ -95,7 +95,9 @@ void sched_timer_cb(void *arg);
 
 static inline void yield()
 {
+  // SCHED_DEBUG2("yield enter: %s\n", get_current()->name);
   asm volatile ("svc %0"::"i"(SVC_YIELD));
+  // SCHED_DEBUG2("yield exit: %s\n", get_current()->name);
 }
 
 task_t *task_create(task_fn fn, const char *task_name);

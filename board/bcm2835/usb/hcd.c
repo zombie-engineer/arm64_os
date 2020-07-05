@@ -649,6 +649,7 @@ int usb_hcd_start()
   dwc2_set_dma_mode();
 
   opmode = dwc2_get_op_mode();
+  dwc2_enable_channel_interrupts();
   HCDLOG("dwc2 op mode: %s", dwc2_op_mode_to_string(opmode));
   switch(opmode) {
     case DWC2_OP_MODE_HNP_SRP_CAPABLE:
@@ -667,7 +668,6 @@ int usb_hcd_start()
   }
   HCDLOG("core started");
   // dwc2_unmask_all_interrupts();
-  dwc2_enable_channel_interrupts();
 
   HCDLOG("setting host clock...");
   dwc2_power_clock_off();
@@ -696,26 +696,20 @@ int usb_hcd_start()
 
   hcd_tx_fifo_flush(16);
   hcd_rx_fifo_flush();
-
   if (!dwc2_is_dma_enabled())
     dwc2_init_channels();
 
   if (!dwc2_is_port_pwr_enabled()) {
     dwc2_port_set_pwr_enabled(true);
-    HCDLOG("host power enabled");
+    // HCDLOG("host power enabled");
   }
 
   dwc2_port_reset();
   wait_msec(60);
-  if (usb_hcd_log_level > 0)
-    dwc2_dump_int_registers();
   dwc2_port_reset_clear();
   HCDLOG("host reset done");
-
-  HCDLOG("host interrupts enabled: haint:%08x, haintmsk:%08x",
-    read_reg(0x3f980414),
-    read_reg(0x3f980418));
-
+  // if (usb_hcd_log_level > 0)
+  //  dwc2_dump_int_registers();
   HCDLOG("host controller device started");
   return err;
 }
@@ -813,25 +807,25 @@ int usb_hcd_init()
 {
   int err;
   uint32_t vendor_id, user_id;
+  int irqflags;
   STATIC_SLOT_INIT_FREE(usb_hcd_device);
   dwc2_init();
-  usb_xfer_queue_init();
   usb_hcd_hub_init();
   usb_hcd_hid_init();
   usb_hcd_mass_init();
-  puts("---------\n");
-
 
   vendor_id = dwc2_get_vendor_id();
   user_id = dwc2_get_user_id();
   HCDLOG("Initializing: usb chip info: vendor:%08x user:%08x", vendor_id, user_id);
 
+  disable_irq_save_flags(irqflags);
   err = usb_hcd_power_on();
   CHECK_ERR("failed to power on");
-
   wait_msec(20);
+  restore_irq_flags(irqflags);
   // wait_on_timer_ms(20);
   powered_on = usb_hcd_is_powered_on();
+
   BUG(powered_on < 0, "Failed to get USB power on state");
   BUG(powered_on != 1, "USB failed to power on");
   HCDLOG("Device powered on");
@@ -839,7 +833,7 @@ int usb_hcd_init()
 
   err = usb_hcd_start();
   CHECK_ERR("hcd start failed");
-
+  usb_xfer_queue_init();
 
   err = usb_hcd_attach_root_hub();
   CHECK_ERR("attach root hub failed");

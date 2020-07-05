@@ -964,7 +964,7 @@ void main()
 
   // cmdrunner_init();
   // cmdrunner_run_interactive_loop();
-  scheduler_init(0 /* log_level */, init_func);
+  scheduler_init(0/* log_level */, init_func);
   while(1);
 
   print_mmu_features();
@@ -974,8 +974,6 @@ void main()
   rand_init();
 
   vcanvas_showpicture();
-  // generate exception here
-  // el = *(unsigned long*)0xffffffff;
   tags_print_cmdline();
 
   print_mmu_stats();

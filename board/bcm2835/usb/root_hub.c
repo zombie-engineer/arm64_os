@@ -34,7 +34,7 @@
 
 
 int usb_root_hub_device_number = 0;
-int usb_root_hub_debug = 1;
+int usb_root_hub_debug = 0;
 struct usb_hcd_device *root_hub = NULL;
 
 static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
@@ -275,7 +275,6 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
   int type = USB_DEV_RQ_GET_TYPE(rq);
   int value = USB_DEV_RQ_GET_VALUE(rq);
   int r;
-  int flags;
   switch (type) {
     case USB_RQ_TYPE_HUB_SET_HUB_FEATURE:
       /* Skipping */
@@ -289,40 +288,23 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_RESET:
-  disable_irq_save_flags(flags);
           r = read_reg(USB_PCGCR);
-          printf("USB_HUB_FEATURE_RESET: PCGCR: %08x\n", r);
           USB_PCGCR_CLR_EN_SLP_CLK_GATE(r);
           USB_PCGCR_CLR_STOP_PCLK(r);
-          printf("USB_HUB_FEATURE_RESET: PCGCR: <-%08x\n", r);
           write_reg(USB_PCGCR, r);
-          asm volatile("dmb sy");
-          asm volatile("dsb sy");
           wait_msec(1);
-          printf("USB_HUB_FEATURE_RESET: PCGCR: <- 0\n");
           write_reg(USB_PCGCR, 0);
-          asm volatile("dmb sy");
-          asm volatile("dsb sy");
           r = read_reg(USB_HPRT);
-          printf("USB_HUB_FEATURE_RESET: HPRT: ->%08x\n", r);
           r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_RST);
           BIT_SET_U32(r, USB_HPRT_PWR);
           BIT_CLEAR_U32(r, USB_HPRT_SUSP);
-          printf("USB_HUB_FEATURE_RESET: HPRT: <-%08x\n", r);
           write_reg(USB_HPRT, r);
-          asm volatile("dmb sy");
-          asm volatile("dsb sy");
 					wait_msec(60);
-          asm volatile("dsb sy");
           r = read_reg(USB_HPRT);
-          asm volatile("dmb sy");
-          asm volatile("dsb sy");
           r &= USB_HPRT_WRITE_MASK;
           BIT_CLEAR_U32(r, USB_HPRT_RST);
-          printf("USB_HUB_FEATURE_RESET: HPRT: <-%08x\n", r);
           write_reg(USB_HPRT, r);
-  restore_irq_flags(flags);
           break;
         default:
           RHWARN("Unsupported request value: %04x\n", value);
