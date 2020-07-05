@@ -65,7 +65,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   int err;
   int ack_direction;
   struct usb_xfer_jobchain *jc;
-  struct usb_xfer_job *last_j, *j;
+  struct usb_xfer_job *j;
 
   jc = usb_xfer_jobchain_alloc();
   if (IS_ERR(jc))
@@ -79,8 +79,8 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     err = PTR_ERR(j);
     goto out_err;
   }
-  jc->first = last_j = j;
-  usb_xfer_job_print(last_j, "usb_xfer_job_prep SETUP");
+  list_add_tail(&j->jobs, &jc->jobs);
+  usb_xfer_job_print(j, "usb_xfer_job_prep SETUP");
 
   /* DATA packet */
   if (addr) {
@@ -89,10 +89,9 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
       err = PTR_ERR(j);
       goto out_err;
     }
-    last_j->next = j;
-    last_j = j;
+    list_add_tail(&j->jobs, &jc->jobs);
   }
-  usb_xfer_job_print(last_j, "usb_xfer_job_prep DATA");
+  usb_xfer_job_print(j, "usb_xfer_job_prep DATA");
 
   /* STATUS packet */
   if (addr && direction == USB_DIRECTION_IN)
@@ -105,20 +104,14 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     err = PTR_ERR(j);
     goto out_err;
   }
-  last_j->next = j;
-  usb_xfer_job_print(last_j, "usb_xfer_job_prep ACK");
+  list_add_tail(&j->jobs, &jc->jobs);
+  usb_xfer_job_print(j, "usb_xfer_job_prep ACK");
   return jc;
 
 out_err:
-  if (jc) {
-    struct usb_xfer_job *next;
-    next = j = jc->first;
-    while (next) {
-      next = j->next;
-      usb_xfer_job_free(j);
-      j = next;
-    }
-  }
+  if (jc)
+    usb_xfer_jobchain_destroy(jc);
+
   return ERR_PTR(err);
 }
 

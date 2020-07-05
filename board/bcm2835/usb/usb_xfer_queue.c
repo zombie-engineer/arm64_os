@@ -28,11 +28,6 @@ void usb_xfer_job_free(struct usb_xfer_job* j)
   usb_xfer_jobs_release(j);
 }
 
-void usb_xfer_link_next(struct usb_xfer_job *j, struct usb_xfer_job *next)
-{
-  j->next = next;
-}
-
 struct usb_xfer_jobchain *usb_xfer_jobchain_alloc(void)
 {
   struct usb_xfer_jobchain *jobchain;
@@ -43,6 +38,15 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_alloc(void)
 void usb_xfer_jobchain_free(struct usb_xfer_jobchain *jc)
 {
   usb_xfer_jobchains_release(jc);
+}
+
+void usb_xfer_jobchain_destroy(struct usb_xfer_jobchain *jc)
+{
+  struct usb_xfer_job *j, *tmp;
+  list_for_each_entry_safe(j, tmp, &jc->jobs, jobs) {
+    list_del_init(&j->jobs);
+    usb_xfer_job_free(j);
+  }
 }
 
 void usb_xfer_jobchain_enqueue(struct usb_xfer_jobchain *jc)
@@ -106,7 +110,7 @@ static inline void usb_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel 
 
 static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
 {
-  struct usb_xfer_job *j, *next_j;
+  struct usb_xfer_job *j;
   struct dwc2_channel *c = NULL;
   DECL_PIPE_DESC(dwc2_pipe, jc->hcd_pipe);
 
@@ -123,8 +127,7 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
   c->pipe.u.raw = dwc2_pipe.u.raw;
 
   jc->err = ERR_OK;
-  j = jc->first;
-  while(j) {
+  list_for_each_entry(j, &jc->jobs, jobs) {
     printf("usb_xfer_one_jobchain: processing next job: %p\n", j);
     usb_xfer_one_job(j, c);
     if (j->err != ERR_OK) {
@@ -132,10 +135,7 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
       printf("usb_xfer_one_jobchain: job %p completed with err %d\n", j, j->err);
       break;
     }
-    printf("usb_xfer_one_jobchain: job %p completed with success, next_job is %p\n", j, j->next);
-    next_j = j->next;
-    usb_xfer_job_free(j);
-    j = next_j;
+    printf("usb_xfer_one_jobchain: job %p completed with success, next_job is %p\n", j, j->jobs.next);
   }
   dwc2_xfer_control_destroy(c->ctl);
   dwc2_channel_free(c);
