@@ -2,7 +2,7 @@
 #include <stringlib.h>
 #include <console.h>
 
-#define PRINTF_BUF_SIZE 512
+#define PRINTF_BUF_SIZE 1024
 
 char printfbuf[PRINTF_BUF_SIZE];
 
@@ -21,7 +21,7 @@ const char * _printf(const char* fmt, ...)
   const char *res = fmt;
   __builtin_va_list args;
   __builtin_va_start(args, fmt);
-  vsnprintf(printfbuf, 512, fmt, &args);
+  vsnprintf(printfbuf, sizeof(printfbuf), fmt, &args);
   console_puts(printfbuf);
   return res;
 }
