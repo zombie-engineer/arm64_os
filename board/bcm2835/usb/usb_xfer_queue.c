@@ -139,6 +139,7 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
   }
   dwc2_xfer_control_destroy(c->ctl);
   dwc2_channel_free(c);
+  j->completion(j->completion_arg);
 }
 
 static int usb_xfer_queue_run(void)

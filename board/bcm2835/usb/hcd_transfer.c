@@ -45,64 +45,6 @@ out_err:
   return err;
 }
 
- //void hcd_transfer_fsm(void *arg)
- //{
- //  struct hcd_transfer_status *s = arg;
- //  struct dwc2_channel *c = s->priv;
- //  HCDDEBUG("hcd_transfer_fsm: %p, stage: %d\n", c, s->stage);
- //
- //  /*
- //   * Read current stage, decide on what the next stage is.
- //   */
- //  switch(s->stage) {
- //    case HCD_TRANSFER_STAGE_SETUP_PACKET:
- //      if (s->addr)
- //        s->stage = HCD_TRANSFER_STAGE_DATA_PACKET;
- //      else
- //        s->stage = HCD_TRANSFER_STAGE_ACK_PACKET;
- //      break;
- //    case HCD_TRANSFER_STAGE_DATA_PACKET:
- //      s->stage = HCD_TRANSFER_STAGE_ACK_PACKET;
- //      break;
- //    case HCD_TRANSFER_STAGE_ACK_PACKET:
- //      s->err = ERR_OK;
- //      s->stage = HCD_TRANSFER_STAGE_COMPLETED;
- //      dwc2_channel_disable(c->id);
- //      dwc2_xfer_control_free(c->ctl);
- //      dwc2_channel_free(c);
- //      return;
- //      break;
- //    default:
- //      BUG(1, "Logic hcd transfer logic error");
- //      break;
- //  }
- //  HCDDEBUG("hcd_transfer_fsm: %p, stage now: %d\n", c, s->stage);
- //
- //  /*
- //   * Next stage figured out, now set it up
- //   */
- //  switch(s->stage) {
- //    case HCD_TRANSFER_STAGE_SETUP_PACKET:
- //      /* can not be */
- //      break;
- //    case HCD_TRANSFER_STAGE_DATA_PACKET:
- //      c->pipe.u.ep_direction = s->direction;
- //      dwc2_transfer_prepare(c->pipe, s->addr, s->transfer_size, USB_PID_DATA1);
- //      dwc2_transfer_start(c->pipe);
- //      break;
- //    case HCD_TRANSFER_STAGE_ACK_PACKET:
- //      if (!c->ctl->dma_addr_base || s->direction == USB_DIRECTION_OUT)
- //        c->pipe.u.ep_direction = USB_DIRECTION_IN;
- //      else
- //        c->pipe.u.ep_direction = USB_DIRECTION_OUT;
- //      dwc2_transfer_prepare(c->pipe, NULL, 0, USB_PID_DATA1);
- //      dwc2_transfer_start(c->pipe);
- //      break;
- //    default:
- //      BUG(1, "hcd_transfer logic at stage action");
- //  }
- //}
-
 static inline struct usb_xfer_job *usb_xfer_job_prep(int pid, int dir, void *addr, int transfer_size)
 {
   struct usb_xfer_job *j;
@@ -186,7 +128,6 @@ static void control_chain_signal_completed(void *arg)
   *completed = 1;
 }
 
-
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   int direction,
@@ -202,6 +143,7 @@ int hcd_transfer_control(
 
   if (pipe->address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
+
   printf("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d\n", pipe, pipe->ls_hub_port, pipe->speed);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
