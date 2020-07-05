@@ -26,7 +26,7 @@ static void debug_mbox()
 {
   int i;
   int dcache_width = (int)dcache_line_width();
-  printf("mbox addr = %p, dcache_line_sz: %d, dcache_addr: %p\n", 
+  printf("mbox addr = %p, dcache_line_sz: %d, dcache_addr: %p\n",
     mbox_buffer, dcache_width,
     (uint64_t)mbox_buffer & ~(dcache_width - 1)
   );
@@ -59,11 +59,8 @@ int mbox_prop_call_no_lock()
   return ret;
 }
 
-static inline void flush_mbox_buffer_dcache()
-{
-  uint64_t addr = (uint64_t)mbox_buffer;
-  dcache_clean_and_invalidate_rng(addr, addr + sizeof(mbox_buffer));
-}
+#define mbox_flush_dcache()\
+  dcache_flush(mbox_buffer, sizeof(mbox_buffer));
 
 int mbox_prop_call()
 {
@@ -77,9 +74,9 @@ int mbox_prop_call()
   if (should_lock)
     spinlock_lock(&mbox_lock);
 
-  flush_mbox_buffer_dcache();
+  mbox_flush_dcache();
   ret = mbox_prop_call_no_lock();
-  flush_mbox_buffer_dcache();
+  mbox_flush_dcache();
 
   if (should_lock)
     spinlock_unlock(&mbox_lock);
