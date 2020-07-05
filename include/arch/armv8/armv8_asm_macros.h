@@ -1,4 +1,6 @@
-#define DAIF_IRQ_BIT    (1 << 1)
+.equ PSTATE_DAIF_OFFSET, 6
+.equ DAIF_IRQ_OFFSET, 1
+.equ DAIF_IRQ_BIT, 1 << DAIF_IRQ_OFFSET
 
 .macro IRQ_DISABLE
   msr daifset, #DAIF_IRQ_BIT
@@ -7,9 +9,6 @@
 .macro IRQ_ENABLE
   msr daifclr, #DAIF_IRQ_BIT
 .endm
-
-.equ PSTATE_DAIF_OFFSET, 6
-.equ DAIF_IRQ_OFFSET, 1
 
 .macro IRQ_ENABLED tmp
   mrs \tmp, daif
