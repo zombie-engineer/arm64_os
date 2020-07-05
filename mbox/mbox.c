@@ -32,7 +32,6 @@ static void debug_mbox()
   );
   for (i = 0; i < 8; ++i)
     printf("mbox[%d] = 0x%08x\n", i, mbox_buffer[i]);
-  puts("--------\n");
 }
 #endif // CONFIG_DEBUG_MBOX
 

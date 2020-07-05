@@ -29,7 +29,6 @@ void intr_ctl_dump_regs(const char* tag)
   print_reg32(BCM2835_IC_DISABLE_GPU_1);
   print_reg32(BCM2835_IC_DISABLE_GPU_2);
   print_reg32(BCM2835_IC_DISABLE_BASIC);
-  printf("---------\n");
 }
 
 uint32_t intr_ctl_read_pending_gpu_1()
