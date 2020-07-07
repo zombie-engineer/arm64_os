@@ -100,14 +100,14 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
 static void usb_xfer_job_cb(void *arg)
 {
   struct usb_xfer_job *j = arg;
-  printf("usb_xfer_job_cb completed\n");
+  USBQ_DEBUG2("usb_xfer_job_cb completed");
   j->completed = true;
 }
 
 static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
 {
   int err;
-  usb_xfer_job_print(j, "usb_xfer_job_set_running");
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_set_running");
   j->completion = usb_xfer_job_cb;
   j->completed = false;
   j->completion_arg = j;
@@ -139,14 +139,12 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
   struct dwc2_channel *c = NULL;
   DECL_PIPE_DESC(dwc2_pipe, jc->hcd_pipe);
 
-  uxb_xfer_jobchain_print(jc, "running");
+  uxb_xfer_jobchain_print(DEBUG2, jc, "running");
 
   while(!c) {
-    printf(">");
     c = dwc2_channel_alloc();
   }
   while(!c->ctl) {
-    printf("++");
     c->ctl = dwc2_xfer_control_create();
   }
   c->pipe.u.raw = dwc2_pipe.u.raw;

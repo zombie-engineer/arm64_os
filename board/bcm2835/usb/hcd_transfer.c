@@ -79,7 +79,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     goto out_err;
   }
   list_add_tail(&j->jobs, &jc->jobs);
-  usb_xfer_job_print(j, "usb_xfer_job_prep SETUP");
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_prep SETUP");
 
   /* DATA packet */
   if (addr) {
@@ -90,7 +90,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     }
     list_add_tail(&j->jobs, &jc->jobs);
   }
-  usb_xfer_job_print(j, "usb_xfer_job_prep DATA");
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_prep DATA");
 
   /* STATUS packet */
   if (addr && direction == USB_DIRECTION_IN)
@@ -104,7 +104,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     goto out_err;
   }
   list_add_tail(&j->jobs, &jc->jobs);
-  usb_xfer_job_print(j, "usb_xfer_job_prep ACK");
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_prep ACK");
   return jc;
 
 out_err:
@@ -139,7 +139,7 @@ int hcd_transfer_control(
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
   transfer_id++;
 
-  printf("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, id:%d, rq:%016llx\n",
+  HCDDEBUG2("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, id:%d, rq:%016llx\n",
     pipe, pipe->ls_hub_port, pipe->speed, transfer_id, rq);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
@@ -147,7 +147,7 @@ int hcd_transfer_control(
     err = PTR_ERR(jc);
     goto out_err;
   }
-  uxb_xfer_jobchain_print(jc, "control job chain");
+  uxb_xfer_jobchain_print(DEBUG2, jc, "control job chain");
   jc->completed = control_chain_signal_completed;
   jc->completed_arg = &completed;
   jc->hcd_pipe = pipe;

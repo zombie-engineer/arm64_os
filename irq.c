@@ -15,7 +15,7 @@ static irq_func irq_post_hook ALIGNED(8) = NULL;
 
 static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
 {
-  puts("\nIRQIRQ\n");
+  // puts("\nIRQIRQ\n");
   if (irq_log_level > 1)
     printf("__handle_irq: %d, irq_table: %p\n" __endline, irqnr, irq_table);
 
@@ -28,7 +28,7 @@ static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
 
   if (irq_post_hook)
     irq_post_hook();
-  puts("\nIRQIRQ END\n");
+  // puts("\nIRQIRQ END\n");
 }
 
 static inline void __handle_local_periph_irq(int cpu_num)

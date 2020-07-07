@@ -31,6 +31,8 @@ extern struct usb_hcd_device *root_hub;
 #define HCDERR(__fmt, ...)     logf(HCDLOGPREFIX(ERR), "err: %d: "__fmt, err, ##__VA_ARGS__)
 #define HCDDEBUG(__fmt, ...)   if (usb_hcd_log_level)\
                                printf(HCDLOGPREFIX(DBG) __fmt __endline, ##__VA_ARGS__)
+#define HCDDEBUG2(__fmt, ...)  if (usb_hcd_log_level > 1)\
+                                 printf(HCDLOGPREFIX(DBG) __fmt __endline, ##__VA_ARGS__)
 #define HCDWARN(__fmt, ...)    logf(HCDLOGPREFIX(WARN), __fmt, ##__VA_ARGS__)
 
 struct usb_hcd_pipe {
