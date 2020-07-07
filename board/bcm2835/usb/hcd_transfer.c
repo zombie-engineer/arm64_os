@@ -49,6 +49,7 @@ static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *j
 {
   struct usb_xfer_job *j;
   j = usb_xfer_job_alloc();
+  BUG(!j || IS_ERR(j), "Failed to alloc job");
   if (IS_ERR(j))
     return j;
 
@@ -119,6 +120,8 @@ static void control_chain_signal_completed(void *arg)
   *completed = 1;
 }
 
+static int transfer_id = 0;
+
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   int direction,
@@ -134,8 +137,10 @@ int hcd_transfer_control(
 
   if (pipe->address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
+  transfer_id++;
 
-  printf("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d\n", pipe, pipe->ls_hub_port, pipe->speed);
+  printf("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, id:%d, rq:%016llx\n",
+    pipe, pipe->ls_hub_port, pipe->speed, transfer_id, rq);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
   if (IS_ERR(jc)) {

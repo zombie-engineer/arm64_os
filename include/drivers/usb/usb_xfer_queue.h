@@ -3,8 +3,18 @@
 #include <drivers/usb/hcd.h>
 #include <list.h>
 
+extern int usb_xfer_log_level;
+
 #define USBQ_INFO(__fmt, ...)\
   printf("[USBQ INFO] " __fmt __endline, ## __VA_ARGS__)
+
+#define USBQ_DEBUG(__fmt, ...)\
+  if (usb_xfer_log_level)\
+    printf("[USBQ DBG] " __fmt __endline, ## __VA_ARGS__)
+
+#define USBQ_DEBUG2(__fmt, ...)\
+  if (usb_xfer_log_level > 1)\
+    printf("[USBQ DBG2] " __fmt __endline, ## __VA_ARGS__)
 
 struct usb_xfer_jobchain;
 

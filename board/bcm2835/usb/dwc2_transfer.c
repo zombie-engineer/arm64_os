@@ -15,7 +15,7 @@
 #include "dwc2_printers.h"
 #include "dwc2_channel.h"
 
-int dwc2_log_level = 10;
+int dwc2_log_level = 0;
 
 int dwc2_set_log_level(int log_level)
 {

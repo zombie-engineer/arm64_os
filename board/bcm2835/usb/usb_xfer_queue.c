@@ -6,6 +6,8 @@
 #include "dwc2_xfer_control.h"
 #include <sched.h>
 
+int usb_xfer_log_level = 0;
+
 DECL_STATIC_SLOT(struct usb_xfer_job, usb_xfer_jobs, 64);
 DECL_STATIC_SLOT(struct usb_xfer_jobchain, usb_xfer_jobchains, 64);
 
@@ -24,12 +26,14 @@ struct usb_xfer_job *usb_xfer_job_alloc(void)
   if (!IS_ERR(j)) {
     INIT_LIST_HEAD(&j->jobs);
   }
+  USBQ_DEBUG2("usb_xfer_job_alloc:%p", j);
   return j;
 }
 
 void usb_xfer_job_free(struct usb_xfer_job* j)
 {
   usb_xfer_jobs_release(j);
+  USBQ_DEBUG2("usb_xfer_job_free:%p", j);
 }
 
 struct usb_xfer_jobchain *usb_xfer_jobchain_alloc(void)
@@ -53,6 +57,10 @@ void usb_xfer_jobchain_destroy(struct usb_xfer_jobchain *jc)
 {
   struct usb_xfer_job *j, *tmp;
   list_for_each_entry_safe(j, tmp, &jc->jobs, jobs) {
+    list_del_init(&j->jobs);
+    usb_xfer_job_free(j);
+  }
+  list_for_each_entry_safe(j, tmp, &jc->completed_jobs, jobs) {
     list_del_init(&j->jobs);
     usb_xfer_job_free(j);
   }
@@ -190,11 +198,12 @@ static void usb_xfer_process_running(void)
       }
       if (jobchain_completed) {
         struct dwc2_channel *c = jc->channel;
+        USBQ_DEBUG2("usb_xfer_process_running: jc completed:%p, err:%d", jc, jc->err);
         jc->channel = NULL;
         jc->completed(jc->completed_arg);
-
         dwc2_xfer_control_destroy(c->ctl);
         dwc2_channel_free(c);
+        usb_xfer_jobchain_destroy(jc);
       }
     }
   }
