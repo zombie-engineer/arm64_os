@@ -133,3 +133,10 @@ static inline void list_move(struct list_head *list,
   __list_del(list);
   list_add(list, head);
 }
+
+static inline void list_move_tail(struct list_head *list,
+    struct list_head *head)
+{
+  __list_del(list);
+  list_add_tail(list, head);
+}
