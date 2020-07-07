@@ -105,7 +105,7 @@ void exception_print_cpu_ctx_uart(exception_info_t *e)
   uart_putc('\n');
   uart_putc('\n');
   uart_putc('\r');
-  print_stack_uart((uint64_t)(e->stack), 8);
+  print_stack_uart((uint64_t)(cpuctx_get_sp(e->cpu_ctx)), 20);
 }
 
 void exception_dump_cpu_ctx_uart(exception_info_t *e)

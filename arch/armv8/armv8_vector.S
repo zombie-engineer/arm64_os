@@ -123,8 +123,10 @@ __prep_exception_info:
   // x1 - top of stack at exception enter
   mov   x8, x1
   ldr   x5, =__exception_info
-  GET_CURRENT_CTX x6, x7
-  ldr   x6, [x6]
+ctx .req x6
+tmp .req x7
+  GET_CURRENT_CTX ctx, tmp
+  // ldr   ctx, [ctx]
   mov   x7, x5
   mrs   x1, esr_el1
   mrs   x2, spsr_el1
@@ -136,4 +138,6 @@ __prep_exception_info:
   stp   x0, x6, [x5], #16
   stp   x8, x9, [x5]
   mov   x0, x7
+.unreq ctx
+.unreq tmp
   ret

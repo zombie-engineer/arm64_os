@@ -51,7 +51,7 @@ static int cpuctx_print_reg(const cpu_reg_t *r, int reg_idx, void *cb_priv)
   char *regptr = regname + sizeof(regname) - 1; // points one char past regname array
   // zero-terminate last char in regname array later
 
-  while(*ptr) 
+  while(*ptr)
     ptr++;
 
   // by now ptr and regptr point at both at last char of zero-termed strings.

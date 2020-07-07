@@ -125,8 +125,10 @@ int add_unhandled_exception_hook(exception_hook cb)
 static void exec_fatal_exception_hooks(exception_info_t *e)
 {
   int i;
-  for (i = 0; i < fatal_exception_hooks_count; ++i)
+  for (i = 0; i < fatal_exception_hooks_count; ++i) {
+    printf("exec_fatal_exception_hooks: %p, %p\n", e, e->cpu_ctx);
     fatal_exception_hooks[i](e);
+  }
 }
 
 void set_irq_cb(irq_cb_t cb)
