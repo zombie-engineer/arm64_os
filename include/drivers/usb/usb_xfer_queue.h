@@ -6,6 +6,8 @@
 #define USBQ_INFO(__fmt, ...)\
   printf("[USBQ INFO] " __fmt __endline, ## __VA_ARGS__)
 
+struct usb_xfer_jobchain;
+
 struct usb_xfer_job {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_xfer_jobs);
 
@@ -20,6 +22,7 @@ struct usb_xfer_job {
   bool completed;
   struct usb_hcd_pipe *pipe;
   struct list_head jobs;
+  struct usb_xfer_jobchain *jc;
 };
 
 static inline void usb_xfer_job_print(struct usb_xfer_job *j, const char *tag)
@@ -35,14 +38,23 @@ void usb_xfer_job_free(struct usb_xfer_job *j);
 
 struct hcd_pipe;
 
+//typedef enum {
+//  JOBCHAIN_STATUS_IDLE      = 0,
+//  JOBCHAIN_STATUS_RUNNING   = 1,
+//  JOBCHAIN_STATUS_COMPLETED = 2
+//} jobchain_status_t;
+
 struct usb_xfer_jobchain {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_xfer_jobchains);
   struct list_head list;
+  // jobchain_status_t status;
   int err;
   struct usb_hcd_pipe *hcd_pipe;
   struct list_head jobs;
-  void (*completion)(void*);
-  void *completion_arg;
+  struct list_head completed_jobs;
+  void (*completed)(void*);
+  void *completed_arg;
+  void *channel;
 };
 
 static inline void uxb_xfer_jobchain_print(struct usb_xfer_jobchain *jc, const char *tag)
@@ -51,7 +63,8 @@ static inline void uxb_xfer_jobchain_print(struct usb_xfer_jobchain *jc, const c
   USBQ_INFO("jobchain [%s]: %p, pipe:%p, speed:%d, list.prev:%p,list.next:%p", tag, jc,
     jc, jc->hcd_pipe, jc->hcd_pipe->speed,
     jc->list.prev, jc->list.next);
-  list_for_each_entry(j, &jc->jobs, jobs) 
+
+  list_for_each_entry(j, &jc->jobs, jobs)
     usb_xfer_job_print(j, tag);
 }
 

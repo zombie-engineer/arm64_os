@@ -336,8 +336,9 @@ void dwc2_transfer_completed_debug(struct dwc2_channel *c)
   }
 }
 
-int dwc2_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel *c)
+int dwc2_xfer_one_job(struct usb_xfer_job *j)
 {
+  struct dwc2_channel *c = j->jc->channel;
   c->ctl->dma_addr_base = (uint64_t)j->addr;
   c->ctl->direction = j->direction;
   c->ctl->transfer_size = j->transfer_size;

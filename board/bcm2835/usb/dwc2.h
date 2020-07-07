@@ -14,7 +14,7 @@ typedef enum {
   DWC2_STATUS_ERR,
 } dwc2_transfer_status_t;
 
-int dwc2_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel *c);
+int dwc2_xfer_one_job(struct usb_xfer_job *j);
 
 dwc2_transfer_status_t dwc2_transfer_blocking(struct dwc2_channel *c, int *out_num_bytes);
 

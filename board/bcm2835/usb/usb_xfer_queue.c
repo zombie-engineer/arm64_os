@@ -10,17 +10,21 @@ DECL_STATIC_SLOT(struct usb_xfer_job, usb_xfer_jobs, 64);
 DECL_STATIC_SLOT(struct usb_xfer_jobchain, usb_xfer_jobchains, 64);
 
 struct jobchain_queue {
-  struct list_head jc_list;
+  struct list_head jobchains_pending;
+  struct list_head jobs_running;
 };
 
-static struct jobchain_queue per_channel_jobchains;
-static DECL_COND_SPINLOCK(jc_list_lock);
+static struct jobchain_queue queue_state;
+static DECL_COND_SPINLOCK(jobchains_pending_lock);
 
 struct usb_xfer_job *usb_xfer_job_alloc(void)
 {
-  struct usb_xfer_job *job;
-  job = usb_xfer_jobs_alloc();
-  return job;
+  struct usb_xfer_job *j;
+  j = usb_xfer_jobs_alloc();
+  if (!IS_ERR(j)) {
+    INIT_LIST_HEAD(&j->jobs);
+  }
+  return j;
 }
 
 void usb_xfer_job_free(struct usb_xfer_job* j)
@@ -30,9 +34,14 @@ void usb_xfer_job_free(struct usb_xfer_job* j)
 
 struct usb_xfer_jobchain *usb_xfer_jobchain_alloc(void)
 {
-  struct usb_xfer_jobchain *jobchain;
-  jobchain = usb_xfer_jobchains_alloc();
-  return jobchain;
+  struct usb_xfer_jobchain *jc;
+  jc = usb_xfer_jobchains_alloc();
+  if (!IS_ERR(jc)) {
+    INIT_LIST_HEAD(&jc->list);
+    INIT_LIST_HEAD(&jc->jobs);
+    INIT_LIST_HEAD(&jc->completed_jobs);
+  }
+  return jc;
 }
 
 void usb_xfer_jobchain_free(struct usb_xfer_jobchain *jc)
@@ -52,15 +61,15 @@ void usb_xfer_jobchain_destroy(struct usb_xfer_jobchain *jc)
 void usb_xfer_jobchain_enqueue(struct usb_xfer_jobchain *jc)
 {
   int irqflags;
-  cond_spinlock_lock_disable_irq(&jc_list_lock, irqflags);
-  list_add_tail(&jc->list, &per_channel_jobchains.jc_list);
-  cond_spinlock_unlock_restore_irq(&jc_list_lock, irqflags);
+  cond_spinlock_lock_disable_irq(&jobchains_pending_lock, irqflags);
+  list_add_tail(&jc->list, &queue_state.jobchains_pending);
+  cond_spinlock_unlock_restore_irq(&jobchains_pending_lock, irqflags);
 }
 
 static inline struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue_locked(void)
 {
   struct usb_xfer_jobchain *jc = NULL;
-  struct list_head *h = &per_channel_jobchains.jc_list;
+  struct list_head *h = &queue_state.jobchains_pending;
   if (!list_empty(h)) {
     jc = list_first_entry(h, typeof(*jc), list);
     list_del_init(&jc->list);
@@ -73,9 +82,9 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
 {
   struct usb_xfer_jobchain *jc;
   int irqflags;
-  cond_spinlock_lock_disable_irq(&jc_list_lock, irqflags);
+  cond_spinlock_lock_disable_irq(&jobchains_pending_lock, irqflags);
   jc = usb_xfer_jobchain_dequeue_locked();
-  cond_spinlock_unlock_restore_irq(&jc_list_lock, irqflags);
+  cond_spinlock_unlock_restore_irq(&jobchains_pending_lock, irqflags);
   return jc;
 }
 
@@ -87,28 +96,36 @@ static void usb_xfer_job_cb(void *arg)
   j->completed = true;
 }
 
-static inline void usb_xfer_one_job(struct usb_xfer_job *j, struct dwc2_channel *c)
+static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
 {
-  usb_xfer_job_print(j, "usb_xfer_one_job");
+  int err;
+  usb_xfer_job_print(j, "usb_xfer_job_set_running");
   j->completion = usb_xfer_job_cb;
   j->completed = false;
   j->completion_arg = j;
-  while(1) {
-    j->err = ERR_OK;
-    dwc2_xfer_one_job(j, c);
-    while(!j->completed && !j->err)
-      asm volatile("wfe");
+  j->err = ERR_OK;
+  err = dwc2_xfer_one_job(j);
+  BUG(err != ERR_OK, "Failed to start job");
 
-    dwc2_channel_disable(c->id);
+  list_move_tail(&j->jobs, &queue_state.jobs_running);
+//  if (j->err != ERR_OK) {
+//    printf("usb_xfer_jobchain_start: job %p completed with err %d\n", j, j->err);
+//    jc->err = j->err;
+//    jc->status = JOBCHAIN_STATUS_COMPLETED;
+//  } else {
+//    jc->current = j;
+//    printf("usb_xfer_jobchain_start: job %p completed with success, next_job is %p\n", j, j->jobs.next);
+//  }
+ //   dwc2_channel_disable(c->id);
 
-    if (j->err != ERR_RETRY)
-      break;
-    if (j->completed)
-      break;
-  }
+ //   if (j->err != ERR_RETRY)
+//      break;
+ //   if (j->completed)
+  //    break;
+ // }
 }
 
-static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
+static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
 {
   struct usb_xfer_job *j;
   struct dwc2_channel *c = NULL;
@@ -125,34 +142,71 @@ static inline void usb_xfer_one_jobchain(struct usb_xfer_jobchain *jc)
     c->ctl = dwc2_xfer_control_create();
   }
   c->pipe.u.raw = dwc2_pipe.u.raw;
-
+  jc->channel = c;
   jc->err = ERR_OK;
-  list_for_each_entry(j, &jc->jobs, jobs) {
-    printf("usb_xfer_one_jobchain: processing next job: %p\n", j);
-    usb_xfer_one_job(j, c);
-    if (j->err != ERR_OK) {
-      jc->err = j->err;
-      printf("usb_xfer_one_jobchain: job %p completed with err %d\n", j, j->err);
-      break;
-    }
-    printf("usb_xfer_one_jobchain: job %p completed with success, next_job is %p\n", j, j->jobs.next);
+  if (!list_empty(&jc->jobs)) {
+    j = list_first_entry(&jc->jobs, typeof(*j), jobs);
+    printf("usb_xfer_jobchain_start: processing next job: %p\n", j);
+    usb_xfer_job_set_running(j);
   }
-  dwc2_xfer_control_destroy(c->ctl);
-  dwc2_channel_free(c);
-  j->completion(j->completion_arg);
+}
+
+
+/*
+ * Check if there are any pending jobchains.
+ * If yes start executing first job in chain.
+ */
+static void usb_xfer_process_pending(void)
+{
+  struct usb_xfer_jobchain *jc;
+  jc = usb_xfer_jobchain_dequeue();
+  if (jc)
+    usb_xfer_jobchain_start(jc);
+}
+
+/*
+ * check if any of pending jobs has been flagged
+ * as completed.
+ */
+static void usb_xfer_process_running(void)
+{
+  struct usb_xfer_jobchain *jc;
+  struct usb_xfer_job *j, *tmp;
+  list_for_each_entry_safe(j, tmp, &queue_state.jobs_running, jobs) {
+    bool jobchain_completed = false;
+    if (j->completed) {
+      jc = j->jc;
+      list_move_tail(&j->jobs, &jc->completed_jobs);
+      if (j->err != ERR_OK) {
+        jc->err = j->err;
+        jobchain_completed = true;
+      }
+      if (list_empty(&jc->jobs))
+        jobchain_completed = true;
+      else {
+        /* more jobs left in jobchain */
+        j = list_first_entry(&jc->jobs, typeof(*j), jobs);
+        usb_xfer_job_set_running(j);
+      }
+      if (jobchain_completed) {
+        struct dwc2_channel *c = jc->channel;
+        jc->channel = NULL;
+        jc->completed(jc->completed_arg);
+
+        dwc2_xfer_control_destroy(c->ctl);
+        dwc2_channel_free(c);
+      }
+    }
+  }
 }
 
 static int usb_xfer_queue_run(void)
 {
-  struct usb_xfer_jobchain *jc;
   USBQ_INFO("starting usb_runqueue");
   while(1) {
     asm volatile ("wfe");
-    jc = usb_xfer_jobchain_dequeue();
-    if (jc) {
-      usb_xfer_one_jobchain(jc);
-      usb_xfer_jobchain_free(jc);
-    }
+    usb_xfer_process_pending();
+    usb_xfer_process_running();
   }
   return 0;
 }
@@ -162,8 +216,9 @@ void usb_xfer_queue_init(void)
   task_t *usb_runqueue_task;
   STATIC_SLOT_INIT_FREE(usb_xfer_jobs);
   STATIC_SLOT_INIT_FREE(usb_xfer_jobchains);
-  INIT_LIST_HEAD(&per_channel_jobchains.jc_list);
-  spinlock_init(&jc_list_lock);
+  INIT_LIST_HEAD(&queue_state.jobchains_pending);
+  INIT_LIST_HEAD(&queue_state.jobs_running);
+  cond_spinlock_init(&jobchains_pending_lock);
 
   usb_runqueue_task = task_create(usb_xfer_queue_run, "usb_runqueue");
   BUG(IS_ERR(usb_runqueue_task), "Failed to initiazlie usb_runqueue_task");

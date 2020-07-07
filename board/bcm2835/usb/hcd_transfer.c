@@ -45,18 +45,18 @@ out_err:
   return err;
 }
 
-static inline struct usb_xfer_job *usb_xfer_job_prep(int pid, int dir, void *addr, int transfer_size)
+static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *jc, int pid, int dir, void *addr, int transfer_size)
 {
   struct usb_xfer_job *j;
   j = usb_xfer_job_alloc();
   if (IS_ERR(j))
     return j;
 
-  memset(j, 0, sizeof(*j));
   j->pid = pid;
   j->addr = addr;
   j->transfer_size = transfer_size;
   j->direction = dir;
+  j->jc = jc;
   return j;
 }
 
@@ -71,10 +71,8 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   if (IS_ERR(jc))
     return jc;
 
-  memset(jc, 0, sizeof(*jc));
-
   /* SETUP packet */
-  j = usb_xfer_job_prep(USB_PID_SETUP, USB_DIRECTION_OUT, request, sizeof(*request));
+  j = usb_xfer_job_prep(jc, USB_PID_SETUP, USB_DIRECTION_OUT, request, sizeof(*request));
   if (IS_ERR(j)) {
     err = PTR_ERR(j);
     goto out_err;
@@ -84,7 +82,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
 
   /* DATA packet */
   if (addr) {
-    j = usb_xfer_job_prep(USB_PID_DATA1, direction, addr, transfer_size);
+    j = usb_xfer_job_prep(jc, USB_PID_DATA1, direction, addr, transfer_size);
     if (IS_ERR(j)) {
       err = PTR_ERR(j);
       goto out_err;
@@ -99,7 +97,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   else
     ack_direction = USB_DIRECTION_IN;
 
-  j = usb_xfer_job_prep(USB_PID_DATA1, ack_direction, NULL, 0);
+  j = usb_xfer_job_prep(jc, USB_PID_DATA1, ack_direction, NULL, 0);
   if (IS_ERR(j)) {
     err = PTR_ERR(j);
     goto out_err;
@@ -145,8 +143,8 @@ int hcd_transfer_control(
     goto out_err;
   }
   uxb_xfer_jobchain_print(jc, "control job chain");
-  jc->completion = control_chain_signal_completed;
-  jc->completion_arg = &completed;
+  jc->completed = control_chain_signal_completed;
+  jc->completed_arg = &completed;
   jc->hcd_pipe = pipe;
 
   usb_xfer_jobchain_enqueue(jc);
