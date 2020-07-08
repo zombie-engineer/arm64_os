@@ -1,6 +1,7 @@
 #pragma once
 #include <refs.h>
 #include <barriers.h>
+#include <compiler.h>
 
 #ifdef CONFIG_DEBUG_LIST
 #include <bug.h>
@@ -35,12 +36,12 @@ static inline int list_empty(const struct list_head *head)
  *    (prev)->(next)
  *
  * Need to insert:
- *    (new)  
+ *    (new)
  *        \
  * Will:   \
  * (prev)->(new)->(next)
  */
-static inline void __list_add(struct list_head *new, 
+static inline OPTIMIZED void __list_add(struct list_head *new,
   struct list_head *prev, struct list_head *next)
 {
 #ifdef CONFI_DEBUG_LIST
@@ -62,20 +63,16 @@ static inline void __list_add(struct list_head *new,
  *    (head)->(head->next)
  *
  * Need to insert:
- *    (new)  
+ *    (new)
  *        \
  * Will:   \
  * (head)->(new)->(head->next)
  */
-static inline void list_add(struct list_head *new, struct list_head *head)
-{
-  __list_add(new, head, head->next);
-}
+#define list_add(__new_node, __list_head)\
+  __list_add(__new_node, __list_head, (__list_head)->next);
 
-static inline void list_add_tail(struct list_head *new, struct list_head *head)
-{
-  __list_add(new, head->prev, head);
-}
+#define list_add_tail(__new_node, __list_head)\
+  __list_add(__new_node, (__list_head)->prev, __list_head)
 
 #define list_entry(ptr, type, member) \
   container_of(ptr, type, member)
