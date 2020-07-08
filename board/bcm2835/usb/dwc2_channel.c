@@ -10,7 +10,7 @@ static DECL_SPINLOCK(dwc2_channels_lock);
 static uint8_t channels_bitmap = 0;
 static struct dwc2_channel dwc2_channels[6] = { 0 };
 
-struct dwc2_channel *dwc2_channel_alloc()
+struct dwc2_channel *dwc2_channel_create()
 {
   uint8_t bitmap;
   int ch;
@@ -32,11 +32,11 @@ struct dwc2_channel *dwc2_channel_alloc()
     DWCERR("Failed to allocate channel");
     return NULL;
   }
-  DWCINFO("channel %d allocated: %p", ch, &dwc2_channels[ch]);
+  DWCDEBUG2("channel %d allocated: %p", ch, &dwc2_channels[ch]);
   return &dwc2_channels[ch];
 }
 
-void dwc2_channel_free(struct dwc2_channel *c)
+void dwc2_channel_destroy(struct dwc2_channel *c)
 {
   uint8_t bitmap;
   if (spinlocks_enabled)
@@ -47,7 +47,7 @@ void dwc2_channel_free(struct dwc2_channel *c)
   channels_bitmap = bitmap;
   if (spinlocks_enabled)
     spinlock_unlock(&dwc2_channels_lock);
-  DWCINFO("channel %d freed %p", c->id, c);
+  DWCDEBUG2("channel %d freed %p", c->id, c);
 }
 
 struct dwc2_channel *dwc2_channel_get_by_id(int ch_id)

@@ -48,7 +48,7 @@ out_err:
 static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *jc, int pid, int dir, void *addr, int transfer_size)
 {
   struct usb_xfer_job *j;
-  j = usb_xfer_job_alloc();
+  j = usb_xfer_job_create();
   BUG(!j || IS_ERR(j), "Failed to alloc job");
   if (IS_ERR(j))
     return j;
@@ -68,7 +68,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   struct usb_xfer_jobchain *jc;
   struct usb_xfer_job *j;
 
-  jc = usb_xfer_jobchain_alloc();
+  jc = usb_xfer_jobchain_create();
   if (IS_ERR(jc))
     return jc;
 
@@ -179,7 +179,7 @@ int hcd_transfer_control_blocking(
   if (pipe->address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
 
-  c = dwc2_channel_alloc();
+  c = dwc2_channel_create();
   if (!c) {
     err = ERR_RETRY;
     HCDERR("channel not allocated. Retry");
@@ -239,7 +239,7 @@ out_err:
     dwc2_channel_disable(c->id);
     if (c->ctl)
       dwc2_xfer_control_destroy(c->ctl);
-    dwc2_channel_free(c);
+    dwc2_channel_destroy(c);
   }
 
   HCDDEBUG("SUBMIT: completed with status: %d", err);
@@ -269,7 +269,7 @@ int hcd_transfer_interrupt(
     }
   };
 
-  c = dwc2_channel_alloc();
+  c = dwc2_channel_create();
   if (!c) {
     err = ERR_RETRY;
     HCDERR("channel not allocated. Retry");
@@ -300,7 +300,7 @@ out_err:
     dwc2_channel_disable(c->id);
     if (c->ctl)
       dwc2_xfer_control_destroy(c->ctl);
-    dwc2_channel_free(c);
+    dwc2_channel_destroy(c);
   }
   return err;
 }
@@ -330,7 +330,7 @@ int hcd_transfer_bulk(
     }
   };
 
-  c = dwc2_channel_alloc();
+  c = dwc2_channel_create();
   if (!c) {
     err = ERR_RETRY;
     HCDERR("channel not allocated. Retry");

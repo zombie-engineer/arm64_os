@@ -42,9 +42,9 @@ struct usb_xfer_job {
       __j->jobs.prev, __j->jobs.next);\
   } while(0)
 
-struct usb_xfer_job *usb_xfer_job_alloc(void);
+struct usb_xfer_job *usb_xfer_job_create(void);
 
-void usb_xfer_job_free(struct usb_xfer_job *j);
+void usb_xfer_job_destroy(struct usb_xfer_job *j);
 
 struct hcd_pipe;
 
@@ -79,9 +79,7 @@ struct usb_xfer_jobchain {
       usb_xfer_job_print(__log_level, j, __tag);\
 } while(0)
 
-struct usb_xfer_jobchain *usb_xfer_jobchain_alloc(void);
-
-void usb_xfer_jobchain_free(struct usb_xfer_jobchain *jc);
+struct usb_xfer_jobchain *usb_xfer_jobchain_create(void);
 
 void usb_xfer_jobchain_destroy(struct usb_xfer_jobchain *jc);
 

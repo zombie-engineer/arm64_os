@@ -52,9 +52,9 @@ static inline bool dwc2_channel_split_mode(struct dwc2_channel *c)
   return !dwc2_channel_is_speed_high(c);
 }
 
-struct dwc2_channel *dwc2_channel_alloc();
+struct dwc2_channel *dwc2_channel_create();
 
-void dwc2_channel_free(struct dwc2_channel *c);
+void dwc2_channel_destroy(struct dwc2_channel *c);
 
 struct dwc2_channel *dwc2_channel_get_by_id(int ch_id);
 
