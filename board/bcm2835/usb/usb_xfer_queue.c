@@ -64,6 +64,7 @@ void usb_xfer_jobchain_destroy(struct usb_xfer_jobchain *jc)
     list_del_init(&j->jobs);
     usb_xfer_job_free(j);
   }
+  usb_xfer_jobchains_release(jc);
 }
 
 void usb_xfer_jobchain_enqueue(struct usb_xfer_jobchain *jc)
@@ -96,7 +97,6 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
   return jc;
 }
 
-
 static void usb_xfer_job_cb(void *arg)
 {
   struct usb_xfer_job *j = arg;
@@ -116,21 +116,6 @@ static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
   BUG(err != ERR_OK, "Failed to start job");
 
   list_move_tail(&j->jobs, &queue_state.jobs_running);
-//  if (j->err != ERR_OK) {
-//    printf("usb_xfer_jobchain_start: job %p completed with err %d\n", j, j->err);
-//    jc->err = j->err;
-//    jc->status = JOBCHAIN_STATUS_COMPLETED;
-//  } else {
-//    jc->current = j;
-//    printf("usb_xfer_jobchain_start: job %p completed with success, next_job is %p\n", j, j->jobs.next);
-//  }
- //   dwc2_channel_disable(c->id);
-
- //   if (j->err != ERR_RETRY)
-//      break;
- //   if (j->completed)
-  //    break;
- // }
 }
 
 static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
