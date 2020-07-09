@@ -106,17 +106,17 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
 
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
-  HUBPORTLOG("status: %04x:%04x", port_status.status, port_status.change);
+  HUBPORTDBG("status: %04x:%04x", port_status.status, port_status.change);
 
 	if (port_status.status.high_speed)
     port_dev->pipe0.speed = USB_SPEED_HIGH;
   else if (port_status.status.low_speed) {
 		port_dev->pipe0.speed = USB_SPEED_LOW;
-    HUBPORTLOG("low speed device");
+    HUBPORTDBG("low speed device");
 	}
 	else {
     port_dev->pipe0.speed = USB_SPEED_FULL;
-    HUBPORTLOG("full speed device");
+    HUBPORTDBG("full speed device");
   }
   if (!port_status.status.high_speed) {
 		port_dev->pipe0.ls_hub_address = h->d->address;
@@ -137,7 +137,7 @@ static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
   }
 
   list_add(&port_dev->hub_children, &h->children);
-  HUBPORTLOG("hub: %p, adding device %p to port, h->children:%p", h, port_dev, &h->children);
+  HUBPORTDBG("hub: %p, adding device %p to port, h->children:%p", h, port_dev, &h->children);
 
 out_err:
   if (err != ERR_OK) {
