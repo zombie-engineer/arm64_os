@@ -93,11 +93,14 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
   return jc;
 }
 
+static uint64_t has_work = 0;
+
 static void usb_xfer_job_cb(void *arg)
 {
   struct usb_xfer_job *j = arg;
   USBQ_DEBUG2("usb_xfer_job_cb completed");
   j->completed = true;
+  wakeup_waitflag(&has_work);
 }
 
 static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
@@ -122,14 +125,10 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
 
   uxb_xfer_jobchain_print(DEBUG2, jc, "running");
 
-  // while(!c) {
   c = dwc2_channel_create();
   BUG(!c, "Failed to create dwc2_channel");
-  // }
-  // while(!c->ctl) {
-    c->ctl = dwc2_xfer_control_create();
+  c->ctl = dwc2_xfer_control_create();
   BUG(!c->ctl, "Failed to create dwc2_xfer_control");
-  //}
   c->pipe.u.raw = dwc2_pipe.u.raw;
   jc->channel = c;
   jc->err = ERR_OK;
@@ -193,6 +192,7 @@ static int usb_xfer_queue_run(void)
 {
   USBQ_INFO("starting usb_runqueue");
   while(1) {
+    wait_on_waitflag(&has_work);
     asm volatile ("wfe");
     usb_xfer_process_pending();
     usb_xfer_process_running();

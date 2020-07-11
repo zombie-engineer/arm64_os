@@ -82,7 +82,7 @@ static void pcpu_scheduler_init(struct scheduler *s)
   BUG(!is_aligned(s, 64), "scheduler struct not aligned to cache line width");
   INIT_LIST_HEAD(&s->running);
   INIT_LIST_HEAD(&s->timer_waiting);
-  INIT_LIST_HEAD(&s->io_waiting);
+  INIT_LIST_HEAD(&s->flag_waiting);
 }
 
 void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
@@ -96,7 +96,14 @@ void sched_queue_timewait_task_noirq(struct scheduler *s, struct task *t)
 {
   list_del_init(&t->schedlist);
   list_add_tail(&t->schedlist, &s->timer_waiting);
-  t->task_state = TASK_STATE_TIMER_WAIT;
+  t->task_state = TASK_STATE_TIMEWAITING;
+}
+
+void sched_queue_flagwait_task_noirq(struct scheduler *s, struct task *t)
+{
+  list_del_init(&t->schedlist);
+  list_add_tail(&t->schedlist, &s->flag_waiting);
+  t->task_state = TASK_STATE_FLAGWAITING;
 }
 
 void sched_queue_runnable_task(struct scheduler *s, struct task *t)
@@ -112,6 +119,14 @@ void sched_queue_timewait_task(struct scheduler *s, struct task *t)
   int flags;
   disable_irq_save_flags(flags);
   sched_queue_timewait_task_noirq(s, t);
+  restore_irq_flags(flags);
+}
+
+void sched_queue_flagwait_task(struct scheduler *s, struct task *t)
+{
+  int flags;
+  disable_irq_save_flags(flags);
+  sched_queue_flagwait_task_noirq(s, t);
   restore_irq_flags(flags);
 }
 
@@ -205,13 +220,32 @@ void wait_on_timer_ms(uint64_t msec)
   yield();
 }
 
+void wait_on_waitflag(uint64_t *waitflag)
+{
+  struct task *t;
+  t = get_current();
+  t->waitflag = waitflag;
+  SCHED_DEBUG("wait_on_waitflag %p", t);
+  sched_queue_flagwait_task(get_scheduler(), t);
+  yield();
+}
+
+void wakeup_waitflag(uint64_t *waitflag)
+{
+  int irqflags;
+  disable_irq_save_flags(irqflags);
+  *waitflag = 1;
+  get_scheduler()->flag_is_set = 1;
+  restore_irq_flags(irqflags);
+}
+
 task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
 {
   const int ticks_until_preempt = 10;
   /*
    * Put currently executing task to end of list
    */
-  if (t->task_state == TASK_STATE_TIMER_WAIT) {
+  if (t->task_state == TASK_STATE_TIMEWAITING) {
 
   } else {
     t->ticks_total += ticks_until_preempt;
@@ -275,6 +309,21 @@ static inline void schedule_handle_timer_waiting(struct scheduler *s)
   }
 }
 
+static inline void schedule_handle_flag_waiting(struct scheduler *s)
+{
+  task_t *t, *tmp;
+  if (s->flag_is_set) {
+    list_for_each_entry_safe(t, tmp, &s->flag_waiting, schedlist) {
+      if (*t->waitflag) {
+        SCHED_DEBUG3("flag at %p is set for task %p",t->waitflag, t);
+        t->waitflag = NULL;
+        sched_queue_runnable_task_noirq(s, t);
+      }
+    }
+    s->flag_is_set = 0;
+  }
+}
+
 static inline void schedule_debug_info(struct scheduler *s)
 {
   task_t *t;
@@ -311,6 +360,11 @@ static void schedule_from_irq()
    * handle tasks waiting on timers.
    */
   schedule_handle_timer_waiting(s);
+
+  /*
+   * handle tasks waiting on event flags
+   */
+  schedule_handle_flag_waiting(s);
 
   /*
    * decrease current task's cpu time

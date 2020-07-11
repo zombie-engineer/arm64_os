@@ -53,15 +53,16 @@ typedef struct task {
    */
   int ticks_total;
 
-#define TASK_STATE_STOPPED    0
-#define TASK_STATE_SCHEDULED  1
-#define TASK_STATE_RUNNING    2
-#define TASK_STATE_TIMER_WAIT 3
-#define TASK_STATE_IO_WAIT    4
+#define TASK_STATE_STOPPED     0
+#define TASK_STATE_SCHEDULED   1
+#define TASK_STATE_RUNNING     2
+#define TASK_STATE_TIMEWAITING 3
+#define TASK_STATE_FLAGWAITING 4
 
   int task_state;
 
   uint64_t timer_wait_until;
+  uint64_t *waitflag;
 } task_t;
 
 extern void *get_current_ctx();
@@ -69,9 +70,10 @@ extern void *get_current_ctx();
 #define get_current() (container_of(get_current_ctx(), task_t, cpuctx))
 
 struct scheduler {
+  uint64_t flag_is_set;
   struct list_head running;
   struct list_head timer_waiting;
-  struct list_head io_waiting;
+  struct list_head flag_waiting;
 };
 
 void scheduler_init(int log_level, task_fn init_func);
@@ -82,7 +84,13 @@ void sched_queue_runnable_task(struct scheduler *s, struct task *t);
 
 void sched_queue_timewait_task(struct scheduler *s, struct task *t);
 
+void sched_queue_flagwait_task(struct scheduler *s, struct task *t);
+
 void wait_on_timer_ms(uint64_t msec);
+
+void wait_on_waitflag(uint64_t *waitflag);
+
+void wakeup_waitflag(uint64_t *waitflag);
 
 int run_on_cpu(struct task *t, int cpu_num);
 
