@@ -91,6 +91,7 @@ void cpu_test(void)
   }
 }
 
+
 static void cpu_run(int cpu_num, void (*fn)(void))
 {
   void **write_to = &__percpu_data[cpu_num].jmp_addr;

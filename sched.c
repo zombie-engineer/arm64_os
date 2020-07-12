@@ -101,6 +101,7 @@ void sched_queue_timewait_task_noirq(struct scheduler *s, struct task *t)
 
 void sched_queue_flagwait_task_noirq(struct scheduler *s, struct task *t)
 {
+  SCHED_INFO("enqueue task %p: wait for flag %p", t, t->waitflag);
   list_del_init(&t->schedlist);
   list_add_tail(&t->schedlist, &s->flag_waiting);
   t->task_state = TASK_STATE_FLAGWAITING;
@@ -220,12 +221,22 @@ void wait_on_timer_ms(uint64_t msec)
   yield();
 }
 
-void wait_on_waitflag(uint64_t *waitflag)
+void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 {
   struct task *t;
+
+  // if (*waitflag) {
+  //  *waitflag = 0;
+  //  return;
+  // }
+  if (atomic_cmp_and_swap(waitflag, 1, 0) == 1) {
+    SCHED_INFO("wait_on_waitflag == 1");
+    return;
+  }
+
   t = get_current();
   t->waitflag = waitflag;
-  SCHED_DEBUG("wait_on_waitflag %p", t);
+  SCHED_INFO("wait_on_waitflag t:%p, flag %p", t, waitflag);
   sched_queue_flagwait_task(get_scheduler(), t);
   yield();
 }
@@ -233,9 +244,11 @@ void wait_on_waitflag(uint64_t *waitflag)
 void wakeup_waitflag(uint64_t *waitflag)
 {
   int irqflags;
+  SCHED_INFO("wakeup_waitflag flag %p", waitflag);
   disable_irq_save_flags(irqflags);
   *waitflag = 1;
   get_scheduler()->flag_is_set = 1;
+
   restore_irq_flags(irqflags);
 }
 
@@ -246,7 +259,9 @@ task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
    * Put currently executing task to end of list
    */
   if (t->task_state == TASK_STATE_TIMEWAITING) {
-
+    puts("scheduling out of a timewait task\n");
+  } else if (t->task_state == TASK_STATE_FLAGWAITING) {
+    puts("scheduling out of a flagwait\n");
   } else {
     t->ticks_total += ticks_until_preempt;
     sched_queue_runnable_task_noirq(s, t);
@@ -285,7 +300,7 @@ void schedule()
   prev_task = get_current();
   next_task = scheduler_pick_next_task(s, prev_task);
   next_task->task_state = TASK_STATE_RUNNING;
-  SCHED_DEBUG("schedule:'%s'->'%s'", prev_task->name, next_task->name);
+  // SCHED_INFO("schedule:'%s'->'%s'", prev_task->name, next_task->name);
   BUG(!next_task, "scheduler logic failed.");
   set_current(next_task);
 }
@@ -313,9 +328,12 @@ static inline void schedule_handle_flag_waiting(struct scheduler *s)
 {
   task_t *t, *tmp;
   if (s->flag_is_set) {
+    printf("--------------schedule_handle_flag_waiting\n");
     list_for_each_entry_safe(t, tmp, &s->flag_waiting, schedlist) {
+      BUG(t->waitflag == NULL, "flagwait queue contains task with no waitflag");
       if (*t->waitflag) {
-        SCHED_DEBUG3("flag at %p is set for task %p",t->waitflag, t);
+        SCHED_INFO("flag at %p is set for task %p",t->waitflag, t);
+        *t->waitflag = 0;
         t->waitflag = NULL;
         sched_queue_runnable_task_noirq(s, t);
       }

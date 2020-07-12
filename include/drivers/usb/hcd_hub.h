@@ -87,6 +87,7 @@ static inline int usb_hub_clear_feature(usb_hub_t *h, int feature)
 
 static inline int usb_hub_get_status(usb_hub_t *h, struct usb_hub_status *status)
 {
+  printf("111111111111111111111111111usb_hub_get_status\n");
   HUBFN(IN, GET_HUB_STATUS, GET_STATUS, 0, 0, sizeof(*status), status);
 }
 

@@ -4,6 +4,7 @@
 #include <syscall.h>
 #include <config.h>
 #include <common.h>
+#include <atomic.h>
 
 extern int sched_log_level;
 
@@ -62,7 +63,7 @@ typedef struct task {
   int task_state;
 
   uint64_t timer_wait_until;
-  uint64_t *waitflag;
+  atomic_t *waitflag;
 } task_t;
 
 extern void *get_current_ctx();
@@ -88,9 +89,9 @@ void sched_queue_flagwait_task(struct scheduler *s, struct task *t);
 
 void wait_on_timer_ms(uint64_t msec);
 
-void wait_on_waitflag(uint64_t *waitflag);
+void wait_on_waitflag(atomic_t *waitflag);
 
-void wakeup_waitflag(uint64_t *waitflag);
+void wakeup_waitflag(atomic_t *waitflag);
 
 int run_on_cpu(struct task *t, int cpu_num);
 
@@ -103,9 +104,9 @@ void sched_timer_cb(void *arg);
 
 static inline void yield()
 {
-  // SCHED_DEBUG2("yield enter: %s\n", get_current()->name);
+  // SCHED_INFO("yield enter: %s\n", get_current()->name);
   asm volatile ("svc %0"::"i"(SVC_YIELD));
-  // SCHED_DEBUG2("yield exit: %s\n", get_current()->name);
+  // SCHED_INFO("yield exit: %s\n", get_current()->name);
 }
 
 task_t *task_create(task_fn fn, const char *task_name);

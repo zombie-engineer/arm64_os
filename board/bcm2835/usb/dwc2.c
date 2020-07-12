@@ -505,8 +505,11 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
       return;
   }
   c->next_pid = dwc2_channel_get_next_pid(c);
-  if (c->ctl->completion)
+  puts("XXXXXXXXXXXXXXX");
+  if (c->ctl->completion) {
+    puts("PPPPPPPPPPPPPPP");
     c->ctl->completion(c->ctl->completion_arg);
+  }
 }
 
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
@@ -519,7 +522,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   GET_INTRMSK();
   raw_intr = intr;
   // intr &= intrmsk;
-  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch_id, raw_intr, intrmsk, intr);
+  DWCINFO("channel %d irq(hcint): %08x & %08x = %08x", ch_id, raw_intr, intrmsk, intr);
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -550,7 +553,7 @@ static inline void dwc2_irq_handle_channel_int(void)
   uint32_t haintmsk = read_reg(USB_HAINTMSK);
   uint32_t masked = haint & haintmsk;
   write_reg(USB_HAINT, masked);
-  DWCDEBUG("channels irq (haint): %08x & %08x = %08x", haint, haintmsk, masked);
+  DWCINFO("channels irq (haint): %08x & %08x = %08x", haint, haintmsk, masked);
   for (i = 0; i < num_channels; ++i) {
     if ((1<<i) & masked)
       dwc2_irq_handle_channel_int_one(i);
@@ -562,7 +565,7 @@ void dwc2_irq_cb(void)
   uint32_t intsts = read_reg(USB_GINTSTS);
   uint32_t intmsk = read_reg(USB_GINTMSK);
   uint32_t masked = intsts & intmsk;
-  DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
+  DWCINFO("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
   write_reg(USB_GINTSTS, masked);
   if (dwc2_log_level > 0)
     dwc2_dump_int_registers();
