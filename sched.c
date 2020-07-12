@@ -221,6 +221,8 @@ void wait_on_timer_ms(uint64_t msec)
   yield();
 }
 
+atomic_t atomic_cmp_and_swap(atomic_t *a, uint64_t expected_val, uint64_t new_val);
+
 void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 {
   struct task *t;
@@ -229,8 +231,9 @@ void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
   //  *waitflag = 0;
   //  return;
   // }
+  //
+  //
   if (atomic_cmp_and_swap(waitflag, 1, 0) == 1) {
-    SCHED_INFO("wait_on_waitflag == 1");
     return;
   }
 
