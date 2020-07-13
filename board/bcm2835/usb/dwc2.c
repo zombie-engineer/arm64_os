@@ -505,11 +505,8 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
       return;
   }
   c->next_pid = dwc2_channel_get_next_pid(c);
-  puts("XXXXXXXXXXXXXXX");
-  if (c->ctl->completion) {
-    puts("PPPPPPPPPPPPPPP");
+  if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);
-  }
 }
 
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
@@ -543,6 +540,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
       DWCERR("+++ %08x\n", intr);
     }
   }
+  // putc('#');
 }
 
 static inline void dwc2_irq_handle_channel_int(void)

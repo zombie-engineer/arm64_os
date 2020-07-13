@@ -83,6 +83,7 @@ static void pcpu_scheduler_init(struct scheduler *s)
   INIT_LIST_HEAD(&s->running);
   INIT_LIST_HEAD(&s->timer_waiting);
   INIT_LIST_HEAD(&s->flag_waiting);
+  s->flag_is_set = 0;
 }
 
 void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
@@ -101,7 +102,7 @@ void sched_queue_timewait_task_noirq(struct scheduler *s, struct task *t)
 
 void sched_queue_flagwait_task_noirq(struct scheduler *s, struct task *t)
 {
-  SCHED_INFO("enqueue task %p: wait for flag %p", t, t->waitflag);
+  SCHED_DEBUG2("enqueue task %p: wait for flag %p", t, t->waitflag);
   list_del_init(&t->schedlist);
   list_add_tail(&t->schedlist, &s->flag_waiting);
   t->task_state = TASK_STATE_FLAGWAITING;
@@ -227,19 +228,12 @@ void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 {
   struct task *t;
 
-  // if (*waitflag) {
-  //  *waitflag = 0;
-  //  return;
-  // }
-  //
-  //
-  if (atomic_cmp_and_swap(waitflag, 1, 0) == 1) {
+  if (atomic_cmp_and_swap(waitflag, 1, 0) == 1)
     return;
-  }
 
   t = get_current();
   t->waitflag = waitflag;
-  SCHED_INFO("wait_on_waitflag t:%p, flag %p", t, waitflag);
+  SCHED_DEBUG2("wait_on_waitflag t:%p, flag %p", t, waitflag);
   sched_queue_flagwait_task(get_scheduler(), t);
   yield();
 }
@@ -247,12 +241,14 @@ void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 void wakeup_waitflag(uint64_t *waitflag)
 {
   int irqflags;
-  SCHED_INFO("wakeup_waitflag flag %p", waitflag);
+  // putc('+');
+  SCHED_DEBUG2("wakeup_waitflag flag %p", waitflag);
   disable_irq_save_flags(irqflags);
   *waitflag = 1;
   get_scheduler()->flag_is_set = 1;
 
   restore_irq_flags(irqflags);
+  // putc('+');
 }
 
 task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
@@ -262,9 +258,20 @@ task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
    * Put currently executing task to end of list
    */
   if (t->task_state == TASK_STATE_TIMEWAITING) {
-    puts("scheduling out of a timewait task\n");
+    putc('^');
+    // puts("scheduling out of a timewait task\n");
   } else if (t->task_state == TASK_STATE_FLAGWAITING) {
-    puts("scheduling out of a flagwait\n");
+    /*
+     * We are here because the currently executing task has called 
+     * 'wait_on_waitflag', and this task is already in a waitflag waiting queue,
+     * so in general case it can not be selected as a next runnable task.
+     *
+     * In a specific case the waitflag can be already set, knowing that we can
+     * optimize the response and put this task to top of stack, but let's leave
+     * it simple for now.
+     *
+     */
+    // putc('*');
   } else {
     t->ticks_total += ticks_until_preempt;
     sched_queue_runnable_task_noirq(s, t);
@@ -303,6 +310,7 @@ void schedule()
   prev_task = get_current();
   next_task = scheduler_pick_next_task(s, prev_task);
   next_task->task_state = TASK_STATE_RUNNING;
+  // putc(')');
   // SCHED_INFO("schedule:'%s'->'%s'", prev_task->name, next_task->name);
   BUG(!next_task, "scheduler logic failed.");
   set_current(next_task);
@@ -330,12 +338,27 @@ static inline void schedule_handle_timer_waiting(struct scheduler *s)
 static inline void schedule_handle_flag_waiting(struct scheduler *s)
 {
   task_t *t, *tmp;
-  if (s->flag_is_set) {
-    printf("--------------schedule_handle_flag_waiting\n");
+  // putc(':');
+  /*
+   * When timer IRQ fires, we call this function to check if there are tasks
+   * that wait for their waitflags. s->flag_is_set is fast way to say that there are
+   * tasks in flag_waiting queue, who's waitflags have been already set, so we can
+   * find this flags by iterating the list.
+   *
+   * We also have to check that the queue itself contains any tasks.
+   * It can be that the waitflag has been set BEFORE the task called 'wait_on_waitflag',
+   * meaning that it is not in the flag_waiting queue yet, although the flag is already
+   * set.
+   * The event that has set the flags has happened BEFORE the task put itself to a waitqueue.
+   * But it would do so soon and when this happens we want s->flag_is_set to be non-zero
+   * to be able to get to processing of this event.
+   */
+  if (s->flag_is_set && !list_empty(&s->flag_waiting)) {
+    // putc(':');
     list_for_each_entry_safe(t, tmp, &s->flag_waiting, schedlist) {
       BUG(t->waitflag == NULL, "flagwait queue contains task with no waitflag");
       if (*t->waitflag) {
-        SCHED_INFO("flag at %p is set for task %p",t->waitflag, t);
+        SCHED_DEBUG2("flag at %p is set for task %p",t->waitflag, t);
         *t->waitflag = 0;
         t->waitflag = NULL;
         sched_queue_runnable_task_noirq(s, t);
@@ -374,6 +397,7 @@ static void schedule_from_irq()
    * print debug info
    */
   struct scheduler *s = get_scheduler();
+  // putc('!');
   if (sched_log_level > 3)
     schedule_debug_info(s);
 

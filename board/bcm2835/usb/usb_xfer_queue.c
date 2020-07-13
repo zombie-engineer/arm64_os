@@ -99,8 +99,7 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
 static void usb_xfer_job_cb(void *arg)
 {
   struct usb_xfer_job *j = arg;
-  printf("QQQQQQQ");
-  USBQ_INFO("usb_xfer_job_cb completed");
+  USBQ_DEBUG("usb_xfer_job_cb completed");
   j->completed = true;
   wakeup_waitflag(&has_work);
 }
@@ -108,8 +107,7 @@ static void usb_xfer_job_cb(void *arg)
 static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
 {
   int err;
-  // usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_set_running");
-  printf("usb_xfer_job_set_running:%p\n", j);
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_set_running");
   j->completion = usb_xfer_job_cb;
   j->completed = false;
   j->completion_arg = j;
@@ -147,10 +145,10 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
  */
 static void usb_xfer_process_pending(void)
 {
-  printf("usb_xfer_process_pending\n");
+  // printf("usb_xfer_process_pending\n");
   struct usb_xfer_jobchain *jc;
   jc = usb_xfer_jobchain_dequeue();
-  printf("usb_xfer_process_pending: jc=%p\n", jc);
+  // printf("usb_xfer_process_pending: jc=%p\n", jc);
   if (jc)
     usb_xfer_jobchain_start(jc);
 }
@@ -163,10 +161,10 @@ static void usb_xfer_process_running(void)
 {
   struct usb_xfer_jobchain *jc;
   struct usb_xfer_job *j, *tmp;
-  printf("usb_xfer_process_running\n");
+  // printf("usb_xfer_process_running\n");
   list_for_each_entry_safe(j, tmp, &queue_state.jobs_running, jobs) {
     bool jobchain_completed = false;
-    printf("usb_xfer_process_running: j:%p, %d\n", j, j->completed);
+    // printf("usb_xfer_process_running: j:%p, %d\n", j, j->completed);
     if (j->completed) {
       jc = j->jc;
       list_move_tail(&j->jobs, &jc->completed_jobs);
@@ -200,10 +198,9 @@ static int usb_xfer_queue_run(void)
   USBQ_INFO("starting usb_runqueue");
   while(1) {
     wait_on_waitflag(&has_work);
-    putc('$');
+    // putc('$');
     usb_xfer_process_pending();
     usb_xfer_process_running();
-    printf("usb_xfer_queue_run loopend\n");
   }
   return 0;
 }

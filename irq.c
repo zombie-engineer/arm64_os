@@ -29,6 +29,7 @@ static inline void __handle_irq(int irqnr, irq_desc_t *irq_table)
   if (irq_post_hook)
     irq_post_hook();
   // puts("\nIRQIRQ END\n");
+  // putc('<');
 }
 
 static inline void __handle_local_periph_irq(int cpu_num)
