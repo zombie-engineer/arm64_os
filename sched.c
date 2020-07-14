@@ -222,8 +222,6 @@ void wait_on_timer_ms(uint64_t msec)
   yield();
 }
 
-atomic_t atomic_cmp_and_swap(atomic_t *a, uint64_t expected_val, uint64_t new_val);
-
 void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 {
   struct task *t;
@@ -245,7 +243,7 @@ void wakeup_waitflag(uint64_t *waitflag)
   SCHED_DEBUG2("wakeup_waitflag flag %p", waitflag);
   disable_irq_save_flags(irqflags);
   *waitflag = 1;
-  get_scheduler()->flag_is_set = 1;
+  atomic_inc(&get_scheduler()->flag_is_set);
 
   restore_irq_flags(irqflags);
   // putc('+');
@@ -262,7 +260,7 @@ task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
     // puts("scheduling out of a timewait task\n");
   } else if (t->task_state == TASK_STATE_FLAGWAITING) {
     /*
-     * We are here because the currently executing task has called 
+     * We are here because the currently executing task has called
      * 'wait_on_waitflag', and this task is already in a waitflag waiting queue,
      * so in general case it can not be selected as a next runnable task.
      *
@@ -353,7 +351,8 @@ static inline void schedule_handle_flag_waiting(struct scheduler *s)
    * But it would do so soon and when this happens we want s->flag_is_set to be non-zero
    * to be able to get to processing of this event.
    */
-  if (s->flag_is_set && !list_empty(&s->flag_waiting)) {
+  BUG(s->flag_is_set > 0xffffffffffff0000ull, "flag_is_set value below 0");
+  if (s->flag_is_set) {
     // putc(':');
     list_for_each_entry_safe(t, tmp, &s->flag_waiting, schedlist) {
       BUG(t->waitflag == NULL, "flagwait queue contains task with no waitflag");
@@ -363,8 +362,8 @@ static inline void schedule_handle_flag_waiting(struct scheduler *s)
         t->waitflag = NULL;
         sched_queue_runnable_task_noirq(s, t);
       }
+      atomic_dec(&s->flag_is_set);
     }
-    s->flag_is_set = 0;
   }
 }
 

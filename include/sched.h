@@ -71,7 +71,7 @@ extern void *get_current_ctx();
 #define get_current() (container_of(get_current_ctx(), task_t, cpuctx))
 
 struct scheduler {
-  uint64_t flag_is_set;
+  atomic_t flag_is_set;
   struct list_head running;
   struct list_head timer_waiting;
   struct list_head flag_waiting;
