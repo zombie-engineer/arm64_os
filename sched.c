@@ -390,7 +390,7 @@ static inline void schedule_debug_info(struct scheduler *s)
 /*
  * schedule_from_irq - is called from irq context with irq off
  */
-static void schedule_from_irq()
+static void OPTIMIZED schedule_from_irq()
 {
   /*
    * print debug info
