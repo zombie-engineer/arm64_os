@@ -35,8 +35,9 @@ typedef struct usb_hcd_device_class_hub {
   struct list_head children;
 } usb_hub_t;
 
-struct usb_hcd_device_class_hub *usb_hcd_allocate_hub();
-void usb_hcd_deallocate_hub(struct usb_hcd_device_class_hub *h);
+struct usb_hcd_device_class_hub *usb_hcd_hub_create(void);
+
+void usb_hcd_hub_destroy(struct usb_hcd_device_class_hub *h);
 
 void usb_hcd_hub_init();
 

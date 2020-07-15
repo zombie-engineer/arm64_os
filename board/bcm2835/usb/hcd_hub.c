@@ -16,17 +16,19 @@ int usb_hcd_hub_device_to_string(struct usb_hcd_device_class_hub *hub, const cha
   return usb_hcd_hub_device_to_string_r(hub, prefix, buf, bufsz, 0);
 }
 
-struct usb_hcd_device_class_hub *usb_hcd_allocate_hub()
+struct usb_hcd_device_class_hub *usb_hcd_hub_create()
 {
   struct usb_hcd_device_class_hub *hub;
   hub = usb_hcd_device_class_hub_alloc();
-  hub->base.device_class = USB_HCD_DEVICE_CLASS_HUB;
-  memset(&hub->descriptor, 0, sizeof(hub->descriptor));
-  INIT_LIST_HEAD(&hub->children);
+  if (hub) {
+    hub->base.device_class = USB_HCD_DEVICE_CLASS_HUB;
+    memset(&hub->descriptor, 0, sizeof(hub->descriptor));
+    INIT_LIST_HEAD(&hub->children);
+  }
   return hub;
 }
 
-void usb_hcd_deallocate_hub(struct usb_hcd_device_class_hub *h)
+void usb_hcd_hub_destroy(struct usb_hcd_device_class_hub *h)
 {
   struct usb_hcd_device *child, *tmp;
   list_for_each_entry_safe(child, tmp, &h->children, hub_children) {
@@ -189,7 +191,7 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   HCDDEBUG("=============================================================");
   HCDDEBUG("===================== ENUMERATE HUB =========================");
   HCDDEBUG("=============================================================");
-  h = usb_hcd_allocate_hub();
+  h = usb_hcd_hub_create();
 
   if (!h) {
     err = ERR_BUSY;
@@ -232,7 +234,7 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
 out_err:
   if (err != ERR_OK && h) {
     dev->class = NULL;
-    usb_hcd_deallocate_hub(h);
+    usb_hcd_hub_destroy(h);
   }
 
   HCDDEBUG("=============================================================");

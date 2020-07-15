@@ -118,7 +118,7 @@ void usb_hcd_deallocate_device(struct usb_hcd_device *d)
   if (d->class) {
     switch(d->class->device_class) {
       case USB_HCD_DEVICE_CLASS_HUB:
-        usb_hcd_deallocate_hub(usb_hcd_device_to_hub(d));
+        usb_hcd_hub_destroy(usb_hcd_device_to_hub(d));
         break;
       default:
         break;
@@ -358,7 +358,7 @@ out_err:
 
 static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_descriptor *desc, const char *prefix, int full)
 {
-  if (full)
+  if (full) {
     HCDDEBUG("%s: VENDOR:%04x,PRODUCT:%04x,bcd:%04x, class:%s(class:%d,subclass:%d,proto:%d), max_packet_size: %d",
         prefix,
         desc->id_vendor,
@@ -369,7 +369,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
         desc->device_subclass,
         desc->device_protocol,
         desc->max_packet_size_0);
-  else /* first half */
+  } else /* first half */ {
     HCDDEBUG("%s: bcd:%04x, class:%s(class:%d,subclass:%d,proto:%d), max_packet_size: %d",
         prefix,
         desc->bcd_usb,
@@ -378,6 +378,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
         desc->device_subclass,
         desc->device_protocol,
         desc->max_packet_size_0);
+  }
 }
 
 /*
