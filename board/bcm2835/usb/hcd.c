@@ -720,6 +720,7 @@ int usb_hcd_start()
 static int usb_hcd_attach_root_hub()
 {
   int err;
+  struct usb_hcd_device_class_hub *h = NULL;
 
   if (root_hub) {
     err = ERR_BUSY;
@@ -732,6 +733,16 @@ static int usb_hcd_attach_root_hub()
     err = PTR_ERR(root_hub);
     goto out_err;
   }
+
+  h = usb_hcd_hub_create();
+  if (!h) {
+    err = ERR_NO_RESOURCE;
+    HCDERR("failed to allocate hub device object");
+    goto out_err;
+  }
+
+  h->d = root_hub;
+  root_hub->class = &h->base;
 
   /*
    * by default our root hub is in not in ADDRESSED state,
