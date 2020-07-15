@@ -482,7 +482,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
 
   dev->address = dev->pipe0.address = device_address;
 
-  wait_msec(10);
+  wait_on_timer_ms(10);
   dev->state = USB_DEVICE_STATE_ADDRESSED;
 out_err:
   return err;
@@ -708,7 +708,7 @@ int usb_hcd_start()
   }
 
   dwc2_port_reset();
-  wait_msec(60);
+  wait_on_timer_ms(60);
   dwc2_port_reset_clear();
   HCDLOG("host reset done");
   // if (usb_hcd_log_level > 0)
@@ -826,7 +826,6 @@ int usb_hcd_init()
   CHECK_ERR("failed to power on");
   wait_msec(20);
   restore_irq_flags(irqflags);
-  // wait_on_timer_ms(20);
   powered_on = usb_hcd_is_powered_on();
 
   BUG(powered_on < 0, "Failed to get USB power on state");
