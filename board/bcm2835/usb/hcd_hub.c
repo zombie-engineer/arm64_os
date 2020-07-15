@@ -38,6 +38,16 @@ void usb_hcd_hub_destroy(struct usb_hcd_device_class_hub *h)
   usb_hcd_device_class_hub_release(h);
 }
 
+struct usb_hcd_device *usb_hub_get_device_at_port(usb_hub_t *h, int port)
+{
+  struct usb_hcd_device *d;
+  list_for_each_entry(d, &h->children, hub_children) {
+    if (d->location.hub_port == port)
+      return d;
+  }
+  return NULL;
+}
+
 int usb_hub_enumerate_port_reset(usb_hub_t *h, int port)
 {
   /*

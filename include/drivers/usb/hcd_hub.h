@@ -48,6 +48,8 @@ int usb_hub_enumerate(struct usb_hcd_device *dev);
  */
 int usb_hub_enumerate_port_reset(usb_hub_t *h, int port);
 
+struct usb_hcd_device *usb_hub_get_device_at_port(usb_hub_t *h, int port);
+
 static inline usb_hub_t *usb_hcd_device_to_hub(struct usb_hcd_device *d)
 {
   return container_of(d->class, usb_hub_t, base);
