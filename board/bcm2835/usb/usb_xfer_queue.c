@@ -167,6 +167,12 @@ static void usb_xfer_process_running(void)
     // printf("usb_xfer_process_running: j:%p, %d\n", j, j->completed);
     if (j->completed) {
       jc = j->jc;
+      struct dwc2_channel *c = jc->channel;
+      if (c->ctl->status == DWC2_STATUS_NYET) {
+        usb_xfer_job_set_running(j);
+        continue;
+      }
+
       list_move_tail(&j->jobs, &jc->completed_jobs);
       if (j->err != ERR_OK) {
         jc->err = j->err;

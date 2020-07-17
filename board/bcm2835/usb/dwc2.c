@@ -509,17 +509,23 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
     c->ctl->completion(c->ctl->completion_arg);
 }
 
+static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
+{
+  DWCDEBUG("channel irq nyet: %d", c->id);
+  c->ctl->status = DWC2_STATUS_NYET;
+  if (c->ctl->completion)
+    c->ctl->completion(c->ctl->completion_arg);
+}
+
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
 {
   bool xfer_complete;
-  uint32_t intr, intrmsk, raw_intr;
+  uint32_t intr, intrmsk;
   struct dwc2_channel *c;
   c = dwc2_channel_get_by_id(ch_id);
   GET_INTR();
   GET_INTRMSK();
-  raw_intr = intr;
-  // intr &= intrmsk;
-  DWCINFO("channel %d irq(hcint): %08x & %08x = %08x", ch_id, raw_intr, intrmsk, intr);
+  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch_id, intrmsk, intr, intr & intrmsk);
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -531,6 +537,11 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
     dwc2_irq_handle_channel_ahb_err(c);
     USB_HOST_INTR_CLR_AHB_ERR(intr);
+  }
+
+  if (USB_HOST_INTR_GET_NYET(intr)) {
+    dwc2_irq_handle_channel_nyet(c);
+    USB_HOST_INTR_CLR_NYET(intr);
   }
   if (intr & ~(uint32_t)0x23) {
     DWCERR("there's more %08x\n", intr);
@@ -551,7 +562,7 @@ static inline void dwc2_irq_handle_channel_int(void)
   uint32_t haintmsk = read_reg(USB_HAINTMSK);
   uint32_t masked = haint & haintmsk;
   write_reg(USB_HAINT, masked);
-  DWCINFO("channels irq (haint): %08x & %08x = %08x", haint, haintmsk, masked);
+  DWCDEBUG("channels irq (haint): %08x & %08x = %08x", haint, haintmsk, masked);
   for (i = 0; i < num_channels; ++i) {
     if ((1<<i) & masked)
       dwc2_irq_handle_channel_int_one(i);
@@ -563,7 +574,7 @@ void dwc2_irq_cb(void)
   uint32_t intsts = read_reg(USB_GINTSTS);
   uint32_t intmsk = read_reg(USB_GINTMSK);
   uint32_t masked = intsts & intmsk;
-  DWCINFO("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
+  DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
   write_reg(USB_GINTSTS, masked);
   if (dwc2_log_level > 0)
     dwc2_dump_int_registers();
