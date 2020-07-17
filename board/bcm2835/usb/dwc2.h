@@ -37,6 +37,7 @@ void dwc2_set_ulpi_no_phy(void);
 uint32_t dwc2_get_vendor_id(void);
 uint32_t dwc2_get_user_id(void);
 void dwc2_print_core_regs(void);
+void dwc2_print_intr_regs(void);
 
 /*
  * dwc2 high speed interface

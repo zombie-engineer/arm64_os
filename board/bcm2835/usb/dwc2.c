@@ -676,3 +676,12 @@ void dwc2_init(void)
   dwc2_channel_init();
   dwc2_xfer_control_init();
 }
+
+void dwc2_print_intr_regs(void)
+{
+  uint32_t intsts = read_reg(USB_GINTSTS);
+  uint32_t gotint = read_reg(USB_GOTGINT);
+  uint32_t hprt = read_reg(USB_HPRT);
+  printf("intsts:%08x, gotint:%08x, hprt:%08x\n", intsts, gotint, hprt);
+}
+
