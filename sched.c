@@ -256,7 +256,7 @@ task_t *scheduler_pick_next_task(struct scheduler *s, task_t *t)
    * Put currently executing task to end of list
    */
   if (t->task_state == TASK_STATE_TIMEWAITING) {
-    putc('^');
+    // putc('^');
     // puts("scheduling out of a timewait task\n");
   } else if (t->task_state == TASK_STATE_FLAGWAITING) {
     /*
