@@ -14,6 +14,8 @@ OPTIMIZATION_FLAGS = -g
 LINKSCRIPT = link.ld
 
 WARNINGS_AS_ERR := \
+	-Werror=return-type\
+	-Werror=unused-label\
 	-Werror=uninitialized\
   -Werror=incompatible-pointer-types\
   -Werror=unused-variable\
