@@ -58,12 +58,12 @@ static inline usb_hub_t *usb_hcd_device_to_hub(struct usb_hcd_device *d)
 int usb_hcd_hub_device_to_string(usb_hub_t *h, const char *prefix, char *buf, int bufsz);
 
 #define DECL_RQ(__type, __rq, __value, __index, __len)\
-  uint64_t rq = USB_DEV_RQ_MAKE(__type, __rq, __value, __index, __len)
+  uint64_t rq ALIGNED(64) = USB_DEV_RQ_MAKE(__type, __rq, __value, __index, __len)
 
 #define HUBFN(__dir, __rq_type, __rq, __rq_value, __rq_index, __rq_size, __addr)\
   int err;\
   int num_bytes;\
-  uint64_t rq = USB_DEV_RQ_MAKE(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
+  uint64_t rq ALIGNED(64) = USB_DEV_RQ_MAKE(HUB_ ## __rq_type, __rq, __rq_value, __rq_index, __rq_size);\
 	err = HCD_TRANSFER_CONTROL(&h->d->pipe0, USB_DIRECTION_ ## __dir, __addr, __rq_size, rq, &num_bytes);\
   if (err != ERR_OK) {\
     HUBERR("request '"#__rq_type "-" #__rq "' v:%d,i:%d,l:%d failed", __rq_value, __rq_index, __rq_size);\
@@ -121,3 +121,5 @@ static inline int usb_hub_port_power_on(usb_hub_t *h, int port)
 {
   return usb_hub_port_set_feature(h, port, USB_HUB_FEATURE_PORT_POWER);
 }
+
+int usb_hub_probe_ports(usb_hub_t *h);
