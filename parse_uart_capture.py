@@ -10,7 +10,7 @@ stack_hdr_sz = 24
 regs_hdr_sz = 20
 
 
-kernel_map_filename = 'all_symbols.map'
+kernel_map_filename = 'kernel8.sym'
 
 class SymbolMap:
     def __init__(self, map_filename):
