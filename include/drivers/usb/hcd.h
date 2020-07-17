@@ -261,3 +261,5 @@ int usb_hcd_init();
 int usb_hcd_start();
 
 int usb_hcd_set_log_level(int);
+
+void usb_hcd_print_intr_regs(void);

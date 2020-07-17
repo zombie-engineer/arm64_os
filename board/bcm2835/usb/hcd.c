@@ -1028,3 +1028,8 @@ int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
   }
   return err;
 }
+
+void usb_hcd_print_intr_regs(void)
+{
+  dwc2_print_intr_regs();
+}
