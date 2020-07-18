@@ -513,6 +513,7 @@ static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
 {
   DWCDEBUG("channel irq nyet: %d", c->id);
   c->ctl->status = DWC2_STATUS_NYET;
+  c->next_pid = dwc2_channel_get_next_pid(c);
   if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);
 }
