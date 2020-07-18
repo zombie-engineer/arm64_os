@@ -39,21 +39,22 @@ void usb_hcd_hid_init()
   STATIC_SLOT_INIT_FREE(usb_hcd_hid_interface);
 }
 
-int usb_hid_get_desc(struct usb_hcd_device *dev, int hid_index, void *buf, int bufsz)
+int usb_hid_get_desc(struct usb_hcd_device *dev, int hid_index, void *descriptor_addr, int descriptor_length)
 {
   int err;
   int num_bytes;
   uint64_t rq;
-  HCDLOG("usb_hid_get_desc: %d %d", hid_index, bufsz);
+  HCDDEBUG("usb_hid_get_desc: hid_index:%d, descriptor_length:%d", hid_index, descriptor_length);
 
-  rq = USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR, USB_DESCRIPTOR_TYPE_HID_REPORT << 8, hid_index, bufsz);
-  memset(buf, 0xff, sizeof(buf));
-
-  err = HCD_TRANSFER_CONTROL(&dev->pipe0, USB_DIRECTION_IN, buf, bufsz, rq, &num_bytes);
-  if (err) {
-    HCDERR("failed to read descriptor header");
-    goto out_err;
-  }
+  rq = USB_DEV_RQ_MAKE(GET_INTERFACE, GET_DESCRIPTOR, USB_DESCRIPTOR_TYPE_HID_REPORT << 8, hid_index, descriptor_length);
+  memset(descriptor_addr, 0xff, descriptor_length);
+  err = HCD_TRANSFER_CONTROL(&dev->pipe0,
+    USB_DIRECTION_IN,
+    descriptor_addr,
+    descriptor_length,
+    rq,
+    &num_bytes);
+  CHECK_ERR("failed to read descriptor header");
 out_err:
   return err;
 }
@@ -100,7 +101,7 @@ int usb_hid_enumerate(struct usb_hcd_device *dev)
   int err = 0;
   int hid_index = 0;
   int desc_length;
-  char buf[256] ALIGNED(4);
+  char buf[256] ALIGNED(64);
   struct usb_hcd_device_class_hid *h;
   struct usb_hcd_hid_interface *i;
   h = usb_hcd_device_to_hid(dev);
