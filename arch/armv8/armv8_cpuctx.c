@@ -36,6 +36,12 @@ uint64_t cpuctx_get_sp(const void *ctx)
   return c->u.n.sp;
 }
 
+uint64_t cpuctx_get_fp(const void *ctx)
+{
+  const armv8_cpuctx_t *c = (const armv8_cpuctx_t*)ctx;
+  return c->u.n.x29;
+}
+
 int cpuctx_init(cpuctx_init_opts_t *o)
 {
   memset(o->cpuctx, 0, o->cpuctx_sz);
