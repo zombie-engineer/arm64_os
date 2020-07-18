@@ -283,7 +283,7 @@ void dwc2_transfer_prepare(struct dwc2_channel *c)
 int dwc2_transfer_retry(struct dwc2_channel *c)
 {
   dwc2_channel_start_transmit(c);
-  putc(',');
+  // putc(',');
   return ERR_OK;
 }
 
