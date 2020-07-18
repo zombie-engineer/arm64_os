@@ -36,6 +36,7 @@ int usb_init_func()
   // disable_irq_save_flags(flags);
   usbd_init();
   usbd_print_device_tree();
+  usbd_monitor();
   // restore_irq_flags(flags);
 
   while(1) {

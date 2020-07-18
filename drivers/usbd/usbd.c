@@ -81,22 +81,42 @@ void usbd_print_device_tree(void)
 
 void usbd_monitor(void)
 {
-  struct usb_hcd_device *d;
-  struct usb_topo_addr ta = {
+  struct usb_hcd_device *d1, *d2;
+  usb_hub_t *h1, *h2;
+
+  struct usb_topo_addr ta1 = {
     .ports = { 0, 0 },
     .depth = 2
   };
-  d = usbd_find_device_by_topo_addr(&ta);
-  if (!d) {
-    printf("failed to find d\n");
+
+  struct usb_topo_addr ta2 = {
+    .ports = { 0, 0, 0 },
+    .depth = 3
+  };
+
+  d1 = usbd_find_device_by_topo_addr(&ta1);
+  if (!d1) {
+    printf("failed to find d1\n");
     while(1);
   }
-  usbd_print_device_summary("-", "--", &ta, d);
+
+  d2 = usbd_find_device_by_topo_addr(&ta2);
+  if (!d2) {
+    printf("failed to find d2\n");
+    while(1);
+  }
+
+  usbd_print_device_summary("-", "--", &ta1, d1);
+  usbd_print_device_summary("-", "--", &ta2, d2);
+  BUG(!d1->class || d1->class->device_class != USB_HCD_DEVICE_CLASS_HUB, "found device not a hub");
+  BUG(!d2->class || d2->class->device_class != USB_HCD_DEVICE_CLASS_HUB, "found device not a hub");
+  h1 = usb_hcd_device_to_hub(d1);
+  h2 = usb_hcd_device_to_hub(d2);
 
   while(1) {
     wait_on_timer_ms(1000);
-    // putc('-');
-    usb_hcd_print_intr_regs();
+    usb_hub_probe_ports(h1);
+    usb_hub_probe_ports(h2);
   }
 }
 
@@ -125,7 +145,7 @@ struct usb_hcd_device *usbd_find_device_by_topo_addr(const struct usb_topo_addr 
   struct usb_hcd_device *d = root_hub;
   printf("root_hub: %p, class: %p\n", d, d->class);
 
-  for (i = 0; i < addr->depth; ++i) {
+  for (i = 0; i + 1 < addr->depth; ++i) {
     puts("-");
     if (!d->class || d->class->device_class != USB_HCD_DEVICE_CLASS_HUB) {
       puts("!");
