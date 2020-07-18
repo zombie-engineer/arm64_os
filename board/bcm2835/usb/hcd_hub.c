@@ -90,7 +90,7 @@ out_err:
   return err;
 }
 
-static int usb_hub_enumerate_conn_changed(usb_hub_t *h, int port)
+static int usb_hub_port_connected(usb_hub_t *h, int port)
 {
   int err = ERR_OK;
 	struct usb_hub_port_status port_status ALIGNED(4);
@@ -160,6 +160,27 @@ out_err:
   return err;
 }
 
+static int usb_hub_port_disconnected(usb_hub_t *h, int port)
+{
+  int err = ERR_OK;
+	struct usb_hub_port_status port_status ALIGNED(4);
+  struct usb_hcd_device *port_dev = NULL;
+
+  err = usb_hub_port_get_status(h, port, &port_status);
+  BUG(err != ERR_OK, "get_port_status failed at disonnection");
+  HUBPORTLOG("disconnecting status: %04x:%04x", port_status.status, port_status.change);
+
+  err = usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_CONNECTION_CHANGE);
+  BUG(err != ERR_OK, "clear_port_status failed at disonnection");
+  HUBPORTLOG("CONNECTION_CHANGE cleared");
+
+  port_dev = usb_hub_get_device_at_port(h, port);
+  BUG(!port_dev, "disconnected device not present in hub children list");
+  usb_hcd_deallocate_device(port_dev);
+  HUBPORTLOG("device disconnected");
+  return err;
+}
+
 #define USB_HUB_CHK_AND_CLR(__fld, __feature)\
 	if (port_status.change.__fld) {\
 		HUBPORTDBG("'"#__fld"' detected. clearing...");\
@@ -175,11 +196,19 @@ int usb_hub_port_check_connection(usb_hub_t *h, int port)
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
 
-  HUBPORTDBG("status:%04x:%04x", port_status.status.raw, port_status.change.raw);
+  HUBPORTLOG("status:%04x:%04x", port_status.status.raw, port_status.change.raw);
 	if (port_status.change.connected_changed) {
-    HUBPORTDBG("CONNECTED status changed");
-  	err = usb_hub_enumerate_conn_changed(h, port);
-    CHECK_ERR_SILENT();
+    HUBPORTLOG("CONNECTED status changed to %s",
+      port_status.status.connected ? "CONNECTED" :"DISCONNECTED");
+
+    if (port_status.status.connected) {
+  	  err = usb_hub_port_connected(h, port);
+      CHECK_ERR("failed to handle connection at port %d", port);
+    } else {
+      err = usb_hub_port_disconnected(h, port);
+      CHECK_ERR("failed to handle device disconnection at port %d", port);
+    }
+
     //HCDERR("LOGIC ERROR: port status not CONNECTED CHANGED");
     // return 0;
   }
@@ -193,11 +222,47 @@ out_err:
   return err;
 }
 
+int usb_hub_power_on_ports(usb_hub_t *h)
+{
+  int port, err;
+
+  err = ERR_OK;
+	HUBDBG("powering on all %d ports", h->descriptor.port_count);
+  for (port = 0; port < h->descriptor.port_count; ++port) {
+	  HUBPORTDBG("powering on port");
+    err = usb_hub_port_power_on(h, port);
+    if (err != ERR_OK) {
+      HUBPORTERR("failed to power on, skipping");
+      continue;
+    }
+    // HUBLOG("power_good_delay: %d msec", h->descriptor.power_good_delay);
+    wait_msec(h->descriptor.power_good_delay * 2);
+  }
+
+  return err;
+}
+
+int usb_hub_probe_ports(usb_hub_t *h)
+{
+  int port, err;
+
+  for (port = 0; port < h->descriptor.port_count; ++port) {
+    HUBPORTDBG("check connection");
+    err = usb_hub_port_check_connection(h, port);
+    if (err != ERR_OK) {
+      HUBPORTERR("failed check connection, skipping");
+      err = ERR_OK;
+      continue;
+    }
+  }
+  return err;
+}
+
 int usb_hub_enumerate(struct usb_hcd_device *dev)
 {
-  int port, err, num_bytes;
-  struct usb_hub_status status ALIGNED(4);
+  int err, num_bytes;
   struct usb_hcd_device_class_hub *h = NULL;
+  struct usb_hub_status status ALIGNED(4);
   HCDDEBUG("=============================================================");
   HCDDEBUG("===================== ENUMERATE HUB =========================");
   HCDDEBUG("=============================================================");
@@ -211,35 +276,15 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
 
   h->d = dev;
   dev->class = &h->base;
-
-  GET_DESC(&dev->pipe0, HUB, 0, 0, &h->descriptor, sizeof(h->descriptor));
+  GET_DESC(&h->d->pipe0, HUB, 0, 0, &h->descriptor, sizeof(h->descriptor));
   wait_msec(1000);
 
   err = usb_hub_get_status(h, &status);
   CHECK_ERR("failed to read hub port status. Enumeration will not continue");
-
-	HUBDBG("powering on all %d ports", h->descriptor.port_count);
-  for (port = 0; port < h->descriptor.port_count; ++port) {
-	  HUBPORTDBG("powering on port");
-    err = usb_hub_port_power_on(h, port);
-    if (err != ERR_OK) {
-      HUBPORTERR("failed to power on, skipping");
-      continue;
-    }
-    // HUBLOG("power_good_delay: %d msec", h->descriptor.power_good_delay);
-    wait_msec(h->descriptor.power_good_delay * 2);
-  }
-  wait_msec(1000);
-
-  for (port = 0; port < h->descriptor.port_count; ++port) {
-    HUBPORTDBG("check connection");
-    err = usb_hub_port_check_connection(h, port);
-    if (err != ERR_OK) {
-      HUBPORTERR("failed check connection, skipping");
-      err = ERR_OK;
-      continue;
-    }
-  }
+  err = usb_hub_power_on_ports(h);
+  CHECK_ERR("failed to power on hub ports");
+  err = usb_hub_probe_ports(h);
+  CHECK_ERR("failed to probe hub");
 
 out_err:
   if (err != ERR_OK && h) {

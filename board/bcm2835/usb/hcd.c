@@ -115,6 +115,7 @@ struct usb_hcd_device *usb_hcd_allocate_device()
 
 void usb_hcd_deallocate_device(struct usb_hcd_device *d)
 {
+  list_del_init(&d->hub_children);
   if (d->class) {
     switch(d->class->device_class) {
       case USB_HCD_DEVICE_CLASS_HUB:
