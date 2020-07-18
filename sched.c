@@ -181,18 +181,24 @@ task_t *task_create(task_fn fn, const char *task_name)
 
   t = alloc_task();
 
-  if (!t)
-    goto out;
+  if (!t) {
+    SCHED_ERR("failed to allocate task");
+    goto out_err;
+  }
 
-  if (strlen(task_name) > sizeof(t->name))
-    goto out;
+  if (strlen(task_name) > sizeof(t->name)) {
+    SCHED_ERR("task name too long");
+    goto out_err;
+  }
 
   strcpy(t->name, task_name);
 
   stack = alloc_stack();
   SCHED_DEBUG("task_create: name: %s, stack: %p", task_name, stack);
-  if (!stack)
-    goto out;
+  if (!stack) {
+    SCHED_ERR("failed to allocate stack for new task");
+    goto out_err;
+  }
 
   INIT_LIST_HEAD(&t->schedlist);
 
@@ -202,7 +208,7 @@ task_t *task_create(task_fn fn, const char *task_name)
   t->stack_base = (uint64_t)stack;
   t->task_state = TASK_STATE_STOPPED;
   return t;
-out:
+out_err:
   if (stack)
     dealloc_stack(stack);
   if (t)

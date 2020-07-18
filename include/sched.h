@@ -18,6 +18,7 @@ extern int sched_log_level;
 #define SCHED_DEBUG(__fmt, ...) __SCHED_DEBUG_N(0, __fmt, ## __VA_ARGS__)
 #define SCHED_DEBUG2(__fmt, ...) __SCHED_DEBUG_N(1, __fmt, ## __VA_ARGS__)
 #define SCHED_DEBUG3(__fmt, ...) __SCHED_DEBUG_N(2, __fmt, ## __VA_ARGS__)
+#define SCHED_ERR(__fmt, ...) printf("[SCHED ERR] " __fmt __endline, ## __VA_ARGS__)
 
 typedef int (*task_fn)(void);
 
