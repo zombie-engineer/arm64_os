@@ -537,6 +537,14 @@ static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
     c->ctl->first_packet);
 
   dwc2_transfer_retry(c);
+  return;
+  /*
+   * TODO: Right not if NYET keeps coming, we will still retry.
+   * need, more elaborate logic here.
+   */
+  c->ctl->status = DWC2_STATUS_NYET;
+  if (c->ctl->completion)
+     c->ctl->completion(c->ctl->completion_arg);
 }
 
 static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *c)
