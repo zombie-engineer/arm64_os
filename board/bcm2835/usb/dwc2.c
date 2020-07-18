@@ -539,6 +539,17 @@ static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
   dwc2_transfer_retry(c);
 }
 
+static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *c)
+{
+  int next_pid = dwc2_channel_get_next_pid(c);
+  DWCERR("DATA TOGGLE_ERR, next_pid: %d, expected: %d\n", c->next_pid, next_pid);
+  /*
+   * TODO: This is a fast patch to the problem, but it needs more attention later
+   */
+  c->next_pid = next_pid;
+  dwc2_transfer_start(c);
+}
+
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
 {
   bool xfer_complete;
@@ -563,6 +574,10 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   if (USB_HOST_INTR_GET_NYET(intr)) {
     dwc2_irq_handle_channel_nyet(c);
     USB_HOST_INTR_CLR_NYET(intr);
+  }
+  if (USB_HOST_INTR_GET_DATTGGLERR(intr)) {
+    dwc2_irq_handle_channel_data_toggle_err(c);
+    USB_HOST_INTR_CLR_DATTGGLERR(intr);
   }
   if (USB_HOST_INTR_GET_NAK(intr)) {
     dwc2_irq_handle_channel_nak(c);
