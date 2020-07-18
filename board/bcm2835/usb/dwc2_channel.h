@@ -37,6 +37,11 @@ struct dwc2_channel {
   usb_pid_t next_pid;
 };
 
+static inline int dwc2_channel_get_max_packet_size(struct dwc2_channel *c)
+{
+  return c->pipe.u.max_packet_size;
+}
+
 static inline bool dwc2_channel_is_speed_low(struct dwc2_channel *c)
 {
   return c->pipe.u.speed == USB_SPEED_LOW;
