@@ -204,12 +204,13 @@ static inline void dwc2_channel_set_dma_addr(struct dwc2_channel *c)
   int ch_id = c->id;
   BUG(c->ctl->dma_addr & 3, "UNALIGNED DMA address");
 
-  if (c->ctl->dma_addr && c->ctl->transfer_size && c->ctl->direction == USB_DIRECTION_OUT)
-    dcache_flush(c->ctl->dma_addr, c->ctl->transfer_size);
-
+  // if (c->ctl->dma_addr && c->ctl->transfer_size && c->ctl->direction == USB_DIRECTION_OUT)
   dcache_flush(c->ctl->dma_addr, c->ctl->transfer_size);
-  dma = RAM_PHY_TO_BUS_UNCACHED(c->ctl->dma_addr);
-  SET_DMA();
+
+  if (c->ctl->dma_addr) {
+    dma = RAM_PHY_TO_BUS_UNCACHED(c->ctl->dma_addr);
+    SET_DMA();
+  }
 }
 
 void dwc2_channel_set_split_complete(struct dwc2_channel *c)
