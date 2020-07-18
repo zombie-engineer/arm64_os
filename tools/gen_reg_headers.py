@@ -27,6 +27,33 @@ def iter_bf(spec, reg, f):
     for name, offset, width in spec[reg]:
         f(reg, name, offset, width)
 
+def gen_function_string(name, return_type, arguments, body):
+    function_decl = '{storage_type} {return_type} {name}({arguments})'.format(
+        storage_type = 'static inline',
+        return_type = return_type,
+        name = name,
+        arguments = ', '.join(arguments))
+    body = map(lambda x: '  ' + x, body)
+    return '\n'.join(['', function_decl, '{', '\n'.join(body), '}'])
+
+def print_bitmask_printer(spec, reg):
+    value_argname = 'v'
+    body = []
+    arguments = ['char *buf', 'int bufsz', 'uint32_t {}'.format(value_argname)]
+    function_name = '{}_bitmask_to_string'.format(reg.lower())
+
+    body.append('int n = 0;')
+    body.append('int first = 1;')
+    for name, offset, width in spec[reg]:
+        body += [
+            'if ({}) '.format(reg_name_getter(reg, name, value_argname)) + '{',
+            '  n += snprintf(buf + n, bufsz - n, "%s{}", first ? "" : ",");'.format(name),
+            '  first = 0;',
+            '}'
+        ]
+    body += ['return n;']
+    print(gen_function_string(function_name, 'int', arguments, body))
+
 def print_printer(spec, reg):
     arg = 'v'
     fmt = ['%08x']
@@ -48,6 +75,12 @@ def print_printer(spec, reg):
 def print_header():
     print('#pragma once\n')
 
+def is_true_bitmask(spec, reg):
+    for name, offset, width in spec[reg]:
+        if width > 1:
+            return False
+    return True
+
 def main(specfile):
     s = parse_specfile(specfile)
     print_header()
@@ -55,6 +88,8 @@ def main(specfile):
         iter_bf(s, reg, print_getter)
         iter_bf(s, reg, print_setter)
         iter_bf(s, reg, print_cleaner)
+        if is_true_bitmask(s, reg):
+            print_bitmask_printer(s, reg)
         print_printer(s, reg)
 
 if __name__ == '__main__':

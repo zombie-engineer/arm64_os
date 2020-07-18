@@ -1,5 +1,6 @@
-board/bcm2835/usb/dwc2_regs_bits.h: board/bcm2835/usb/dwc2_regs_spec.yaml
-	python3 tools/gen_reg_headers.py $^ > $@
+.PHONY: board/bcm2835/usb/dwc2_regs_bits.h
+board/bcm2835/usb/dwc2_regs_bits.h: board/bcm2835/usb/dwc2_regs_spec.yaml $(REGTOOL)
+	python3 $(REGTOOL) $^ > $@
 
 OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/dwc2 \

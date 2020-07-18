@@ -5,6 +5,7 @@ CPP     = $(CROSS_COMPILE)cpp
 LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
+REGTOOL = tools/gen_reg_headers.py
 
 INCLUDES := include firmware/atmega8a/include
 

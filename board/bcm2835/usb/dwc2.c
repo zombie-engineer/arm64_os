@@ -545,7 +545,9 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
     USB_HOST_INTR_CLR_NYET(intr);
   }
   if (intr & ~(uint32_t)0x23) {
-    DWCERR("there's more %08x\n", intr);
+    char regbuf[512];
+    usb_host_intr_bitmask_to_string(regbuf, sizeof(regbuf), intr);
+    DWCERR("there's more %08x, %s\n", intr, regbuf);
     while(1) {
       wait_msec(500);
       GET_INTR();

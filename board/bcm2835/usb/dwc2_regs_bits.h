@@ -179,6 +179,69 @@ static inline int usb_host_size_to_string(char *buf, int bufsz, uint32_t v)
 #define USB_HOST_INTR_CLR_EXCESSXMIT(v)          BF_CLEAR(v, 12, 1 )
 #define USB_HOST_INTR_CLR_FRMLISTROLL(v)         BF_CLEAR(v, 13, 1 )
 
+static inline int usb_host_intr_bitmask_to_string(char *buf, int bufsz, uint32_t v)
+{
+  int n = 0;
+  int first = 1;
+  if (USB_HOST_INTR_GET_XFER_COMPLETE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sXFER_COMPLETE", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_HALT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sHALT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_AHB_ERR(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sAHB_ERR", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_STALL(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSTALL", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_NAK(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sNAK", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_ACK(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sACK", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_NYET(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sNYET", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_TRNSERR(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sTRNSERR", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_BABBLERR(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sBABBLERR", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_FRMOVRN(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sFRMOVRN", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_DATTGGLERR(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sDATTGGLERR", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_BUFNOTAVAIL(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sBUFNOTAVAIL", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_EXCESSXMIT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sEXCESSXMIT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_HOST_INTR_GET_FRMLISTROLL(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sFRMLISTROLL", first ? "" : ",");
+    first = 0;
+  }
+  return n;
+}
+
 
 static inline int usb_host_intr_to_string(char *buf, int bufsz, uint32_t v)
 {
@@ -550,6 +613,45 @@ static inline int usb_hprt_to_string(char *buf, int bufsz, uint32_t v)
 #define USB_PCGCR_CLR_PHY_SLEEPING(v)            BF_CLEAR(v, 6 , 1 )
 #define USB_PCGCR_CLR_DEEP_SLEEP(v)              BF_CLEAR(v, 7 , 1 )
 
+static inline int usb_pcgcr_bitmask_to_string(char *buf, int bufsz, uint32_t v)
+{
+  int n = 0;
+  int first = 1;
+  if (USB_PCGCR_GET_STOP_PCLK(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSTOP_PCLK", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_GATE_HCLK(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sGATE_HCLK", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_PWR_CLMP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sPWR_CLMP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_RST_PDWN_MODULE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sRST_PDWN_MODULE", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_PHY_SUSPENDED(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sPHY_SUSPENDED", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_EN_SLP_CLK_GATE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sEN_SLP_CLK_GATE", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_PHY_SLEEPING(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sPHY_SLEEPING", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_PCGCR_GET_DEEP_SLEEP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sDEEP_SLEEP", first ? "" : ",");
+    first = 0;
+  }
+  return n;
+}
+
 
 static inline int usb_pcgcr_to_string(char *buf, int bufsz, uint32_t v)
 {
@@ -661,6 +763,141 @@ static inline int usb_pcgcr_to_string(char *buf, int bufsz, uint32_t v)
 #define USB_GINTSTS_CLR_SESSREQINT(v)            BF_CLEAR(v, 30, 1 )
 #define USB_GINTSTS_CLR_WKUPINT(v)               BF_CLEAR(v, 31, 1 )
 
+static inline int usb_gintsts_bitmask_to_string(char *buf, int bufsz, uint32_t v)
+{
+  int n = 0;
+  int first = 1;
+  if (USB_GINTSTS_GET_CURMODE_HOST(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sCURMODE_HOST", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_MODEMIS(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sMODEMIS", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_OTGINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sOTGINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_SOF(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSOF", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_RXFLVL(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sRXFLVL", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_NPTXFEMP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sNPTXFEMP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_GINNAKEFF(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sGINNAKEFF", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_GOUTNAKEFF(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sGOUTNAKEFF", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_ULPI_CK_INT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sULPI_CK_INT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_I2CINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sI2CINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_ERLYSUSP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sERLYSUSP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_USBSUSP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sUSBSUSP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_USBRST(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sUSBRST", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_ENUMDONE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sENUMDONE", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_ISOUTDROP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sISOUTDROP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_EOPF(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sEOPF", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_RESTOREDONE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sRESTOREDONE", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_EPMIS(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sEPMIS", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_IEPINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sIEPINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_OEPINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sOEPINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_INCOMPL_SOIN(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sINCOMPL_SOIN", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_INCOMPL_SOOUT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sINCOMPL_SOOUT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_FET_SUSP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sFET_SUSP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_RESETDET(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sRESETDET", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_PRTINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sPRTINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_HCHINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sHCHINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_PTXFEMP(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sPTXFEMP", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_LPMTRANRCVD(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sLPMTRANRCVD", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_CONIDSTSCHNG(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sCONIDSTSCHNG", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_DISCONNINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sDISCONNINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_SESSREQINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSESSREQINT", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GINTSTS_GET_WKUPINT(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sWKUPINT", first ? "" : ",");
+    first = 0;
+  }
+  return n;
+}
+
 
 static inline int usb_gintsts_to_string(char *buf, int bufsz, uint32_t v)
 {
@@ -717,6 +954,37 @@ static inline int usb_gintsts_to_string(char *buf, int bufsz, uint32_t v)
 #define USB_GOTGINT_CLR_HST_NEG_DET(v)           BF_CLEAR(v, 17, 1 )
 #define USB_GOTGINT_CLR_A_DEV_TOUT_CHG(v)        BF_CLEAR(v, 18, 1 )
 #define USB_GOTGINT_CLR_DBNCE_DONE(v)            BF_CLEAR(v, 19, 1 )
+
+static inline int usb_gotgint_bitmask_to_string(char *buf, int bufsz, uint32_t v)
+{
+  int n = 0;
+  int first = 1;
+  if (USB_GOTGINT_GET_SES_END_DET(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSES_END_DET", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GOTGINT_GET_SES_REQ_SUC_STS_CHNG(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sSES_REQ_SUC_STS_CHNG", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GOTGINT_GET_HST_NEG_SUC_STS_CHNG(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sHST_NEG_SUC_STS_CHNG", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GOTGINT_GET_HST_NEG_DET(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sHST_NEG_DET", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GOTGINT_GET_A_DEV_TOUT_CHG(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sA_DEV_TOUT_CHG", first ? "" : ",");
+    first = 0;
+  }
+  if (USB_GOTGINT_GET_DBNCE_DONE(v)) {
+    n += snprintf(buf + n, bufsz - n, "%sDBNCE_DONE", first ? "" : ",");
+    first = 0;
+  }
+  return n;
+}
 
 
 static inline int usb_gotgint_to_string(char *buf, int bufsz, uint32_t v)
