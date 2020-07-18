@@ -32,12 +32,9 @@ static int run_uart_thread()
 
 int usb_init_func()
 {
-  // int flags;
-  // disable_irq_save_flags(flags);
   usbd_init();
   usbd_print_device_tree();
   usbd_monitor();
-  // restore_irq_flags(flags);
 
   while(1) {
     blink_led_2(12, 100);

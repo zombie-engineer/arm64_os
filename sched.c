@@ -309,7 +309,7 @@ void schedule()
   next_task = scheduler_pick_next_task(s, prev_task);
   next_task->task_state = TASK_STATE_RUNNING;
   // putc(')');
-  // SCHED_INFO("schedule:'%s'->'%s'", prev_task->name, next_task->name);
+  SCHED_DEBUG("schedule:'%s'->'%s'", prev_task->name, next_task->name);
   BUG(!next_task, "scheduler logic failed.");
   set_current(next_task);
 }
