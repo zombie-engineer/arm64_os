@@ -15,6 +15,7 @@ struct dwc2_xfer_control {
   int direction;
   int transfer_size;
   int split_start;
+  int first_packet;
   uint64_t dma_addr_base;
   uint64_t dma_addr;
   completion_fn completion;

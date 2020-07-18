@@ -504,6 +504,16 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
       dwc2_transfer_start(c);
       return;
   }
+
+  /*
+   * This is one of the possible locations to put flush_dcache in
+   * case we have recieved some data via usb dma, but it looks like
+   * we don't have enough information about the address, we are
+   * writing to, maybe we do not need to flush at all.
+   *
+   * if (c->ctl->direction == USB_DIRECTION_IN)
+   *   dcache_flush(c->ctl->dma_addr_base, c->ctl->transfer_size);
+   */
   c->next_pid = dwc2_channel_get_next_pid(c);
   if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);

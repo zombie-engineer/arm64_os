@@ -202,9 +202,12 @@ static inline void dwc2_channel_set_dma_addr(struct dwc2_channel *c)
 {
   uint32_t dma;
   int ch_id = c->id;
-  BUG(c->ctl->dma_addr & 3, "UNALIGNED DMA address");
+  BUG(c->ctl->first_packet && (c->ctl->dma_addr & 3), "UNALIGNED DMA address");
 
-  // if (c->ctl->dma_addr && c->ctl->transfer_size && c->ctl->direction == USB_DIRECTION_OUT)
+  /*
+   * TODO: Need to figure out why we need this flush here, because it
+   * actually needs to be done (and is already done) on the upper level
+   */
   dcache_flush(c->ctl->dma_addr, c->ctl->transfer_size);
 
   if (c->ctl->dma_addr) {
@@ -274,6 +277,7 @@ void dwc2_transfer_prepare(struct dwc2_channel *c)
   if (dwc2_channel_split_mode(c))
     c->ctl->split_start = true;
   c->ctl->dma_addr = c->ctl->dma_addr_base;
+  c->ctl->first_packet = 1;
 }
 
 int dwc2_transfer_retry(struct dwc2_channel *c)
@@ -311,8 +315,9 @@ int dwc2_transfer_recalc_next(struct dwc2_xfer_control *ctl)
     bytes_left = USB_HOST_SIZE_GET_SIZE(siz);
     packets_left = USB_HOST_SIZE_GET_PACKET_COUNT(siz);
     if (packets_left) {
-      DWCDEBUG("transmission state(IN): packets left: %d, bytes left: %d", packets_left, bytes_left);
       ctl->dma_addr = ctl->dma_addr_base + ctl->transfer_size - bytes_left;
+      ctl->first_packet = 0;
+      DWCDEBUG("transmission state(IN): packets left: %d, bytes left: %d, base_addr: %p, next_addr: %p", packets_left, bytes_left, ctl->dma_addr_base, ctl->dma_addr);
       return 1;
     }
     DWCDEBUG("transmission state(IN): complete");

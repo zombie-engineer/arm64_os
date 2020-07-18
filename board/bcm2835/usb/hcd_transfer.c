@@ -122,6 +122,22 @@ static void control_chain_signal_completed(void *arg)
 
 static int transfer_id = 0;
 
+/*
+ * hcd_transfer_control - transfer control message to USB device.
+ * This function is a perfect place to decide that we need to flush data cache,
+ * because we assume the underlying usb transfer method is DMA, and we now
+ * have to answer the question what are the cacheing attributes of the
+ * given memory area. If 'addr' is in cacheable memory, then we would need
+ * to clean and invalidate the cache according to the IN or OUT direction of
+ * transmission. If we are sending out, then we flush data cache in order to
+ * be sure that it has landed the RAM and DMA will fetch the right data (IN),
+ * or, in case we are the receiving side, DAM will copy the data to RAM, and
+ * we have to flush after the transaction has been completed, so that the caller
+ * could read the right data, delivered by DMA
+ * TODO: In case if we 100% allocated transfer memory from the scope of
+ * DMA-friendly memory, then we don't need to flush, this should be done
+ * some time.
+ */
 int hcd_transfer_control(
   struct usb_hcd_pipe *pipe,
   int direction,
@@ -137,10 +153,13 @@ int hcd_transfer_control(
 
   if (pipe->address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
+
   transfer_id++;
 
-  HCDDEBUG2("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, id:%d, rq:%016llx\n",
-    pipe, pipe->ls_hub_port, pipe->speed, transfer_id, rq);
+  HCDDEBUG("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, dir:%s, id:%d, rq:%016llx",
+    pipe, pipe->ls_hub_port, pipe->speed,
+    direction == USB_DIRECTION_OUT ? "out" : "in",
+    transfer_id, rq);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
   if (IS_ERR(jc)) {
@@ -152,12 +171,33 @@ int hcd_transfer_control(
   jc->completed_arg = &completed;
   jc->hcd_pipe = pipe;
 
+  /*
+   * Flush data cache at where 8 bytes of request are located.
+   */
+  dcache_flush(&rqbuf, sizeof(rqbuf));
+
+  /*
+   * For HOST-TO-DEVICE transfers flush the data first, so
+   * DMA could read it from RAM.
+   */
+  if (direction == USB_DIRECTION_OUT)
+    dcache_flush(addr, transfer_size);
+
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed)
     asm volatile("wfe");
   err = jc->err;
   *out_num_bytes = transfer_size;
+
+  /*
+   * For DEVICE-TO-HOST transfers flush the cache after DMA
+   * has delivered the data to the requested address, and the
+   * caller will be able to read it instead of reading outdated cache.
+   */
+  if (direction == USB_DIRECTION_IN)
+    dcache_flush(addr, transfer_size);
+
 out_err:
   HCDDEBUG("control transfer completed with, err = %d", err);
   return err;
