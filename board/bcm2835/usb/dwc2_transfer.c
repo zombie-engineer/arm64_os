@@ -276,7 +276,14 @@ void dwc2_transfer_prepare(struct dwc2_channel *c)
   c->ctl->dma_addr = c->ctl->dma_addr_base;
 }
 
-int dwc2_transfer_start(struct dwc2_channel *c)
+int dwc2_transfer_retry(struct dwc2_channel *c)
+{
+  dwc2_channel_start_transmit(c);
+  putc(',');
+  return ERR_OK;
+}
+
+int OPTIMIZED dwc2_transfer_start(struct dwc2_channel *c)
 {
   if (dwc2_channel_split_mode(c)) {
     if (c->ctl->split_start) {

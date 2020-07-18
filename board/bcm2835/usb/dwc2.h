@@ -22,6 +22,7 @@ bool dwc2_channel_is_split_enabled(struct dwc2_channel *c);
 void dwc2_transfer_completed_debug(struct dwc2_channel *c);
 void dwc2_transfer_prepare(struct dwc2_channel *c);
 int dwc2_transfer_start(struct dwc2_channel *c);
+int dwc2_transfer_retry(struct dwc2_channel *c);
 int dwc2_transfer_recalc_next(struct dwc2_xfer_control *ctl);
 
 struct usb_hub_port_status;

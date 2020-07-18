@@ -509,13 +509,34 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
     c->ctl->completion(c->ctl->completion_arg);
 }
 
+static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
+{
+  /*
+   * According to Universal Serial Bus Specification Revision 2.0
+   * 8.5.1 NAK Limiting via Ping Flow Control
+   *
+   * Full/low-speed devices can have bulk/control endpoints that take time to process
+   * their data and, therefore, respond to OUT transactions with a NAK handshake.
+   * This handshake response indicates that the endpoint did not accept the data because
+   * it did not have space for the data. The host controller is expected ot retry the
+   * transaction at some future time when the endpoint has space available. ...
+   */
+  DWCDEBUG("channel irq NAK: channel: %d", c->id);
+  if (dwc2_channel_split_mode(c))
+    dwc2_transfer_start(c);
+  else
+    BUG(1, "Unexpected NAK");
+}
+
 static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
 {
-  DWCDEBUG("channel irq nyet: %d", c->id);
-  c->ctl->status = DWC2_STATUS_NYET;
-  c->next_pid = dwc2_channel_get_next_pid(c);
-  if (c->ctl->completion)
-    c->ctl->completion(c->ctl->completion_arg);
+  int next_pid = dwc2_channel_get_next_pid(c);
+  DWCDEBUG("channel irq nyet: channel: %d, current_pid: %d, next_pid: %d, first_packet: %d", c->id,
+    c->next_pid,
+    next_pid,
+    c->ctl->first_packet);
+
+  dwc2_transfer_retry(c);
 }
 
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
@@ -539,10 +560,13 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
     dwc2_irq_handle_channel_ahb_err(c);
     USB_HOST_INTR_CLR_AHB_ERR(intr);
   }
-
   if (USB_HOST_INTR_GET_NYET(intr)) {
     dwc2_irq_handle_channel_nyet(c);
     USB_HOST_INTR_CLR_NYET(intr);
+  }
+  if (USB_HOST_INTR_GET_NAK(intr)) {
+    dwc2_irq_handle_channel_nak(c);
+    USB_HOST_INTR_CLR_NAK(intr);
   }
   if (intr & ~(uint32_t)0x23) {
     char regbuf[512];
