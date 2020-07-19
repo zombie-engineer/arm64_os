@@ -22,17 +22,19 @@
 #include <bits_api.h>
 #include "pl011_regs_bits.h"
 #include <sched.h>
+#include <pipe.h>
 
 DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
 static char pl011_rx_buf[2048];
 static int pl011_uart_initialized = 0;
+static struct pipe pl011_rx_pipe ALIGNED(64);
+static uint64_t ringbuf_stat_chars_lost;
 
 static void pl011_uart_disable()
 {
   write_reg(PL011_UARTCR, 0);
 }
-
 
 static int pl011_uart_gpio_init()
 {
@@ -52,7 +54,6 @@ static int pl011_uart_gpio_init()
   gpio_set_pullupdown(rx_pin, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
   return ERR_OK;
 }
-
 
 static void pl011_calc_divisor(int baudrate, uint64_t clock_hz, uint32_t *idiv, uint32_t *fdiv)
 {
@@ -119,16 +120,9 @@ void pl011_uart_init(int baudrate, int _not_used)
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
-static struct ringbuf pl011_rx_pipe ALIGNED(64);
-static struct spinlock pl011_rx_pipe_lock;
-static uint64_t has_new_char;
-static uint64_t ringbuf_stat_chars_lost;
-
 static inline void pl011_rx_pipe_init()
 {
-  spinlock_init(&pl011_rx_pipe_lock);
-  ringbuf_init(&pl011_rx_pipe, pl011_rx_buf, sizeof(pl011_rx_buf));
-  has_new_char = 0;
+  pipe_init(&pl011_rx_pipe, pl011_rx_buf, sizeof(pl011_rx_buf));
   ringbuf_stat_chars_lost = 0;
 }
 
@@ -144,13 +138,7 @@ static inline void pl011_rx_pipe_init()
  */
 static inline void pl011_rx_pipe_push(char c)
 {
-  int irqflags;
-  spinlock_lock_disable_irq(&pl011_rx_pipe_lock, irqflags);
-  if (ringbuf_write(&pl011_rx_pipe, &c, 1) != 1)
-    ringbuf_stat_chars_lost++;
-
-  spinlock_unlock_restore_irq(&pl011_rx_pipe_lock, irqflags);
-  wakeup_waitflag(&has_new_char);
+  pipe_push(&pl011_rx_pipe, c);
 }
 
 /*
@@ -159,10 +147,7 @@ static inline void pl011_rx_pipe_push(char c)
  */
 static inline char pl011_rx_pipe_pop(void)
 {
-  char c;
-  wait_on_waitflag(&has_new_char);
-  BUG(ringbuf_read(&pl011_rx_pipe, &c, 1) != 1, "pl011_rx_pipe_pop should wait until char appears in buf");
-  return c;
+  return pipe_pop(&pl011_rx_pipe);
 }
 
 static void OPTIMIZED pl011_uart_print_int_status()
@@ -210,7 +195,7 @@ static void pl011_uart_handle_interrupt()
 
   if (PL011_UARTMIS_GET_RXMIS(mis)) {
       dr = read_reg(PL011_UARTDR);
-      if (dr & 0xff != dr) {
+      if ((dr & 0xff) != dr) {
         if (PL011_UARTDR_GET_FE(dr)) {
           pl011_rx_pipe_push('.');
         }
@@ -272,12 +257,10 @@ void pl011_uart_set_interrupt_mode()
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
   irq_set(0, ARM_IRQ_UART, pl011_uart_handle_interrupt);
 
-  // pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
-
   /* Clear pending interrupts */
   write_reg(PL011_UARTICR, 0x7ff);
-  /* Unmask all interrupts */
 
+  /* Unmask all interrupts */
   interrupt_mask =
     PL011_UARTRXINTR /* |
     PL011_UARTTXINTR  |
@@ -362,8 +345,8 @@ int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg)
 int pl011_io_thread(void)
 {
   char c;
-  // int i;
-  // rx_subscriber_t *subscriber;
+  int i;
+  rx_subscriber_t *subscriber;
   int irqflags;
 
   rx_subscribers_init();
@@ -372,19 +355,17 @@ int pl011_io_thread(void)
   pl011_uart_set_interrupt_mode();
   pl011_puts_blocking("interrupt mode set");
   restore_irq_flags(irqflags);
-  // DATA_BARRIER;
   while(1) {
     c = pl011_rx_pipe_pop();
     pl011_putc_blocking(c);
     // disable_irq_save_flags(irqflags);
-    //while(1);
- //    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
- //      if (rx_subscriber_is_valid(i)) {
- //        subscriber = &rx_subscribers[i];
- //        subscriber->cb(subscriber->cb_arg, c);
- //        // debug_event_1();
- //      }
- //    }
+    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
+      if (rx_subscriber_is_valid(i)) {
+        subscriber = &rx_subscribers[i];
+        subscriber->cb(subscriber->cb_arg, c);
+        // debug_event_1();
+      }
+    }
   }
   return ERR_OK;
 }

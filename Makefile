@@ -47,6 +47,7 @@ OBJS := \
 	irq.o\
 	kernel_panic.o\
 	percpu.o\
+	pipe.o\
 	power.o\
 	pwm.o\
 	rand.o\
