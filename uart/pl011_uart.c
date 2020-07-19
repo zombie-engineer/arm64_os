@@ -418,3 +418,24 @@ int uart_is_initialized()
   DATA_BARRIER;
   return ret;
 }
+
+int uart_putc_blocking(char c)
+{
+  int ret;
+  int irqflags;
+  disable_irq_save_flags(irqflags);
+  ret = pl011_uart_putchar(c);
+  restore_irq_flags(irqflags);
+  return ret;
+}
+
+int uart_puts_blocking(const char *c)
+{
+  int ret;
+  int irqflags;
+  disable_irq_save_flags(irqflags);
+  while(*c)
+    ret = pl011_uart_putchar(*c++);
+  restore_irq_flags(irqflags);
+  return ret;
+}
