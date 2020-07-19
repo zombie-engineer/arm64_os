@@ -6,6 +6,8 @@
 #include <mbox/mbox_props.h>
 #include <types.h>
 #include <intr_ctl.h>
+#include <board/bcm2835/bcm2835_irq.h>
+#include <irq.h>
 #include <vcanvas.h>
 #include <common.h>
 #include <stringlib.h>
@@ -18,45 +20,45 @@
 #include <barriers.h>
 
 
-#define UART0_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
-#define UART0_DR    ((reg32_t)(UART0_BASE + 0x00))
-#define UART0_FR    ((reg32_t)(UART0_BASE + 0x18))
-#define UART0_IBRD  ((reg32_t)(UART0_BASE + 0x24))
-#define UART0_FBRD  ((reg32_t)(UART0_BASE + 0x28))
-#define UART0_LCRH  ((reg32_t)(UART0_BASE + 0x2c))
-#define UART0_CR    ((reg32_t)(UART0_BASE + 0x30))
+#define PL011_UART_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
+#define PL011_UARTDR    ((reg32_t)(PL011_UART_BASE + 0x00))
+#define PL011_UARTFR    ((reg32_t)(PL011_UART_BASE + 0x18))
+#define PL011_UARTIBRD  ((reg32_t)(PL011_UART_BASE + 0x24))
+#define PL011_UARTFBRD  ((reg32_t)(PL011_UART_BASE + 0x28))
+#define PL011_UARTLCR_H  ((reg32_t)(PL011_UART_BASE + 0x2c))
+#define PL011_UARTCR    ((reg32_t)(PL011_UART_BASE + 0x30))
 // Interrupt mask set clear
-#define UART0_IMSC  ((reg32_t)(UART0_BASE + 0x38))
+#define PL011_UARTIMSC  ((reg32_t)(PL011_UART_BASE + 0x38))
 // Raw interrupt status
-#define UART0_RIS   ((reg32_t)(UART0_BASE + 0x3c))
+#define PL011_UARTRIS   ((reg32_t)(PL011_UART_BASE + 0x3c))
 // Masked interrupt status
-#define UART0_MIS   ((reg32_t)(UART0_BASE + 0x40))
-#define UART0_ICR   ((reg32_t)(UART0_BASE + 0x44))
+#define PL011_UARTMIS   ((reg32_t)(PL011_UART_BASE + 0x40))
+#define PL011_UARTICR   ((reg32_t)(PL011_UART_BASE + 0x44))
 
 
 /* UART0 enable */
-#define UART0_CR_UARTEN (1)
+#define PL011_UARTCR_UARTEN (1)
 
 /* UART0 Transmit enable */
-#define UART0_CR_TXE (1 << 8)
+#define PL011_UARTCR_TXE (1 << 8)
 
 /* UART0 Recieve enable */
-#define UART0_CR_RXE (1 << 9)
+#define PL011_UARTCR_RXE (1 << 9)
 
 /* UART0 Work length */
-#define UART0_LCRH_WLEN_5BITS (0b00 << 5)
-#define UART0_LCRH_WLEN_6BITS (0b01 << 5)
-#define UART0_LCRH_WLEN_7BITS (0b10 << 5)
-#define UART0_LCRH_WLEN_8BITS (0b11 << 5)
+#define PL011_UARTLCR_H_WLEN_5BITS (0b00 << 5)
+#define PL011_UARTLCR_H_WLEN_6BITS (0b01 << 5)
+#define PL011_UARTLCR_H_WLEN_7BITS (0b10 << 5)
+#define PL011_UARTLCR_H_WLEN_8BITS (0b11 << 5)
 
 /* UART is transmitting */
-#define UART0_FR_BUSY (1<<3)
+#define PL011_UARTFR_BUSY (1<<3)
 
 /* Recieve FIFO empty */
-#define UART0_FR_RXFE (1<<4)
+#define PL011_UARTFR_RXFE (1<<4)
 
 /* Transmit FIFO full*/
-#define UART0_FR_TXFF (1<<5)
+#define PL011_UARTFR_TXFF (1<<5)
 
 DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
@@ -66,7 +68,7 @@ static int pl011_uart_initialized = 0;
 
 static void pl011_uart_disable()
 {
-  write_reg(UART0_CR, 0);
+  write_reg(PL011_UARTCR, 0);
 }
 
 
@@ -128,7 +130,7 @@ void pl011_uart_init(int baudrate, int _not_used)
 {
   uint32_t hz, idiv, fdiv;
   pl011_uart_disable();
-  while(read_reg(UART0_FR) & (UART0_FR_BUSY | UART0_FR_TXFF));
+  while(read_reg(PL011_UARTFR) & (PL011_UARTFR_BUSY | PL011_UARTFR_TXFF));
   pl011_uart_gpio_init();
 
   /* set up clock for consistent divisor values */
@@ -137,7 +139,7 @@ void pl011_uart_init(int baudrate, int _not_used)
     debug_event_1();
 
   /* Clear all interrupts */
-  write_reg(UART0_ICR, 0x7ff);
+  write_reg(PL011_UARTICR, 0x7ff);
 
   /* IBRD - interger part of divisor
    * FBRD - floating-point part of divisor
@@ -145,13 +147,13 @@ void pl011_uart_init(int baudrate, int _not_used)
    */
   pl011_calc_divisor(baudrate, hz, &idiv, &fdiv);
 
-  write_reg(UART0_IBRD, idiv);
-  write_reg(UART0_FBRD, fdiv);
+  write_reg(PL011_UARTIBRD, idiv);
+  write_reg(PL011_UARTFBRD, fdiv);
 
   // Word length is 8 bits
-  write_reg(UART0_LCRH, UART0_LCRH_WLEN_8BITS);
+  write_reg(PL011_UARTLCR_H, PL011_UARTLCR_H_WLEN_8BITS);
   // enable Tx, Rx, FIFO
-  write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
+  write_reg(PL011_UARTCR, PL011_UARTCR_UARTEN | PL011_UARTCR_TXE | PL011_UARTCR_RXE);
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
@@ -224,19 +226,19 @@ static void pl011_uart_print_int_status()
   char buf[128];
   int ris; /* raw interrupt status */
   int mis; /* masked interrupt status */
-  ris = read_reg(UART0_RIS);
-  mis = read_reg(UART0_RIS);
+  ris = read_reg(PL011_UARTRIS);
+  mis = read_reg(PL011_UARTRIS);
   n = snprintf(buf, sizeof(buf), "MIS: %08x, RIS: %08x\n", mis, ris);
   pl011_uart_send_buf(buf, n);
 }
 
-static int pl011_log_level = 0;
+static int pl011_log_level = 2;
 
 static void pl011_uart_debug_interrupt()
 {
   if (pl011_log_level > 0)
     debug_event_1();
-  if (pl011_log_level > 2)
+  if (pl011_log_level > 1)
     pl011_uart_print_int_status();
 }
 
@@ -244,51 +246,50 @@ static void pl011_uart_handle_interrupt()
 {
   int c;
   int mis; /* masked interrupt status */
-  // uart_puts_blocking("pl011_uart_handle_interrupt"__endline);
   // blink_led(20, 100);
 
   pl011_uart_debug_interrupt();
-  mis = read_reg(UART0_MIS);
+  mis = read_reg(PL011_UARTMIS);
 
   DATA_BARRIER;
 
   if (mis & PL011_UARTRXINTR) {
-    c = read_reg(UART0_DR);
+    c = read_reg(PL011_UARTDR);
     pl011_rx_buf_putchar(c);
-    write_reg(UART0_ICR, PL011_UARTRXINTR);
+    write_reg(PL011_UARTICR, PL011_UARTRXINTR);
   }
   else if (mis & PL011_UARTTXINTR) {
     pl011_uart_send('T');
-    write_reg(UART0_ICR, PL011_UARTTXINTR);
+    write_reg(PL011_UARTICR, PL011_UARTTXINTR);
   }
   else if (mis & PL011_UARTRTINTR) {
     pl011_uart_send('R');
-    write_reg(UART0_ICR, PL011_UARTRTINTR);
+    write_reg(PL011_UARTICR, PL011_UARTRTINTR);
   }
   else if (mis & PL011_UARTFEINTR) {
     pl011_uart_send('F');
-    write_reg(UART0_ICR, PL011_UARTFEINTR);
+    write_reg(PL011_UARTICR, PL011_UARTFEINTR);
   }
   else if (mis & PL011_UARTPEINTR) {
     pl011_uart_send('P');
-    write_reg(UART0_ICR, PL011_UARTPEINTR);
+    write_reg(PL011_UARTICR, PL011_UARTPEINTR);
   }
   else if (mis & PL011_UARTBEINTR) {
     pl011_uart_send('B');
-    write_reg(UART0_ICR, PL011_UARTBEINTR);
+    write_reg(PL011_UARTICR, PL011_UARTBEINTR);
   }
   else if (mis & PL011_UARTOEINTR) {
     pl011_uart_send('O');
-    write_reg(UART0_ICR, PL011_UARTOEINTR);
+    write_reg(PL011_UARTICR, PL011_UARTOEINTR);
   }
 }
 
 void pl011_uart_print_regs()
 {
   printf("pl011_uart registers: ris: %08x, mis: %08x, imsc: %08x\n",
-      read_reg(UART0_RIS),
-      read_reg(UART0_MIS),
-      read_reg(UART0_IMSC)
+      read_reg(PL011_UARTRIS),
+      read_reg(PL011_UARTMIS),
+      read_reg(PL011_UARTIMSC)
       );
 }
 
@@ -300,12 +301,15 @@ void pl011_uart_set_interrupt_mode()
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0,
       pl011_uart_handle_interrupt);
 
+  printf("pl011_uart_set_interrupt_mode"__endline);
+
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
+  irq_set(0, ARM_IRQ_UART, pl011_uart_handle_interrupt);
 
   // pl011_uart_gpio_enable(14 /*tx pin*/, 15 /*rx pin*/);
 
   /* Clear pending interrupts */
-  write_reg(UART0_ICR, 0x7ff);
+  write_reg(PL011_UARTICR, 0x7ff);
   /* Unmask all interrupts */
 
   interrupt_mask =
@@ -316,8 +320,8 @@ void pl011_uart_set_interrupt_mode()
     PL011_UARTPEINTR  |
     PL011_UARTBEINTR  |
     PL011_UARTOEINTR*/;
-  write_reg(UART0_IMSC, interrupt_mask);
-  write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
+  write_reg(PL011_UARTIMSC, interrupt_mask);
+  write_reg(PL011_UARTCR, PL011_UARTCR_UARTEN | PL011_UARTCR_TXE | PL011_UARTCR_RXE);
 }
 
 extern int pl011_uart_putchar(uint8_t c);
@@ -332,16 +336,16 @@ int pl011_uart_send_buf(const void *buf, size_t n)
   int i;
   const uint8_t *b = (const uint8_t *)buf;
   for (i = 0; i < n; ++i) {
-    while(read_reg(UART0_FR) & UART0_FR_TXFF);
-    write_reg(UART0_DR, b[i]);
+    while(read_reg(PL011_UARTFR) & PL011_UARTFR_TXFF);
+    write_reg(PL011_UARTDR, b[i]);
   }
   return n;
 }
 
 char pl011_uart_getc()
 {
-  while(read_reg(UART0_FR) & UART0_FR_RXFE);
-  return (char)read_reg(UART0_DR);
+  while(read_reg(PL011_UARTFR) & PL011_UARTFR_RXFE);
+  return (char)read_reg(PL011_UARTDR);
 }
 
 typedef struct rx_subscriber {
@@ -390,23 +394,28 @@ int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg)
 
 int pl011_io_thread(void)
 {
-  char c;
-  int i;
-  rx_subscriber_t *subscriber;
+  // char c;
+  // int i;
+  // rx_subscriber_t *subscriber;
 
   rx_subscribers_init();
   pl011_uart_initialized = 1;
+  disable_irq();
   pl011_uart_set_interrupt_mode();
-  DATA_BARRIER;
+  uart_puts_blocking("interrupt mode set");
+  enable_irq();
+  // DATA_BARRIER;
   while(1) {
-    c = pl011_rx_buf_getchar();
-    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
-      if (rx_subscriber_is_valid(i)) {
-        subscriber = &rx_subscribers[i];
-        subscriber->cb(subscriber->cb_arg, c);
-        // debug_event_1();
-      }
-    }
+    asm volatile("wfe");
+    // c = pl011_rx_buf_getchar();
+    // putc(c);
+ //    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
+ //      if (rx_subscriber_is_valid(i)) {
+ //        subscriber = &rx_subscribers[i];
+ //        subscriber->cb(subscriber->cb_arg, c);
+ //        // debug_event_1();
+ //      }
+ //    }
   }
   return ERR_OK;
 }
