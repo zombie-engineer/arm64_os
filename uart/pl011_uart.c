@@ -297,7 +297,7 @@ void pl011_uart_set_interrupt_mode()
   int interrupt_mask;
   pl011_rx_buf_init();
 
-  intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0, 
+  intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0,
       pl011_uart_handle_interrupt);
 
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);
@@ -340,7 +340,7 @@ int pl011_uart_send_buf(const void *buf, size_t n)
 
 char pl011_uart_getc()
 {
-  while(read_reg(UART0_FR) & UART0_FR_RXFE); 
+  while(read_reg(UART0_FR) & UART0_FR_RXFE);
   return (char)read_reg(UART0_DR);
 }
 
@@ -364,7 +364,7 @@ static inline int rx_subscriber_slot_is_free(int slot)
 }
 
 static inline void rx_subscriber_slot_occupy(int slot, uart_rx_event_cb cb, void *cb_arg)
-{ 
+{
    rx_subscribers[slot].cb = cb;
    rx_subscribers[slot].cb_arg = cb_arg;
 }
