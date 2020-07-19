@@ -6,6 +6,7 @@
 #include "dwc2_xfer_control.h"
 #include <sched.h>
 #include <bug.h>
+#include <uart/pl011_uart.h>
 
 int usb_xfer_log_level = 0;
 
@@ -204,7 +205,7 @@ static int usb_xfer_queue_run(void)
   USBQ_INFO("starting usb_runqueue");
   while(1) {
     wait_on_waitflag(&has_work);
-    // putc('$');
+    // pl011_putc_blocking('$');
     usb_xfer_process_pending();
     usb_xfer_process_running();
   }

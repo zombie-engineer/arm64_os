@@ -9,6 +9,7 @@
 #include <debug.h>
 #include <board/bcm2835/bcm2835_irq.h>
 #include <board/bcm2835/bcm2835_arm_timer.h>
+#include <uart/pl011_uart.h>
 #include <irq.h>
 #include <delays.h>
 #include <syscall.h>
@@ -367,8 +368,8 @@ static inline void schedule_handle_flag_waiting(struct scheduler *s)
         *t->waitflag = 0;
         t->waitflag = NULL;
         sched_queue_runnable_task_noirq(s, t);
+        atomic_dec(&s->flag_is_set);
       }
-      atomic_dec(&s->flag_is_set);
     }
   }
 }
