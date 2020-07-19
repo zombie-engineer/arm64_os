@@ -15,10 +15,6 @@ int uart_puts(const char *s);
 
 int uart_putc(char c);
 
-int uart_putc_blocking(char c);
-
-int uart_puts_blocking(const char *c);
-
 // TODO remove that
 void uart_hex(unsigned int d);
 

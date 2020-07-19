@@ -18,9 +18,6 @@ typedef struct ringbuf {
   int read_is_ahead;
 } ringbuf_t;
 
-char pipe_buf[2048];
-ringbuf_t pipe;
-
 void ringbuf_init(ringbuf_t *r, char *buf, int sz);
 
 #define ringbuf_sz_inv(r) ((r->buf_end - r->start) + (r->end - r->buf))

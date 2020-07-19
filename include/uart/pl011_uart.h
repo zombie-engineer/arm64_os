@@ -15,3 +15,7 @@ char pl011_uart_getc();
 int pl011_io_thread(void);
 
 int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg);
+
+int pl011_puts_blocking(const char *c);
+
+int pl011_putc_blocking(char c);

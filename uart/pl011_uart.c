@@ -21,11 +21,11 @@
 #include "pl011_regs.h"
 #include <bits_api.h>
 #include "pl011_regs_bits.h"
+#include <sched.h>
 
 DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
 static char pl011_rx_buf[2048];
-static int pl011_rx_data_sz = 0;
 static int pl011_uart_initialized = 0;
 
 static void pl011_uart_disable()
@@ -119,88 +119,115 @@ void pl011_uart_init(int baudrate, int _not_used)
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
-static inline void pl011_rx_buf_init()
+static struct ringbuf pl011_rx_pipe ALIGNED(64);
+static struct spinlock pl011_rx_pipe_lock;
+static uint64_t has_new_char;
+static uint64_t ringbuf_stat_chars_lost;
+
+static inline void pl011_rx_pipe_init()
 {
-  pl011_rx_data_sz = 0;
+  spinlock_init(&pl011_rx_pipe_lock);
+  ringbuf_init(&pl011_rx_pipe, pl011_rx_buf, sizeof(pl011_rx_buf));
+  has_new_char = 0;
+  ringbuf_stat_chars_lost = 0;
 }
 
-static inline void pl011_rx_buf_putchar(char c)
+/*
+ * Push new char from pl011 fifo to ringbuffer.
+ * This is called from interrupt context.
+ *
+ * - lock ringbuf
+ * - put char to ringbuf
+ * - record error stat
+ * - unlock ringbuf
+ * - wakeup sleeper on this pipe
+ */
+static inline void pl011_rx_pipe_push(char c)
 {
-  if (pl011_rx_data_sz == sizeof(pl011_rx_buf))
-    return;
+  int irqflags;
+  spinlock_lock_disable_irq(&pl011_rx_pipe_lock, irqflags);
+  if (ringbuf_write(&pl011_rx_pipe, &c, 1) != 1)
+    ringbuf_stat_chars_lost++;
 
-  pl011_rx_buf[pl011_rx_data_sz] = c;
-  pl011_rx_data_sz++;
+  spinlock_unlock_restore_irq(&pl011_rx_pipe_lock, irqflags);
+  wakeup_waitflag(&has_new_char);
 }
 
-static inline char pl011_rx_buf_getchar()
+/*
+ * Get new char from ringbuffer.
+ * This is called from scheduling context.
+ */
+static inline char pl011_rx_pipe_pop(void)
 {
   char c;
-  while(1) {
-    disable_irq();
-    SYNC_BARRIER;
-    if (pl011_rx_data_sz) {
-      SYNC_BARRIER;
-      --pl011_rx_data_sz;
-      c = pl011_rx_buf[pl011_rx_data_sz];
-      enable_irq();
-      break;
-    }
-    enable_irq();
-    WAIT_FOR_EVENT;
-  }
-
+  wait_on_waitflag(&has_new_char);
+  BUG(ringbuf_read(&pl011_rx_pipe, &c, 1) != 1, "pl011_rx_pipe_pop should wait until char appears in buf");
   return c;
 }
 
-static void pl011_uart_print_int_status()
+static void OPTIMIZED pl011_uart_print_int_status()
 {
-  int n;
   char buf[128];
   char imscbuf[256];
   char risbuf[256];
   char misbuf[256];
   int imsc; /* interrupt mask set/clear */
   int ris;  /* raw interrupt status     */
-  int mis;  /* masked interrupt status */
+  int mis;  /* masked interrupt status  */
   ris = read_reg(PL011_UARTRIS);
   mis = read_reg(PL011_UARTMIS);
   imsc = read_reg(PL011_UARTIMSC);
   pl011_uartris_bitmask_to_string(risbuf, sizeof(risbuf), ris);
   pl011_uartmis_bitmask_to_string(misbuf, sizeof(misbuf), mis);
   pl011_uartimsc_bitmask_to_string(imscbuf, sizeof(imscbuf), imsc);
-  n = snprintf(buf, sizeof(buf), "IMSC:%08x(%s), MASKED:%08x(%s), RAW:%08x(%s)"__endline,
+  snprintf(buf, sizeof(buf), "IMSC:%08x(%s), MASKED:%08x(%s), RAW:%08x(%s)"__endline,
     imsc, imscbuf, mis, misbuf, ris, risbuf);
-  uart_puts_blocking(buf);
+  pl011_puts_blocking(buf);
 }
 
-static int pl011_log_level = 2;
+static int pl011_log_level = 0;
 
 static void pl011_uart_debug_interrupt()
 {
   if (pl011_log_level > 0)
-    debug_event_1();
-  if (pl011_log_level > 1)
+    blink_led_2(1, 5);
+  else if (pl011_log_level > 1)
     pl011_uart_print_int_status();
 }
 
+
 static void pl011_uart_handle_interrupt()
 {
-  int c;
-  int mis; /* masked interrupt status */
+  uint32_t dr;
+  int mis;
   // blink_led(20, 100);
 
   pl011_uart_debug_interrupt();
   mis = read_reg(PL011_UARTMIS);
+  write_reg(PL011_UARTICR, mis);
 
-  DATA_BARRIER;
+  // DATA_BARRIER;
 
-  if (mis & PL011_UARTRXINTR) {
-    c = read_reg(PL011_UARTDR);
-    pl011_rx_buf_putchar(c);
-    write_reg(PL011_UARTICR, PL011_UARTRXINTR);
+  if (PL011_UARTMIS_GET_RXMIS(mis)) {
+      dr = read_reg(PL011_UARTDR);
+      if (dr & 0xff != dr) {
+        if (PL011_UARTDR_GET_FE(dr)) {
+          pl011_rx_pipe_push('.');
+        }
+        if (PL011_UARTDR_GET_PE(dr)) {
+          pl011_rx_pipe_push(',');
+        }
+        if (PL011_UARTDR_GET_BE(dr)) {
+          pl011_rx_pipe_push('!');
+        }
+        if (PL011_UARTDR_GET_OE(dr)) {
+          pl011_rx_pipe_push('$');
+        }
+      }
+      pl011_rx_pipe_push(dr & 0xff);
   }
-  else if (mis & PL011_UARTTXINTR) {
+  return;
+  if (mis & PL011_UARTTXINTR) {
     pl011_uart_send('T');
     write_reg(PL011_UARTICR, PL011_UARTTXINTR);
   }
@@ -238,7 +265,7 @@ void pl011_uart_print_regs()
 void pl011_uart_set_interrupt_mode()
 {
   int interrupt_mask;
-  pl011_rx_buf_init();
+  pl011_rx_pipe_init();
 
   intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0,
       pl011_uart_handle_interrupt);
@@ -296,7 +323,7 @@ typedef struct rx_subscriber {
 } rx_subscriber_t;
 
 static rx_subscriber_t rx_subscribers[8];
-static ALIGNED(64) uint64_t rx_subscribers_lock;
+static struct spinlock rx_subscribers_lock;
 
 static inline void rx_subscribers_init()
 {
@@ -323,34 +350,37 @@ static inline int rx_subscriber_is_valid(int slot)
 int pl011_uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *cb_arg)
 {
   int i;
-  spinlock_lock(&rx_subscribers_lock);
+  int irqflags;
+  spinlock_lock_disable_irq(&rx_subscribers_lock, irqflags);
   for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
     if (rx_subscriber_slot_is_free(i)) {
       rx_subscriber_slot_occupy(i, cb, cb_arg);
       break;
     }
   }
-  spinlock_unlock(&rx_subscribers_lock);
+  spinlock_unlock_restore_irq(&rx_subscribers_lock, irqflags);
   return ERR_OK;
 }
 
 int pl011_io_thread(void)
 {
-  // char c;
+  char c;
   // int i;
   // rx_subscriber_t *subscriber;
+  int irqflags;
 
   rx_subscribers_init();
   pl011_uart_initialized = 1;
-  disable_irq();
+  disable_irq_save_flags(irqflags);
   pl011_uart_set_interrupt_mode();
-  uart_puts_blocking("interrupt mode set");
-  enable_irq();
+  pl011_puts_blocking("interrupt mode set");
+  restore_irq_flags(irqflags);
   // DATA_BARRIER;
   while(1) {
-    asm volatile("wfe");
-    // c = pl011_rx_buf_getchar();
-    // putc(c);
+    c = pl011_rx_pipe_pop();
+    pl011_putc_blocking(c);
+    // disable_irq_save_flags(irqflags);
+    //while(1);
  //    for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
  //      if (rx_subscriber_is_valid(i)) {
  //        subscriber = &rx_subscribers[i];
@@ -370,7 +400,7 @@ int uart_is_initialized()
   return ret;
 }
 
-int uart_putc_blocking(char c)
+int pl011_putc_blocking(char c)
 {
   int ret;
   int irqflags;
@@ -380,7 +410,7 @@ int uart_putc_blocking(char c)
   return ret;
 }
 
-int uart_puts_blocking(const char *c)
+int pl011_puts_blocking(const char *c)
 {
   int ret;
   int irqflags;
