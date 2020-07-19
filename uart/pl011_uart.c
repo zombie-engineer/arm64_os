@@ -224,19 +224,19 @@ static void pl011_uart_print_int_status()
   char buf[128];
   int ris; /* raw interrupt status */
   int mis; /* masked interrupt status */
-  ris = read_reg(UART0_RIS); 
-  mis = read_reg(UART0_RIS); 
+  ris = read_reg(UART0_RIS);
+  mis = read_reg(UART0_RIS);
   n = snprintf(buf, sizeof(buf), "MIS: %08x, RIS: %08x\n", mis, ris);
   pl011_uart_send_buf(buf, n);
 }
 
-static int pl011_debug_level = 0;
+static int pl011_log_level = 0;
 
 static void pl011_uart_debug_interrupt()
 {
-  if (pl011_debug_level > 0)
+  if (pl011_log_level > 0)
     debug_event_1();
-  if (pl011_debug_level > 2)
+  if (pl011_log_level > 2)
     pl011_uart_print_int_status();
 }
 
