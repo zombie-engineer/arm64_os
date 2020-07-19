@@ -62,21 +62,4 @@ int fn(__VA_ARGS__) { \
 
 #define container_of(ptr, type, member) (type *)(__ptr_off(ptr, - address_of(type, member)))
 
-static inline int should_lock() 
-{
-  return spinlocks_enabled && is_irq_enabled();
-}
-
-#define spinlock_cond_lock(lock) \
-  do {                           \
-  if (should_lock())             \
-    spinlock_lock(lock);         \
-  } while(0)
-
-#define spinlock_cond_unlock(lock) \
-  do {                             \
-    if (should_lock())             \
-      spinlock_unlock(lock);       \
-  } while(0)
-
 int prefix_padding_to_string(const char *prefix, char padchar, int depth, int repeat, char *buf, int buf_sz);

@@ -82,3 +82,5 @@ int mbox_prop_call_no_lock();
 int mbox_prop_call();
 
 int mbox_call_blocking(int mbox_channel);
+
+void mbox_init(void);

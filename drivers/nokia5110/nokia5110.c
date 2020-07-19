@@ -61,7 +61,7 @@ typedef struct nokia5110_canvas_control {
 static const font_desc_t *nokia5110_font;
 static nokia5110_dev_t nokia5110_device;
 static nokia5110_dev_t *nokia5110_dev = 0;
-static DECL_SPINLOCK(nokia5110_lock);
+static struct spinlock nokia5110_lock;
 
 static uint8_t nokia5110_canvas[NOKIA5110_CANVAS_SIZE];
 
@@ -153,7 +153,7 @@ int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int fun
 
   RET_IF_ERR(nokia5110_set_cursor, 0, 0);
   nokia5110_font = 0;
-  spinlock_init(&nokia5110_lock);
+  cond_spinlock_init(&nokia5110_lock);
 
   puts("NOKIA5110: init is complete\n");
   return ERR_OK;
@@ -377,15 +377,12 @@ static nokia5110_canvas_control_t nokia5110_canvas_control = {
 int nokia5110_draw_text(const char *text, int x, int y)
 {
   int err;
-  int under_lock;
+  int irqflags;
   nokia5110_canvas_control_t *ctl;
 
   ctl = &nokia5110_canvas_control;
 
-  if (should_lock()) {
-    spinlock_lock(&nokia5110_lock);
-    under_lock = 1;
-  }
+  cond_spinlock_lock_disable_irq(&nokia5110_lock, irqflags);
 
   if (!nokia5110_font) {
     err = ERR_NOT_INIT;
@@ -397,8 +394,7 @@ int nokia5110_draw_text(const char *text, int x, int y)
 
   err = nokia5110_canvas_redraw_locked();
 out:
-  if (under_lock)
-    spinlock_unlock(&nokia5110_lock);
+  cond_spinlock_unlock_restore_irq(&nokia5110_lock, irqflags);
   return err;
 }
 
@@ -421,23 +417,19 @@ int nokia5110_canvas_set_cursor(int x, int y)
 
 int nokia5110_canvas_get_cursor(int *x, int *y)
 {
-  *x = nokia5110_canvas_control.cursor_x; 
-  *y = nokia5110_canvas_control.cursor_y; 
+  *x = nokia5110_canvas_control.cursor_x;
+  *y = nokia5110_canvas_control.cursor_y;
   return ERR_OK;
 }
 
 void nokia5110_set_font(const font_desc_t *f)
 {
-  int under_lock;
-  if (should_lock()) {
-    spinlock_lock(&nokia5110_lock);
-    under_lock = 1;
-  }
+  int irqflags;
+  cond_spinlock_lock_disable_irq(&nokia5110_lock, irqflags);
 
-  nokia5110_font = f; 
+  nokia5110_font = f;
 
-  if (under_lock)
-    spinlock_unlock(&nokia5110_lock);
+  cond_spinlock_unlock_restore_irq(&nokia5110_lock, irqflags);
 
   nokia5110_canvas_set_font(&nokia5110_canvas_control, f);
 }

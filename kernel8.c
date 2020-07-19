@@ -898,6 +898,7 @@ static void print_memory_map(void)
 void main()
 {
   int ret;
+  mbox_init();
   debug_init();
   gpio_set_init();
   dma_area_init();

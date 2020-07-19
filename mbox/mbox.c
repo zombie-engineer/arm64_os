@@ -8,7 +8,7 @@
 #include <config.h>
 #include <debug.h>
 
-static DECL_SPINLOCK(mbox_lock);
+static struct spinlock mbox_lock;
 
 #define VIDEOCORE_MBOX (PERIPHERAL_BASE_PHY + 0xb880)
 #define MBOX_READ   ((volatile unsigned int*)(VIDEOCORE_MBOX + 0x00))
@@ -63,25 +63,27 @@ int mbox_prop_call_no_lock()
 
 int mbox_prop_call()
 {
-  int ret, should_lock;
+  int ret;
+  int irqflags;
 
 #ifdef CONFIG_DEBUG_MBOX
   debug_mbox();
 #endif
 
-  should_lock = spinlocks_enabled && is_irq_enabled();
-  if (should_lock)
-    spinlock_lock(&mbox_lock);
+  cond_spinlock_lock_disable_irq(&mbox_lock, irqflags);
 
   mbox_flush_dcache();
   ret = mbox_prop_call_no_lock();
   mbox_flush_dcache();
-
-  if (should_lock)
-    spinlock_unlock(&mbox_lock);
+  cond_spinlock_unlock_restore_irq(&mbox_lock, irqflags);
 
 #ifdef CONFIG_DEBUG_MBOX
   debug_mbox();
 #endif
   return ret;
+}
+
+void mbox_init(void)
+{
+  cond_spinlock_init(&mbox_lock);
 }

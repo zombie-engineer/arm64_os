@@ -13,17 +13,18 @@
 
 static char ringbuf_buf[256];
 static ringbuf_t char_pipe;
-static ALIGNED(64) uint64_t char_pipe_lock;
+static struct spinlock char_pipe_lock;
 
 static char cmdrunner_getch()
 {
   int n;
   char c;
+  int irqflags;
   n = 0;
   while(1) {
-    spinlock_lock(&char_pipe_lock);
+    spinlock_lock_disable_irq(&char_pipe_lock, irqflags);
     n = ringbuf_read(&char_pipe, &c, 1);
-    spinlock_unlock(&char_pipe_lock);
+    spinlock_unlock_restore_irq(&char_pipe_lock, irqflags);
     if (n)
       break;
 
@@ -36,9 +37,10 @@ static char cmdrunner_getch()
 
 static void cmdrunner_rx_cb(void *priv, char c)
 {
-  spinlock_lock(&char_pipe_lock);
+  int irqflags;
+  spinlock_lock_disable_irq(&char_pipe_lock, irqflags);
   ringbuf_write(&char_pipe, &c, 1);
-  spinlock_unlock(&char_pipe_lock);
+  spinlock_unlock_restore_irq(&char_pipe_lock, irqflags);
 }
 
 extern int pl011_uart_putchar(uint8_t c);
