@@ -18,47 +18,9 @@
 #include <debug.h>
 #include <error.h>
 #include <barriers.h>
-
-
-#define PL011_UART_BASE  (PERIPHERAL_BASE_PHY + 0x00201000)
-#define PL011_UARTDR    ((reg32_t)(PL011_UART_BASE + 0x00))
-#define PL011_UARTFR    ((reg32_t)(PL011_UART_BASE + 0x18))
-#define PL011_UARTIBRD  ((reg32_t)(PL011_UART_BASE + 0x24))
-#define PL011_UARTFBRD  ((reg32_t)(PL011_UART_BASE + 0x28))
-#define PL011_UARTLCR_H  ((reg32_t)(PL011_UART_BASE + 0x2c))
-#define PL011_UARTCR    ((reg32_t)(PL011_UART_BASE + 0x30))
-// Interrupt mask set clear
-#define PL011_UARTIMSC  ((reg32_t)(PL011_UART_BASE + 0x38))
-// Raw interrupt status
-#define PL011_UARTRIS   ((reg32_t)(PL011_UART_BASE + 0x3c))
-// Masked interrupt status
-#define PL011_UARTMIS   ((reg32_t)(PL011_UART_BASE + 0x40))
-#define PL011_UARTICR   ((reg32_t)(PL011_UART_BASE + 0x44))
-
-
-/* UART0 enable */
-#define PL011_UARTCR_UARTEN (1)
-
-/* UART0 Transmit enable */
-#define PL011_UARTCR_TXE (1 << 8)
-
-/* UART0 Recieve enable */
-#define PL011_UARTCR_RXE (1 << 9)
-
-/* UART0 Work length */
-#define PL011_UARTLCR_H_WLEN_5BITS (0b00 << 5)
-#define PL011_UARTLCR_H_WLEN_6BITS (0b01 << 5)
-#define PL011_UARTLCR_H_WLEN_7BITS (0b10 << 5)
-#define PL011_UARTLCR_H_WLEN_8BITS (0b11 << 5)
-
-/* UART is transmitting */
-#define PL011_UARTFR_BUSY (1<<3)
-
-/* Recieve FIFO empty */
-#define PL011_UARTFR_RXFE (1<<4)
-
-/* Transmit FIFO full*/
-#define PL011_UARTFR_TXFF (1<<5)
+#include "pl011_regs.h"
+#include <bits_api.h>
+#include "pl011_regs_bits.h"
 
 DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
@@ -157,35 +119,6 @@ void pl011_uart_init(int baudrate, int _not_used)
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
-/*
- * Interrupts according to
- * PrimeCell UART (PL011) Technical Reference Manual
- */
-
-/* change in nUARTCTS modem status line */
-#define PL011_UARTCTSINTR (1<<1)
-
-/* receive interrupt - recieve buffer is not empty */
-#define PL011_UARTRXINTR  (1<<4)
-
-/* transmit interrupt - transfer buffer is empty */
-#define PL011_UARTTXINTR  (1<<5)
-
-/* recieve timeout interrupt */
-#define PL011_UARTRTINTR  (1<<6)
-
-/* framing error in a received character interrupt */
-#define PL011_UARTFEINTR  (1<<7)
-
-/* parity error in a received character interrupt */
-#define PL011_UARTPEINTR  (1<<8)
-
-/* break error interrupt - break in reception */
-#define PL011_UARTBEINTR  (1<<9)
-
-/* overrun error interrupt */
-#define PL011_UARTOEINTR  (1<<10)
-
 static inline void pl011_rx_buf_init()
 {
   pl011_rx_data_sz = 0;
@@ -224,12 +157,21 @@ static void pl011_uart_print_int_status()
 {
   int n;
   char buf[128];
-  int ris; /* raw interrupt status */
-  int mis; /* masked interrupt status */
+  char imscbuf[256];
+  char risbuf[256];
+  char misbuf[256];
+  int imsc; /* interrupt mask set/clear */
+  int ris;  /* raw interrupt status     */
+  int mis;  /* masked interrupt status */
   ris = read_reg(PL011_UARTRIS);
-  mis = read_reg(PL011_UARTRIS);
-  n = snprintf(buf, sizeof(buf), "MIS: %08x, RIS: %08x\n", mis, ris);
-  pl011_uart_send_buf(buf, n);
+  mis = read_reg(PL011_UARTMIS);
+  imsc = read_reg(PL011_UARTIMSC);
+  pl011_uartris_bitmask_to_string(risbuf, sizeof(risbuf), ris);
+  pl011_uartmis_bitmask_to_string(misbuf, sizeof(misbuf), mis);
+  pl011_uartimsc_bitmask_to_string(imscbuf, sizeof(imscbuf), imsc);
+  n = snprintf(buf, sizeof(buf), "IMSC:%08x(%s), MASKED:%08x(%s), RAW:%08x(%s)"__endline,
+    imsc, imscbuf, mis, misbuf, ris, risbuf);
+  uart_puts_blocking(buf);
 }
 
 static int pl011_log_level = 2;

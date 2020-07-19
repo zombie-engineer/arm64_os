@@ -1,0 +1,99 @@
+# Register descriptions taken from PrimeCell UART (PL011) Technical Reference Manual
+# https://developer.arm.com/documentation/ddi0183/f/programmer-s-model/register-descriptions?lang=en
+
+PL011_UARTDR:
+  - [ DATA,   0, 8]
+  - [ FE  ,   8, 1]
+  - [ PE  ,   9, 1]
+  - [ BE  ,  10, 1]
+  - [ OE  ,  11, 1]
+
+PL011_UARTFR:
+  - [ CTS , 0, 1]
+  - [ DSR , 1, 1]
+  - [ DCD , 2, 1]
+  - [ BUSY, 3, 1]
+  - [ RXFE, 4, 1]
+  - [ TXFF, 5, 1]
+  - [ RXFF, 6, 1]
+  - [ TXFE, 7, 1]
+  - [ RI  , 8, 1]
+
+PL011_UARTLCR_H:
+  - [ BRK , 0, 1]
+  - [ PEN , 1, 1]
+  - [ EPS , 2, 1]
+  - [ STP2, 3, 1]
+  - [ FEN , 4, 1]
+  - [ WLEN, 5, 2]
+  - [ SPS , 7, 1]
+
+PL011_UARTCR:
+  - [ UARTEN, 0, 1]
+  - [ SIREN,  1, 1]
+  - [ SIRLP,  2, 1]
+  - [ LBE,    7, 1]
+  - [ TXE,    8, 1]
+  - [ RXE,    9, 1]
+  - [ DTR,   10, 1]
+  - [ RTS,   11, 1]
+  - [ OUT1,  12, 1]
+  - [ OUT2,  13, 1]
+  - [ RTSEN, 14, 1]
+  - [ CTSEN, 15, 1]
+
+PL011_UARTIFLS:
+  - [ TXIFLSEL, 0, 3]
+  - [ RXIFLSEL, 3, 3]
+
+PL011_UARTIMSC:
+  - [ RIMIM ,  0, 1]
+  - [ CTSMIM,  1, 1]
+  - [ DCDMIM,  2, 1]
+  - [ DSRMIM,  3, 1]
+  - [ RXIM  ,  4, 1]
+  - [ TXIM  ,  5, 1]
+  - [ RTIM  ,  6, 1]
+  - [ FEIM  ,  7, 1]
+  - [ PEIM  ,  8, 1]
+  - [ BEIM  ,  9, 1]
+  - [ OEIM  , 10, 1]
+
+PL011_UARTRIS:
+  - [ RIRMIS ,  0, 1]
+  - [ CTSRMIS,  1, 1]
+  - [ DCDRMIS,  2, 1]
+  - [ DSRRMIS,  3, 1]
+  - [ RXRIS  ,  4, 1]
+  - [ TXRIS  ,  5, 1]
+  - [ RTRIS  ,  6, 1]
+  - [ FERIS  ,  7, 1]
+  - [ PERIS  ,  8, 1]
+  - [ BERIS  ,  9, 1]
+  - [ OERIS  , 10, 1]
+
+PL011_UARTMIS:
+  - [ RIMMIS ,  0, 1]
+  - [ CTSMMIS,  1, 1]
+  - [ DCDMMIS,  2, 1]
+  - [ DSRMMIS,  3, 1]
+  - [ RXMIS  ,  4, 1]
+  - [ TXMIS  ,  5, 1]
+  - [ RTMIS  ,  6, 1]
+  - [ FEMIS  ,  7, 1]
+  - [ PEMIS  ,  8, 1]
+  - [ BEMIS  ,  9, 1]
+  - [ OEMIS  , 10, 1]
+
+PL011_UARTICR:
+  - [ RIMIC ,  0, 1]
+  - [ CTSMIC,  1, 1]
+  - [ DCDMIC,  2, 1]
+  - [ DSRMIC,  3, 1]
+  - [ RXIC  ,  4, 1]
+  - [ TXIC  ,  5, 1]
+  - [ RTIC  ,  6, 1]
+  - [ FEIC  ,  7, 1]
+  - [ PEIC  ,  8, 1]
+  - [ BEIC  ,  9, 1]
+  - [ OEIC  , 10, 1]
