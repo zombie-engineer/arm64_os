@@ -196,7 +196,7 @@ int usb_hub_port_check_connection(usb_hub_t *h, int port)
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR_SILENT();
 
-  HUBPORTLOG("status:%04x:%04x", port_status.status.raw, port_status.change.raw);
+  HUBPORTDBG("status:%04x:%04x", port_status.status.raw, port_status.change.raw);
 	if (port_status.change.connected_changed) {
     HUBPORTLOG("CONNECTED status changed to %s",
       port_status.status.connected ? "CONNECTED" :"DISCONNECTED");
