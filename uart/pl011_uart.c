@@ -308,14 +308,14 @@ void pl011_uart_set_interrupt_mode()
   write_reg(UART0_ICR, 0x7ff);
   /* Unmask all interrupts */
 
-  interrupt_mask = 
+  interrupt_mask =
     PL011_UARTRXINTR /* |
     PL011_UARTTXINTR  |
     PL011_UARTRTINTR  |
-    UART0_INT_BIT_FE  |
-    UART0_INT_BIT_PE  |
-    UART0_INT_BIT_BE  |
-    UART0_INT_BIT_OE*/;
+    PL011_UARTFEINTR  |
+    PL011_UARTPEINTR  |
+    PL011_UARTBEINTR  |
+    PL011_UARTOEINTR*/;
   write_reg(UART0_IMSC, interrupt_mask);
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
 }
