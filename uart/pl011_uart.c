@@ -74,11 +74,11 @@ static int pl011_uart_gpio_init()
 {
   const int tx_pin = 14;
   const int rx_pin = 15;
-  gpio_set_handle_t gpio_set_handle; 
+  gpio_set_handle_t gpio_set_handle;
   gpio_set_handle = gpio_set_request_2_pins(tx_pin, rx_pin, pl011_gpio_set_key);
   if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
     printf("Failed to request gpio pins 14, 15 for pl011_uart.\n");
-    return ERR_BUSY;  
+    return ERR_BUSY;
   }
 
   /* map UART0 to GPIO pins */
@@ -114,7 +114,7 @@ static void pl011_calc_divisor(int baudrate, uint64_t clock_hz, uint32_t *idiv, 
   div = clock_hz * 10 / (16 * baudrate);
   i = div / 10;
   f = div % 10;
-  if (i > 0xffff) 
+  if (i > 0xffff)
     return;
 
   if (f > 0b11111)
@@ -149,20 +149,40 @@ void pl011_uart_init(int baudrate, int _not_used)
   write_reg(UART0_FBRD, fdiv);
 
   // Word length is 8 bits
-  write_reg(UART0_LCRH, UART0_LCRH_WLEN_8BITS); 
+  write_reg(UART0_LCRH, UART0_LCRH_WLEN_8BITS);
   // enable Tx, Rx, FIFO
   write_reg(UART0_CR, UART0_CR_UARTEN | UART0_CR_TXE | UART0_CR_RXE);
   // 0000 0010 <> 1011 - 0x0002 0xb
 }
 
-#define UART0_INT_BIT_CTS (1<<1)
-#define UART0_INT_BIT_RX  (1<<4)
-#define UART0_INT_BIT_TX  (1<<5)
-#define UART0_INT_BIT_RT  (1<<6)
-#define UART0_INT_BIT_FE  (1<<7)
-#define UART0_INT_BIT_PE  (1<<8)
-#define UART0_INT_BIT_BE  (1<<9)
-#define UART0_INT_BIT_OE  (1<<10)
+/*
+ * Interrupts according to
+ * PrimeCell UART (PL011) Technical Reference Manual
+ */
+
+/* change in nUARTCTS modem status line */
+#define PL011_UARTCTSINTR (1<<1)
+
+/* receive interrupt - recieve buffer is not empty */
+#define PL011_UARTRXINTR  (1<<4)
+
+/* transmit interrupt - transfer buffer is empty */
+#define PL011_UARTTXINTR  (1<<5)
+
+/* recieve timeout interrupt */
+#define PL011_UARTRTINTR  (1<<6)
+
+/* framing error in a received character interrupt */
+#define PL011_UARTFEINTR  (1<<7)
+
+/* parity error in a received character interrupt */
+#define PL011_UARTPEINTR  (1<<8)
+
+/* break error interrupt - break in reception */
+#define PL011_UARTBEINTR  (1<<9)
+
+/* overrun error interrupt */
+#define PL011_UARTOEINTR  (1<<10)
 
 static inline void pl011_rx_buf_init()
 {
@@ -224,40 +244,42 @@ static void pl011_uart_handle_interrupt()
 {
   int c;
   int mis; /* masked interrupt status */
+  // uart_puts_blocking("pl011_uart_handle_interrupt"__endline);
+  // blink_led(20, 100);
 
   pl011_uart_debug_interrupt();
   mis = read_reg(UART0_MIS);
 
   DATA_BARRIER;
 
-  if (mis & UART0_INT_BIT_RX) {
+  if (mis & PL011_UARTRXINTR) {
     c = read_reg(UART0_DR);
     pl011_rx_buf_putchar(c);
-    write_reg(UART0_ICR, UART0_INT_BIT_RX);
+    write_reg(UART0_ICR, PL011_UARTRXINTR);
   }
-  else if (mis & UART0_INT_BIT_TX) {
+  else if (mis & PL011_UARTTXINTR) {
     pl011_uart_send('T');
-    write_reg(UART0_ICR, UART0_INT_BIT_TX);
+    write_reg(UART0_ICR, PL011_UARTTXINTR);
   }
-  else if (mis & UART0_INT_BIT_RT) {
+  else if (mis & PL011_UARTRTINTR) {
     pl011_uart_send('R');
-    write_reg(UART0_ICR, UART0_INT_BIT_RT);
+    write_reg(UART0_ICR, PL011_UARTRTINTR);
   }
-  else if (mis & UART0_INT_BIT_FE) {
+  else if (mis & PL011_UARTFEINTR) {
     pl011_uart_send('F');
-    write_reg(UART0_ICR, UART0_INT_BIT_FE);
+    write_reg(UART0_ICR, PL011_UARTFEINTR);
   }
-  else if (mis & UART0_INT_BIT_PE) {
+  else if (mis & PL011_UARTPEINTR) {
     pl011_uart_send('P');
-    write_reg(UART0_ICR, UART0_INT_BIT_PE);
+    write_reg(UART0_ICR, PL011_UARTPEINTR);
   }
-  else if (mis & UART0_INT_BIT_BE) {
+  else if (mis & PL011_UARTBEINTR) {
     pl011_uart_send('B');
-    write_reg(UART0_ICR, UART0_INT_BIT_BE);
+    write_reg(UART0_ICR, PL011_UARTBEINTR);
   }
-  else if (mis & UART0_INT_BIT_OE) {
+  else if (mis & PL011_UARTOEINTR) {
     pl011_uart_send('O');
-    write_reg(UART0_ICR, UART0_INT_BIT_OE);
+    write_reg(UART0_ICR, PL011_UARTOEINTR);
   }
 }
 
@@ -287,9 +309,9 @@ void pl011_uart_set_interrupt_mode()
   /* Unmask all interrupts */
 
   interrupt_mask = 
-    UART0_INT_BIT_RX /* |
-    UART0_INT_BIT_TX  |
-    UART0_INT_BIT_RT  |
+    PL011_UARTRXINTR /* |
+    PL011_UARTTXINTR  |
+    PL011_UARTRTINTR  |
     UART0_INT_BIT_FE  |
     UART0_INT_BIT_PE  |
     UART0_INT_BIT_BE  |
