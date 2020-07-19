@@ -5,17 +5,6 @@
 #include <reg_access.h>
 #include <board/bcm2835/bcm2835_irq_ctrl.h>
 
-static intr_ctl_irq_cb irq_callbacks[64 + 8];
-
-int intr_ctl_set_cb(int irq_type, int irq_num, intr_ctl_irq_cb cb)
-{
-  if (irq_num + irq_type > ARRAY_SIZE(irq_callbacks))
-    return ERR_INVAL_ARG;
-
-  irq_callbacks[irq_num + irq_type] = cb;
-  return ERR_OK;
-}
-
 void intr_ctl_dump_regs(const char* tag)
 {
   printf("ARM_TIMER_REGS: tag: %s\n", tag);

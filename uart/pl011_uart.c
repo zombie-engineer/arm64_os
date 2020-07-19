@@ -267,9 +267,6 @@ void pl011_uart_set_interrupt_mode()
   int interrupt_mask;
   pl011_rx_pipe_init();
 
-  intr_ctl_set_cb(INTR_CTL_IRQ_TYPE_GPU, INTR_CTL_IRQ_GPU_UART0,
-      pl011_uart_handle_interrupt);
-
   printf("pl011_uart_set_interrupt_mode"__endline);
 
   intr_ctl_gpu_irq_enable(INTR_CTL_IRQ_GPU_UART0);

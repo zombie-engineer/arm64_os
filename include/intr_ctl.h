@@ -2,10 +2,11 @@
 #include "reg_access.h"
 #include "gpio.h"
 
-// Optimizations in API is not a good thing, 
-// but still macro values are optimized for performance
-// as code that works with interrupt controller has to
-// be fast.
+/*
+ * Optimizations in API is not a good thing, but still
+ * macro values are optimized for performance as code
+ * that works with interrupt controller has to be fast.
+ */
 #define INTR_CTL_IRQ_TYPE_GPU 0
 #define INTR_CTL_IRQ_TYPE_ARM 64
 
@@ -28,8 +29,6 @@
 #define INTR_CTL_IRQ_ARM_ACCESS_ERR_TYPE_1 7
 #define INTR_CTL_IRQ_ARM_MAX               INTR_CTL_IRQ_ARM_ACCESS_ERR_TYPE_1
 
-typedef void (*intr_ctl_irq_cb)(void);
-
 uint32_t intr_ctl_read_pending_gpu_1();
 
 void intr_ctl_dump_regs(const char* tag);
@@ -49,8 +48,6 @@ int intr_ctl_gpu_irq_enable(int irq_num);
 int intr_ctl_arm_interrupt_enable(int irq_num);
 
 int intr_ctl_arm_interrupt_disable(int irq_num);
-
-int intr_ctl_set_cb(int irq_type, int irq_num, intr_ctl_irq_cb cb);
 
 void intr_ctl_arm_generic_timer_irq_enable(int cpu);
 
