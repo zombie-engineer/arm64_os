@@ -26,7 +26,9 @@ static int run_uart_thread()
 {
   task_t *t;
   t = task_create(pl011_io_thread, "pl011_io_thread");
-  if (t);
+  if (IS_ERR(t))
+    return PTR_ERR(t);
+  sched_queue_runnable_task(get_scheduler(), t);
   return ERR_OK;
 }
 
@@ -102,7 +104,7 @@ static void cpu_run(int cpu_num, void (*fn)(void))
 int init_func(void)
 {
   SCHED_DEBUG("starting init function");
-  // run_uart_thread();
+  BUG(run_uart_thread() != ERR_OK, "failed to run uart_thread");
   // run_cmdrunner_thread();
   BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   SCHED_REARM_TIMER;
@@ -110,8 +112,8 @@ int init_func(void)
   // cpu_run(1, cpu_test);
 
   while(1) {
-    asm volatile("wfe");
     yield();
+    asm volatile("wfe");
   }
 }
 
