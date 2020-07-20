@@ -81,7 +81,7 @@ char *strncpy(char *dst, const char *src, size_t n)
   char *res = dst;
   char tmp;
   while(n) {
-    tmp = *src++; 
+    tmp = *src++;
     *dst++ = tmp;
     n--;
     if (!tmp)
@@ -182,5 +182,5 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
       *dptr = 0;
       break;
     }
-  } 
+  }
 }

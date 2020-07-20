@@ -84,7 +84,7 @@ int usb_hub_enumerate_port_reset(usb_hub_t *h, int port)
         HUBPORTDBG("port: %d ENABLED", port);
         goto out_err;
       }
-    } 
+    }
   }
 out_err:
   return err;
@@ -103,7 +103,7 @@ static int usb_hub_port_connected(usb_hub_t *h, int port)
   err = usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_CONNECTION_CHANGE);
   CHECK_ERR_SILENT();
   HUBPORTDBG("CONNECTION_CHANGE cleared");
-  
+
   err = usb_hub_enumerate_port_reset(h, port);
   CHECK_ERR_SILENT();
 

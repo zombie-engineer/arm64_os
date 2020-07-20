@@ -87,15 +87,15 @@ typedef struct {
 #define SPI_DLEN ((reg32_t)(SPI_BASE + 0xc))
 
 typedef struct {
-  
+
 } __attribute__ ((packed)) spi_reg_dlen_t;
 
 typedef struct {
-  
+
 } __attribute__ ((packed)) spi_reg_ltoh_t;
 
 typedef struct {
-  
+
 } __attribute__ ((packed)) spi_reg_dc_t;
 
 
@@ -272,11 +272,11 @@ static int spi0_xmit(struct spi_dev *d, const char* bytes_in, char *bytes_out, u
       // printf("RX data: 0x%08x\n", rx_data);
     }
 
-    // printf("spi0_xmit: transmitting: %08x\n", bytes[i]); 
+    // printf("spi0_xmit: transmitting: %08x\n", bytes[i]);
     *SPI_FIFO = bytes_in[i];
     while((*SPI_CS & SPI_CS_DONE) == 0);
     //  puts("SPI_CS->DONE not yet\n");
-  } 
+  }
   *SPI_CS = 0;
   // puts("spi0_xmit complete\n");
   return ERR_OK;
@@ -298,25 +298,25 @@ int spi0_init()
   RET_IF_ERR(spi0_init_dev);
   *SPI_CLK = 256;
   *SPI_CS = SPI_CS_CLEAR;
-  printf("spi0_init_poll completed: SPI_CS: %08x\n>", *SPI_CS); 
+  printf("spi0_init_poll completed: SPI_CS: %08x\n>", *SPI_CS);
   RET_IF_ERR(spi0_init_dma);
   return ERR_OK;
 }
 
 
-static spi_dev_t *spi0_get_dev() 
+static spi_dev_t *spi0_get_dev()
 {
   return spi0_dev_initialized ? &spi0_dev.spidev : 0;
 }
 
 
-static spi_dev_t *spi1_get_dev() 
+static spi_dev_t *spi1_get_dev()
 {
   return spi1_dev_initialized ? &spi1_dev.spidev : 0;
 }
 
 
-static spi_dev_t *spi2_get_dev() 
+static spi_dev_t *spi2_get_dev()
 {
   return spi2_dev_initialized ? &spi2_dev.spidev : 0;
 }

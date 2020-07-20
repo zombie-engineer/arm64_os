@@ -48,7 +48,7 @@ typedef struct {
 
 int vcanvas_is_initialized()
 {
-  return vcanvas.initialization_key == VCANVAS_INITIALIZED_KEY; 
+  return vcanvas.initialization_key == VCANVAS_INITIALIZED_KEY;
 }
 
 static void vcanvas_set_initialized()
@@ -82,7 +82,7 @@ void vcanvas_init(int width, int height)
   vcanvas.fb.height = mbox_res.fb_height;
   vcanvas.fb.pitch = mbox_res.fb_pitch;
   vcanvas.fb.pixel_size = mbox_res.fb_pixel_size;
-  
+
   vcanvas.tabwidth = 4;
   num_viewports = 0;
   vcanvas_set_initialized();
@@ -100,13 +100,13 @@ static unsigned int * fb_get_pixel_addr(int x, int y)
 }
 
 static void vcanvas_draw_glyph(
-  psf_t *font, 
-  unsigned char *glyph, 
-  int x, 
-  int y, 
-  unsigned int max_size_x, 
-  unsigned int max_size_y, 
-  int fg_color, 
+  psf_t *font,
+  unsigned char *glyph,
+  int x,
+  int y,
+  unsigned int max_size_x,
+  unsigned int max_size_y,
+  int fg_color,
   int bg_color)
 {
   unsigned int _x, _y;
@@ -162,7 +162,7 @@ unsigned char * font_get_glyph(psf_t *font, char c)
 {
   int glyph_idx;
   unsigned char *glyphs;
-  
+
   // get offset to the glyph. Need to adjust this to support unicode..
   glyphs = ((unsigned char*)font) + font->headersize;
   glyph_idx = (c < font->numglyph) ? c : 0;
@@ -181,7 +181,7 @@ void vcanvas_putc(int* x, int* y, char chr)
       *x = 0;
       break;
     case CONSOLE_CHAR_LINEFEED:
-      *x = 0; 
+      *x = 0;
       (*y)++;
       break;
     case CONSOLE_CHAR_HORIZONTAL_TAB:
@@ -218,7 +218,7 @@ void vcanvas_puts(int *x, int *y, const char *s)
 
   while(*s) {
     if (*x >= (width_limit - 1)) {
-      if (*y >= (height_limit - 1)) 
+      if (*y >= (height_limit - 1))
         break;
       *x = 0;
       (*y)++;
@@ -270,7 +270,7 @@ void viewport_fill_rect(viewport_t *v, int x, int y, unsigned int size_x, unsign
 
   _size_x = (x + size_x > v->size_x) ? v->size_x - x : size_x;
   _size_y = (y + size_y > v->size_y) ? v->size_y - y : size_y;
-  
+
   vcanvas_fill_rect(_x, _y, _size_x, _size_y, color);
 }
 
@@ -344,12 +344,12 @@ int vcanvas_get_fontsize(int *size_x, int *size_y)
 
 void viewport_copy_rect_unsafe(viewport_t *v, int x0, int y0, int size_x, int size_y, int x1, int y1)
 {
-  int i; 
+  int i;
   char *src, *dst;
 
   src = (char *)fb_get_pixel_addr(v->pos_x + x0, v->pos_y + y0);
   dst = (char *)fb_get_pixel_addr(v->pos_x + x1, v->pos_y + y1);
-  
+
   for (i = 0; i < size_y; i++) {
     memcpy(dst, src, size_x * vcanvas.fb.pixel_size);
     src += vcanvas.fb.pitch;
@@ -375,7 +375,7 @@ void viewport_copy_rect(viewport_t *v, int x0, int y0, int size_x, int size_y, i
   r1.y.size = v->size_y;
 
   if (!get_intersection_regions(&r0, &r1, rs)) {
-    // r0 is outside viewport 
+    // r0 is outside viewport
     viewport_fill_rect(v, x1, y1, size_x, size_y, vcanvas.bg_color);
     return;
   }
@@ -385,7 +385,7 @@ void viewport_copy_rect(viewport_t *v, int x0, int y0, int size_x, int size_y, i
         continue;
       ir = RGN(xi, yi);
       if (ir->exists && ir->r.x.size && ir->r.y.size)
-        viewport_fill_rect(v, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1, ir->r.x.size, ir->r.y.size, vcanvas.bg_color); 
+        viewport_fill_rect(v, ir->r.x.offset - x0 + x1, ir->r.y.offset - y0 + y1, ir->r.x.size, ir->r.y.size, vcanvas.bg_color);
     }
   }
   ir = RGN(1, 1);

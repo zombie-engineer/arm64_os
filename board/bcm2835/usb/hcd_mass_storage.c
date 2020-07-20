@@ -44,7 +44,7 @@ int cbw_set_log_level(int level)
   CBW_ERR("err: %d " __fmt, err, ##__VA_ARGS__);\
   goto out_err;\
 }
- 
+
 #define CBW_DBG2_DUMP(__addr, __size)\
   hexdump_memory_ex(__CBW_DUMP_PREFIX(DEBUG2), 64, data, datasz);
 
@@ -68,15 +68,15 @@ void usb_hcd_mass_init()
 
 static inline void scsi_inquiry_data_to_string(char *buf, int bufsz, struct scsi_response_inquiry *data)
 {
-  snprintf(buf, bufsz, "version: %d, data_format: %d, add_length: %d, vendor: %s, product: %s\n", 
-    data->version, 
+  snprintf(buf, bufsz, "version: %d, data_format: %d, add_length: %d, vendor: %s, product: %s\n",
+    data->version,
     data->response_data_format,
     data->additional_length,
     data->vendor_id,
     data->product_id);
 }
 
-static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd, 
+static inline void scsi_fill_cmd_inquiry(struct scsi_op_inquiry *op, int evpd,
   int page_code, int allocation_length)
 {
   memset(op, 0, sizeof(*op));
@@ -419,7 +419,7 @@ hcd_mass_t *usb_mass_init_class(struct usb_hcd_device* d)
   else
     m->ep_in = ep_tmp;
 
-  MASSLOG("usb_mass_storage_init: OUT:ep%d, IN:ep%d", 
+  MASSLOG("usb_mass_storage_init: OUT:ep%d, IN:ep%d",
     hcd_endpoint_get_number(m->ep_out),
     hcd_endpoint_get_number(m->ep_in));
   m->d = d;

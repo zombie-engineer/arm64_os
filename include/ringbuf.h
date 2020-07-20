@@ -6,8 +6,8 @@ typedef struct ringbuf {
   /* linear array end */
   char *buf_end;
 
-  /* writes feed write_ptr, write_ptr extends until 
-   * it reaches read_ptr 
+  /* writes feed write_ptr, write_ptr extends until
+   * it reaches read_ptr
    */
   char *write_ptr;
 

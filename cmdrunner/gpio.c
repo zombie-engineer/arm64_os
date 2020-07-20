@@ -15,7 +15,7 @@ typedef struct gpio_function {
 
 typedef struct gpio_functions {
   gpio_function_t f[6];
-} gpio_functions_t; 
+} gpio_functions_t;
 
 static int gpio_functions_set = 0;
 
@@ -168,7 +168,7 @@ static int command_gpio_set_function(const string_tokens_t *args)
   return CMD_ERR_INVALID_ARGS;
 }
 
-static int command_gpio_get_functions(const string_tokens_t *args) 
+static int command_gpio_get_functions(const string_tokens_t *args)
 {
   int pin_idx, i;
   char *endptr;
@@ -227,7 +227,7 @@ static int command_gpio_set_pullupdown(const string_tokens_t *args)
     puts("gpio_set_pullupdown failed\n");
     return CMD_ERR_EXECUTION_ERR;
   }
-    
+
 
   printf("success: pin%d is set to %d\n", pin_idx, pullup_val);
   return CMD_ERR_NO_ERROR;

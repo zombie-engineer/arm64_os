@@ -56,11 +56,11 @@ static inline void print_usb_configuration_desc(const struct usb_configuration_d
 static inline void print_usb_endpoint_desc(struct usb_endpoint_descriptor *e)
 {
   printf("ep_desc:%p:type:%d,len:%d,ep_addr:%02x,attr:%02x,mpsz:%d,intv:%d\r\n",
-    e, 
+    e,
     e->header.descriptor_type,
     e->header.length,
     e->endpoint_address,
-    e->attributes, 
+    e->attributes,
     e->max_packet_size,
     e->interval
     );
@@ -93,7 +93,7 @@ static inline const char *usb_full_class_to_string(int class, int subclass, int 
       return "MASS_STORAGE_DEVICE";
     case USB_INTERFACE_CLASS_HID:
       switch (subclass) {
-        case 0: 
+        case 0:
           switch (proto) {
             case 0:  return "HID_NO_SUBCLASS_NO_PROTO";
             case 1:  return "HID_NO_SUBCLASS_KEYBOARD";
@@ -270,6 +270,6 @@ static inline const char *usb_speed_to_string(int s)
     case USB_SPEED_HIGH: return "HIGH";
     case USB_SPEED_FULL: return "FULL";
     case USB_SPEED_LOW : return "LOW";
-    default: return "UNDEFINED";                    
+    default: return "UNDEFINED";
   }
 }

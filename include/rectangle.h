@@ -18,7 +18,7 @@ int clip_segment(segment_t *s0, segment_t *s1);
  *
  * intersection_regions_t is in essence a 3 x 3 matrix, with elements composed
  * of rectangle objects plus the mark that this rect exists in intersection
- * 
+ *
  *  x-------x-------x-------x
  *  |       |       |       |
  *  | [0,0] | [0,1] | [0,2] |
@@ -34,7 +34,7 @@ int clip_segment(segment_t *s0, segment_t *s1);
  *  x-------x-------x-------x
  *
  *  in this 3 x 3 matrix, cell with coordinates x = 1, y = 1 is an intersection
- *  of r0 and r1 and all the cells around it are possible regions that are 
+ *  of r0 and r1 and all the cells around it are possible regions that are
  *  outside of the intersection. For example if r1 completely contains r0, then
  *  only cell 1:1 exists and there are not outside regions, if r0 is much bigger
  *  than r1, like below:
@@ -70,7 +70,7 @@ int clip_segment(segment_t *s0, segment_t *s1);
  *    -----------            |
  *    |                      |
  *    |                      |
- *    ------------------------, 
+ *    ------------------------,
  * there would exist 8 outside regions, like:
  *    ------------------------
  *  r0|r1       |r2          |
@@ -80,7 +80,7 @@ int clip_segment(segment_t *s0, segment_t *s1);
  *    -----------------------|
  *  r6|r7       |r8          |
  *    |         |            |
- *    ------------------------, 
+ *    ------------------------,
  * you can see, that after applying boundary, there are no left-side outter
  * rectangles, because r0 and r1 did not overlap from left-side
  */

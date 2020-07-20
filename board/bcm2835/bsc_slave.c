@@ -56,7 +56,7 @@ static int bsc_slave_init_as_i2c(char addr)
 
   gpio_set_handle_t gpio_set_handle;
 
-  gpio_set_handle = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), 
+  gpio_set_handle = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins),
       gpio_set_key_bsc_i2c_slave);
 
   if (gpio_set_handle == GPIO_SET_INVALID_HANDLE)
@@ -105,7 +105,7 @@ int bsc_slave_debug()
     printf("ris:%08x,icr:%08x,debug:%08x\r\n", ris, icr, debug_i2c);
     if ((dr & 0xff) == 0x66)
       break;
-  } 
+  }
   return ERR_OK;
 }
 

@@ -18,12 +18,12 @@ typedef struct gpio_set {
   gpio_set_mask_t mask;
 } gpio_set_t;
 
-static inline void gpio_set_mask_clear(gpio_set_mask_t* mask) 
+static inline void gpio_set_mask_clear(gpio_set_mask_t* mask)
 {
   *mask = 0;
 }
 
-static inline void gpio_set_mask_add(gpio_set_mask_t *mask, int gpio_num) 
+static inline void gpio_set_mask_add(gpio_set_mask_t *mask, int gpio_num)
 {
   *mask |= (1<<gpio_num);
 }

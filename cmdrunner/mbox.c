@@ -22,7 +22,7 @@ typedef struct {
 
 static clock_info_t clock_names[10];
 
-static clock_info_t* command_mbox_get_clock_infos(int *num) 
+static clock_info_t* command_mbox_get_clock_infos(int *num)
 {
   memset(&clock_names, 0, sizeof(clock_names));
 
@@ -57,18 +57,18 @@ static clock_info_t* command_mbox_get_clock_infos(int *num)
 
 static int command_mbox_get_clock_worker(const clock_info_t *i)
 {
-  uint32_t enabled, exists, clock_rate, 
-           min_clock_rate, max_clock_rate, 
+  uint32_t enabled, exists, clock_rate,
+           min_clock_rate, max_clock_rate,
            status;
 
   RUN_CHK_STATUS(mbox_get_clock_rate , (i->id, &clock_rate));
   RUN_CHK_STATUS(mbox_get_min_clock_rate , (i->id, &min_clock_rate));
   RUN_CHK_STATUS(mbox_get_max_clock_rate , (i->id, &max_clock_rate));
   RUN_CHK_STATUS(mbox_get_clock_state, (i->id, &enabled, &exists));
-  printf("\t%s: %s%s, %dHz, min: %dHz, max: %dHz\n", 
-    i->name, 
-    enabled ? " on" : "off", 
-    exists  ? "   "   : " ,x", 
+  printf("\t%s: %s%s, %dHz, min: %dHz, max: %dHz\n",
+    i->name,
+    enabled ? " on" : "off",
+    exists  ? "   "   : " ,x",
     clock_rate,
     min_clock_rate,
     max_clock_rate);

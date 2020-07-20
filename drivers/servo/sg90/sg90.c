@@ -26,10 +26,10 @@ static int servo_sg90_initialized = 0;
  *
  *
  *         1-2ms duty cycle
- *     >----------< 
- * 4.8v ___________ 
+ *     >----------<
+ * 4.8v ___________
  *     |          |
- *     |          | 
+ *     |          |
  *     |          |
  * 0v__|          |_____________________________
  *     ^                                    ^
@@ -43,7 +43,7 @@ static int servo_sg90_initialized = 0;
  * Implementation
  * 50Hz, 20ms period with 1-2ms dury cycle is implemented as follows
  * Raspberry PWM module sources from clock CM_CLK_ID_PWM which runs at 19.2MHz
- * The clock integral divisor is set to 192 resulting in 
+ * The clock integral divisor is set to 192 resulting in
  * 19 200 000 / 192 = 100 000 Hz.
  * The PWM is set to M/S mode. MSENn = 1
  *
@@ -52,7 +52,7 @@ static int servo_sg90_initialized = 0;
  *     <---------->
  *     ___________
  *     |          |
- *     |          | 
+ *     |          |
  *     |          |
  *   __|          |_____________________________
  *     ^                                    ^
@@ -61,8 +61,8 @@ static int servo_sg90_initialized = 0;
  *     .<---------------------------------->.
  *                     S
  *
- * In M/S mode at 100 000 Hz. The full period is set by S(PWM range register) 
- * and duty cycle is set by M(PWM data register) 
+ * In M/S mode at 100 000 Hz. The full period is set by S(PWM range register)
+ * and duty cycle is set by M(PWM data register)
  *
  * The math for M/S values is as follows:
  * at clock set 100 000 Hz: 1  sec = 100 000 ticks.
@@ -89,7 +89,7 @@ static int servo_sg90_set_angle(struct servo *servo, int angle)
   uint32_t data;
   float norm;
   int normal_angle;
-    
+
   struct servo_sg90 *s =
     container_of(servo, struct servo_sg90, servo);
 
@@ -97,8 +97,8 @@ static int servo_sg90_set_angle(struct servo *servo, int angle)
   normal_angle = min(normal_angle, SG90_MAX_DEGREE);
   normal_angle -= SG90_MIN_DEGREE;
   norm = ((float)(normal_angle)) / SG90_DEGREE_RANGE;
-  //printf("servo_sg90_set_angle:%p,%d,%d,%d\r\n", 
-  // s, 
+  //printf("servo_sg90_set_angle:%p,%d,%d,%d\r\n",
+  // s,
   // angle, normal_angle, (int)(SG90_RANGE * norm));
   data = SG90_RANGE_START + SG90_RANGE * norm;
   return s->pwm->set_data(s->pwm, data);

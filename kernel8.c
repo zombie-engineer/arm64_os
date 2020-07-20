@@ -110,8 +110,8 @@ void print_current_ex_level()
   unsigned long el;
   asm volatile("mrs %0, CurrentEL; lsr %0, %0, #2" : "=r"(el));
   printf("Executing at EL%d\n", el);
-  printf("HCR_EL2: %016lx (stored at %016lx)\n", 
-    __aarch64_hcr_el2_init_value, 
+  printf("HCR_EL2: %016lx (stored at %016lx)\n",
+    __aarch64_hcr_el2_init_value,
     &__aarch64_hcr_el2_init_value);
 }
 
@@ -131,7 +131,7 @@ void print_mbox_props()
   if (mbox_get_mac_addr(&buf[0], &buf[7]))
     printf("failed to get MAC addr\n");
   else
-    printf("mac address:     %02x:%02x:%02x:%02x:%02x:%02x\n", 
+    printf("mac address:     %02x:%02x:%02x:%02x:%02x:%02x\n",
       (int)(buf[0]),
       (int)(buf[1]),
       (int)(buf[2]),
@@ -143,15 +143,15 @@ void print_mbox_props()
   if (mbox_get_arm_memory(&val, &val2))
     printf("failed to get arm memory\n");
   else {
-    printf("arm memory base: %08x\n", val);  
-    printf("arm memory size: %08x\n", val2);  
+    printf("arm memory base: %08x\n", val);
+    printf("arm memory size: %08x\n", val2);
   }
 
   if (mbox_get_vc_memory(&val, &val2))
     printf("failed to get arm memory\n");
   else {
-    printf("vc memory base:  %08x\n", val);  
-    printf("vc memory size:  %08x\n", val2);  
+    printf("vc memory base:  %08x\n", val);
+    printf("vc memory size:  %08x\n", val2);
   }
   for (i = 0; i < 8; ++i) {
     if (mbox_get_clock_rate(i, &clock_rate))
@@ -164,7 +164,7 @@ void print_mbox_props()
   if (mbox_get_power_state(MBOX_DEVICE_ID_ ## x, (uint32_t*)&val, (uint32_t*)&val2))\
     puts("failed to get power state for device " #x "\r\n");\
   else\
-    printf("power_state: " #x ": on:%d,exists:%d\r\n", val, val2);  
+    printf("power_state: " #x ": on:%d,exists:%d\r\n", val, val2);
   GET_DEVICE_POWER_STATE(SD);
   GET_DEVICE_POWER_STATE(UART0);
   GET_DEVICE_POWER_STATE(UART1);
@@ -183,7 +183,7 @@ void wait_gpio()
   gpio_set_function(20, GPIO_FUNC_IN);
   // gpio_set_detect_high(20);
   gpio_set_detect_falling_edge(2);
-  
+
   intr_ctl_dump_regs("after set\n");
   while(1) {
     // f: 1111 b: 1011
@@ -233,9 +233,9 @@ void print_cache_stats()
 
 void print_mmu_stats()
 {
-  printf("ttbr0_el1: 0x%016lx ttbr1_el1: 0x%016lx, tcr_el1: 0x%016lx\n", 
-    arm_get_ttbr0_el1(), 
-    arm_get_ttbr1_el1(), 
+  printf("ttbr0_el1: 0x%016lx ttbr1_el1: 0x%016lx, tcr_el1: 0x%016lx\n",
+    arm_get_ttbr0_el1(),
+    arm_get_ttbr1_el1(),
     arm_get_tcr_el1());
 }
 

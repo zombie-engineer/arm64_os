@@ -47,8 +47,8 @@ static f5161ah_t dev_f5161ah;
 static int dev_f5161ah_initialized = 0;
 
 
-/* 7 - Segments pinout 
- * 
+/* 7 - Segments pinout
+ *
  *   G    F    GND     A    B
  *   9    8     7      6    5
  *   |    |     |      |    |
@@ -119,7 +119,7 @@ static uint8_t f5161ah_encode_char(uint8_t ch)
     case 9:
       return F5161AH_SEG_PIN_A | F5161AH_SEG_PIN_F | F5161AH_SEG_PIN_B | F5161AH_SEG_PIN_G | F5161AH_SEG_PIN_C | F5161AH_SEG_PIN_D;
   }
-  
+
   return 0;
 }
 
@@ -170,6 +170,6 @@ int f5161ah_display_char(uint8_t ch, uint8_t dot)
     printf("f5161ah_display_char: shiftreg_pulse_rclk failed with error %d\n", st);
     return -1;
   }
-  
+
   return 0;
 }

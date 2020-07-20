@@ -85,8 +85,8 @@ long long int strtoll(const char *str, char **endptr, int basis)
       // forward walk
       for(bptr = ptr; *bptr; bptr++) {
         c = *bptr;
-        if ((unsigned char)(c -'0') > 9 
-            && ((unsigned char)(c - 'a') > 5) 
+        if ((unsigned char)(c -'0') > 9
+            && ((unsigned char)(c - 'a') > 5)
             && ((unsigned char)(c - 'A') > 5))
           break;
       }

@@ -140,9 +140,9 @@ void usb_hid_parse_report_descriptor(const void *buf, int bufsz)
     }
     for (; item_size; item_size--) {
       PARSER_FETCH_CHAR(data);
-      printf(" %02x", data); 
+      printf(" %02x", data);
     }
-    
+
     puts("\r\n");
    // ptr += item_size;
   }

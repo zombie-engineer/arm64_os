@@ -44,7 +44,7 @@ static int bcm2835_systimer_set(uint32_t usec)
   return ERR_OK;
 }
 
-static void bcm2835_systimer_info_reset(bcm2835_systimer_t *t) 
+static void bcm2835_systimer_info_reset(bcm2835_systimer_t *t)
 {
   memset(t, 0, sizeof(*t));
 }
@@ -91,7 +91,7 @@ uint32_t bcm2835_systimer_get_min_set_time()
     kernel_panic("bcm2835_systimer_get_min_set_time should not be called after timer is set\n");
 
   max_delta = 0;
-  // While loop here to calculate time range only when 
+  // While loop here to calculate time range only when
   // non overflowed values
   for (i = 0; i < num_samples; ++i) {
     while(1) {

@@ -49,7 +49,7 @@ typedef struct mbox_set_fb_res {
   uint32_t fb_width;
   uint32_t fb_height;
   uint32_t fb_pitch;
-  uint32_t fb_pixel_size; 
+  uint32_t fb_pixel_size;
 } mbox_set_fb_res_t;
 
 int mbox_set_fb(mbox_set_fb_args_t *args, mbox_set_fb_res_t *res);

@@ -18,7 +18,7 @@ int fn(__VA_ARGS__) \
   if (!spidev) { \
     puts(#fn " error: max7219 driver not initialized\n"); \
     return -1; \
-  } 
+  }
 
 #define MAX7219_ADDR_NOOP         0x00
 #define MAX7219_ADDR_DIGIT_0      0x01
@@ -103,9 +103,9 @@ DECL_CHECKED_FUNC(max7219_set_intensity, uint8_t value)
 
 
 DECL_CHECKED_FUNC(max7219_set_decode_mode, uint8_t value)
-  if  (value != MAX7219_DATA_DECODE_MODE_NO 
+  if  (value != MAX7219_DATA_DECODE_MODE_NO
     && value != MAX7219_DATA_DECODE_MODE_B0
-    && value != MAX7219_DATA_DECODE_MODE_B30 
+    && value != MAX7219_DATA_DECODE_MODE_B30
     && value != MAX7219_DATA_DECODE_MODE_B70)
     return -1;
 

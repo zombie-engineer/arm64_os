@@ -30,10 +30,10 @@ static inline void print_reg(reg32_t reg, uint32_t val, reg_printer p, int is_wr
     else
       reg_printer_simple(val_string, sizeof(val_string), val);
 
-    DWCDEBUG2("__xfer:%s:%s:%08x:%s", 
+    DWCDEBUG2("__xfer:%s:%s:%08x:%s",
       is_write_op ? "wr" : "rd",
-      reg_to_string(reg), 
-      reg, 
+      reg_to_string(reg),
+      reg,
       val_string);
   }
 }

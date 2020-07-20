@@ -34,7 +34,7 @@ typedef struct  {
   int len;
 } history_element_t;
 
-typedef struct { 
+typedef struct {
   history_element_t h[MAX_HISTORY_LINES];
   int current;
   int last;
@@ -46,16 +46,16 @@ static char inputbuf[CMDLINE_BUF_SIZE];
 static char *inputbuf_end;
 static char *inputbuf_carret;
 
-static int cmdrunner_history_prev() 
+static int cmdrunner_history_prev()
 {
   int tmp_current;
   tmp_current = hist.current;
-  if (hist.current == 0) { 
+  if (hist.current == 0) {
     if (hist.h[MAX_HISTORY_LINES - 2].s[0])
       hist.current = MAX_HISTORY_LINES - 2;
-  } else { 
-    if (hist.h[hist.current - 1].s[0]) 
-      hist.current--; 
+  } else {
+    if (hist.h[hist.current - 1].s[0])
+      hist.current--;
   }
   return hist.current != tmp_current;
 }
@@ -66,7 +66,7 @@ static int cmdrunner_history_next()
   tmp_current = hist.current;
 
   if (hist.current + 1 != MAX_HISTORY_LINES) {
-    if (hist.h[hist.current + 1].s[0]) 
+    if (hist.h[hist.current + 1].s[0])
       hist.current++;
   }
   else
@@ -86,7 +86,7 @@ static void cmdrunner_backspace(void)
   putc(CONSOLE_CHAR_BACKSPACE);
 }
 
-static void cmdrunner_clear_line(void) 
+static void cmdrunner_clear_line(void)
 {
   while (inputbuf_carret > inputbuf)
     cmdrunner_backspace();
@@ -123,7 +123,7 @@ static void cmdrunner_history_put()
 }
 
 
-static const char *cmdrunner_err_to_str(int err) 
+static const char *cmdrunner_err_to_str(int err)
 {
 #define CASE(a) case a: return #a
   switch(err) {
@@ -183,7 +183,7 @@ static void cmdrunner_history_scroll_down()
     cmdrunner_history_fetch();
 }
 
-static void cmdrunner_on_arrow_up(void) 
+static void cmdrunner_on_arrow_up(void)
 {
   int x, y;
   x = y = 0;
@@ -191,7 +191,7 @@ static void cmdrunner_on_arrow_up(void)
   vcanvas_puts(&x, &y, "UP");
 }
 
-static void cmdrunner_on_arrow_down(void) 
+static void cmdrunner_on_arrow_down(void)
 {
   int x, y;
   x = y = 0;
@@ -231,8 +231,8 @@ void cmdrunner_init(void)
 }
 
 int cmdrunner_add_cmd(
-  const char *name, 
-  const char *description, 
+  const char *name,
+  const char *description,
   cmd_func func)
 {
   if (num_commands == COMMAND_MAX_COUNT)
@@ -269,7 +269,7 @@ int cmdrunner_handle_char(cmdrunner_state_t *s, char c)
       s->escbuflen = 0;
     }
     return ERR_OK;
-  } 
+  }
 
   if (c == CONSOLE_CHAR_ESC) {
     // vcanvas_puts(&x, &y, "ESC");

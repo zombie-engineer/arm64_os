@@ -82,7 +82,7 @@ static void textviewport_scrolldown(textviewport_t *tv, unsigned int lines)
   pos_x = 0;
   while(tv->charpos_y && lines) {
     for (i = 0; i < tv->maxchars_y; ++i) {
-      pos_y0 = tv->fontsize_y * (i + 1); 
+      pos_y0 = tv->fontsize_y * (i + 1);
       pos_y1 = pos_y0 - size_y;
       viewport_copy_rect(tv->viewport, pos_x, pos_y0, size_x, size_y, pos_x, pos_y1);
     }
@@ -104,7 +104,7 @@ static void textviewport_backspace(textviewport_t *tv)
 {
   if (tv->charpos_x) {
     tv->charpos_x--;
-    viewport_fill_rect(tv->viewport, 
+    viewport_fill_rect(tv->viewport,
       tv->charpos_x * tv->fontsize_x,
       tv->charpos_y * tv->fontsize_y,
       tv->fontsize_x,

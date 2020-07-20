@@ -65,7 +65,7 @@ static int command_clock_set(const string_tokens_t *args)
     puts("error: invalid clock source argument\n");
     return CMD_ERR_INVALID_ARGS;
   }
-  
+
   GET_NUMERIC_PARAM(divi, uint32_t, 2, "divi");
 
   divf = 0;

@@ -4,7 +4,7 @@
 #include <config.h>
 
 /*
- * __percpu_func - is a hint notice to indicate this function runs in percpu 
+ * __percpu_func - is a hint notice to indicate this function runs in percpu
  * context, in other words the function will access/modify data, that is
  * related to exactly to the id of currently running CPU/CORE.
  */
@@ -25,7 +25,7 @@
 
 /*
  * Structure that stores information per processing unit.
- * For best cache performance each per-cpu context should be 
+ * For best cache performance each per-cpu context should be
  * aligned to cache line width. This way writing to one will
  * not invalidate others.
  */

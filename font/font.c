@@ -44,14 +44,14 @@ int font_get_font(const char *name, const font_desc_t **f)
 }
 
 //static const uint8_t *font_get_glyph(const font_desc_t *f, char c)
-//{   
+//{
 //  /*       c2      glyph_cols = 5
 //   *    c1 /       glyph_rows = 3
 //   * c0 / /c3
 //   * / / / /
 //   * 0 1 2 3 4 <- row 0
 //   * 5 6 7 8 9 <- row 1
-//   * a b c d e <- row 2 
+//   * a b c d e <- row 2
 //   *
 //   * 'd' is r2;c4 , r =  13(0xd) / glyph_cols = 2; c = 14 % glyph_cols = 3
 //   */
@@ -59,8 +59,8 @@ int font_get_font(const char *name, const font_desc_t **f)
 //  int x, y;
 //  const uint8_t *base;
 //
-//  if (c < 0x20) 
-//    c = '.'; 
+//  if (c < 0x20)
+//    c = '.';
 //  c -= 0x20;
 //
 //  y = c / f->glyphs_per_x;
@@ -81,7 +81,7 @@ int font_get_font(const char *name, const font_desc_t **f)
 //  int byte_off, bit_off;
 //  char val;
 //
-//  if (c->size_x <= x || c->size_y <= y)  
+//  if (c->size_x <= x || c->size_y <= y)
 //    return;
 //
 //  byte_off = x / c->pixels_per_byte + y * c->stride;

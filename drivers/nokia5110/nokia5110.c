@@ -82,7 +82,7 @@ static uint8_t nokia5110_canvas[NOKIA5110_CANVAS_SIZE];
 
 #define SEND_DATA(data, len) SET_DATA(); SPI_SEND(data, len)
 
-int nokia5110_send_data(const void *data, size_t sz) 
+int nokia5110_send_data(const void *data, size_t sz)
 {
   int ret;
   gpio_set_on(nokia5110_dev->dc);
@@ -98,7 +98,7 @@ int nokia5110_send_data_dma(const void *data, size_t sz)
   return ret;
 }
 
-#define SEND_DATA_DMA(data, len) 
+#define SEND_DATA_DMA(data, len)
 
 
 
@@ -116,7 +116,7 @@ int nokia5110_send_data_dma(const void *data, size_t sz)
 //}
 
 int nokia5110_init(spi_dev_t *spidev, uint32_t rst_pin, uint32_t dc_pin, int function_flags, int display_mode)
-{ 
+{
   int err;
   if (!spidev)
     return ERR_INVAL_ARG;

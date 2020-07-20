@@ -9,7 +9,7 @@
 #define DUMPSIZE_WORDS       4
 #define DUMPSIZE_DOUBLEWORDS 8
 
-static void memdump_dump_bytes(const char *ptr, size_t sz) 
+static void memdump_dump_bytes(const char *ptr, size_t sz)
 {
   int i;
   for (i = 0; i < min(sz, 8); i++)
@@ -22,17 +22,17 @@ static void memdump_dump_bytes(const char *ptr, size_t sz)
     printf("%02x ", *(ptr++));
 }
 
-static void memdump_dump_halfwords(const char *ptr, size_t sz) 
+static void memdump_dump_halfwords(const char *ptr, size_t sz)
 {
 
 }
 
-static void memdump_dump_words(const char *ptr, size_t sz) 
+static void memdump_dump_words(const char *ptr, size_t sz)
 {
 
 }
 
-static void memdump_dump_doublewords(const char *ptr, size_t sz) 
+static void memdump_dump_doublewords(const char *ptr, size_t sz)
 {
 
 }
@@ -50,13 +50,13 @@ static int memdump_print_help()
   return CMD_ERR_NO_ERROR;
 }
 
-int command_memdump_get_elementsize(char c) 
+int command_memdump_get_elementsize(char c)
 {
   switch (c) {
     case 'H': return DUMPSIZE_HALFWORDS;
     case 'W': return DUMPSIZE_WORDS;
     case 'D': return DUMPSIZE_DOUBLEWORDS;
-    case 'B': 
+    case 'B':
     default : return DUMPSIZE_BYTES;
   }
 }

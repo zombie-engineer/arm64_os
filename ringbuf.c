@@ -6,7 +6,7 @@
 #include <string.h>
 #endif
 
-void ringbuf_init(ringbuf_t *r, char *buf, int sz) 
+void ringbuf_init(ringbuf_t *r, char *buf, int sz)
 {
   r->buf = r->write_ptr = r->read_ptr = buf;
   r->buf_end = buf + sz;
@@ -26,7 +26,7 @@ void * ring_memcpy(void *dst, const void *src, size_t n)
   int i;
   for (i = 0; i < n; ++i)
     *(d++) = *(s++);
-    
+
 //  asm volatile (
 //      "mov   x0, %0\n"
 //      "mov   x1, %1\n"
@@ -37,7 +37,7 @@ void * ring_memcpy(void *dst, const void *src, size_t n)
 //      "1:\n"
 //      "cmp   x1, x2\n"
 //      "ldrb  w3, [x1]\n"
-//      "strb  w3, [x2]\n" 
+//      "strb  w3, [x2]\n"
 //      "add   x1, x1, #1\n"
 //      "add   x2, x2, #1\n"
 //      "bne   1b\n"
@@ -48,14 +48,14 @@ void * ring_memcpy(void *dst, const void *src, size_t n)
   return dst;
 }
 
-int ringbuf_read(ringbuf_t *r, char *dst, int sz) 
+int ringbuf_read(ringbuf_t *r, char *dst, int sz)
 {
   /*
-  | --------*-------|   
-  | ++++++*-*-------|   
-  | ++++++*-------*-|   
-  | ++++++++++++++*-|   
-  | ----*+++++++++*-|   
+  | --------*-------|
+  | ++++++*-*-------|
+  | ++++++*-------*-|
+  | ++++++++++++++*-|
+  | ----*+++++++++*-|
   */
   int io_sz;
   int progress = 0;
@@ -68,13 +68,13 @@ int ringbuf_read(ringbuf_t *r, char *dst, int sz)
     io_sz = min(r->write_ptr - r->buf, sz - progress);
     if (io_sz) {
       r->read_is_ahead = 0;
-      ring_memcpy(dst + progress, r->buf, io_sz); 
+      ring_memcpy(dst + progress, r->buf, io_sz);
       r->read_ptr = r->buf + io_sz;
       progress += io_sz;
     }
   } else {
     io_sz = min(r->write_ptr - r->read_ptr, sz);
-    ring_memcpy(dst, r->read_ptr, io_sz); 
+    ring_memcpy(dst, r->read_ptr, io_sz);
     progress += io_sz;
     r->read_ptr += io_sz;
   }

@@ -114,7 +114,7 @@ static int command_f5161ah_countdown(const string_tokens_t *args) {
       wait_msec(msec);
     }
   }
-  
+
   return CMD_ERR_NO_ERROR;
 }
 

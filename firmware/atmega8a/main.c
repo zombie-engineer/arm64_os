@@ -53,7 +53,7 @@ extern void countdown_32(uint16_t count_hi, uint16_t count_low);
 //#define PIN_OFF(port, pin) PORT ## port &= ~_BV(pin)
 //#define PIN_MODE_OUT(port, pin) DDR ## port |= _BV(pin)
 
-//void __attribute__((optimize("O2"))) blink() 
+//void __attribute__((optimize("O2"))) blink()
 //{
 //  char *blinker = (char *)0x100;
 //  if (*blinker == 1) {
@@ -180,14 +180,14 @@ static inline void atmcmd_signature()
   SPDR = 0x71;
 }
 
-__attribute__((optimize("O2"))) 
+__attribute__((optimize("O2")))
 ISR(SPI_STC_vect)
 {
   char cmd;
   cmd = SPDR;
   switch(atmcmd_status) {
     case ATMCMD_STATUS_IDLE:
-      atmcmd_cmd(cmd); 
+      atmcmd_cmd(cmd);
       break;
     case ATMCMD_STATUS_SEND_SIGN1:
       atmcmd_signature();
@@ -201,7 +201,7 @@ ISR(SPI_STC_vect)
 
 static char chan = 0;
 
-__attribute__((optimize("O2"))) 
+__attribute__((optimize("O2")))
 ISR(ADC_vect)
 {
   adc_value_low = ADCL;
@@ -277,7 +277,7 @@ ISR(TWI_vect)
   }
   // Clear TWINT Flag
   TWCR |= (1<<TWINT);
-  
+
   // Enable Global Interrupt
   sei();
 }
@@ -306,8 +306,8 @@ static inline void atmcmd_start()
 //  PORTC |= ((1<<PINC4) | (1<<PINC5));
 //  // Initial I2C Slave
 //  TWAR = I2CSLAVE_ADDR & 0xfe; // Set I2C Address, Ignore I2C General address 0x00
-//  TWDR = 0x00;                 // Default value 
-//  
+//  TWDR = 0x00;                 // Default value
+//
 //  // Start Slave Listening: Clear TWINT Flag, Enable ACK, Enable TWI, TWI Interrupt Enable
 //  TWCR = (1<<TWINT) | (1<<TWEA) | (1<<TWEN) | (1<<TWIE);
 //  // Enable Global Interrupt
@@ -342,7 +342,7 @@ static inline void on_startup_blink(void)
     asm volatile ("nop\r\nnop\r\nnop\r\n");\
     PORTB |= (1<<SS);
 
-static inline __attribute__((optimize("O2"))) void adc_sample(int ch) 
+static inline __attribute__((optimize("O2"))) void adc_sample(int ch)
 {
     ADCSRA = 0;
     asm volatile("nop");
@@ -358,7 +358,7 @@ static inline __attribute__((optimize("O2"))) void adc_sample(int ch)
     SPI_SEND(adc_value_high);
 }
 
-static inline void __attribute__((optimize("O2"))) adc_loop() 
+static inline void __attribute__((optimize("O2"))) adc_loop()
 {
   while(1) {
     adc_sample(0);

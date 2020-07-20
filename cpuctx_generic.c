@@ -38,7 +38,7 @@ int cpuctx_binblock_fill_regs(const void *ctx, binblock_cpuctx_t *binblock)
 typedef struct cpuctx_print_reg_arg {
   cpuctx_print_regs_cb print;
   void *print_priv;
-} cpuctx_print_reg_arg_t; 
+} cpuctx_print_reg_arg_t;
 
 static int cpuctx_print_reg(const cpu_reg_t *r, int reg_idx, void *cb_priv)
 {

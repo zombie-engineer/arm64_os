@@ -73,7 +73,7 @@
 
 static ALIGNED(32) dma_cb_t dma_channels[16];
 
-int dma_set_transfer_width(int channel, int width) 
+int dma_set_transfer_width(int channel, int width)
 {
   int ti = *DMA_TI(channel);
   if (width == DMA_TRANSFER_WIDTH_32BIT) {
@@ -82,7 +82,7 @@ int dma_set_transfer_width(int channel, int width)
   } else if (width == DMA_TRANSFER_WIDTH_128BIT) {
     ti |= DMA_TI_SRC_WIDTH;
     ti |= DMA_TI_DEST_WIDTH;
-  } else 
+  } else
     return ERR_INVAL_ARG;
 
   *DMA_TI(channel) = ti;
@@ -130,7 +130,7 @@ int dma_reset(int channel)
   return ERR_OK;
 }
 
-int dma_setup(dma_ch_opts_t *o) 
+int dma_setup(dma_ch_opts_t *o)
 {
   dma_cb_t *cb = &dma_channels[o->channel];
 

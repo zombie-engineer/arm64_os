@@ -57,10 +57,10 @@ static inline int atmega8a_is_init()
 #define _FLASH_WORD_ADDR(word_addr)  (((word_addr)&0xf00)|(((word_addr)&0xff)<<16))
 #define _EEPROM_BYTE_ADDR(byte_addr) (((byte_addr)&0x100)|(((byte_addr)&0xff)<<16))
 
-/* CMD_FLASH_READ_BYTE 
+/* CMD_FLASH_READ_BYTE
  * Instruction format:
  * [0010 H000][0000 aaaa][bbbb bbbb][oooo oooo]
- * H - high or low byte of a word 
+ * H - high or low byte of a word
  * aaaa bbbb bbbb - word address 0 - 4095
  *
  * Flash memory is 128 Pages of 32 Words each. Word size = 2 bytes.
@@ -76,7 +76,7 @@ static inline int atmega8a_is_init()
 /* CMD_FLASH_LOAD_BYTE
  * Instruction format:
  * [0100 H000][0000 xxxx][xxxb bbbb][iiii iiii]
- * H - high or low byte of a word 
+ * H - high or low byte of a word
  * b bbbb - word address in page 0-31
  */
 #define CMD_FLASH_LOAD_BYTE(word_addr, H, byte) (0x40|_FLASH_WORD_BYTE(H)|(word_addr&0b11111)<<16|((byte&0xff)<<24))
@@ -215,19 +215,19 @@ int atmega8a_drop_spi()
 int atmega8a_deinit()
 {
   int err = atmega8a_drop_spi();
-  if (err) 
+  if (err)
     return err;
 
   gpio_set_off(atmega8a_dev.gpio_pin_reset);
   gpio_set_function(atmega8a_dev.gpio_pin_reset, GPIO_FUNC_OUT);
   err = gpio_set_release(atmega8a_dev.gpio_set_handle, atmega8a_reset_key);
   if (err != ERR_OK) {
-    printf("atmega8a_deinit: failed to release gpioset:%d:%s:%d\r\n", 
+    printf("atmega8a_deinit: failed to release gpioset:%d:%s:%d\r\n",
         atmega8a_dev.gpio_set_handle,
         atmega8a_reset_key, err);
     return err;
   }
-  
+
   printf("atmega8a_deinit:%d .\r\n", err);
   return err;
 }
@@ -276,7 +276,7 @@ static int atmega8a_flash_page_fill(const uint8_t *src)
   return ERR_OK;
 }
 
-static int atmega8a_flash_page_write(int page, int check_value, int check_addr) 
+static int atmega8a_flash_page_write(int page, int check_value, int check_addr)
 {
   char res[4];
   char cmd[4];
@@ -317,7 +317,7 @@ static int atmega8a_flash_page_write(int page, int check_value, int check_addr)
       if (atmega8a_cmd(atmega8a_dev.spi, cmd, res) != ERR_OK)
         return ERR_FATAL;
 
-      if (res[3] == check_value) 
+      if (res[3] == check_value)
         goto success;
 
       wait_msec(500);
@@ -396,7 +396,7 @@ int atmega8a_write_flash(const void *buf, int sz, int from_page)
   }
 
   atlog("Pages %d to %d successfully written to flash memory.",
-    from_page, 
+    from_page,
     end_page - 1);
 
   return ERR_OK;
@@ -406,7 +406,7 @@ int atmega8a_read_flash_memory(void *buf, int sz, int byte_addr)
 {
   char res[4];
   char cmd[4] = { 0x20, 0x00, 0x00, 0x00 };
-  char *ptr = (char *)buf; 
+  char *ptr = (char *)buf;
   char *end = ptr + sz;
   uint16_t wordaddr = byte_addr / 2;
   int high = byte_addr & 1;
@@ -433,7 +433,7 @@ int atmega8a_write_eeprom(const void *buf, int sz, int byte_addr)
   char res[4];
   char cmd[4] = { 0xc0, 0x00, 0x00, 0x00 };
 
-  char *src = (char *)buf; 
+  char *src = (char *)buf;
   int i;
   for (i = 0; i < sz; ++i) {
     cmd[1] = (byte_addr >> 8) & 1;
@@ -451,7 +451,7 @@ int atmega8a_read_eeprom_memory(void *buf, int sz, int addr)
 {
   char res[4];
   char cmd[4] = { 0xa0, 0x00, 0x00, 0x00 };
-  char *ptr = (char *)buf; 
+  char *ptr = (char *)buf;
   size_t i;
   for (i = 0; i < sz; ++i) {
     cmd[1] = ((addr + i) >> 8) & 1;
@@ -558,11 +558,11 @@ int atmega8a_lock_bits_describe(char *buf, int bufsz, char lock_bits)
 
   n = 0;
   is_before = 0;
-  
+
   for (i = 0; i < ARRAY_SIZE(descs) - 1; ++i) {
-    n += snprintf(buf + n, bufsz - n, 
-        "%s%s:%c", 
-        is_before ? "," : "", 
+    n += snprintf(buf + n, bufsz - n,
+        "%s%s:%c",
+        is_before ? "," : "",
         descs[i],
         // lock bit is programmed when it is "0"
         // "1" for unprogrammed
@@ -654,7 +654,7 @@ static inline void on_sample(uint16_t value)
       return;
     y_norm = (float)v / 0x3ff;
     y = 24 * y_norm;
-     
+
     nokia5110_draw_dot(x, y);
     nokia5110_draw_dot(x, 24);
     if (++x > NOKIA5110_PIXEL_SIZE_X) {

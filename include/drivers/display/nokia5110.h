@@ -2,7 +2,7 @@
 #include <spi.h>
 #include <font.h>
 
-#define NOKIA5110_PIXEL_SIZE_X    84 
+#define NOKIA5110_PIXEL_SIZE_X    84
 #define NOKIA5110_PIXEL_SIZE_Y    48
 
 #define NOKIA5110_ROW_MAX (NOKIA5110_PIXEL_SIZE_Y / 8 - 1)
@@ -25,7 +25,7 @@
 #define NOKIA5110_FUNCF_PD_MODE     4
 
 // initialize nokia5110 display
-// spidev         - SPI device object that will provide data transfer via SPI protocol MOSI, SCLK and CS0 pins 
+// spidev         - SPI device object that will provide data transfer via SPI protocol MOSI, SCLK and CS0 pins
 // rst_pin        - GPIO pin number for RST role
 // dc_pin         - GPIO pin number for D/C role
 // function_flags - NOKIA5110_FUNCF_* flags that describe mode of operation
@@ -67,16 +67,16 @@ int nokia5110_draw_dot(int x, int y);
 // Updates current cursor position
 int nokia5110_draw_char(char c);
 
-// Draw a line 
+// Draw a line
 int nokia5110_draw_line(int x0, int y0, int x1, int y1);
 
-// Draw rectangle 
+// Draw rectangle
 int nokia5110_draw_rect(int x, int y, int sx, int sy);
 
 // Set current font
 void nokia5110_set_font(const font_desc_t *f);
 
-// Draw text using currently set font starting from 
+// Draw text using currently set font starting from
 // coordinates x,y
 int nokia5110_draw_text(const char *text, int x, int y);
 

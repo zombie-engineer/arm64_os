@@ -44,7 +44,7 @@ void test_perf_sprintf()
   char buf[1024];
   int n, i;
   uint64_t ts1, ts2;
-  printf("Running test_perf_sprintf. generic counter freq: %d Hz\n", 
+  printf("Running test_perf_sprintf. generic counter freq: %d Hz\n",
       get_cpu_counter_64_freq());
 
 #define TEST_SPRINTF_PERF(exp, exp_n, fmt, ...)\

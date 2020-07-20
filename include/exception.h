@@ -14,9 +14,9 @@ void generate_exception();
 void __handle_interrupt();
 
 typedef struct exception_info {
-  uint64_t esr; 
-  uint64_t spsr; 
-  uint64_t elr; 
+  uint64_t esr;
+  uint64_t spsr;
+  uint64_t elr;
   uint64_t far;
   uint64_t type;
   void *cpu_ctx;

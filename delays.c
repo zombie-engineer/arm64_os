@@ -10,7 +10,7 @@
 
 void wait_cycles(uint32_t n)
 {
-  if (n) 
+  if (n)
     while(n--);
 }
 

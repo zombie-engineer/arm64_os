@@ -51,12 +51,12 @@ void cmdrunner_init(void);
 
 /* add command to command runner */
 int cmdrunner_add_cmd(
-  const char *name, 
-  const char *description, 
+  const char *name,
+  const char *description,
   cmd_func);
 
 
-/* helper macro to add command. Addition of all commands 
+/* helper macro to add command. Addition of all commands
  * is built around this macro.
  */
 #define CMDRUNNER_ADD_CMD(cmd) \
@@ -81,7 +81,7 @@ typedef int (*iter_cmd_cb)(command_t* cmd);
 
 
 /* iterate all registered command and execute a callback function
- * for each of them. Iteration stops when all commands are 
+ * for each of them. Iteration stops when all commands are
  * iterated or when callback function returns non-zero.
  */
 void cmdrunner_iterate_commands(iter_cmd_cb cb);

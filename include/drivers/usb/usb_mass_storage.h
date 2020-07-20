@@ -19,8 +19,8 @@ typedef struct usb_hcd_device_class_mass {
    */
   struct usb_hcd_device_class_base base;
 
-  struct usb_hcd_endpoint *ep_out; 
-  struct usb_hcd_endpoint *ep_in; 
+  struct usb_hcd_endpoint *ep_out;
+  struct usb_hcd_endpoint *ep_in;
 } hcd_mass_t;
 
 static inline hcd_mass_t *usb_hcd_device_to_mass(struct usb_hcd_device *d)

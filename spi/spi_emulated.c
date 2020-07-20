@@ -63,7 +63,7 @@ spi_emulated_dev_t *__spi_emulated_alloc()
 
 void __spi_emulated_release(struct spi_emulated_dev *dev)
 {
-  list_move(&dev->spi_emulated_list, &spi_emulated_free);  
+  list_move(&dev->spi_emulated_list, &spi_emulated_free);
 }
 
 static int spi_emulated_verbose_output = 0;
@@ -103,10 +103,10 @@ static inline int spi_emulated_ce0_clear(struct spi_emulated_dev *d)
   gpio_set_off(d->sclk_gpio_pin);             \
   wait_usec(d->clk_half_period);
 
-static int spi_emulated_xmit_bit(spi_dev_t *spidev, 
+static int spi_emulated_xmit_bit(spi_dev_t *spidev,
     uint8_t bit_in, uint8_t *bit_out)
 {
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 
   if (spi_emulated_verbose_output)
@@ -127,10 +127,10 @@ static int spi_emulated_xmit_bit(spi_dev_t *spidev,
   return ERR_OK;
 }
 
-static inline OPTIMIZED void spi_emulated_slave_xmit_bit(spi_dev_t *spidev, 
+static inline OPTIMIZED void spi_emulated_slave_xmit_bit(spi_dev_t *spidev,
     uint8_t bit_in, uint8_t *bit_out)
 {
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 
   if (bit_out && d->mosi_gpio_pin != -1)
@@ -159,7 +159,7 @@ static int spi_emulated_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_ou
   int i, err;
   char out;
 
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 
   if (spi_emulated_verbose_output)
@@ -199,7 +199,7 @@ static void spi_emulated_slave_wait_ce0(spi_emulated_dev_t *spidev)
 //    lev1 = *(uint32_t *)GPIO_REG_GPLEV1;
 //    printf("%08x%08x\r\n", lev0, lev1);
 //  }
- // printf("spi_emulated_slave_wait_sclk_rise:sclk at gpio_pin:%d\r\n", 
+ // printf("spi_emulated_slave_wait_sclk_rise:sclk at gpio_pin:%d\r\n",
    //   spidev->sclk_gpio_pin);
 //  while(gpio_is_set(spidev->sclk_gpio_pin)) {
 //  }
@@ -212,7 +212,7 @@ struct spi_slave_stats spi_slave_stats = { 0 };
 static int __attribute__((optimize("O3"))) spi_emulated_slave_xmit_byte(spi_dev_t *spidev, char byte_in, char *byte_out)
 {
   // char from_mosi;
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 #define STATE_WAIT_CE0 0
 #define STATE_EXPECT_SCLK_DROP 1
@@ -288,7 +288,7 @@ static int spi_emulated_slave_xmit(spi_dev_t *spidev, const char* bytes_in, char
 {
   int i, j;
   char from_mosi;
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 
   for (j = 0; j < len; ++j) {
@@ -309,7 +309,7 @@ static int spi_emulated_xmit(spi_dev_t *spidev, const char* bytes_in, char *byte
 {
   int i, j, st;
   char out;
-  struct spi_emulated_dev *d = container_of(spidev, 
+  struct spi_emulated_dev *d = container_of(spidev,
       struct spi_emulated_dev, spidev);
 
   spi_emulated_ce0_clear(d);
@@ -402,9 +402,9 @@ static inline void spi_gpio_set_slave(
 
 spi_dev_t *spi_allocate_emulated(
   const char *name,
-  int sclk_pin, 
-  int mosi_pin, 
-  int miso_pin, 
+  int sclk_pin,
+  int mosi_pin,
+  int miso_pin,
   int ce0_pin,
   int ce1_pin,
   int mode)
@@ -485,7 +485,7 @@ spi_dev_t *spi_allocate_emulated(
 
   printf("SPIemu: allocated at %p with name: '%s'\n"
          "SPIemu: SCLK:%d,MOSI:%d,MISO:%d,CE0:%d,CE1:%d\n"
-         "SPIemu: gpio:%d,key:%s,mode:%d\n", 
+         "SPIemu: gpio:%d,key:%s,mode:%d\n",
       spidev, spidev->spidev.name, sclk_pin, mosi_pin,
       miso_pin, ce0_pin, ce1_pin, gpio_set_handle, gpioset_key,
       mode);
@@ -501,7 +501,7 @@ error:
 int spi_deallocate_emulated(spi_dev_t *s)
 {
   int err;
-  struct spi_emulated_dev *d = container_of(s, 
+  struct spi_emulated_dev *d = container_of(s,
       struct spi_emulated_dev, spidev);
 
 #define PIN(x) d->x ## _gpio_pin
@@ -519,7 +519,7 @@ int spi_deallocate_emulated(spi_dev_t *s)
 
   err = gpio_set_release(d->gpio_set_handle, d->gpio_set_key);
   if (err != ERR_OK) {
-    printf("spi_deallocate_emulated: failed to release gpioset:%d:%s:%d\r\n", 
+    printf("spi_deallocate_emulated: failed to release gpioset:%d:%s:%d\r\n",
         d->gpio_set_handle,
         d->gpio_set_key, err);
     return err;
@@ -550,7 +550,7 @@ void spi_emulated_print_info()
 
 void spi_emulated_set_clk(spi_dev_t *s, int val)
 {
-  struct spi_emulated_dev *d = container_of(s, 
+  struct spi_emulated_dev *d = container_of(s,
       struct spi_emulated_dev, spidev);
   printf("spi_emulated: setting clk period to %d micro seconds\n\r", val);
   d->clk_half_period = val;

@@ -12,5 +12,5 @@
 #define CPSR_F 6
 #define CPSR_DAIF_MASK 0x3c0
 
-#define CPSR_EL_OFF 2 
+#define CPSR_EL_OFF 2
 #define CPSR_EL_WIDTH 2

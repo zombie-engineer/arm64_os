@@ -3,17 +3,17 @@
 
 
 /* r0       - rectangle to clip
- * r1       - boundary rectangle 
- * our_rect - rectangle, that is the result of applying 
+ * r1       - boundary rectangle
+ * our_rect - rectangle, that is the result of applying
  *          - r1 boundary to r0 rect
  * return value - '-1', rectangle is clipped away
  *                ' 0', rectangle is not clipped
  *                ' 1', rectangle is partially clipped
  */
 // static int clip_rect(
-//     rect_t *r0, 
-//     rect_t *r1, 
-//     rect_t *out_i, 
+//     rect_t *r0,
+//     rect_t *r1,
+//     rect_t *out_i,
 //     intersection_type *out_t
 //     )
 // {
@@ -22,16 +22,16 @@
 //   partial_x = clip_segment(&tmp->x, &r1->x);
 //   if (partial_x < 0)
 //     return -1;
-// 
+//
 //   partial_y = clip_segment(&tmp->y, &r1->y);
 //   if (partial_y < 0)
 //     return -1;
-// 
+//
 //   *out_t = tmp;
 //   return (partial_x + partial_y) ? 1 : 0;
 // }
 
-int clip_segment(segment_t *s0, segment_t *s1) 
+int clip_segment(segment_t *s0, segment_t *s1)
 {
   /*
    * x------------------x
@@ -45,7 +45,7 @@ int clip_segment(segment_t *s0, segment_t *s1)
    * .       x----------x
    * .       .          .
    */
-  if (s0->offset + s0->size > s1->offset 
+  if (s0->offset + s0->size > s1->offset
    || s1->offset + s1->size < s0->offset)
     return -1;
 
@@ -59,14 +59,14 @@ int clip_segment(segment_t *s0, segment_t *s1)
     s0->offset = s1->offset;
     return 1;
   }
-  
+
   return 0;
 }
 
 
 
 int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
-{ 
+{
   int r0x0, r0x1, r0y0, r0y1, r1x0, r1x1, r1y0, r1y1;
 
   r0x0 = r0->x.offset;
@@ -92,7 +92,7 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
 
   // Check interection from the left size
   if (r0x0 < r1x0) {
-  /*  
+  /*
    *  x---x---x---x
    *  | x |   |   |
    *  x---x---x---x
@@ -111,7 +111,7 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
 
   // Check interection from the right size
   if (r0x1 > r1x1) {
-  /*  
+  /*
    *  x---x---x---x
    *  |   |   | x |
    *  x---x---x---x
@@ -129,7 +129,7 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
 
   // Check interection from the top
   if (r0y0 < r1y0) {
-  /*  
+  /*
    *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
    *  |   | x |   |   | x | x |   |   |   | x | x |   | x | x | x |
    *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
@@ -153,7 +153,7 @@ int get_intersection_regions(rect_t *r0, rect_t *r1, intersection_regions_t *rs)
 
   // Check interection from the bottom
   if (r0y1 > r1y1) {
-  /*  
+  /*
    *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x
    *  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
    *  x---x---x---x   x---x---x---x   x---x---x---x   x---x---x---x

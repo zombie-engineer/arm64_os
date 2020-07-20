@@ -73,9 +73,9 @@ int i2c_init()
   write_reg(BSC_MASTER_REG_FIFO(1), 0x66);
   write_reg(BSC_MASTER_REG_A(1), SLAVE_ADDR);
 
-  write_reg(BSC_MASTER_REG_C(1), 
-      BSC_MASTER_C_I2CEN       | 
-      BSC_MASTER_C_ST          | 
+  write_reg(BSC_MASTER_REG_C(1),
+      BSC_MASTER_C_I2CEN       |
+      BSC_MASTER_C_ST          |
       BSC_MASTER_C_CLEAR);
 
   while(read_reg(BSC_MASTER_REG_S(1)) & BSC_MASTER_S_TA);
@@ -139,10 +139,10 @@ void i2c_test()
   // Data length is 1 byte
   write_reg(BSC_MASTER_REG_DLEN(1), 1);
   while(1) {
-    // Enable I2C Master 
-    write_reg(BSC_MASTER_REG_C(1), 
-        BSC_MASTER_C_I2CEN       | 
-        BSC_MASTER_C_ST          | 
+    // Enable I2C Master
+    write_reg(BSC_MASTER_REG_C(1),
+        BSC_MASTER_C_I2CEN       |
+        BSC_MASTER_C_ST          |
         BSC_MASTER_C_CLEAR);
 
     while(1) {

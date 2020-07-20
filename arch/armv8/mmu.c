@@ -83,10 +83,10 @@
 
   // MAP a range of 32 megabytes
   // map range 32Mb
-  // 32Mb = 32 * 1024 * 1024 = 8 * 4 * 1024 * 1024 = 8 * 1024 * 4096 
-  // = 8192 x 4K pages 
+  // 32Mb = 32 * 1024 * 1024 = 8 * 4 * 1024 * 1024 = 8 * 1024 * 4096
+  // = 8192 x 4K pages
   // = 8192 l3 pte's
-  // 8192 l3 pte's = 16 * 512 
+  // 8192 l3 pte's = 16 * 512
   // = 16 l2 pte's
   // =  1 l1 pte's
   // =  1 l0 pte's
@@ -120,12 +120,12 @@
 
 #define MAKE_PAGE_PTE_LO_ATTR(attr_idx, ns, ap, sh, af, ng) \
   BITS_AT_POS(attr_idx, 0, 0b111) | BIT_AT_POS(ns, 3) | BITS_AT_POS(ap, 4, 0b11) \
-  | BITS_AT_POS(sh, 6, 0b11) | BIT_AT_POS(af, 8) | BIT_AT_POS(ng, 9) 
+  | BITS_AT_POS(sh, 6, 0b11) | BIT_AT_POS(af, 8) | BIT_AT_POS(ng, 9)
 
 #define MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page) \
   BIT_AT_POS(ns_table, 63) | BITS_AT_POS(ap_table, 61, 0b11) | BIT_AT_POS(xn_table, 60) | BIT_AT_POS(pxn_table, 59) | \
   PTE_OUT_ADDR(next_lvl_table_page) | 0b11
-  
+
 #define MAKE_TABLE_PTE(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page) \
   MAKE_TABLE_PTE_VALID_TABLE_4KB(ns_table, ap_table, xn_table, pxn_table, next_lvl_table_page)
 

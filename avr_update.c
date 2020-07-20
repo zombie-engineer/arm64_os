@@ -25,11 +25,11 @@ int init_atmega8a()
   int eeprom_size;
   spi_dev_t *spidev;
   char lock_bits_desc[128];
-  spidev = spi_allocate_emulated("spi_avr_isp", 
+  spidev = spi_allocate_emulated("spi_avr_isp",
       gpio_pin_sclk, gpio_pin_mosi, gpio_pin_miso, gpio_pin_cs0, -1,
       SPI_EMU_MODE_MASTER);
   if (IS_ERR(spidev)) {
-    printf("Failed to initialize emulated spi. Error code: %d\n", 
+    printf("Failed to initialize emulated spi. Error code: %d\n",
        (int)PTR_ERR(spidev));
     return ERR_GENERIC;
   }
@@ -40,7 +40,7 @@ int init_atmega8a()
     printf("Failed to init atmega8a. Error_code: %d\n", ret);
     return ERR_GENERIC;
   }
- 
+
   if (atmega8a_read_fuse_bits(&fuse_low, &fuse_high) != ERR_OK) {
     printf("Failed to read program memory\n");
     return ERR_GENERIC;
@@ -109,8 +109,8 @@ static int atmega8a_download(const void *bin, int bin_size)
   if (bin_size % 64) {
     binary = membuf;
     binary_size = ((bin_size / 64) + 1) * 64;
-    printf("atmega8a_download: firmware size %d not page-aligned (64 bytes), " 
-          "padding up to %d bytes\r\n", 
+    printf("atmega8a_download: firmware size %d not page-aligned (64 bytes), "
+          "padding up to %d bytes\r\n",
         bin_size, binary_size);
     memcpy(membuf, bin, bin_size);
   }
@@ -122,7 +122,7 @@ static int atmega8a_download(const void *bin, int bin_size)
     return err;
   }
   puts("atmega8a_download: flash erased.\r\n");
-  printf("atmega8a_download: writing firmware to flash (%d bytes at %p)..\r\n", 
+  printf("atmega8a_download: writing firmware to flash (%d bytes at %p)..\r\n",
       binary_size, binary);
 
   err = atmega8a_write_flash(binary, binary_size, 0);
@@ -177,28 +177,28 @@ int avr_update(void)
   if (check_crc) {
     printf("avr_update: Checking update blob, start:%p, end:%p, size:%d\n",
       bin, bin + binsz, binsz);
-  
+
     if (strncmp(bin + footer_offset, ATMEGA_FIRMWARE_HEADER, 8)) {
       puts("avr_update: no header in uploadable blob\n");
       return ERR_INVAL_ARG;
     }
-  
+
     if (strncmp(bin + footer_offset + 8 + 4, ATMEGA_FIRMWARE_HEADER_END, 8)) {
       puts("avr_update: no header end in uploadable blob\n");
       return ERR_INVAL_ARG;
     }
-  
+
     new_checksum = unaligned_read32((void*)(bin + footer_offset + 8));
     printf("avr_update: new firmware checksum: %08x\n",
         new_checksum);
-  
+
     err = atmega8a_read_flash_memory(&old_checksum, 4, footer_offset + 8);
     if (err != ERR_OK) {
       printf("avr_update: flash read failed: %d\n", err);
       return err;
     }
     printf("avr_update: firmware checksum on device: %08x\n", old_checksum);
-  
+
     if (new_checksum == old_checksum) {
       puts("avr_update: old checksum matches new. Skipping update.\n");
       reprogram = 0;

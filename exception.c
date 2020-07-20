@@ -67,8 +67,8 @@ static const char *kernel_panic_msg = 0;
 static int elevel = 0;
 
 /*
- * Fatal exception hooks can be set by kernel startup code as 
- * hook functions, which will be executed in case of an exception 
+ * Fatal exception hooks can be set by kernel startup code as
+ * hook functions, which will be executed in case of an exception
  * that was considered to be fatal / unrecoverable.
  * The system will execute all the hooks one after another before
  * entering a halted state.
@@ -84,8 +84,8 @@ static kernel_panic_reporter kernel_panic_reporters[8] = { 0 };
 static int kernel_panic_reporters_count = 0;
 
 /*
- * irq_cb / fiq_cb - callbacks set by kernel startup code 
- * that totally control the behavior of the system at triggered 
+ * irq_cb / fiq_cb - callbacks set by kernel startup code
+ * that totally control the behavior of the system at triggered
  * external interrupts.
  */
 static irq_cb_t irq_cb = 0;
@@ -155,7 +155,7 @@ static void __handle_instr_abort(exception_info_t *e, uint64_t elr)
 
 int get_synchr_exception_class(uint64_t esr)
 {
-  return (esr >> 26) & 0x7f; 
+  return (esr >> 26) & 0x7f;
 }
 
 static void __handle_svc_32(exception_info_t *e)
@@ -258,7 +258,7 @@ const char *get_data_abort_string(uint64_t esr)
   return "DAT_ABRT_UNDEF";
 }
 
-const char *get_exception_type_string(int type) 
+const char *get_exception_type_string(int type)
 {
   switch(type) {
     case INTERRUPT_TYPE_SYNCHRONOUS: return "Synchronous";
@@ -269,7 +269,7 @@ const char *get_exception_type_string(int type)
   }
 }
 
-const char *get_synchr_exception_class_string(uint64_t esr) 
+const char *get_synchr_exception_class_string(uint64_t esr)
 {
   int exception_class = get_synchr_exception_class(esr);
 
@@ -301,7 +301,7 @@ const char *get_svc_aarch64_string(int esr)
 #undef SWICASE
 }
 
-const char *get_synch_exception_detail_string(uint64_t esr) 
+const char *get_synch_exception_detail_string(uint64_t esr)
 {
   int exception_class = get_synchr_exception_class(esr);
   switch(exception_class) {
@@ -358,8 +358,8 @@ int gen_exception_string_specific(exception_info_t *e, char *buf, size_t bufsz)
 int gen_exception_string_generic(exception_info_t *e, char *buf, size_t bufsz)
 {
   int n;
-  n = snprintf( buf, bufsz, 
-    "Excepiton: type:%s, esr: 0x%016llx, elr: 0x%016llx, far: 0x%016llx", 
+  n = snprintf( buf, bufsz,
+    "Excepiton: type:%s, esr: 0x%016llx, elr: 0x%016llx, far: 0x%016llx",
     get_exception_type_string(e->type),
     e->esr,
     e->elr,
@@ -388,7 +388,7 @@ void __handle_interrupt(exception_info_t *e)
     case INTERRUPT_TYPE_SERROR:
       __handle_interrupt_serror();
       break;
-  } 
+  }
   elevel--;
 }
 

@@ -91,7 +91,7 @@ typedef struct {
   char RES0_63 : 5;
 } __attribute__((packed)) tcr_el1_t;
 
-#define TCR_IPS_32_BITS 0b000 
+#define TCR_IPS_32_BITS 0b000
 #define TCR_IPS_36_BITS 0b001
 #define TCR_IPS_40_BITS 0b010
 #define TCR_IPS_42_BITS 0b011

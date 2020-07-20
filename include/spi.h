@@ -4,7 +4,7 @@
 // SPI operation mode poll
 #define SPI_TYPE_POLL 0
 
-// SPI operation mode interrupts 
+// SPI operation mode interrupts
 #define SPI_TYPE_INT  1
 
 // SPI operation mode DMA
@@ -52,9 +52,9 @@ int spi0_init();
 
 spi_dev_t *spi_allocate_emulated(
   const char *name,
-  int sclk_pin, 
-  int mosi_pin, 
-  int miso_pin, 
+  int sclk_pin,
+  int mosi_pin,
+  int miso_pin,
   int ce0_pin,
   int ce1_pin,
   int mode);

@@ -26,8 +26,8 @@ typedef struct binblock_cpuctx {
 
 typedef struct binblock_exception {
   uint64_t type;
-  uint64_t esr; 
-  uint64_t spsr; 
+  uint64_t esr;
+  uint64_t spsr;
   uint64_t far;
   binblock_cpuctx_t cpu_ctx;
 } PACKED binblock_exception_t;

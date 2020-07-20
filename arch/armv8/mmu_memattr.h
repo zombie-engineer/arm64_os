@@ -5,9 +5,9 @@
  * Provides the memory attribute encodings corresponding to the possible AttrIndx values in a
  * Long-descriptor format translation table entry for stage 1 translations at EL1.
  * Attr<n>, bits [8n+7:8n], for n = 0 to 7
- *    0b0000dd00 Device memory. 
+ *    0b0000dd00 Device memory.
  *    0b0000ddxx (xx != 00) unpredictable
- *    0booooiiii (oooo != 0000 and iiii != 0000) Normal memory 
+ *    0booooiiii (oooo != 0000 and iiii != 0000) Normal memory
  *    0b11110000 Tagged Normal Memory.
  *    0bxxxx0000 (xxxx != 0000 and xxxx != 1111) unpredictable
  *    dd: 0b00 Device-nGnRnE memory
@@ -33,7 +33,7 @@
  * Memory attributes for device memory consist of 3 params:
  * G or nG - Gathering or Non-Gathering
  * R or nR - Reordering or Non-Reordering
- * E or nE - Execution of No Execution bit 
+ * E or nE - Execution of No Execution bit
  * Gathering means if multiple accesses to memory can be combined in
  * one big access.
  *
@@ -53,18 +53,18 @@
  * For both inner and outer shareable types the cache might be
  *  - Write-Through - data written to memory is written both to cache and to target memory
  *  - Write-Back    - data is only written to cache and then when evicted written to memory
- *  - Non-Cacheable at all 
- *  - Transient / NonTransient - a hint for cache system, wheather to put the data into 
+ *  - Non-Cacheable at all
+ *  - Transient / NonTransient - a hint for cache system, wheather to put the data into
  *    cache or not
  * All cacheable types also have Read Allocate / Write allocate possible policies
  * Read Allocate - data will be put to cache to read.
  * Write Allocate - data will be put to cache at write or at read.
  *
  * Write-Back Write Allocate Transient Normal Cache
- * Would mean that at write operation the target memory location would be 
+ * Would mean that at write operation the target memory location would be
  * first put to cache (Write Allocate), then written in cache and marked as dirty.
  * Later when the cache should be eviceted, the dirty flag would tell the system
- * to write cache contents to memory. 
+ * to write cache contents to memory.
  */
 #define MEMATTR_NON_CACHEABLE()             0b0100
 #define MEMATTR_WRITETHROUGH_TRANS(R, W)    (0b0000 | ((R & 1) << 1) | (W & 1))

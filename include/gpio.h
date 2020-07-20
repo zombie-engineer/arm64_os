@@ -3,7 +3,7 @@
 #include <reg_access.h>
 #include <types.h>
 
-/* 
+/*
  * GPIO OUT outputs 3.3 volts
  */
 
@@ -11,12 +11,12 @@
 
 #define GPIO_FUNC_IN     0b000
 #define GPIO_FUNC_OUT    0b001
-#define GPIO_FUNC_ALT_0  0b100 
-#define GPIO_FUNC_ALT_1  0b101 
-#define GPIO_FUNC_ALT_2  0b110 
-#define GPIO_FUNC_ALT_3  0b111 
-#define GPIO_FUNC_ALT_4  0b011 
-#define GPIO_FUNC_ALT_5  0b010 
+#define GPIO_FUNC_ALT_0  0b100
+#define GPIO_FUNC_ALT_1  0b101
+#define GPIO_FUNC_ALT_2  0b110
+#define GPIO_FUNC_ALT_3  0b111
+#define GPIO_FUNC_ALT_4  0b011
+#define GPIO_FUNC_ALT_5  0b010
 
 #define GPIO_PULLUPDOWN_NO_PULLUPDOWN 0b00
 #define GPIO_PULLUPDOWN_EN_PULLDOWN   0b01

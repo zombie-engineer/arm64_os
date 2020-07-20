@@ -139,7 +139,7 @@ static inline const char *__find_special_or_null(const char *pos, const char *en
 }
 
 #define fmt_fetch_special() special = *(++c->fmt)
-  
+
 #define fmt_handle_flag(fname, fchar) \
     c->flag_ ## fname = 0;\
     if (special == '0') {\
@@ -320,14 +320,14 @@ int OPTIMIZED closest_round_base10_nodiv(uint64_t val)
   return pivot - 1;
 }
 
-// 0: 
+// 0:
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
 // d = 2 ->1, b = 0, p = 2 , >= false
 // d = 1 ->0, b = 0, p = 1 , >= false
 // d = 0    , b = 1, p = 1 , >= false, p[0] = 1 -> 0
 
-// 10: 
+// 10:
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
 // d = 2 ->1, b = 0, p = 2 , >= false
@@ -335,14 +335,14 @@ int OPTIMIZED closest_round_base10_nodiv(uint64_t val)
 // d = 0    , b = 1, p = 1,  >= true , p[1] = 10 -> 1
 
 
-// 101: 
+// 101:
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
 // d = 2 ->1, b = 0, p = 2 , >= true , p[2] = 100
 // d = 1 ->0, b = 2, p = 3 , >= false, p[3] = 1000
 // d = 0,     b = 3, p = 3 , >= false, p[3] = 1000 -> 3
 
-// 101: 
+// 101:
 // d = 10->5, b = 0, p = 10, >= false
 // d = 5 ->2, b = 0, p = 5 , >= false
 // d = 2 ->1, b = 0, p = 2 , >= true , p[2] = 100
@@ -419,7 +419,7 @@ static inline void __print_fn_number_10(struct printf_ctx *c, struct print_num_s
 {
   DST_MEMSET(' ', s->space_padding);
   s->padding -= s->space_padding;
-  
+
   if (s->is_neg_sign) {
     DST_APPEND_C('-');
     s->wordlen--;
@@ -459,7 +459,7 @@ static NOINLINE void __print_fn_number_10_d(struct printf_ctx *c)
   struct print_num_spec s = { 0 };
   int max_bit_pos = 31;
   uint64_t type_mask;
-  // TODO: Support more types 
+  // TODO: Support more types
   if (c->size & (FMT_SIZE_LLONG |
 #if (__LP64__ == 1)
         FMT_SIZE_LONG |
@@ -492,7 +492,7 @@ static void NOINLINE  __print_fn_number_16(struct printf_ctx *c)
 {
   int nibble;
   int leading_zeroes = 0;
-  int maxbits = 0; 
+  int maxbits = 0;
   int rightmost_nibble;
   int space_padding, padding;
   char tmp;
@@ -583,7 +583,7 @@ ALIGNED(64) __print_fn_t __printf_fn_map[] = {
   DECL('d', __print_fn_number_10_d),
   DECL('e', __print_fn_float_exp),
   DECL('f', __print_fn_float),
-  DECL('g', __print_fn_float),    
+  DECL('g', __print_fn_float),
   IGNR('h'),
   DECL('i', __print_fn_number_10_d),
   IGNR('j'),
@@ -607,7 +607,7 @@ ALIGNED(64) __print_fn_t __printf_fn_map[] = {
 
 void fmt_print_type(struct printf_ctx *c)
 {
-  /* To lower type 'A'(0x41) -> 'a'(0x61), because 0x61=0x41|0x20 
+  /* To lower type 'A'(0x41) -> 'a'(0x61), because 0x61=0x41|0x20
    * but we keep type in original.
    */
   int gentype = c->type | 0x20;
@@ -615,7 +615,7 @@ void fmt_print_type(struct printf_ctx *c)
     __printf_fn_map[gentype - 'a'](c);
 }
 
-/* 
+/*
  * Returns NULL if reached zero termination or any format specifier,
  * after % in case it was not %%, ex 'string%p' returns 'p'
  * c->fmt points at position where return value wat taken.
@@ -629,7 +629,7 @@ static inline char fmt_skip_to_special(struct printf_ctx *c)
 
   DST_MEMCPY(c->fmt, fmt_pos - c->fmt);
   c->fmt = fmt_pos;
-  
+
   special = *c->fmt;
   if (special == '%')
     special = *(++(c->fmt));
@@ -691,7 +691,7 @@ int /*optimized*/ __vsnprintf(char *dst, size_t dst_len, const char *fmt, __buil
     fmt_print_type(c);
 
   /*
-   * Two possible outcomes are possible. 
+   * Two possible outcomes are possible.
    * - c->dst has reached end.
    * - c->dst haven't readed end.
    * In first - we still need to write zero-termination somewhere.
@@ -703,7 +703,7 @@ int /*optimized*/ __vsnprintf(char *dst, size_t dst_len, const char *fmt, __buil
     if (c->dst == c->dst_end)
       *(c->dst - 1) = 0;
     else
-      *c->dst = 0; 
+      *c->dst = 0;
   }
 
   return c->dst_virt - dst;

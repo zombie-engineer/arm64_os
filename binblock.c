@@ -28,8 +28,8 @@ static int binblock_send_ascii_bin(const void *bytes, size_t bytes_count, sender
   int bytes_sent = 0;
   int sz;
   while(bytes_sent < bytes_count) {
-    sz = bin_to_ascii_hex(buf, sizeof(buf), 
-        ((const char *)bytes) + bytes_sent, 
+    sz = bin_to_ascii_hex(buf, sizeof(buf),
+        ((const char *)bytes) + bytes_sent,
         bytes_count - bytes_sent);
 
     send(buf, sz);

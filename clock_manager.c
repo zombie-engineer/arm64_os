@@ -15,15 +15,15 @@
 #define CM_PWMDIV  (reg32_t)(PERIPHERAL_BASE_PHY + 0x001010a4)
 
 
-// Any value that is written into registers 
+// Any value that is written into registers
 // CLKGPn, CLKDIVn, CLKPWM, DIVPWM
 // should be ORed with CM_REG_PASSWR
 // *reg = 0x5a000000 | REGVALUE
-// if that is not done, write operation is 
+// if that is not done, write operation is
 // ignored and target register will still hold
 // old value.
 //
-// Due to that reason declaration of helper 
+// Due to that reason declaration of helper
 // struct is not feasable for these registers.
 
 #define CM_REG_PASSWD          0x5a000000
@@ -45,7 +45,7 @@
 
 // Readable flag to check that this clock control
 // register is not writeable at the moment
-// At BUSY you are only good for clearing 
+// At BUSY you are only good for clearing
 // CM_CLK_REG_ENAB flag.
 #define CM_CLK_REG_BUSY (1 << 7)
 
@@ -58,7 +58,7 @@
   *(reg32_t)regaddr = CM_REG_PASSWD | (*(reg32_t)regaddr & ~CM_CLK_REG_ENAB)
 
 
-#define CM_CLK_IS_BUSY(regaddr) (*(reg32_t)regaddr & CM_CLK_REG_BUSY) 
+#define CM_CLK_IS_BUSY(regaddr) (*(reg32_t)regaddr & CM_CLK_REG_BUSY)
 
 #define CM_CLK_REG_SET(regaddr, clock_src, mash) \
   *(reg32_t)regaddr = CM_REG_PASSWD | clock_src | ((mash & 3) << 9)
@@ -138,21 +138,21 @@ struct clock_desc {
 };
 
 static const char *src[] = {
-  " GND", 
-  " OSC", 
-  "DBG0", 
-  "DBG1", 
-  "PLLA", 
-  "PLLC", 
-  "PLLD", 
-  "HDMI", 
-  " GND", 
-  " GND", 
-  " GND", 
-  " GND", 
-  " GND", 
-  " GND", 
-  " GND", 
+  " GND",
+  " OSC",
+  "DBG0",
+  "DBG1",
+  "PLLA",
+  "PLLC",
+  "PLLD",
+  "HDMI",
+  " GND",
+  " GND",
+  " GND",
+  " GND",
+  " GND",
+  " GND",
+  " GND",
   " GND"
 };
 
@@ -165,7 +165,7 @@ void cm_print_clock(int clock_id)
     CLK(GP0),
     CLK(GP1),
     CLK(GP2),
-    CLK(PWM) 
+    CLK(PWM)
   };
 
   if (clock_id > CM_CLK_ID_MAX) {
@@ -177,7 +177,7 @@ void cm_print_clock(int clock_id)
   ctlval = read_reg(c->ctl);
   divval = read_reg(c->div);
 
-  printf("clock_manager:clock:%s:%08x:%08x:%s,%s,%s,MASH:%d,DIV:%d.%d\r\n", 
+  printf("clock_manager:clock:%s:%08x:%08x:%s,%s,%s,MASH:%d,DIV:%d.%d\r\n",
       c->name,
       ctlval,
       divval,

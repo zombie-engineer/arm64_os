@@ -99,10 +99,10 @@ int OPTIMIZED gpio_set_pullupdown(uint32_t gpio_num, int pullupdown)
 {
   /*
    * According to datasheet BCM2835 ARM Peripherals, page 101
-   * 1. Write to GPPUD to set the required control signal (i.e. 
+   * 1. Write to GPPUD to set the required control signal (i.e.
    * Pull-up or Pull-Down or neither
    * to remove the current Pull-up/down)
-   * 2. Wait 150 cycles – this provides the required set-up time 
+   * 2. Wait 150 cycles – this provides the required set-up time
    * for the control signal
    * 3. Write to GPPUDCLK0/1 to clock the control signal into the GPIO pads you wish to
    * modify – NOTE only the pads which receive a clock will be modified, all others will
@@ -117,10 +117,10 @@ int OPTIMIZED gpio_set_pullupdown(uint32_t gpio_num, int pullupdown)
   GPIO_CHECK_GPIO_NUM(gpio_num);
   write_reg(GPIO_REG_GPPUD, pullupdown);
   r = 150;
-  while(r--) { asm volatile("nop"); } 
+  while(r--) { asm volatile("nop"); }
   gpio_set_gppudclk(gpio_num);
   r = 150;
-  while(r--) { asm volatile("nop"); } 
+  while(r--) { asm volatile("nop"); }
   write_reg(GPIO_REG_GPPUD, 0);
 
   write_reg(GPIO_REG_GPPUDCLK0, 0);
@@ -152,12 +152,12 @@ void gpio_power_off(void)
   write_reg(GPIO_REG_GPFSEL5, 0);
   write_reg(GPIO_REG_GPPUD, 0);
   r = 150;
-  while(r--) { asm volatile("nop"); } 
+  while(r--) { asm volatile("nop"); }
   // flush GPIO setup
   write_reg(GPIO_REG_GPPUDCLK0, 0xffffffff);
   write_reg(GPIO_REG_GPPUDCLK1, 0xffffffff);
   r = 150;
-  while(r--) { asm volatile("nop"); } 
+  while(r--) { asm volatile("nop"); }
   write_reg(GPIO_REG_GPPUDCLK0, 0);
 }
 

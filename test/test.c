@@ -64,10 +64,10 @@ void set_iregion(intersection_region_t *r, int x, int y, unsigned int sx, unsign
   r->exists = exists;
 }
 
-void fill_rect(rect_t *r, int x, int y, unsigned int sx, unsigned int sy) 
-{ 
-  r->x.offset = x; 
-  r->y.offset = y; 
+void fill_rect(rect_t *r, int x, int y, unsigned int sx, unsigned int sy)
+{
+  r->x.offset = x;
+  r->y.offset = y;
   r->x.size = sx;
   r->y.size = sy;
 }
@@ -82,62 +82,62 @@ void run_cases_rectangle()
 
   // perfect match
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 0, 0, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 0, 0, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   set_iregion(RGN(1, 1), 0, 0, 20, 20, 1);
   test_rectangle(&r0, &r1, &r, 1);
 
   // clip left
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, -1, 0, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, -1, 0, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   set_iregion(RGN(0, 1), -1,  0,  1, 20,  1);
   set_iregion(RGN(1, 1),  0,  0, 19, 20,  1);
   test_rectangle(&r0, &r1, &r, 1);
 
-  // clip top 
+  // clip top
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 0, -1, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 0, -1, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   set_iregion(RGN(1, 0),  0,  -1, 20, 1,  1);
   set_iregion(RGN(1, 1),  0,  0, 20, 19,  1);
   test_rectangle(&r0, &r1, &r, 1);
 
-  // clip right 
+  // clip right
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 19, 0, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 19, 0, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   set_iregion(RGN(1, 1), 19,  0,  1, 20,  1);
   set_iregion(RGN(2, 1), 20,  0, 19, 20,  1);
   test_rectangle(&r0, &r1, &r, 1);
 
   // clip bottom
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 0, 19, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 0, 19, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   set_iregion(RGN(1, 1),  0,  19, 20, 1,  1);
   set_iregion(RGN(1, 2),  0,  20, 20, 19,  1);
   test_rectangle(&r0, &r1, &r, 1);
 
   // out bounds
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, -20, 0, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, -20, 0, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   test_rectangle(&r0, &r1, &r, 0);
 
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 20, 0, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 20, 0, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   test_rectangle(&r0, &r1, &r, 0);
 
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 0, 20, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 0, 20, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   test_rectangle(&r0, &r1, &r, 0);
 
   memset(rs, 0, sizeof(*rs));
-  fill_rect(&r0, 0, -20, 20, 20);  
-  fill_rect(&r1, 0, 0, 20, 20);  
+  fill_rect(&r0, 0, -20, 20, 20);
+  fill_rect(&r1, 0, 0, 20, 20);
   test_rectangle(&r0, &r1, &r, 0);
 }
 
@@ -270,8 +270,8 @@ void run_cases_ringbuf_loop(const char *pat)
   int i;
   int sz = strlen(pat);
 
-  for (i = 0; i < 20; ++i) { 
-    RNGBUF_WRITE(pat, sz);  
+  for (i = 0; i < 20; ++i) {
+    RNGBUF_WRITE(pat, sz);
     RNGBUF_READ(sz, pat);
   }
 }
@@ -304,7 +304,7 @@ void run_cases_ringbuf()
   run_cases_ringbuf_loop("kixutyz01234567");
 }
 
-int main() 
+int main()
 {
   run_cases_rectangle();
   run_cases_strtol();

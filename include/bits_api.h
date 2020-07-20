@@ -15,7 +15,7 @@
 
 #define BIT_IS_CLEAR(val, bitpos) (!BIT_IS_SET(val, bitpos))
 
-#define BIT_CLEAR(val, bitpos) val &= ~BT(bitpos) 
+#define BIT_CLEAR(val, bitpos) val &= ~BT(bitpos)
 
 #define BIT_CLEAR_U32(val, bitpos) val &= ~BT(bitpos)
 

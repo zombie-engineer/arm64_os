@@ -10,7 +10,7 @@ out \reg\()L, r16
 .endm
 
 .macro in16 sreg dreg_low dreg_high
-in \dreg_low, \sreg\()L 
+in \dreg_low, \sreg\()L
 in \dreg_high, \sreg\()H
 .endm
 

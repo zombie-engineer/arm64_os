@@ -37,9 +37,9 @@
 typedef struct {
   // transfer information
   uint32_t ti;
-  // 
+  //
   uint32_t src_addr;
-  // 
+  //
   uint32_t dst_addr;
   uint32_t transfer_length;
   uint32_t stride;

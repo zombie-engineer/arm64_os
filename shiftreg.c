@@ -21,7 +21,7 @@
     gpio_set_off(sr->srclr); \
     wait_msec(sr->delay_ms); \
     gpio_set_on(sr->srclr);
- 
+
 
 #define PUSH_BIT(sr, b) {    \
     if (b)                   \
@@ -58,15 +58,15 @@ shiftreg_t *shiftreg_init(int clk_wait, int32_t ser, int32_t srclk, int32_t rclk
   // ser   = 16;
   // srclr = 12;
 
-  gpio_set_function(shiftreg.ser  , GPIO_FUNC_OUT); 
-  gpio_set_function(shiftreg.rclk , GPIO_FUNC_OUT); 
-  gpio_set_function(shiftreg.srclk, GPIO_FUNC_OUT); 
-  // gpio_set_function(srclr, GPIO_FUNC_OUT); 
+  gpio_set_function(shiftreg.ser  , GPIO_FUNC_OUT);
+  gpio_set_function(shiftreg.rclk , GPIO_FUNC_OUT);
+  gpio_set_function(shiftreg.srclk, GPIO_FUNC_OUT);
+  // gpio_set_function(srclr, GPIO_FUNC_OUT);
 
-  gpio_set_off (shiftreg.ser); 
-  gpio_set_off (shiftreg.rclk); 
-  gpio_set_off (shiftreg.rclk); 
-  // gpio_set_off (srclr); 
+  gpio_set_off (shiftreg.ser);
+  gpio_set_off (shiftreg.rclk);
+  gpio_set_off (shiftreg.rclk);
+  // gpio_set_off (srclr);
 
   shiftreg.delay_ms = clk_wait;
   shiftreg_initialized = 1;

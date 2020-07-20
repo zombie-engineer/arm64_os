@@ -33,7 +33,7 @@ static int command_nokia5110_init(const string_tokens_t *args)
   int err;
   spi_dev_t *spidev;
 
-  uint32_t rst_pin, dc_pin; 
+  uint32_t rst_pin, dc_pin;
   int function_flags, display_mode;
   ASSERT_NUMARGS_EQ(5);
   GET_NUMERIC_PARAM(rst_pin       , uint32_t, 1, "rst pin");

@@ -60,13 +60,13 @@ void mini_uart_init(int baudrate, int system_clock)
 
 void mini_uart_send(unsigned int c)
 {
-  do { asm volatile("nop"); } while(!(*AUX_MU_LSR & AUX_MU_LSR_TRANSMITTER_EMPTY)); 
+  do { asm volatile("nop"); } while(!(*AUX_MU_LSR & AUX_MU_LSR_TRANSMITTER_EMPTY));
   *AUX_MU_IO = c;
 }
 
 char mini_uart_getc()
 {
-  do { asm volatile("nop"); } while(!(*AUX_MU_LSR & AUX_MU_LSR_DATA_READY)); 
+  do { asm volatile("nop"); } while(!(*AUX_MU_LSR & AUX_MU_LSR_DATA_READY));
   return (char)*AUX_MU_IO;
 }
 

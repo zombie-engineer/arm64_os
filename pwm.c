@@ -168,7 +168,7 @@ int pwm_enable(int ch, int ms_mode)
 
     if (sta & (BT(PWM_STA_EMPT1)|BT(PWM_STA_STA1+ch)))
       break;
-    printf("pwm_enable:STA:%08x\n", sta); 
+    printf("pwm_enable:STA:%08x\n", sta);
     sta = read_reg(PWM_STA);
   }
 
@@ -213,7 +213,7 @@ int pwm_prepare(int gpio_pwm0, int gpio_pwm1)
   int pins[] = { gpio_pwm0, gpio_pwm1 };
   int alt_func_pwm_0 = -1;
   int alt_func_pwm_1 = -1;
-  
+
   switch (gpio_pwm0) {
     case 12:
       alt_func_pwm_0 = GPIO_FUNC_ALT_0;
@@ -243,11 +243,11 @@ int pwm_prepare(int gpio_pwm0, int gpio_pwm1)
   gpio_set_handle_pwm = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), pwm_key);
 
   if (gpio_set_handle_pwm == GPIO_SET_INVALID_HANDLE) {
-    printf("Failed to request gpio pins %d,%d for pwm0,pwm1\r\n", 
+    printf("Failed to request gpio pins %d,%d for pwm0,pwm1\r\n",
         gpio_pin_pwm0, gpio_pin_pwm1);
     return ERR_BUSY;
   }
-    
+
   gpio_pin_pwm0 = gpio_pwm0;
   gpio_pin_pwm1 = gpio_pwm1;
 
@@ -302,7 +302,7 @@ struct pwm *pwm_bcm2835_create(int gpio_pin, int ms_mode)
     printf("pwm_bcm2835_create:not initialized\r\n");
     return ERR_PTR(ERR_NOT_INIT);
   }
- 
+
   p = pwm_bcm2835_alloc();
   if (!p)
     return ERR_PTR(ERR_BUSY);
@@ -328,7 +328,7 @@ struct pwm *pwm_bcm2835_create(int gpio_pin, int ms_mode)
 
   p->gpio_handle = gpio_set_request_1_pins(gpio_pin, gpio_key);
   if (p->gpio_handle == GPIO_SET_INVALID_HANDLE) {
-    printf("pwm_bcm2835_prepare_channel_x:failed to request gpio pin:%d, key:%s\r\n", 
+    printf("pwm_bcm2835_prepare_channel_x:failed to request gpio pin:%d, key:%s\r\n",
         gpio_pin, gpio_key);
     err = ERR_BUSY;
     goto err;
@@ -367,7 +367,7 @@ int bcm2835_set_pwm_clk_freq(int hz)
   int err;
   const uint32_t pwm_clock_hz = 19200000;
   /* freq = 19.2 MHz = 19 200 000 */
-  uint32_t divi = pwm_clock_hz / hz; 
+  uint32_t divi = pwm_clock_hz / hz;
   /* freq = 19.2 MHz / 192 = 100 KHz = 19200000 / 192 = 100000 */
   uint32_t divf = (((float)pwm_clock_hz / hz) - divi) * 10000;
 

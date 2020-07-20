@@ -41,7 +41,7 @@ static void print_stack_uart(uint64_t stack_top, int depth)
 {
   print_stack_ctx_t arg;
   memset(&arg, 0, sizeof(arg));
-  print_stack_generic(stack_top, depth, print_stack_uart_cb, &arg); 
+  print_stack_generic(stack_top, depth, print_stack_uart_cb, &arg);
 }
 
 void exception_print_summary_uart(exception_info_t *e)

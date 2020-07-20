@@ -189,7 +189,7 @@
   ((power_sw_mode&3)|((is_compound&1)<<2)|((overcurrent_prot&3)<<3)|((thinktime&3)<<5)|((port_indicator&1)<<7))
 
 #define USB_HUB_PORT_PWD_MASK_DEFAULT 0x1b
-  
+
 #define USB_PORT_STATUS_CH_BIT_CONNECTED_CHANGED   0
 #define USB_PORT_STATUS_CH_BIT_ENABLED_CHANGED     1
 #define USB_PORT_STATUS_CH_BIT_SUSPENDED_CHANGED   2

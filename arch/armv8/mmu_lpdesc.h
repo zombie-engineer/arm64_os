@@ -14,7 +14,7 @@
 
  //typedef struct {
  //  // bit[0], valid bit - indicates this whole descriptor is valid or not.
- //  //                     in case it's not translation fault is generated during page 
+ //  //                     in case it's not translation fault is generated during page
  //  //                     walk that arrived at this descriptor.
  //  char     valid_bit      : 1;
  //

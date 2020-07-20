@@ -3,7 +3,7 @@
 #include <types.h>
 
 
-// This trick helps testing scenarios on a host machine, when we should 
+// This trick helps testing scenarios on a host machine, when we should
 #ifdef TEST_STRING
 #define strcmp     _strcmp
 #define strncmp    _strncmp

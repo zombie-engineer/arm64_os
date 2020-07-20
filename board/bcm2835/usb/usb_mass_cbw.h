@@ -29,12 +29,12 @@ static inline char cbw_make_flags(int direction)
   return BT_V(7, direction);
 }
 
-static inline void cbw_set_flags(struct cbw *c, int dir) 
+static inline void cbw_set_flags(struct cbw *c, int dir)
 {
   BIT_SET_V_8(c->cbw_flags, 7, dir);
 }
 
-static inline int cbw_get_direction(struct cbw *c) 
+static inline int cbw_get_direction(struct cbw *c)
 {
   return BIT_IS_SET(c->cbw_flags, 7) ? 1 : 0;
 }
@@ -58,9 +58,9 @@ struct csw {
  * According to USB Mass Device Spec there should be two different
  * checks on the recieved CSW. First the host checks that
  * CSW is VALID. Next the host checks that it is MEANINGFUL.
- * Because they go one after another there is no reason to 
+ * Because they go one after another there is no reason to
  * check signature and tag in meaningful check.
- * 
+ *
  */
 static inline int is_csw_valid(void *buf, int size, int tag_in_cbw)
 {

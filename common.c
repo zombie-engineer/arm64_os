@@ -32,7 +32,7 @@ void hexdump_addr(unsigned int *addr)
   volatile unsigned int *base_ptr = (volatile unsigned int *)addr;
   for (i = 0; i < 32; ++i)
   {
-    printf("%08x: %08x %08x %08x %08x\n", 
+    printf("%08x: %08x %08x %08x %08x\n",
         base_ptr + i * 4,
         *(base_ptr + i * 4 + 0),
         *(base_ptr + i * 4 + 1),

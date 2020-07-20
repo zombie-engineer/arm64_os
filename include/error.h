@@ -16,7 +16,7 @@
 #define ERR_RETRY          -12
 #define MAX_ERRNO          128
 
-static inline void *ERR_PTR(int64_t err) 
+static inline void *ERR_PTR(int64_t err)
 {
   return (void *)err;
 }

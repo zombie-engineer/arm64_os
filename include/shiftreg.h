@@ -8,7 +8,7 @@ typedef struct shiftreg {
   int32_t srclk;
   int32_t rclk;
   int32_t srclr;
-  int32_t ce; 
+  int32_t ce;
   int delay_ms;
 } shiftreg_t;
 

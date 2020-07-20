@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#define getnext_char_expected(ch) if (read(fd, &tmp_char, 1) != 1 || tmp_char != ch) abort() 
+#define getnext_char_expected(ch) if (read(fd, &tmp_char, 1) != 1 || tmp_char != ch) abort()
 #define getnext_char(ch) if (read(fd, &tmp_char, 1) != 1) abort()
 
 #define call_err_ret(fn, desc, ...) \
@@ -21,7 +21,7 @@ typedef struct font_desc {
   void *bitmap;
   int bitmap_sz;
 } font_desc_t;
-  
+
 int read_pbm_number(int fd)
 {
   char to_atoi[128] = { 0 };
@@ -76,9 +76,9 @@ char *fmtcvt_pbm_to_bitmap_nokia(int width, int height, const char *raw_img, int
       char new_value = 0;
       for (bit = 0; bit < 8; ++bit) {
         char value = *(raw_img + (y * 8 + bit) * width + x);
-        if (value) 
+        if (value)
           new_value |= 1 << bit;
-      } 
+      }
       *(img + y * width + x) = new_value;
     }
   }
@@ -100,7 +100,7 @@ int fmtcvt_pbm_to_bitmap(font_desc_t *d, int width, int height, const char *raw_
         byteval |= (value ? 1 : 0) << bit;
       }
       *(dst++) = byteval;
-    } 
+    }
   }
   return 0;
 }
@@ -134,14 +134,14 @@ int store_buf(void *buf, int bufsz, const char *filename)
 
 int bitmap_print_as_char_array(FILE *fp, const char *font_name, const unsigned char *bitmap, int bitmap_sz, int n_cols)
 {
-  int i; 
+  int i;
   fprintf(fp, "char font_bitmap_raw_%s[] = {", font_name);
   fprintf(fp, "\n    ");
   for (i = 0; i < bitmap_sz - 1; ++i) {
     fprintf(fp, "0x%02x", bitmap[i]);
     if ((i + 1) % n_cols)
       fprintf(fp, ", ");
-    else 
+    else
       fprintf(fp, ",\n    ");
   }
   fprintf(fp, "0x%02x\n};\n", bitmap[i]);

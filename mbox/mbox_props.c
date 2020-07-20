@@ -229,7 +229,7 @@ DECL_MBOX_REQ_2T(set_power_state, device_id, state);
 DECL_MBOX_RSP_2T(set_power_state, device_id, state);
 DECL_MBOX_1TAG_MSG_T(set_power_state);
 
-int mbox_set_power_state(uint32_t device_id, 
+int mbox_set_power_state(uint32_t device_id,
     uint32_t *power_on, uint32_t wait, uint32_t *exists)
 {
   DECL_MBOX_MSG(set_power_state, MBOX_TAG_SET_POWER_STATE);
@@ -382,7 +382,7 @@ int mbox_set_fb(mbox_set_fb_args_t *args, mbox_set_fb_res_t *res)
 
   mbox_buffer[34] = MBOX_TAG_LAST;
 
-  if (mbox_prop_call(MBOX_CH_PROP)) 
+  if (mbox_prop_call(MBOX_CH_PROP))
     return -1;
 
   if (mbox_buffer[20] != 32 || mbox_buffer[28] == 0)

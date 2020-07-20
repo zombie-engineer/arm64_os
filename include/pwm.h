@@ -1,7 +1,7 @@
 #pragma once
 #include <types.h>
 
-/* pwm_enable  - enables pwm 
+/* pwm_enable  - enables pwm
  * channel_id  - enable one of two channels 0 or 1
  */
 

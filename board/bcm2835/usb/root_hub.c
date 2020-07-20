@@ -49,7 +49,7 @@ static ALIGNED(4) struct usb_hub_descriptor usb_root_hub_descriptor = {
       USB_HUB_ATTR_NOT_COMPOUND,
       USB_HUB_ATTR_OVER_CURRENT_PROT_GLOBAL,
       USB_HUB_ATTR_THINKTIME_00,
-      USB_HUB_ATTR_PORT_INDICATOR_NO), 
+      USB_HUB_ATTR_PORT_INDICATOR_NO),
     },
 	.power_good_delay = 100,
   .maximum_hub_power = 0,
@@ -190,7 +190,7 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
           RHERR("requested string %d does not exit", desc_idx);
           err = ERR_INVAL_ARG;
           break;
-      } 
+      }
       break;
     case USB_DESCRIPTOR_TYPE_DEVICE:
       reply_sz = sizeof(struct usb_device_descriptor);

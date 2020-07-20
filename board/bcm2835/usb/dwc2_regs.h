@@ -427,7 +427,7 @@
 #define USB_GNPTXFSIZ_IN_EP_TXF0_DEP         16//  31 0xffff0000 0x0000ffff 0x0
 #define USB_GNPTXFSIZ_NP_TXF_DEP             16//  31 0xffff0000 0x0000ffff 0x0
 
-/* 0: Connection status: 1 - has connection , 0 - no connection 
+/* 0: Connection status: 1 - has connection , 0 - no connection
  * 1: Connection detected: 1 - connection detected, 0 - not, write 1 to clear
  * 2: Enabled: 1 - enabled, 0 - not enabled                , write 1 to clear
  * 3: Enabled changed: enabled status changed,             , write 1 to clear
@@ -449,7 +449,7 @@
 #define USB_HPRT_RES                          6//  6 0x00000040 0xffffffbf 0x0
 #define USB_HPRT_SUSP                         7//  7 0x00000080 0xffffff7f 0x0
 #define USB_HPRT_RST                          8//  8 0x00000100 0xfffffeff 0x0
-#define USB_HPRT_RES0                         9//  9   NA    NA    NA 
+#define USB_HPRT_RES0                         9//  9   NA    NA    NA
 #define USB_HPRT_LN_STS                      10//  11 0x00000c00 0xfffff3ff 0x0
 #define USB_HPRT_PWR                         12//  12 0x00001000 0xffffefff 0x0
 #define USB_HPRT_TST_CTL                     13//  16 0x0001e000 0xfffe1fff 0x0

@@ -41,7 +41,7 @@ typedef struct font_desc {
   /* Number of glyphs on bitmap plate per y dimension */
   int glyphs_per_y;
 
-  /* Number of bytes to offset from current glyph pixel 
+  /* Number of bytes to offset from current glyph pixel
    * to get to pixel right below current one. y+1
    */
   int glyph_stride;

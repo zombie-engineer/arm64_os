@@ -2,7 +2,7 @@
 #include <types.h>
 
 /* cm_set_clk - sets clock to desired clock source and divisor
- * clk_id     - clock to set, one of general purpose clocks or 
+ * clk_id     - clock to set, one of general purpose clocks or
  *              pwm clock
  * clck_src   - source clock
  * mash       - noise-shaping MASH divider. Read "BCM2835 ARM Peripherals" manual.

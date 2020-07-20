@@ -36,9 +36,9 @@ viewport_t * vcanvas_make_viewport(int x, int y, unsigned int size_x, unsigned i
 /* fills whole viewport with given color */
 void viewport_fill(viewport_t *v, int color);
 
-/* fills rectangle in viewport with given color 
+/* fills rectangle in viewport with given color
  * x, y - rectangle starting position, given in coordinates,
- * relative to viewport 'v'. 
+ * relative to viewport 'v'.
  * size_x, size_y - rectangle with and height
  * color - rectangle color
  */
@@ -56,7 +56,7 @@ void viewport_draw_char(viewport_t *v, int x, int y, int fg_color, int bg_color,
 
 int vcanvas_get_fontsize(int *size_x, int *size_y);
 
-/* copyes rectangle from position [x0:y0, x0+size_x:y0+size_y] 
+/* copyes rectangle from position [x0:y0, x0+size_x:y0+size_y]
  * to [x1:y1, x1+size_x:y2+sizey]
  */
 void viewport_copy_rect(viewport_t *v, int x, int y0, int size_x, int size_y, int x1, int y1);

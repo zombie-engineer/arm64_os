@@ -14,8 +14,8 @@ void print_cpu_flags()
     "mrs %2, currentel\n"
     "mrs %3, spsel\n" : "=r"(nzcv), "=r"(daif), "=r"(current_el), "=r"(sp_sel));
 
-  printf("cpsr: nzcv: %x, daif: %x(%s%s%s%s), current_el: %x, sp_sel: %x" __endline, 
-    nzcv, daif, 
+  printf("cpsr: nzcv: %x, daif: %x(%s%s%s%s), current_el: %x, sp_sel: %x" __endline,
+    nzcv, daif,
     daif & BT(CPSR_F) ? "no-FIQ" : "",
     daif & BT(CPSR_I) ? "no-IRQ" : "",
     daif & BT(CPSR_A) ? "no-SError" : "",
@@ -43,7 +43,7 @@ static int print_reg_cb(const char *reg_str, size_t reg_str_sz, void *cb_priv)
   return 0;
 }
 
-void armv8_print_cpu_ctx(armv8_cpuctx_t *ctx) 
+void armv8_print_cpu_ctx(armv8_cpuctx_t *ctx)
 {
   print_cpuctx_ctx_t print_ctx = { 0 };
   cpuctx_print_regs(ctx, print_reg_cb, &print_ctx);
