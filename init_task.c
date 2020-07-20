@@ -18,7 +18,9 @@ static int run_cmdrunner_thread()
 {
   task_t *t;
   t = task_create(cmdrunner_process, "cmdrunner_process");
-  if (t);
+  if (IS_ERR(t))
+    return PTR_ERR(t);
+  sched_queue_runnable_task(get_scheduler(), t);
   return ERR_OK;
 }
 
@@ -104,8 +106,8 @@ static void cpu_run(int cpu_num, void (*fn)(void))
 int init_func(void)
 {
   SCHED_DEBUG("starting init function");
-  BUG(run_uart_thread() != ERR_OK, "failed to run uart_thread");
-  // run_cmdrunner_thread();
+  BUG(run_uart_thread()        != ERR_OK, "failed to run uart_thread");
+  BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
   BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   SCHED_REARM_TIMER;
   enable_irq();

@@ -7,6 +7,7 @@
 #include <exception.h>
 #include "cmdrunner_internal.h"
 #include <error.h>
+#include <debug.h>
 
 CMDRUNNER_DECL_CMD(clock);
 CMDRUNNER_DECL_CMD(f5161ah);
@@ -226,6 +227,7 @@ void cmdrunner_init(void)
   CMDRUNNER_ADD_CMD(sleep);
   CMDRUNNER_ADD_CMD(spi);
   CMDRUNNER_ADD_CMD(ww);
+  printf("cmdrunner_init completed"__endline);
 }
 
 int cmdrunner_add_cmd(
@@ -275,7 +277,7 @@ int cmdrunner_handle_char(cmdrunner_state_t *s, char c)
     return ERR_OK;
   }
 
-  if (c == CONSOLE_CHAR_LINEFEED) {
+  if (c == CONSOLE_CHAR_LINEFEED || c == 0x0d) {
     cmdrunner_on_newline();
     cmdrunner_flush_inputbuf();
     puts("\n\r >");

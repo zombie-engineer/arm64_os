@@ -357,13 +357,11 @@ int pl011_io_thread(void)
   restore_irq_flags(irqflags);
   while(1) {
     c = pl011_rx_pipe_pop();
-    pl011_putc_blocking(c);
-    // disable_irq_save_flags(irqflags);
+    // pl011_putc_blocking(c);
     for (i = 0; i < ARRAY_SIZE(rx_subscribers); ++i) {
       if (rx_subscriber_is_valid(i)) {
         subscriber = &rx_subscribers[i];
         subscriber->cb(subscriber->cb_arg, c);
-        // debug_event_1();
       }
     }
   }

@@ -90,6 +90,8 @@ void sched_queue_flagwait_task(struct scheduler *s, struct task *t);
 
 void wait_on_timer_ms(uint64_t msec);
 
+void waitflag_init(atomic_t *waitflag);
+
 void wait_on_waitflag(atomic_t *waitflag);
 
 void wakeup_waitflag(atomic_t *waitflag);

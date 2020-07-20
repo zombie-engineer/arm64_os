@@ -963,7 +963,7 @@ void main()
   ret = armv8_generic_timer_init();
   BUG(ret != ERR_OK, "Failed to init armv8 generic timer");
 
-  // cmdrunner_init();
+  cmdrunner_init();
   // cmdrunner_run_interactive_loop();
   scheduler_init(0/* log_level */, init_func);
   while(1);
