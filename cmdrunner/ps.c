@@ -14,6 +14,11 @@ static int command_ps_print_help()
   return CMD_ERR_NO_ERROR;
 }
 
+static inline int cmdrunner_ps_print_one(char *buf, int bufsz, int cpu_n, struct task *t)
+{
+  return snprintf(buf, bufsz, "cpu:%d, task: %s\n", cpu_n, t->name);
+}
+
 static int cmdrunner_ps()
 {
   char buf[256];
@@ -23,9 +28,14 @@ static int cmdrunner_ps()
   struct task *t;
   for (cpu_n = 0; cpu_n < NUM_CORES; ++cpu_n) {
     s = get_scheduler_n(cpu_n);
-    list_for_each_entry(t, &s->running, schedlist) {
-      snprintf(buf + n, sizeof(buf) - n, "cpu:%d, task: %s\n", cpu_n, t->name);
-    }
+    list_for_each_entry(t, &s->running, schedlist)
+      n +=  cmdrunner_ps_print_one(buf + n, sizeof(buf) - n, cpu_n, t);
+
+    list_for_each_entry(t, &s->timer_waiting, schedlist)
+      n +=  cmdrunner_ps_print_one(buf + n, sizeof(buf) - n, cpu_n, t);
+
+    list_for_each_entry(t, &s->flag_waiting, schedlist)
+      n +=  cmdrunner_ps_print_one(buf + n, sizeof(buf) - n, cpu_n, t);
   }
   printf("%s", buf);
   return CMD_ERR_NO_ERROR;
