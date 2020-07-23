@@ -100,7 +100,7 @@ LIBS += $(OBJS_BINS)
 LIBS += $(OBJS_SERVO_SG90)
 $(info LIBS = $(LIBS))
 
-OBJS += $(LIBS) lib/checksum.o font/font.o
+OBJS += $(LIBS) lib/checksum.o font/font.o lib/parse_string.o
 
 TARGET_PREFIX_REAL := kernel8
 TARGET_PREFIX_QEMU := kernel8_qemu

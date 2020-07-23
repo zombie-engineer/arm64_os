@@ -1,4 +1,5 @@
 #pragma once
+#include <parse_string.h>
 
 #define CMDRUNNER_ERR_MAXCOMMANDSREACHED -1
 
@@ -13,30 +14,10 @@
 #define CMDLINE_BUF_SIZE 1024
 #define MAX_HISTORY_LINES  8
 
-
-typedef struct string_token {
-  const char *s;
-  int len;
-} string_token_t;
-
-typedef struct string_tokens {
-  string_token_t *ts;
-  int len;
-} string_tokens_t;
-
 #define STRING_TOKEN_ARGN(arg, n) (arg->ts[n])
-
-int string_tokens_from_string(const char *string_start, const char *string_end, int maxlen, string_tokens_t *out);
-
-int string_token_eq(const string_token_t *t, const char *str);
-
-#define STRING_TOKENS_LOOP(t, var) \
-  string_token_t *var = t->ts; \
-  for(; var < &t->ts[t->len]; ++var)
 
 /* generic signature for every command */
 typedef int (*cmd_func)(const string_tokens_t *);
-
 
 /* structure of a command */
 typedef struct command {

@@ -16,7 +16,11 @@ static struct pipe char_pipe;
 
 static char cmdrunner_getch()
 {
-  return pipe_pop(&char_pipe);
+  char c;
+  c = pipe_pop(&char_pipe);
+  putc(c); 
+  putc('-'); 
+  return c;
 }
 
 static void cmdrunner_rx_cb(void *priv, char c)
