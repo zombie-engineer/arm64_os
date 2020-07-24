@@ -1,6 +1,6 @@
 OBJS_ARMV8 = \
 	armv8.o \
-	armv8_cpu.o \
+	armv8_cpuctx_routines.o \
 	armv8_lock.o \
 	armv8_cpuctx.o \
 	armv8_printers.o \
