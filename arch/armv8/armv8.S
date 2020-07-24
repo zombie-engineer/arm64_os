@@ -1,26 +1,31 @@
 #include <arch/armv8/percpu_asm_macros.h>
-   // 
-   // Arm Architecture Reference Manual
-   // Armv8, for Armv8-A architecture profile
-   // DDI0487E_a_armv8_arm.pdf
 
 #include <asm_macros.h>
 #include <arch/armv8/armv8_asm_macros.h>
 
+/*
+ * Arm Architecture Reference Manual
+ * Armv8, for Armv8-A architecture profile
+ * DDI0487E_a_armv8_arm.pdf
+ */
+
+
 #define DAIF_IRQ_BIT    (1 << 1)
 
-// CurrentEL - Current Exception Level
-// bits [63:4] - RES0
-// bits [3:2]  - EL, Current exception level
-//             - 0b00 EL0
-//             - 0b01 EL1
-//             - 0b10 EL2
-//             - 0b11 EL3
-
+/*
+ * GET_CURRENT_EXCEPTION_LEVEL
+ * CurrentEL - Current Exception Level
+ * bits [63:4] - RES0
+ * bits [3:2]  - EL, Current exception level
+ *             - 0b00 EL0
+ *             - 0b01 EL1
+ *             - 0b10 EL2
+ *             - 0b11 EL3
+ */
 .macro GET_CURRENT_EXCEPTION_LEVEL dreg
-  // dreg - destination register
+  /* dreg - destination register */
   mrs \dreg, CurrentEl
-  // clear reserved bits
+  /* clear reserved bits */
   and \dreg, \dreg, #0xc
 .endm
 
@@ -28,17 +33,17 @@
 .section ".text"
 
 FUNC(__armv8_set_elr_el1):
-  # x0 - value
+  /* x0 - value */
   msr elr_el1, x0
   ret
 
 FUNC(__armv8_set_sp_el1):
-  # x0 - value
+  /* x0 - value */
   msr sp_el1, x0
   ret
 
 FUNC(armv8_get_mpidr_el1):
-  # x0 - cpu core number 0-3
+  /* x0 - cpu core number 0-3 */
   ldr x1, =__percpu_data
   add x1, x1, x0, lsl #3
   ldr x0, [x1]
@@ -60,26 +65,23 @@ FUNC(get_cpu_num):
   get_cpu_id x0
   ret
 
-// MEMORY MODEL -----------------------------------------------
-// CACHE ------------------------------------------------------
-
-  ////////////////////////////////////////////////////////////////////////
-  // AArch64 Memory Model Feature Register 2
-  // ID_AA64MMFR2_EL1
-  // |----|-----|-----|-----|-----|-----|-----|-----|
-  // |E0PD| EVT | BBM | TTL |RES0 | FWB | IDS | AT  |
-  // |----|-----|-----|-----|-----|-----|-----|-----|
-  // 63 60 59 56 55 52 51 48 47 44 43 40 39 36 35 32 
-  //
-  // |----|-----|-------|-------|-----|-----|-----|-----|
-  // | ST | NV  | CCIDX |VARange|IESB |LSM  | UAO | CnP |
-  // |----|-----|-------|-------|-----|-----|-----|-----|
-  // 31 28 27 24 23   20 19   16 15 12 11 8 7 4 3 0
-  // 
-  // 
+/*
+ * AArch64 Memory Model Feature Register 2
+ * ID_AA64MMFR2_EL1
+ * |----|-----|-----|-----|-----|-----|-----|-----|
+ * |E0PD| EVT | BBM | TTL |RES0 | FWB | IDS | AT  |
+ * |----|-----|-----|-----|-----|-----|-----|-----|
+ * 63 60 59 56 55 52 51 48 47 44 43 40 39 36 35 32
+ *
+ * |----|-----|-------|-------|-----|-----|-----|-----|
+ * | ST | NV  | CCIDX |VARange|IESB |LSM  | UAO | CnP |
+ * |----|-----|-------|-------|-----|-----|-----|-----|
+ * 31 28 27 24 23   20 19   16 15 12 11 8 7 4 3 0
+ */
 FUNC(mem_model_max_pa_bits):
-  mrs x0, id_aa64mmfr0_el1 // AArch64 Memory Model Feature Register 0
-  // x0 = 0x1122
+  /* AArch64 Memory Model Feature Register 0 */
+  mrs x0, id_aa64mmfr0_el1
+  /* x0 = 0x1122 */
   and x0, x0, #0xf
   cmp x0, #0
   beq 1f
@@ -93,7 +95,7 @@ FUNC(mem_model_max_pa_bits):
   beq 5f
   cmp x0, #0b0101
   beq 6f
-  mov x0, #52 
+  mov x0, #52
   b   0f
 6:
   mov x0, #48
@@ -116,7 +118,8 @@ FUNC(mem_model_max_pa_bits):
   ret
 
 FUNC(mem_model_num_asid_bits):
-  mrs   x0, id_aa64mmfr0_el1 // AArch64 Memory Model Feature Register 0
+  /* AArch64 Memory Model Feature Register 0 */
+  mrs   x0, id_aa64mmfr0_el1
   mov   x1, #0xf
   lsr   x0, x0, #4
   and   x0, x0, x1
@@ -294,7 +297,7 @@ FUNC(mem_model_st2_64k_granule_support):
 
   // DC CISW, Data or unified Cache line Clean and Invalidate by Set/Way
   // Clean and Invalidate data cache by set/way.
-  // 
+  //
   // |-------|--------|-------|-|
   // | RES0  | SetWay | Level |0|
   // |-------|--------|-------|-|
@@ -305,15 +308,15 @@ FUNC(mem_model_st2_64k_granule_support):
   //  -- Bits[L-1:4] are RES 0.
   //     A = Log 2 (ASSOCIATIVITY), L = Log 2 (LINELEN), B = (L + S), S = Log 2 (NSETS).
   // Bit[0] - RES0
-  // 
+  //
   // |--------|-------|------|
   // |  Way   |  Set  | RES0 |
   // |--------|-------|------|
   // |31  32-A| B-1  L|L-1  4|
-  // 
+  //
 
-  // clz - get leading zeroes explained 
-  // x3 = 3 = 0b0000 0000 0000 0000 0000 0000 0000 0011 - last way idx - 
+  // clz - get leading zeroes explained
+  // x3 = 3 = 0b0000 0000 0000 0000 0000 0000 0000 0011 - last way idx -
   // all idxes fit into 2 bits
   // A = 2 bits
   // Way offset = 32 - 2 = 30
@@ -394,7 +397,7 @@ disable_l3_caches:
 0:
   ret
 .endm
-  
+
 FUNC(mem_cache_get_line_size):
   GET_CACHE_LINE_SIZE
 
@@ -476,62 +479,52 @@ FUNC(arm_set_tcr_el1):
   msr tcr_el1, x0
   ret
 
-    // G8.2.162 TTBCR, Translation Table Base Control Register
-    // 
-
-
-    // D13.2.112 TCR_EL1, Translation Control Register (EL1)
-    // The control register for stage 1 of the EL1&0 translation regime.
-    // T0SZ, bits  [5:0] The size offset of the memory region addressed by TTBR0_EL
-    // EPD0, bit   [7]   Translation table walk disable for translations using TTBR0_EL
-    //                   0 Enable
-    //                   1 Disable -> Translation fault
-    // IRGN0, bits [9:8] Inner cacheability 
-    //                  0 Normal memory, Inner Non-cacheable
-    //                  1 Normal memory, Inner Write-Back Read-Alloc Write Alloc Cacheable 
-    //                  2 Normal memory, Inner Write-Through Read-Alloc No-Write-Alloc Cacheable 
-    //                  3 Normal memory, Inner Write-Back Read-Alloc No-Write-Alloc Cacheable 
-    // ORGN0, bits[11:10] Outer cacheability
-    // SH0,   bits[13:12] Sharebility attr
-    //                  0 Non-shareable
-    //                  2 Outer Shareable
-    //                  3 Inner Shareable
-    // TG0,   bits[15:14] Granule size for TTBR0_EL1
-    //                  0: 4kb, 1: 64kb, 2: 16kb
-    // T1SZ,  bits[21:16] Size offset of the memory region addressed by TTBR1_EL1
-    // A1,    bit [22]    Selects whether TTBR0_EL1 or TTBR1_EL1 defines the ASID
-    //                  0 - TTBR0_EL1.ASID, 1 - TTBR1_EL1
-    // EPD1,  bit [23]  Traslation table walk disable for TTBR1_EL
-    // IRGN1, bits[25:24] Inner cacheability 
-    // ORGN1, bits[27:26] Outer cacheability 
-    // SH1,   bits[29:28] Shareability
-    // TG1,   bits[31:30] Granule size for TTBR1_EL1
-    // IPS,   bits[34:32] Intermediate Physical Address Size
-    //                  0: 32bits 4ggb
-    //                  1: 36bits 64gb
-    //                  2: 40bits 01tb
-    //                  3: 42bits 04tb
-    //                  4: 44bits 16tb
-    //                  5: 48bits 256tb
-    //                  6: 52bits 4pb
-    // AS,    bit[35]   ASID Size.  0 - 8 bit, 1 - 16 bit
-    // TBI0,  bit[37]   Top Byte ignored
-    // TBI1,  bit[38]   Top Byte ignored
-    // NFD0,  bit[53]   Non-fault translation table walk disable for stage 1 tranlations
-    //                  for TTBR0_EL1
-    // NFD1,  bit[54]   Non-fault translation table disable for stage 1 TTBR1_EL1
-
-
-
-    // Search "Table D5-33 Stage 1 access permissions for instruction execution for a translation regime that applies to EL0 and a
-    // higher Exception level"
-
-
-.macro LED_ON
-  ldr   x6, =0x3F20001c
-  mov   w7, #(1<<21)
-  str   w7, [x6]
-.endm
+/*
+ * G8.2.162 TTBCR, Translation Table Base Control Register
+ * D13.2.112 TCR_EL1, Translation Control Register (EL1)
+ * The control register for stage 1 of the EL1&0 translation regime.
+ * T0SZ, bits  [5:0] The size offset of the memory region addressed by TTBR0_EL
+ * EPD0, bit   [7]   Translation table walk disable for translations using TTBR0_EL
+ *                   0 Enable
+ *                   1 Disable -> Translation fault
+ * IRGN0, bits [9:8] Inner cacheability
+ *                  0 Normal memory, Inner Non-cacheable
+ *                  1 Normal memory, Inner Write-Back Read-Alloc Write Alloc Cacheable
+ *                  2 Normal memory, Inner Write-Through Read-Alloc No-Write-Alloc Cacheable
+ *                  3 Normal memory, Inner Write-Back Read-Alloc No-Write-Alloc Cacheable
+ * ORGN0, bits[11:10] Outer cacheability
+ * SH0,   bits[13:12] Sharebility attr
+ *                  0 Non-shareable
+ *                  2 Outer Shareable
+ *                  3 Inner Shareable
+ * TG0,   bits[15:14] Granule size for TTBR0_EL1
+ *                  0: 4kb, 1: 64kb, 2: 16kb
+ * T1SZ,  bits[21:16] Size offset of the memory region addressed by TTBR1_EL1
+ * A1,    bit [22]    Selects whether TTBR0_EL1 or TTBR1_EL1 defines the ASID
+ *                  0 - TTBR0_EL1.ASID, 1 - TTBR1_EL1
+ * EPD1,  bit [23]  Traslation table walk disable for TTBR1_EL
+ * IRGN1, bits[25:24] Inner cacheability
+ * ORGN1, bits[27:26] Outer cacheability
+ * SH1,   bits[29:28] Shareability
+ * TG1,   bits[31:30] Granule size for TTBR1_EL1
+ * IPS,   bits[34:32] Intermediate Physical Address Size
+ *                  0: 32bits 4ggb
+ *                  1: 36bits 64gb
+ *                  2: 40bits 01tb
+ *                  3: 42bits 04tb
+ *                  4: 44bits 16tb
+ *                  5: 48bits 256tb
+ *                  6: 52bits 4pb
+ * AS,    bit[35]   ASID Size.  0 - 8 bit, 1 - 16 bit
+ * TBI0,  bit[37]   Top Byte ignored
+ * TBI1,  bit[38]   Top Byte ignored
+ * NFD0,  bit[53]   Non-fault translation table walk disable for stage 1 tranlations
+ *                  for TTBR0_EL1
+ * NFD1,  bit[54]   Non-fault translation table disable for stage 1 TTBR1_EL1
+ *
+ * Search "Table D5-33 Stage 1 access permissions for instruction execution for a translation regime that applies to EL0 and a
+ * higher Exception level"
+ */
 
 FUNC(armv8_set_mair_el1):
   msr mair_el1, x0
@@ -540,13 +533,13 @@ FUNC(armv8_set_mair_el1):
 FUNC(armv8_get_mair_el1):
   mrs x0, mair_el1
   ret
-   
+
 FUNC(__armv8_enable_mmu):
   msr   ttbr0_el1, x0
   msr   ttbr1_el1, x1
 
   mrs   x2, tcr_el1
-   
+
   // Set T0SZ to 16
   orr   x2, x2, #0b1000
 
@@ -569,7 +562,7 @@ FUNC(__armv8_enable_mmu):
   orr   x2, x2, #(1<<39)
   msr   tcr_el1, x2
   isb
-  
+
   mrs   x0, sctlr_el1
   // M bit
   orr   x0, x0, #(1<<0)
@@ -577,6 +570,6 @@ FUNC(__armv8_enable_mmu):
   // C bit
   orr   x0, x0, #(1<<2)
   msr   sctlr_el1, x0
-  
+
   isb
   ret
