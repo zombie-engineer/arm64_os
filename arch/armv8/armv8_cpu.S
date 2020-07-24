@@ -74,6 +74,7 @@ FUNC(__armv8_cpuctx_store):
    */
   stp   x29, x30, [sp, #-16]
   GET_CURRENT_CTX x30, x29
+
   /*
    * Immediately restore x29 from stack
    */
@@ -86,35 +87,39 @@ FUNC(__armv8_cpuctx_store):
    * store original link register (x30)
    * of the caller function
    */
-  ldr   x28, [sp] 
+  ldr   x28, [sp]
 
-  /* 
+  /*
    * store stack pointer from a task
    * before exception happened
    */
   mrs   x29, sp_el0
   stp   x28, x29, [x30], #16
-  // store program counter and cpsr from a task
-  // before exception happened
+
+  /*
+   * store program counter and cpsr from a task
+   * before exception happened
+   */
   mrs   x28, elr_el1
   mrs   x29, spsr_el1
   stp   x28, x29, [x30]
 
-  // restore this function's link register (x30)
-  // to return
+  /*
+   * restore this function's link register (x30)
+   * to return
+   */
   ldr   x30, [sp, #-8]
   ret
 
 
 FUNC(__armv8_cpuctx_eret):
   GET_CURRENT_CTX x30, x29
-  // restore elr and sp0 first 
+  /* restore elr and sp0 first */
   ldp   x0 , x1 , [x30, #(31 << 3)]
   msr   sp_el0, x0
   msr   elr_el1, x1
-  // restore spsr
+  /* restore spsr */
   ldr   x0 , [x30, #(33 << 3)]
-  // msr   spsr_el1, x0
   LOAD_REGS_X0_X30 x30
   eret
 
@@ -122,23 +127,23 @@ FUNC(__armv8_cpuctx_eret):
  * Ready context to jump to second part of yield
  * function. This is needed to restore irq after
  * jump to initial context is complete
+ * x0 - sp for a new task
+ * x1 - link register value
+ * x2 - flags
+ * x3 - cpu_context
  */
 FUNC(__armv8_prep_context):
-  // x0 - sp for a new task
-  // x1 - link register value
-  // x2 - flags
-  // x3 - cpu_context
   stack     .req x0
   link      .req x1
   flags     .req x2
   ctx       .req x3
   tmp       .req x4
   ZERO_REGS_X0_X29 tmp, ctx
-  // store x30(link) and sp
+  /* store x30(link) and sp */
   stp   link, stack, [ctx], #16
   .unreq stack
   .unreq link
-  // zero out pc, put flags in cpsr
+  /* zero out pc, put flags in cpsr */
   adr   tmp, __pc_resume_from_yield
   stp   tmp, flags, [ctx], #16
   .unreq tmp
@@ -167,8 +172,10 @@ FUNC(__armv8_restore_ctx_from):
   mov sp, stack
   .unreq stack
   tmpdaif .req x0
-  // do not restore pc
-  // restore cpsr and put it on stack
+  /*
+   * do not restore pc
+   * restore cpsr and put it on stack
+   */
   ldr tmpdaif, [ctx, #(33 << 3)]
   str tmpdaif, [sp, #-8]
   .unreq tmpdaif
@@ -182,9 +189,11 @@ FUNC(__armv8_restore_ctx_from):
   ret
 
 .macro STORE_CONTEXT
-  // x30 - is a link register
-  // at store context we will use x30 as a writing
-  // so we first stack it to later recover
+  /*
+   * x30 - is a link register
+   * at store context we will use x30 as a writing
+   * so we first stack it to later recover
+   */
   stp   x30, x29, [sp, #-8]
   GET_CURRENT_CTX x30, x29
   /*
@@ -205,15 +214,17 @@ FUNC(__armv8_restore_ctx_from):
   mov   x1, sp
   stp   x30, x1, [x0], #16
 
-  // make patched program counter, that
-  // will point at end second part of yield
-  // function for proper return
+  /*
+   * make patched program counter, that
+   * will point at end second part of yield
+   * function for proper return
+   */
   adr   x30, __pc_resume_from_yield
   ldr   x30, [x30]
   mov   x30, #1
   mov   x30, #1
 
-  // make cpsr
+  /* make cpsr */
   mrs   x1, daif
   stp  x30, x1, [x0], #16
 .endm
@@ -364,5 +375,3 @@ FUNC(__armv8_self_test_irq_context):
   ldp x3 , x4 , [sp], #16
   ldp x1 , x2 , [sp], #16
   ret
-
-
