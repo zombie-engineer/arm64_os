@@ -171,6 +171,8 @@ void pt_config_print(pt_config_t *p)
 {
   int i;
   uint64_t total_l3_ptes = 0;
+
+  printf("mmu: ttbr0:%p, ttbr1:%p"__endline, p->base_address, p->base_address);
   for (i = 0; i < p->num_ranges; ++i) {
     pt_mem_range_t *r = &p->mem_ranges[i];
     total_l3_ptes += r->num_pages;
@@ -309,18 +311,23 @@ void mmu_self_test(void)
 }
 
 #define DECL_RANGE(__start, __num, __memattr) \
-  pt_config.mem_ranges[num_ranges].pa_start_page = __start;\
-  pt_config.mem_ranges[num_ranges].va_start_page = __start;\
-  pt_config.mem_ranges[num_ranges].num_pages     = __num;\
-  pt_config.mem_ranges[num_ranges].mem_attr_idx  = MEMATTR_IDX_ ## __memattr;\
+  mmu_info.pt_config.mem_ranges[num_ranges].pa_start_page = __start;\
+  mmu_info.pt_config.mem_ranges[num_ranges].va_start_page = __start;\
+  mmu_info.pt_config.mem_ranges[num_ranges].num_pages     = __num;\
+  mmu_info.pt_config.mem_ranges[num_ranges].mem_attr_idx  = MEMATTR_IDX_ ## __memattr;\
   num_ranges++
+
+struct mmu_info {
+  pt_config_t pt_config;
+  mair_repr_64_t mair_repr;
+};
+
+static struct mmu_info mmu_info ALIGNED(64) = { 0 };
 
 void mmu_init(void)
 {
   uint64_t va_start;
   mmu_caps_t mmu_caps;
-  pt_config_t pt_config;
-  mair_repr_64_t mair_repr;
   int num_ranges = 0;
 
   int pg_norm_off = 0;
@@ -334,12 +341,12 @@ void mmu_init(void)
   int pg_locl_off = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
   int pg_locl_num = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
 
-  pt_config.base_address = (uint64_t)&__mmu_table_base;
-  pt_config.page_size = MMU_PAGE_GRANULE;
-  pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
+  mmu_info.pt_config.base_address = (uint64_t)&__mmu_table_base;
+  mmu_info.pt_config.page_size = MMU_PAGE_GRANULE;
+  mmu_info.pt_config.num_entries_per_pt = MMU_PTES_PER_LEVEL;
   // Cover from 0 to 1GB of physical address space
-  pt_config.pa_start = 0;
-  pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
+  mmu_info.pt_config.pa_start = 0;
+  mmu_info.pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
   DECL_RANGE(pg_norm_off, pg_norm_num, NORMAL);
   DECL_RANGE(pg_dma_off , pg_dma_num , DEV_NGNRE);
@@ -347,27 +354,46 @@ void mmu_init(void)
   DECL_RANGE(pg_peri_off, pg_peri_num, DEV_NGNRE);
   DECL_RANGE(pg_locl_off, pg_locl_num, DEV_NGNRE);
 
-  pt_config.num_ranges = num_ranges;
+  mmu_info.pt_config.num_ranges = num_ranges;
+  pt_config_print(&mmu_info.pt_config);
 
-  pt_config_print(&pt_config);
-
-  memset(&mair_repr, 0, sizeof(mair_repr));
+  memset(&mmu_info.mair_repr, 0, sizeof(mmu_info.mair_repr));
 
   // memory region attributes of 0xff enable stxr / ldxr operations
-  mair_repr.memattrs[MEMATTR_IDX_NORMAL]   = MAKE_MEMATTR_NORMAL(
+  mmu_info.mair_repr.memattrs[MEMATTR_IDX_NORMAL]   = MAKE_MEMATTR_NORMAL(
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
-  mair_repr.memattrs[MEMATTR_IDX_DEV_NGNRE] = MEMATTR_DEVICE_NGNRE;
-  mair_repr.memattrs[MEMATTR_IDX_NORMAL2]   = MAKE_MEMATTR_NORMAL(
+  mmu_info.mair_repr.memattrs[MEMATTR_IDX_DEV_NGNRE] = MEMATTR_DEVICE_NGNRE;
+  mmu_info.mair_repr.memattrs[MEMATTR_IDX_NORMAL2]   = MAKE_MEMATTR_NORMAL(
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
 
-  armv8_set_mair_el1(mair_repr_64_to_value(&mair_repr));
+  armv8_set_mair_el1(mair_repr_64_to_value(&mmu_info.mair_repr));
 
-  // Number of entries (ptes) in a single page table
+  /* Number of entries (ptes) in a single page table */
   mmu_caps.max_pa_bits = mem_model_max_pa_bits();
   va_start = 0;
-  map_linear_range(va_start, &mmu_caps, &pt_config);
-  __armv8_enable_mmu(pt_config.base_address, pt_config.base_address);
+  map_linear_range(va_start, &mmu_caps, &mmu_info.pt_config);
+  __armv8_enable_mmu(
+    mmu_info.pt_config.base_address,
+    mmu_info.pt_config.base_address);
+  // dcache_flush(&mmu_info, sizeof(mmu_info));
+  mmu_self_test();
+}
+
+/*
+ * mmu_enable_configured - used to startup secondary cpus to a state
+ * when it would need MMU, spinlocks and scheduling. The call is only
+ * valid when MMU tables has already been configured, which is indicated
+ * by ttbr0/ttb1 static variables set to some non-zero addresses.
+ */
+void mmu_enable_configured(void)
+{
+  BUG(!mmu_info.pt_config.base_address,
+    "mmu enable not possible: mmu table not initialized");
+  armv8_set_mair_el1(mair_repr_64_to_value(&mmu_info.mair_repr));
+  __armv8_enable_mmu(
+    mmu_info.pt_config.base_address,
+    mmu_info.pt_config.base_address);
   mmu_self_test();
 }
