@@ -73,6 +73,8 @@ extern void *get_current_ctx();
 
 struct scheduler {
   atomic_t flag_is_set;
+
+  struct spinlock lock;
   struct list_head running;
   struct list_head timer_waiting;
   struct list_head flag_waiting;
@@ -96,8 +98,6 @@ void wait_on_waitflag(atomic_t *waitflag);
 
 void wakeup_waitflag(atomic_t *waitflag);
 
-int run_on_cpu(struct task *t, int cpu_num);
-
 extern struct timer *sched_timer;
 
 void sched_timer_cb(void *arg);
@@ -116,7 +116,7 @@ task_t *task_create(task_fn fn, const char *task_name);
 
 struct pcpu_scheduler_holder {
   struct scheduler s;
-  char   padding[64 - sizeof(struct scheduler)];
+ // char   padding[64 - sizeof(struct scheduler)];
 };
 
 extern struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES];
@@ -124,3 +124,6 @@ extern struct pcpu_scheduler_holder pcpu_schedulers[NUM_CORES];
 #define get_scheduler_n(cpu) (&pcpu_schedulers[cpu].s)
 #define get_scheduler() (get_scheduler_n(get_cpu_num()))
 
+void start_task_from_ctx(void *cpuctx);
+
+void run_on_cpu(int cpu_n, void (*fn)(void));

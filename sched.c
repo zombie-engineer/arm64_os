@@ -84,6 +84,7 @@ static void pcpu_scheduler_init(struct scheduler *s)
   INIT_LIST_HEAD(&s->running);
   INIT_LIST_HEAD(&s->timer_waiting);
   INIT_LIST_HEAD(&s->flag_waiting);
+  spinlock_init(&s->lock);
   s->flag_is_set = 0;
 }
 
@@ -162,6 +163,15 @@ void prep_task_ctx(uint64_t *sp, uint64_t fn, uint64_t flags, void *cpuctx)
 void start_task_from_ctx(void *cpuctx)
 {
   __armv8_restore_ctx_from(cpuctx);
+}
+
+void run_on_cpu(int cpu_n, void (*fn)(void))
+{
+  void **write_to = &__percpu_data[cpu_n].jmp_addr;
+  SCHED_DEBUG("setting %p to %p", write_to, fn);
+  *write_to = (void *)fn;
+  dcache_flush(write_to, 64);
+  asm volatile("sev");
 }
 
 char stacks[STACK_SIZE * NUM_STACKS] ALIGNED(1024);
@@ -456,7 +466,7 @@ void scheduler_init(int log_level, task_fn init_func)
   stack_idx = 0;
   memset(&tasks, 0, sizeof(tasks));
 
-  init_task = task_create(init_func, "init_func");
+  init_task = task_create(init_func, "init");
   init_task->ticks_left = ticks_until_preempt;
   sched_queue_runnable_task(get_scheduler(), init_task);
 
