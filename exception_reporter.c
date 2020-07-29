@@ -54,6 +54,9 @@ void exception_print_summary_uart(exception_info_t *e)
   n = gen_exception_string_specific(e, buf, sizeof(buf));
   uart_send_buf(buf, n);
   uart_send_buf("\n\r", 2);
+  n = snprintf(buf, sizeof(buf), "cpu:%d\n\r", get_cpu_num());
+  uart_send_buf(buf, n);
+  uart_send_buf("\n\r", 2);
 }
 
 void exception_print_summary_vcanvas(exception_info_t *e)
