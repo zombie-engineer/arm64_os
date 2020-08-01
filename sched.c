@@ -17,7 +17,6 @@
 #include <mem_access.h>
 
 int sched_log_level = 0;
-struct timer *sched_timer = NULL;
 
 /*
  * Description of current scheduling algorithm:
@@ -86,6 +85,7 @@ static void pcpu_scheduler_init(struct scheduler *s)
   INIT_LIST_HEAD(&s->flag_waiting);
   spinlock_init(&s->lock);
   s->flag_is_set = 0;
+  s->timer_interval_ms = 1000;
 }
 
 void sched_queue_runnable_task_noirq(struct scheduler *s, struct task *t)
@@ -448,7 +448,8 @@ static void OPTIMIZED schedule_from_irq()
 void sched_timer_cb(void *arg)
 {
   SCHED_DEBUG2("sched_timer_cb");
-  SCHED_REARM_TIMER;
+  asm volatile("sev");
+  SCHED_REARM_TIMER(get_scheduler());
   schedule_from_irq();
 }
 
@@ -456,11 +457,13 @@ void scheduler_init(int log_level, task_fn init_func)
 {
   const int ticks_until_preempt = 10;
   int i;
+  struct scheduler *s;
   task_t *init_task;
 
   for (i = 0; i < ARRAY_SIZE(pcpu_schedulers); ++i)
     pcpu_scheduler_init(get_scheduler_n(i));
 
+  s = get_scheduler();
   puts("Starting task scheduler" __endline);
   task_idx = 0;
   stack_idx = 0;
@@ -468,16 +471,17 @@ void scheduler_init(int log_level, task_fn init_func)
 
   init_task = task_create(init_func, "init");
   init_task->ticks_left = ticks_until_preempt;
-  sched_queue_runnable_task(get_scheduler(), init_task);
+  sched_queue_runnable_task(s, init_task);
 
-  sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
-  if (sched_timer->interrupt_enable) {
-    BUG(sched_timer->interrupt_enable() != ERR_OK, "Failed to init scheduler timer");
+  s->sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  if (s->sched_timer->interrupt_enable) {
+    BUG(s->sched_timer->interrupt_enable() != ERR_OK,
+      "Failed to init scheduler timer");
   }
   sched_log_level = log_level;
   intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
-  SCHED_REARM_TIMER;
   irq_mask_all();
   enable_irq();
+  SCHED_REARM_TIMER(get_scheduler());
   start_task_from_ctx(init_task->cpuctx);
 }

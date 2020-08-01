@@ -11,6 +11,7 @@
 #include <cmdrunner.h>
 #include <uart/pl011_uart.h>
 #include <drivers/usb/usbd.h>
+#include <mmu.h>
 
 static struct timer *test_timer;
 
@@ -93,14 +94,39 @@ void cpu_test(void)
   }
 }
 
-
-static void cpu_run(int cpu_num, void (*fn)(void))
+static int idle(void)
 {
-  void **write_to = &__percpu_data[cpu_num].jmp_addr;
-  SCHED_DEBUG("setting %p to %p", write_to, fn);
-  *write_to = (void *)fn;
-  dcache_flush(write_to, 64);
-  asm volatile("sev");
+  printf("starting idle process on cpu %d\n", get_cpu_num());
+  while(1) {
+    asm volatile("wfe");
+    wait_msec(500);
+    printf("__cpu:%d"__endline, get_cpu_num());
+  }
+  return 0;
+}
+
+static void scheduler_startup_idle(void)
+{
+  task_t *t;
+  struct scheduler *s = get_scheduler();
+
+  s->sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
+  mmu_enable_configured();
+  printf("startup idle on cpu: %d\n", get_cpu_num());
+  t = task_create(idle, "idle");
+  BUG(IS_ERR(t), "failed to create idle task");
+  intr_ctl_arm_generic_timer_irq_enable(get_cpu_num());
+  s->timer_interval_ms = 1000;
+  sched_queue_runnable_task(s, t);
+  // s->sched_timer->set_oneshot(s->timer_interval_ms, sched_timer_cb, 0);
+  // SCHED_REARM_TIMER(s);
+  enable_irq();
+  start_task_from_ctx(t->cpuctx);
+}
+
+void scheduler_second_cpu_startup(int cpu_n)
+{
+  run_on_cpu(cpu_n, scheduler_startup_idle);
 }
 
 int init_func(void)
@@ -109,13 +135,14 @@ int init_func(void)
   BUG(run_uart_thread()        != ERR_OK, "failed to run uart_thread");
   BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
   BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
-  SCHED_REARM_TIMER;
-  enable_irq();
-  // cpu_run(1, cpu_test);
+  scheduler_second_cpu_startup(1);
+  scheduler_second_cpu_startup(2);
+  scheduler_second_cpu_startup(3);
 
   while(1) {
-    yield();
+    // debug_event_1();
     asm volatile("wfe");
+    yield();
   }
 }
 

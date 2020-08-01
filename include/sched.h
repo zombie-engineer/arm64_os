@@ -78,6 +78,8 @@ struct scheduler {
   struct list_head running;
   struct list_head timer_waiting;
   struct list_head flag_waiting;
+  struct timer *sched_timer;
+  int timer_interval_ms;
 };
 
 void scheduler_init(int log_level, task_fn init_func);
@@ -98,12 +100,10 @@ void wait_on_waitflag(atomic_t *waitflag);
 
 void wakeup_waitflag(atomic_t *waitflag);
 
-extern struct timer *sched_timer;
-
 void sched_timer_cb(void *arg);
 
-#define SCHED_REARM_TIMER \
-  sched_timer->set_oneshot(3000, sched_timer_cb, 0)
+#define SCHED_REARM_TIMER(__scheduler) \
+  __scheduler->sched_timer->set_oneshot(__scheduler->timer_interval_ms, sched_timer_cb, 0)
 
 static inline void yield()
 {
