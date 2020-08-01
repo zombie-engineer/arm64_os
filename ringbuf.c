@@ -108,3 +108,18 @@ int ringbuf_write(ringbuf_t *r, const char *src, int sz)
   }
   return progress;
 }
+
+void ringbuf_debug(ringbuf_t *r)
+{
+  int i = 0;
+  const char *ptr = r->buf;
+  printf("ringbuf:%p, buf:%p, end:%p, wp:%p, rp:%p, ahead:%d"__endline, r, r->buf, r->buf_end, r->write_ptr, r->read_ptr, r->read_is_ahead);
+  while(ptr < r->buf_end) {
+    char c = *ptr++;
+    putc(isprint(c) ? c : '.');
+    if (++i == 64) {
+      i = 0;
+      puts(__endline);
+    }
+  }
+}

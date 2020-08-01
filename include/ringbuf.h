@@ -27,3 +27,5 @@ void ringbuf_init(ringbuf_t *r, char *buf, int sz);
 int ringbuf_read(ringbuf_t *r, char *dst, int sz);
 
 int ringbuf_write(ringbuf_t *r, const char *src, int sz);
+
+void ringbuf_debug(ringbuf_t *r);

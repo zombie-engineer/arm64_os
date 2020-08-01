@@ -24,3 +24,8 @@ void pipe_init(struct pipe *p, char *buf, int bufsize)
   waitflag_init(&p->waitflag);
 }
 
+void pipe_debug(struct pipe *p)
+{
+  printf("pipe: %p, ringbuf: %p"__endline, p, &p->ringbuf);
+  ringbuf_debug(&p->ringbuf);
+}

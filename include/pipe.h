@@ -16,3 +16,4 @@ void pipe_push(struct pipe *p, char c);
 
 char pipe_pop(struct pipe *p);
 
+void pipe_debug(struct pipe *p);
