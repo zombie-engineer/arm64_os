@@ -65,27 +65,30 @@
  * dest     - register : recieves the value in the register.
  * tmp      - register : temporary
  */
-.macro read_gpio_reg_64 reg_addr, gpio_num, dest, regnum
+.macro read_gpio_reg_64 reg_addr, gpio_num, dest, regnum, tmp
   mov \regnum, \gpio_num
   lsr \regnum, \regnum, #5
-  mov32 \reg_addr, \dest
-  add \dest, \dest, \regnum, lsl #2
-  ldr \dest, [\dest]
+  mov32 \reg_addr, \tmp
+  add \tmp, \tmp, \regnum, lsl #2
+  ldr \dest, [\tmp]
 .endm
 
 FUNC(gpio_read_level_reg):
   gpio_num .req x0
   tmp      .req x1
-  read_gpio_reg_64 GPIO_REG_GPLEV0, gpio_num, gpio_num, tmp
+  tmp2     .req x2
+  read_gpio_reg_64 GPIO_REG_GPLEV0, gpio_num, gpio_num, tmp, tmp2
   .unreq gpio_num
   .unreq tmp
+  .unreq tmp2
   ret
 
 FUNC(gpio_is_set):
   gpio_num .req x0
   regval   .req x1
+  regvalw  .req w1
   regnum   .req x2
-  read_gpio_reg_64 GPIO_REG_GPLEV0, gpio_num, regval, regnum
+  read_gpio_reg_64 GPIO_REG_GPLEV0, gpio_num, regvalw, regnum, x3
   sub regnum, gpio_num, regnum, lsl #5
   .unreq regnum
   bitpos .req x2
@@ -93,6 +96,7 @@ FUNC(gpio_is_set):
   lsr regval, regval, bitpos
   and x0, x0, regval
   .unreq gpio_num
+  .unreq regvalw
   .unreq regval 
   .unreq bitpos
   ret
