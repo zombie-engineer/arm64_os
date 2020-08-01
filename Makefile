@@ -21,7 +21,8 @@ WARNINGS_AS_ERR := \
   -Werror=incompatible-pointer-types\
   -Werror=unused-variable\
  	-Werror=int-conversion\
- 	-Werror=implicit-function-declaration
+	-Werror=implicit-function-declaration\
+	-Werror=shift-count-overflow
 
 CFLAGS = $(WARNINGS_AS_ERR) -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
