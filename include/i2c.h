@@ -1,8 +1,7 @@
 #pragma once
 
-static int __i2c_init()
-{
-  return 0;
-}
+int i2c_init(void);
 
-int i2c_init() __attribute__((weak, alias("__i2c_init")));
+int i2c_write(uint8_t i2c_addr, const char *buf, int bufsz);
+
+int i2c_read(uint8_t i2c_addr, const char *buf, int bufsz);

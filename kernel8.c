@@ -895,6 +895,29 @@ static void print_memory_map(void)
   printf("dma   : [0x%016x:0x%016x]"__endline, dma_start, dma_end);
 }
 
+void UNUSED i2c_eeprom()
+{
+  int err, n;
+  err = i2c_init();
+  BUG(err != ERR_OK, "i2c_init failed");
+  bool is_read = true;
+
+  if (is_read) {
+    char addr = 0x00;
+    char readbuf[8];
+    n = i2c_write(0x50, &addr, 1);
+    BUG(n != 1, "i2c_write did not return 1");
+    n = i2c_read(0x50, readbuf, 2);
+    BUG(n != 2, "i2c_write did not return 2");
+    printf("i2c_read: %02x" __endline, readbuf[0]);
+  } else {
+    char buf[] = { 0x00, 0x77 };
+    n = i2c_write(0x50, buf, sizeof(buf));
+    BUG(n != 2, "i2c_write did not return 2");
+  }
+  while(1);
+}
+
 void main()
 {
   int ret;
@@ -916,6 +939,7 @@ void main()
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);
+  // i2c_eeprom();
   // pwm_bcm2835_init();
   // bcm2835_set_pwm_clk_freq(100000);
   // servo_sg90_init();
