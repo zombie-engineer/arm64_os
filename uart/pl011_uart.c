@@ -26,7 +26,7 @@
 
 DECL_GPIO_SET_KEY(pl011_gpio_set_key, "PL011_GPIO_SET_");
 
-static char pl011_rx_buf[2048];
+static char pl011_rx_buf[8];
 static int pl011_uart_initialized = 0;
 static struct pipe pl011_rx_pipe ALIGNED(64);
 static uint64_t ringbuf_stat_chars_lost;
