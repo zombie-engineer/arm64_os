@@ -721,7 +721,7 @@ static inline void dwc2_deinit_channel_int(int ch_id)
 
 void dwc2_channel_enable(int ch_id)
 {
-  dwc2_init_channel_int(ch_id);
+  // dwc2_init_channel_int(ch_id);
   dwc2_enable_channel_int(ch_id);
 }
 

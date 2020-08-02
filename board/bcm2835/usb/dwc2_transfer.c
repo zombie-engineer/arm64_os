@@ -258,12 +258,18 @@ void dwc2_channel_set_intmsk(struct dwc2_channel *c)
   intrmsk = 0;
   USB_HOST_INTR_CLR_SET_HALT(intrmsk, 1);
   USB_HOST_INTR_CLR_SET_AHB_ERR(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
   SET_INTRMSK();
 }
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
 {
-  DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%d", c->ctl->dma_addr_base, c->ctl->transfer_size, c->next_pid);
+  DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s",
+    c->ctl->dma_addr_base,
+    c->ctl->transfer_size,
+    usb_pid_to_string(c->next_pid),
+    usb_direction_to_string(c->ctl->direction)
+  );
 
   BUG((uint64_t)c->ctl->dma_addr_base & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
   dwc2_channel_enable(c->id);

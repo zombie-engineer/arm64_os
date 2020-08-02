@@ -264,6 +264,31 @@ static inline const char *usb_direction_to_string(int d)
   return "UNK";
 }
 
+static inline const char *usb_pid_to_string(int pid)
+{
+  switch(pid) {
+#define __CASE(__t) case USB_PID_TYPE_ ## __t: return #__t;
+  __CASE(OUT);
+  __CASE(IN);
+  __CASE(SOF);
+  __CASE(SETUP);
+  __CASE(DATA0);
+  __CASE(DATA1);
+  __CASE(DATA2);
+  __CASE(MDATA);
+  __CASE(ACK);
+  __CASE(NAK);
+  __CASE(STALL);
+  __CASE(NYET);
+  __CASE(PRE);
+ // __CASE(ERR);
+  __CASE(SPLIT);
+  __CASE(PING);
+#undef __CASE
+  }
+  return "UNK";
+}
+
 static inline const char *usb_speed_to_string(int s)
 {
   switch (s) {
