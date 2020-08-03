@@ -289,6 +289,15 @@ static inline const char *usb_pid_to_string(int pid)
   return "UNK";
 }
 
+static inline const char *usb_hub_power_mode_to_string(struct usb_hub_descriptor *d)
+{
+  switch(d->attributes.raw16 & 3) {
+    case USB_HUB_ATTR_POWER_SW_MODE_GANGED: return "GANGED";
+    case USB_HUB_ATTR_POWER_SW_MODE_INDIVIDUAL: return "SINGLE";
+    default: return "UNKNOWN";
+  }
+}
+
 static inline const char *usb_speed_to_string(int s)
 {
   switch (s) {

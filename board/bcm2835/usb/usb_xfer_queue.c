@@ -110,6 +110,7 @@ static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
 {
   int err;
   usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_set_running");
+  wait_msec(12);
   j->completion = usb_xfer_job_cb;
   j->completed = false;
   j->completion_arg = j;
@@ -137,7 +138,6 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
   jc->err = ERR_OK;
   BUG(list_empty(&jc->jobs), "Trying to process jobchain with 0 jobs");
   j = list_first_entry(&jc->jobs, typeof(*j), jobs);
-  wait_msec(100);
   usb_xfer_job_set_running(j);
 }
 
@@ -176,7 +176,6 @@ static void usb_xfer_process_running(void)
         continue;
       }
       if (c->ctl->status == DWC2_STATUS_NAK) {
-        printf("retry");
         j->err = ERR_RETRY;
       }
 

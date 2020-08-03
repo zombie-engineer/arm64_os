@@ -589,7 +589,6 @@ int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
       CHECK_ERR_SILENT();
   } else if (usb_hcd_get_interface_class(dev, 0) == USB_INTERFACE_CLASS_MASSSTORAGE) {
       usb_mass_init(dev);
-      // while(1);
   }
 out_err:
   HCDDEBUG("=============================================================");
@@ -836,7 +835,7 @@ int usb_hcd_init()
   disable_irq_save_flags(irqflags);
   err = usb_hcd_power_on();
   CHECK_ERR("failed to power on");
-  wait_msec(20);
+  // wait_msec(20);
   restore_irq_flags(irqflags);
   powered_on = usb_hcd_is_powered_on();
 

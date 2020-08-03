@@ -37,6 +37,11 @@ typedef struct usb_hcd_device_class_hub {
 
 struct usb_hcd_device_class_hub *usb_hcd_hub_create(void);
 
+static inline int usb_hcd_hub_get_power_mode(struct usb_hcd_device_class_hub *h)
+{
+  return h->descriptor.attributes.raw16 & 3;
+}
+
 void usb_hcd_hub_destroy(struct usb_hcd_device_class_hub *h);
 
 void usb_hcd_hub_init();

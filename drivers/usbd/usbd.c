@@ -19,14 +19,15 @@ static void usbd_print_device_summary(const char *padding, const char *subpaddin
 {
   char topoaddr[32];
   usb_topo_addr_to_string(topoaddr, sizeof(topoaddr), ta);
-  printf("%s%s: addr:%02d id:%04x:%04x class:%s(%d)" __endline,
+  printf("%s%s: addr:%02d id:%04x:%04x class:%s(%d) conf:%d" __endline,
     padding,
     topoaddr,
     d->address,
     d->descriptor.id_vendor,
     d->descriptor.id_product,
     d->class ? usb_hcd_device_class_to_string(d->class->device_class) : "NONE",
-    d->class ? d->class->device_class : 0);
+    d->class ? d->class->device_class : 0,
+    d->descriptor.num_configurations);
 
   printf("%s%smanufacturer: '%s', product: '%s', serial: '%s'" __endline,
     padding,
@@ -123,6 +124,7 @@ void usbd_monitor(void)
   while(1) {
     wait_on_timer_ms(1000);
     usb_hub_probe_ports(h1);
+    usbd_print_device_tree();
     usb_hub_probe_ports(h2);
   }
 }

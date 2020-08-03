@@ -264,13 +264,18 @@ void dwc2_channel_set_intmsk(struct dwc2_channel *c)
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
 {
-  DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s%s",
-    c->ctl->dma_addr_base,
-    c->ctl->transfer_size,
-    usb_pid_t_to_string(c->next_pid),
-    usb_direction_to_string(c->ctl->direction),
-    dwc2_channel_is_speed_high(c) ? " (HS)" : "(FS/LS)"
-  );
+  if (dwc2_channel_is_speed_high(c)) {
+    DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s%s",
+      c->ctl->dma_addr_base,
+      c->ctl->transfer_size,
+      usb_pid_t_to_string(c->next_pid),
+      usb_direction_to_string(c->ctl->direction),
+      dwc2_channel_is_speed_high(c) ? " (HS)" : "(FS/LS)"
+    );
+    wait_msec(8);
+  }
+  else
+    wait_msec(1);
 
   BUG((uint64_t)c->ctl->dma_addr_base & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
   dwc2_channel_enable(c->id);

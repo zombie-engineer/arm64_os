@@ -532,14 +532,16 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
    * transaction at some future time when the endpoint has space available. ...
    */
   DWCINFO("channel irq NAK: channel: %d", c->id);
-  if (dwc2_channel_split_mode(c))
+  if (dwc2_channel_split_mode(c)) {
+    putc('+');
     dwc2_transfer_start(c);
-  // else {
+  } else {
+    int ch_id = 0;
+    int intr = 0xffffffff;
+    GET_INTR();
+    printf("+:%08x\r\n", intr);
   //  DWCINFO("channel irq NAK: channel: %d, completion: %p", c->id, c->ctl->completion);
-  //  c->ctl->status = DWC2_STATUS_NAK;
-  //  if (c->ctl->completion)
-  //   c->ctl->completion(c->ctl->completion_arg);
-  // }
+  }
 }
 
 static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
