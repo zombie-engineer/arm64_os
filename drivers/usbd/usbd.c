@@ -37,7 +37,7 @@ static void usbd_print_device_summary(const char *padding, const char *subpaddin
 static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
 {
   usb_hub_t *h;
-  int i;
+  int i, e;
   struct usb_topo_addr ta;
   struct usb_hcd_device *child;
   char padding[128];
@@ -53,6 +53,13 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
       iface->descriptor.subclass,
       iface->descriptor.protocol);
     printf("%s%sinterface:%s" __endline, padding, subpadding, class_string);
+    for (e = 0; e < iface->descriptor.endpoint_count; ++e) {
+      struct usb_hcd_endpoint *ep = hcd_interface_get_endpoint(iface, e);
+      if (ep)
+        printf("%s%sep:interval:%d"__endline, padding, subpadding, ep->descriptor.interval);
+      else
+        printf("%s%sep"__endline, padding, subpadding);
+    }
   }
   if (d->class) {
     switch(d->class->device_class) {

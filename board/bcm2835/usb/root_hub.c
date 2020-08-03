@@ -300,7 +300,7 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
           BIT_SET_U32(r, USB_HPRT_PWR);
           BIT_CLEAR_U32(r, USB_HPRT_SUSP);
           write_reg(USB_HPRT, r);
-					wait_msec(60);
+					wait_msec(50);
           r = read_reg(USB_HPRT);
           r &= USB_HPRT_WRITE_MASK;
           BIT_CLEAR_U32(r, USB_HPRT_RST);

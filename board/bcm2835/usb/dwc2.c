@@ -486,8 +486,8 @@ static inline void dwc2_irq_handle_sess_req(void)
 
 static inline void dwc2_irq_handle_channel_ahb_err(struct dwc2_channel *c)
 {
+  DWCERR("AHB ERR");
   dwc2_transfer_start(c);
-  DWCDEBUG("AHB ERR");
 }
 
 static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer_complete)
@@ -531,11 +531,15 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
    * it did not have space for the data. The host controller is expected ot retry the
    * transaction at some future time when the endpoint has space available. ...
    */
-  DWCDEBUG("channel irq NAK: channel: %d", c->id);
+  DWCINFO("channel irq NAK: channel: %d", c->id);
   if (dwc2_channel_split_mode(c))
     dwc2_transfer_start(c);
-  else
-    BUG(1, "Unexpected NAK");
+  // else {
+  //  DWCINFO("channel irq NAK: channel: %d, completion: %p", c->id, c->ctl->completion);
+  //  c->ctl->status = DWC2_STATUS_NAK;
+  //  if (c->ctl->completion)
+  //   c->ctl->completion(c->ctl->completion_arg);
+  // }
 }
 
 static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
@@ -600,6 +604,8 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   if (USB_HOST_INTR_GET_NAK(intr)) {
     dwc2_irq_handle_channel_nak(c);
     USB_HOST_INTR_CLR_NAK(intr);
+    // GET_INTR();
+    // printf("---%08x\r\n", intr);
   }
   if (intr & ~(uint32_t)0x23) {
     char regbuf[512];

@@ -264,11 +264,12 @@ void dwc2_channel_set_intmsk(struct dwc2_channel *c)
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
 {
-  DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s",
+  DWCDEBUG("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s%s",
     c->ctl->dma_addr_base,
     c->ctl->transfer_size,
-    usb_pid_to_string(c->next_pid),
-    usb_direction_to_string(c->ctl->direction)
+    usb_pid_t_to_string(c->next_pid),
+    usb_direction_to_string(c->ctl->direction),
+    dwc2_channel_is_speed_high(c) ? " (HS)" : "(FS/LS)"
   );
 
   BUG((uint64_t)c->ctl->dma_addr_base & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
@@ -303,8 +304,11 @@ int OPTIMIZED dwc2_transfer_start(struct dwc2_channel *c)
       dwc2_channel_set_split_complete(c);
 
     c->ctl->split_start = !c->ctl->split_start;
-  } else
+    // DWCINFO("split_mode: dwc2_transfer_start, split_start set to %s"__endline, c->ctl->split_start ? "yes" : "no");
+  } else {
+    // DWCINFO("no_split_mode: dwc2_transfer_start"__endline);
     dwc2_channel_set_dma_addr(c);
+  }
 
   dwc2_channel_start_transmit(c);
   return ERR_OK;

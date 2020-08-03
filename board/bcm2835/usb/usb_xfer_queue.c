@@ -7,6 +7,7 @@
 #include <sched.h>
 #include <bug.h>
 #include <uart/pl011_uart.h>
+#include <delays.h>
 
 int usb_xfer_log_level = 0;
 
@@ -100,7 +101,7 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
 static void usb_xfer_job_cb(void *arg)
 {
   struct usb_xfer_job *j = arg;
-  USBQ_DEBUG("usb_xfer_job_cb completed");
+  // printf("usb_xfer_job_cb completed"__endline);
   j->completed = true;
   wakeup_waitflag(&has_work);
 }
@@ -136,6 +137,7 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
   jc->err = ERR_OK;
   BUG(list_empty(&jc->jobs), "Trying to process jobchain with 0 jobs");
   j = list_first_entry(&jc->jobs, typeof(*j), jobs);
+  wait_msec(100);
   usb_xfer_job_set_running(j);
 }
 
@@ -173,15 +175,21 @@ static void usb_xfer_process_running(void)
         usb_xfer_job_set_running(j);
         continue;
       }
+      if (c->ctl->status == DWC2_STATUS_NAK) {
+        printf("retry");
+        j->err = ERR_RETRY;
+      }
 
       list_move_tail(&j->jobs, &jc->completed_jobs);
       if (j->err != ERR_OK) {
         jc->err = j->err;
         jobchain_completed = true;
       }
+
       if (list_empty(&jc->jobs))
         jobchain_completed = true;
-      else {
+
+      if (!jobchain_completed) {
         /* more jobs left in jobchain */
         j = list_first_entry(&jc->jobs, typeof(*j), jobs);
         usb_xfer_job_set_running(j);
