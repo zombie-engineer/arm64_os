@@ -98,9 +98,9 @@ static int idle(void)
 {
   printf("starting idle process on cpu %d\n", get_cpu_num());
   while(1) {
-    asm volatile("wfe");
+    asm volatile("wfi");
     wait_msec(500);
-    printf("__cpu:%d"__endline, get_cpu_num());
+    // printf("__cpu:%d"__endline, get_cpu_num());
   }
   return 0;
 }
