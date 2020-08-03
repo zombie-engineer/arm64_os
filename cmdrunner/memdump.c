@@ -152,7 +152,7 @@ int command_rw(const string_tokens_t *args)
     return command_ww_print_help();
 
   GET_NUMERIC_PARAM(address, unsigned long long, 0, "address to read");
-  printf("%08x (%d)\n\r", *(int*)address, *(int*)address);
+  printf("%08llx: %08x (%d)\n\r", address, *(int*)address, *(int*)address);
   return CMD_ERR_NO_ERROR;
 }
 

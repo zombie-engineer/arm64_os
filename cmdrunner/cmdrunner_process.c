@@ -44,7 +44,7 @@ int cmdrunner_process(void)
   while(1) {
     i++;
     if (i == 8) {
-      pipe_debug(&char_pipe);
+     // pipe_debug(&char_pipe);
       i = 0;
     }
     c = cmdrunner_getch();
