@@ -176,22 +176,6 @@ void print_mbox_props()
   GET_DEVICE_POWER_STATE(CCP2TX);
 }
 
-void wait_gpio()
-{
-  intr_ctl_enable_gpio_irq();
-  enable_irq();
-  gpio_set_function(20, GPIO_FUNC_IN);
-  // gpio_set_detect_high(20);
-  gpio_set_detect_falling_edge(2);
-
-  intr_ctl_dump_regs("after set\n");
-  while(1) {
-    // f: 1111 b: 1011
-    wait_cycles(0x300000);
-  }
-}
-
-
 void print_cache_stats_for_type(int cache_level, int cache_type)
 {
   char cache_type_s = 'U';
@@ -229,23 +213,6 @@ void print_cache_stats()
     for (cl = 0; cl <= CACHE_LEVEL_MAX; cl++)
       print_cache_stats_for_type(cl, ct);
   }
-}
-
-void print_mmu_stats()
-{
-  printf("ttbr0_el1: 0x%016lx ttbr1_el1: 0x%016lx, tcr_el1: 0x%016lx\n",
-    arm_get_ttbr0_el1(),
-    arm_get_ttbr1_el1(),
-    arm_get_tcr_el1());
-}
-
-void print_mmu_features()
-{
-  char memattrs[8];
-  uint64_t mair_value = armv8_get_mair_el1();
-  memattrs[0] = mair_value & 0xff;
-  memattrs[1] = (mair_value >> 8) & 0xff;
-  printf("mmu: mem_attr_0: %02x, mem_attr_1: %02x\n", memattrs[0], memattrs[1]);
 }
 
 void print_arm_features()
@@ -918,6 +885,88 @@ void UNUSED i2c_eeprom()
   while(1);
 }
 
+static char samples_dp[8192] ALIGNED(64);
+static char samples_dm[8192] ALIGNED(64);
+
+static int sample;
+
+#define USB_DPLUS 19
+#define USB_DMINUS 26
+static void __attribute__((optimize("O3"))) UNUSED test_pic()
+{
+  char A[8] = {
+    6, 6, 6, 6, 6, 3, 1, 6
+  };
+  float K[8] = {
+    1.0, 1.0, 2.0, 6.0, 1.0, 2.0, 1.0, 3.0
+  };
+
+  gpio_set_function(19, GPIO_FUNC_OUT);
+  gpio_set_off(19);
+  // float K = 1.0;
+  int i;
+  int j;
+  while(1) {
+    for (i = 0; i < 8; ++i) {
+      gpio_set_on(19);
+      for (j = 0; j < 100; ++j) {
+        wait_usec(4 * K[i] * A[i]);
+        gpio_set_off(19);
+        wait_usec(2 * K[i] * A[i]);
+      }
+    }
+  }
+}
+
+static void __attribute__((optimize("O3"))) UNUSED test_usb2()
+{
+  int dp, dm;
+#define get_v() \
+  v = *(volatile uint32_t*)0x3f200034
+
+#define get_dpdm() \
+    dp = (v >> USB_DPLUS) & 1;\
+    dm = (v >> USB_DMINUS) & 1;
+
+  volatile uint64_t v;
+  gpio_set_function(USB_DPLUS, GPIO_FUNC_IN);
+  gpio_set_function(USB_DMINUS, GPIO_FUNC_IN);
+  gpio_set_pullupdown(USB_DPLUS, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+  gpio_set_pullupdown(USB_DMINUS, GPIO_PULLUPDOWN_NO_PULLUPDOWN);
+ // char old_c = 'i';
+
+  sample = 0;
+  while(1) {
+    get_v();
+    get_dpdm();
+    if (dp)
+      break;
+  }
+
+  while(sample < sizeof(samples_dp)) {
+    get_v();
+    get_dpdm();
+    samples_dp[sample] = dp;
+    samples_dm[sample] = dm;
+    sample++;
+    wait_usec(500);
+  }
+  puts("dp:\r\n");
+  for (sample = 0; sample < sizeof(samples_dp); ++sample) {
+    putc(samples_dp[sample] ? '1' : '0');
+    if (sample % 64 == 0)
+      puts("\r\n");
+  }
+
+  puts("\r\ndm:\r\n");
+  for (sample = 0; sample < sizeof(samples_dm); ++sample) {
+    putc(samples_dm[sample] ? '1' : '0');
+    if (sample % 64 == 0)
+      puts("\r\n");
+  }
+  while(1);
+}
+
 void main()
 {
   int ret;
@@ -930,9 +979,12 @@ void main()
 
   font_init_lib();
 
+#ifdef CONFIG_HDMI
   vcanvas_init(CONFIG_DISPLAY_WIDTH, CONFIG_DISPLAY_HEIGHT);
   vcanvas_set_fg_color(0x00ffffaa);
   vcanvas_set_bg_color(0x00000010);
+#endif
+
   init_uart(1);
   init_consoles();
   self_test();
@@ -963,7 +1015,6 @@ void main()
   // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
   // while(1);
 
-  // wait_gpio();
   // i2c_init();
   // i2c_bitbang();
   //  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
@@ -988,19 +1039,16 @@ void main()
   BUG(ret != ERR_OK, "Failed to init armv8 generic timer");
 
   cmdrunner_init();
+  print_cache_stats();
+  tags_print_cmdline();
+  // disable_l1_caches();
+
+#ifdef CONFIG_HDMI
+  vcanvas_showpicture();
+#endif
+
+  rand_init();
   // cmdrunner_run_interactive_loop();
   scheduler_init(0/* log_level */, init_func);
   while(1);
-
-  print_mmu_features();
-  print_cache_stats();
-  // disable_l1_caches();
-
-  rand_init();
-
-  vcanvas_showpicture();
-  tags_print_cmdline();
-
-  print_mmu_stats();
-  // run_task();
 }
