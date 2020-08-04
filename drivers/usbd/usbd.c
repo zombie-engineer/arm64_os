@@ -57,7 +57,13 @@ static void usbd_print_device_recursive(struct usb_hcd_device *d, int depth)
     for (e = 0; e < iface->descriptor.endpoint_count; ++e) {
       struct usb_hcd_endpoint *ep = hcd_interface_get_endpoint(iface, e);
       if (ep)
-        printf("%s%sep:interval:%d"__endline, padding, subpadding, ep->descriptor.interval);
+        printf("%s%sep%d,dir:%s,type:%s,mps:%d,interval:%d"__endline, padding, subpadding, 
+          ep->descriptor.endpoint_address & 0xf,
+          usb_direction_to_string((ep->descriptor.endpoint_address >> 7) & 1),
+          usb_transfer_type_to_string(ep->descriptor.attributes & 3),
+          ep->descriptor.max_packet_size,
+          ep->descriptor.interval
+        );
       else
         printf("%s%sep"__endline, padding, subpadding);
     }

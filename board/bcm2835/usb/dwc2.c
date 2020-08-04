@@ -494,6 +494,10 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
 {
   DWCDEBUG("channel irq ack: %d", c->id);
   if (!xfer_complete) {
+    uint32_t intr;
+    int ch_id = c->id;
+    GET_INTR();
+    printf("%08x"__endline, intr);
     BUG(!dwc2_channel_is_split_enabled(c), "dwc2_ack_interrupt logic error");
     dwc2_transfer_start(c);
     return;

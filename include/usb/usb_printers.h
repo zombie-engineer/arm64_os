@@ -255,6 +255,17 @@ static inline const char *usb_endpoint_type_to_short_string(int t)
 #undef  __CASE
 }
 
+static inline const char *usb_transfer_type_to_string(int type)
+{
+  switch (type) {
+    case USB_ENDPOINT_TYPE_BULK: return "BULK";
+    case USB_ENDPOINT_TYPE_CONTROL: return "CTRL";
+    case USB_ENDPOINT_TYPE_ISOCHRONOUS: return "ISO";
+    case USB_ENDPOINT_TYPE_INTERRUPT: return "INTR";
+    default: return "UNKN";
+  }
+}
+
 static inline const char *usb_direction_to_string(int d)
 {
   if (d == USB_DIRECTION_OUT)
