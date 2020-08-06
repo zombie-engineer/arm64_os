@@ -11,6 +11,7 @@
 #include <spinlock.h>
 #include <delays.h>
 #include "dwc2_channel.h"
+#include <usb/usb_timings.h>
 
 static port_status_changed_cb_t port_status_changed_cb = NULL;
 
@@ -116,6 +117,40 @@ void dwc2_reset(void)
   DWCDEBUG("reset done.");
 }
 
+void dwc2_reset_clock_root(void)
+{
+  uint32_t r;
+  r = read_reg(USB_PCGCR);
+  USB_PCGCR_CLR_EN_SLP_CLK_GATE(r);
+  USB_PCGCR_CLR_STOP_PCLK(r);
+  write_reg(USB_PCGCR, r);
+  wait_msec(1);
+  write_reg(USB_PCGCR, 0);
+}
+void dwc2_port_reset_root(void)
+{
+  uint32_t r;
+  r = read_reg(USB_HPRT);
+  r &= USB_HPRT_WRITE_MASK;
+  BIT_SET_U32(r, USB_HPRT_RST);
+  // BIT_SET_U32(r, USB_HPRT_PWR);
+  // BIT_CLEAR_U32(r, USB_HPRT_SUSP);
+  write_reg(USB_HPRT, r);
+  wait_msec(TDRSTR_MS);
+  r = read_reg(USB_HPRT);
+  r &= USB_HPRT_WRITE_MASK;
+  BIT_CLEAR_U32(r, USB_HPRT_RST);
+  write_reg(USB_HPRT, r);
+}
+
+void dwc2_port_reset_clear(void)
+{
+  uint32_t r = read_reg(USB_HPRT);
+  r &= USB_HPRT_WRITE_MASK;
+  USB_HPRT_CLR_RST(r);
+  DWCDEBUG("reset clear: %08x", r);
+  write_reg(USB_HPRT, r);
+}
 
 void dwc2_set_ulpi_no_phy(void)
 {
@@ -341,16 +376,6 @@ void dwc2_disable_ahb_interrupts(void)
   USB_GAHBCFG_CLR_GLBL_INTR_EN(ahb);
   DWCDEBUG("disabling global ahb interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
   write_reg(USB_GAHBCFG, ahb);
-}
-
-
-void dwc2_port_reset_clear(void)
-{
-  uint32_t hostport = read_reg(USB_HPRT);
-  hostport &= USB_HPRT_WRITE_MASK;
-  USB_HPRT_CLR_RST(hostport);
-  DWCDEBUG("reset clear: %08x", hostport);
-  write_reg(USB_HPRT, hostport);
 }
 
 void dwc2_dump_internal_status_reg(void)

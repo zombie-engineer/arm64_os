@@ -1,6 +1,7 @@
 #include <drivers/usb/hcd_hub.h>
 #include <delays.h>
 #include <bits_api.h>
+#include <usb/usb_timings.h>
 
 DECL_STATIC_SLOT(struct usb_hcd_device_class_hub, usb_hcd_device_class_hub, 12)
 
@@ -48,7 +49,7 @@ struct usb_hcd_device *usb_hub_get_device_at_port(usb_hub_t *h, int port)
   return NULL;
 }
 
-int usb_hub_enumerate_port_reset(usb_hub_t *h, int port)
+int usb_hub_port_reset(usb_hub_t *h, int port)
 {
   /*
    * port reset procedure by USB 2.0 spec
@@ -61,14 +62,15 @@ int usb_hub_enumerate_port_reset(usb_hub_t *h, int port)
   for (reset_try = 0; reset_try < 3; ++reset_try) {
     err = usb_hub_port_set_feature(h, port, USB_HUB_FEATURE_RESET);
     CHECK_ERR_SILENT();
+    wait_msec(TDRST_MS);
 
     for (wait_enabled_try = 0; wait_enabled_try < 3; ++wait_enabled_try) {
-      wait_msec(20);
       err = usb_hub_port_get_status(h, port, &port_status);
       if (err != ERR_OK) {
         HUBPORTERR("failed to read status");
         continue;
       }
+      wait_msec(TDRST_MS);
 
       if (port_status.change.reset_changed) {
         HUBPORTDBG("RESET_CHANGED");
@@ -104,7 +106,7 @@ static int usb_hub_port_connected(usb_hub_t *h, int port)
   CHECK_ERR_SILENT();
   HUBPORTDBG("CONNECTION_CHANGE cleared");
 
-  err = usb_hub_enumerate_port_reset(h, port);
+  err = usb_hub_port_reset(h, port);
   CHECK_ERR_SILENT();
 
   port_dev = usb_hcd_allocate_device();

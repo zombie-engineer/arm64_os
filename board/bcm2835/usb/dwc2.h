@@ -150,9 +150,13 @@ bool dwc2_is_port_pwr_enabled(void);
 
 void dwc2_port_set_pwr_enabled(bool);
 
+void dwc2_reset_clock_root(void);
+
 void dwc2_port_reset(void);
 
 void dwc2_port_reset_clear(void);
+
+void dwc2_port_reset_root(void);
 
 void dwc2_setup_fifo_sizes(int rx_fifo_sz, int non_periodic_fifo_sz, int periodic_fifo_sz);
 

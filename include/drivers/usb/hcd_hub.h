@@ -51,7 +51,7 @@ int usb_hub_enumerate(struct usb_hcd_device *dev);
 /*
  * port given in 0-based form
  */
-int usb_hub_enumerate_port_reset(usb_hub_t *h, int port);
+int usb_hub_port_reset(usb_hub_t *h, int port);
 
 struct usb_hcd_device *usb_hub_get_device_at_port(usb_hub_t *h, int port);
 

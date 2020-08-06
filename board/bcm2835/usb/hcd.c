@@ -466,7 +466,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
    * last part of device descriptor, that we asked at DEFAULT state.
    */
   if (dev->location.hub) {
-    err = usb_hub_enumerate_port_reset(usb_hcd_device_to_hub(dev->location.hub),
+    err = usb_hub_port_reset(usb_hcd_device_to_hub(dev->location.hub),
         dev->location.hub_port);
     CHECK_ERR("failed to reset parent hub port");
   }

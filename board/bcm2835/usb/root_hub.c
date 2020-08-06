@@ -5,6 +5,7 @@
 #include <bits_api.h>
 #include <delays.h>
 #include <drivers/usb/usb_dev_rq.h>
+#include "dwc2.h"
 #include "dwc2_regs.h"
 #include "dwc2_regs_bits.h"
 
@@ -288,23 +289,8 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_RESET:
-          r = read_reg(USB_PCGCR);
-          USB_PCGCR_CLR_EN_SLP_CLK_GATE(r);
-          USB_PCGCR_CLR_STOP_PCLK(r);
-          write_reg(USB_PCGCR, r);
-          wait_msec(1);
-          write_reg(USB_PCGCR, 0);
-          r = read_reg(USB_HPRT);
-          r &= USB_HPRT_WRITE_MASK;
-          BIT_SET_U32(r, USB_HPRT_RST);
-          BIT_SET_U32(r, USB_HPRT_PWR);
-          BIT_CLEAR_U32(r, USB_HPRT_SUSP);
-          write_reg(USB_HPRT, r);
-					wait_msec(100);
-          r = read_reg(USB_HPRT);
-          r &= USB_HPRT_WRITE_MASK;
-          BIT_CLEAR_U32(r, USB_HPRT_RST);
-          write_reg(USB_HPRT, r);
+          // dwc2_reset_clock_root();
+          dwc2_port_reset_root();
           break;
         default:
           RHWARN("Unsupported request value: %04x\n", value);
