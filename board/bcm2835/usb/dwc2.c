@@ -130,6 +130,8 @@ void dwc2_reset_clock_root(void)
 void dwc2_port_reset_root(void)
 {
   uint32_t r;
+  uint32_t irqflags;
+  disable_irq_save_flags(irqflags);
   r = read_reg(USB_HPRT);
   r &= USB_HPRT_WRITE_MASK;
   BIT_SET_U32(r, USB_HPRT_RST);
@@ -141,6 +143,7 @@ void dwc2_port_reset_root(void)
   r &= USB_HPRT_WRITE_MASK;
   BIT_CLEAR_U32(r, USB_HPRT_RST);
   write_reg(USB_HPRT, r);
+  restore_irq_flags(irqflags);
 }
 
 void dwc2_port_reset_clear(void)
