@@ -892,33 +892,37 @@ static int sample;
 
 #define USB_DPLUS 19
 #define USB_DMINUS 26
-static void __attribute__((optimize("O3"))) UNUSED test_pic()
+static void __attribute__((optimize("O3"))) UNUSED test_pic(int pin)
 {
-  char A[8] = {
-    6, 6, 6, 6, 6, 3, 1, 6
-  };
+ // char A[8] = {
+   // 6, 6, 6, 6, 6, 3, 1, 6
+ // };
   float K[8] = {
-    1.0, 1.0, 2.0, 6.0, 1.0, 2.0, 1.0, 3.0
+    1.0, 1.0, 1.0, 1.0, 0.01, 2.0, 1.0, 1.0
   };
 
-  gpio_set_function(19, GPIO_FUNC_OUT);
-  gpio_set_off(19);
-  // float K = 1.0;
+#define ON() gpio_set_on(pin)
+#define OFF() gpio_set_off(pin)
+
+  gpio_set_function(pin, GPIO_FUNC_OUT);
+  gpio_set_off(pin);
   int i;
   int j;
   while(1) {
     for (i = 0; i < 8; ++i) {
-      gpio_set_on(19);
-      for (j = 0; j < 100; ++j) {
-        wait_usec(4 * K[i] * A[i]);
-        gpio_set_off(19);
-        wait_usec(2 * K[i] * A[i]);
+      float p = 100 * K[i];
+      for (j = 0; j < 1000; ++j) {
+        float working_cycle = 0.5;
+        ON();
+        wait_usec(p * working_cycle);
+        OFF();
+        wait_usec(p * (1- working_cycle));
       }
     }
   }
 }
 
-static void __attribute__((optimize("O3"))) UNUSED test_usb2()
+static void __attribute__((optimize("O3"))) UNUSED test_usb()
 {
   int dp, dm;
 #define get_v() \
@@ -1026,6 +1030,7 @@ void main()
 
   mmu_init();
   print_memory_map();
+  // test_pic(19);
   // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
 
