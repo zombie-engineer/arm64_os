@@ -22,7 +22,8 @@ WARNINGS_AS_ERR := \
   -Werror=unused-variable\
  	-Werror=int-conversion\
 	-Werror=implicit-function-declaration\
-	-Werror=shift-count-overflow
+	-Werror=shift-count-overflow\
+  -Werror=unused-value
 
 CFLAGS = $(WARNINGS_AS_ERR) -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
