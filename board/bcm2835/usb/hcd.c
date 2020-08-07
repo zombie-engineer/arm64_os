@@ -407,7 +407,11 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev)
   }
 
   dev->pipe0.address = USB_DEFAULT_ADDRESS;
-  dev->pipe0.max_packet_size = USB_DEFAULT_PACKET_SIZE;
+  if (dev->pipe0.speed == USB_SPEED_HIGH)
+    dev->pipe0.max_packet_size = 64;
+  else
+    dev->pipe0.max_packet_size = USB_DEFAULT_PACKET_SIZE;
+
 
   HCD_ASSERT_DEVICE_STATE_CHANGE(dev, POWERED, DEFAULT);
 
@@ -579,8 +583,6 @@ int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
   CHECK_ERR_SILENT();
 
   if (dev->descriptor.device_class == USB_INTERFACE_CLASS_HUB) {
-      HCDDEBUG("HUB: vendor:%04x:product:%04x", dev->descriptor.id_vendor, dev->descriptor.id_product);
-      HCDDEBUG("   : max_packet_size: %d", dev->descriptor.max_packet_size_0);
       err = usb_hub_enumerate(dev);
       CHECK_ERR_SILENT();
   } else if (dev->class && dev->class->device_class == USB_HCD_DEVICE_CLASS_HID) {
