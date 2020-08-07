@@ -151,13 +151,29 @@ static inline void usb_cbw_transfer_debug_send_cbw(hcd_mass_t *m,
   CBW_DBG("sending CBW: lun:%d,command:'%s',data:'%s'", lun, cmd_string, data_string);
 }
 
+#define CHECK_RETRYABLE_ERROR(__stage) \
+  if (err != ERR_OK) {\
+    if (err == ERR_RETRY) {\
+      if (retries) {\
+        --retries;\
+        CBW_INFO("error %d at stage: %s. retrying", err, __stage);\
+        wait_usec(900);\
+        goto retry;\
+      }\
+      CBW_INFO("error %d at stage: %s. out of retries", err, __stage);\
+      goto out_err;\
+    }\
+    CBW_ERR("failed at stage" __stage);\
+    goto out_err;\
+  }
+
 int usb_cbw_transfer(hcd_mass_t *m,
   int tag, int lun, void *cmd, int cmdsz, int data_direction, void *data, int datasz)
 {
   int err;
   int num_bytes;
 
-  struct cbw cbw ALIGNED(4) = {
+  struct cbw cbw ALIGNED(512) = {
     .cbw_signature   = CBW_SIGNATURE,
     .cbw_tag         = tag,
     .cbw_data_length = datasz,
@@ -174,10 +190,12 @@ int usb_cbw_transfer(hcd_mass_t *m,
     .speed           = m->d->pipe0.speed,
     .max_packet_size = hcd_endpoint_get_max_packet_size(m->ep_out),
     .ls_hub_port     = m->d->pipe0.ls_hub_port,
-    .ls_hub_address  = m->d->pipe0.ls_hub_address
+    .ls_hub_address  = m->d->pipe0.ls_hub_address,
+    .ep_type         = USB_ENDPOINT_TYPE_BULK,
   };
 
-  char cmdbuf[31] ALIGNED(4);
+  char cmdbuf[31] ALIGNED(512);
+  int retries = 5;
 
   usb_pid_t *next_pid = &m->ep_out->next_toggle_pid;
 
@@ -190,41 +208,30 @@ int usb_cbw_transfer(hcd_mass_t *m,
   memcpy(cmdbuf, &cbw, sizeof(cbw));
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
   memcpy(&status, 0, sizeof(status));
+  dcache_flush(cmdbuf, sizeof(cmdbuf));
+  hexdump_memory(cmdbuf, sizeof(cmdbuf));
 
+retry:
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
-  CBW_CHECK_ERR("failed at CBW send stage");
+  CHECK_RETRYABLE_ERROR("OUT:CBW");
 
   if (data && datasz) {
     if (data_direction == USB_DIRECTION_IN) {
       p.ep = hcd_endpoint_get_number(m->ep_in);
       next_pid = &m->ep_in->next_toggle_pid;
     }
-    int retries = 0;
-    for (retries = 0; retries < 5; retries++) {
-      wait_usec(500);
-      err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
-      if (err == ERR_OK)
-        break;
-
-      if (err == ERR_RETRY) {
-        CBW_INFO("is retryable error. retrying");
-        wait_usec(900);
-        continue;
-      }
-
-      CBW_ERR("failed at data transfer stage");
-      goto out_err;
-    }
-    if (cbw_log_level >= LOG_LEVEL_DEBUG2) {
-      CBW_DBG2("transfer complete: ");
-      CBW_DBG2_DUMP(data, datasz);
-    }
+    err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
+    CHECK_RETRYABLE_ERROR("INOUT:DATA");
+  }
+  if (cbw_log_level >= LOG_LEVEL_DEBUG2) {
+    CBW_DBG2("transfer complete: ");
+    CBW_DBG2_DUMP(data, datasz);
   }
 
   p.ep = hcd_endpoint_get_number(m->ep_in);
   next_pid = &m->ep_in->next_toggle_pid;
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
-  CBW_CHECK_ERR("transfer failed to CSW recieve");
+  CHECK_RETRYABLE_ERROR("IN:CSW");
 
   if (!is_csw_valid(&status, num_bytes, tag)) {
     err = ERR_GENERIC;
@@ -307,7 +314,7 @@ out_err:
 int usb_mass_test_unit_ready(hcd_mass_t *m, int lun)
 {
   int err;
-  struct scsi_op_test_unit_ready cmd ALIGNED(4) = { 0 };
+  struct scsi_op_test_unit_ready cmd ALIGNED(512) = { 0 };
   cmd.opcode = SCSI_OPCODE_TEST_UNIT_READY;
   MASSLOG("TEST UNIT READY: cmd size: %d", sizeof(cmd));
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0);
@@ -319,7 +326,7 @@ out_err:
 int usb_mass_inquiry(hcd_mass_t *m, int lun)
 {
   int err;
-  char buf[128] ALIGNED(4);
+  char buf[128] ALIGNED(512);
   char description[256];
   struct scsi_op_inquiry cmd;
   struct scsi_response_inquiry *info = (struct scsi_response_inquiry *)buf;
@@ -329,9 +336,11 @@ int usb_mass_inquiry(hcd_mass_t *m, int lun)
   memset(buf , 0, sizeof(buf));
 
   scsi_fill_cmd_inquiry(&cmd, 0, 0, min_cmd_len);
+  MASSLOG("SCSI_OPCODE_INQUIRY: cmd size: %d", sizeof(cmd));
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, min_cmd_len);
   CHECK_ERR("Failed to get INQUIRY data length");
   scsi_fill_cmd_inquiry(&cmd, 0, 0, info->additional_length);
+  MASSLOG("SCSI_OPCODE_INQUIRY 2: cmd size: %d", sizeof(cmd));
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, info->additional_length);
   CHECK_ERR("Failed to get full INQUIRY data");
   scsi_inquiry_data_to_string(description, sizeof(description), info);
