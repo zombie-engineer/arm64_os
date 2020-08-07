@@ -98,10 +98,23 @@ struct usb_xfer_jobchain *usb_xfer_jobchain_dequeue(void)
   return jc;
 }
 
-static void usb_xfer_job_cb(void *arg)
+static void usb_xfer_handle_completed(void *arg)
 {
   struct usb_xfer_job *j = arg;
-  // printf("usb_xfer_job_cb completed"__endline);
+  struct usb_xfer_jobchain *jc = j->jc;
+  struct dwc2_channel *c = jc->channel;
+
+  if (c->ctl->status == DWC2_STATUS_NAK) {
+    if (jc->nak_retries > 0) {
+      jc->nak_retries--;
+      return;
+    }
+    j->err = ERR_RETRY;
+    dwc2_irq_mask_nak(c);
+  } else {
+    j->err = ERR_OK;
+  }
+
   j->completed = true;
   wakeup_waitflag(&has_work);
 }
@@ -110,8 +123,8 @@ static inline void usb_xfer_job_set_running(struct usb_xfer_job *j)
 {
   int err;
   usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_set_running");
-  wait_msec(12);
-  j->completion = usb_xfer_job_cb;
+  // wait_msec(20);
+  j->completion = usb_xfer_handle_completed;
   j->completed = false;
   j->completion_arg = j;
   j->err = ERR_OK;
@@ -175,12 +188,13 @@ static void usb_xfer_process_running(void)
         usb_xfer_job_set_running(j);
         continue;
       }
-      if (c->ctl->status == DWC2_STATUS_NAK) {
-        j->err = ERR_RETRY;
-      }
-
       list_move_tail(&j->jobs, &jc->completed_jobs);
       if (j->err != ERR_OK) {
+        if (j->err == ERR_RETRY) {
+          dwc2_transfer_stop(c);
+          dwc2_irq_unmask_nak(c);
+        }
+
         jc->err = j->err;
         jobchain_completed = true;
       }

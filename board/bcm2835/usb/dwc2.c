@@ -551,6 +551,24 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
     c->ctl->completion(c->ctl->completion_arg);
 }
 
+void dwc2_irq_mask_nak(struct dwc2_channel *c)
+{
+  int ch_id = c->id;
+  int intrmsk;
+  GET_INTRMSK();
+  USB_HOST_INTR_CLR_NAK(intrmsk);
+  SET_INTRMSK();
+}
+
+void dwc2_irq_unmask_nak(struct dwc2_channel *c)
+{
+  int ch_id = c->id;
+  int intrmsk;
+  GET_INTRMSK();
+  USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
+  SET_INTRMSK();
+}
+
 static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
 {
   /*
@@ -563,17 +581,17 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
    * it did not have space for the data. The host controller is expected ot retry the
    * transaction at some future time when the endpoint has space available. ...
    */
-  DWCINFO("channel irq NAK: channel: %d", c->id);
+  DWCDEBUG("channel irq NAK: channel: %d", c->id);
   if (dwc2_channel_split_mode(c)) {
-    putc('+');
     dwc2_transfer_start(c);
-  } else {
-    int ch_id = 0;
-    int intr = 0xffffffff;
-    GET_INTR();
-    printf("+:%08x\r\n", intr);
-  //  DWCINFO("channel irq NAK: channel: %d, completion: %p", c->id, c->ctl->completion);
+    return;
   }
+
+  DWCDEBUG("ep_type:%d, compl:%p\r\n", c->pipe.u.ep_type, c->ctl->completion);
+  wait_msec(50);
+  c->ctl->status = DWC2_STATUS_NAK;
+  if (c->ctl->completion)
+    c->ctl->completion(c->ctl->completion_arg);
 }
 
 static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)

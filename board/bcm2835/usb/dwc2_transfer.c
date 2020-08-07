@@ -230,6 +230,7 @@ static inline void dwc2_channel_start_transmit(struct dwc2_channel *c)
 {
   uint32_t chr;
   int ch_id = c->id;
+
   GET_CHAR();
   USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
   USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
@@ -296,6 +297,22 @@ int dwc2_transfer_retry(struct dwc2_channel *c)
 {
   dwc2_channel_start_transmit(c);
   // putc(',');
+  return ERR_OK;
+}
+
+int OPTIMIZED dwc2_transfer_stop(struct dwc2_channel *c)
+{
+  uint32_t chr;
+  int ch_id = c->id;
+  int intr;
+
+  GET_CHAR();
+  USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
+  SET_CHAR();
+  printf("transfer_stop\r\n");
+  GET_INTR();
+  USB_HOST_INTR_CLR_NAK(intr);
+  SET_INTR();
   return ERR_OK;
 }
 

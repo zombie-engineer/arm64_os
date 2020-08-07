@@ -58,11 +58,12 @@ struct usb_xfer_jobchain {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_xfer_jobchains);
   struct list_head list;
   // jobchain_status_t status;
+  int nak_retries;
   int err;
   struct usb_hcd_pipe *hcd_pipe;
   struct list_head jobs;
   struct list_head completed_jobs;
-  void (*completed)(void*);
+  void (*completed)(void *);
   void *completed_arg;
   void *channel;
 };

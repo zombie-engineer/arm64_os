@@ -22,6 +22,7 @@ bool dwc2_channel_is_split_enabled(struct dwc2_channel *c);
 void dwc2_transfer_completed_debug(struct dwc2_channel *c);
 void dwc2_transfer_prepare(struct dwc2_channel *c);
 int dwc2_transfer_start(struct dwc2_channel *c);
+int dwc2_transfer_stop(struct dwc2_channel *c);
 int dwc2_transfer_retry(struct dwc2_channel *c);
 int dwc2_transfer_recalc_next(struct dwc2_xfer_control *ctl);
 
@@ -196,3 +197,5 @@ void dwc2_channel_set_split_complete(struct dwc2_channel *c);
 
 usb_pid_t dwc2_channel_get_next_pid(struct dwc2_channel *c);
 
+void dwc2_irq_mask_nak(struct dwc2_channel *c);
+void dwc2_irq_unmask_nak(struct dwc2_channel *c);
