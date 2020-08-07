@@ -72,6 +72,8 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   if (IS_ERR(jc))
     return jc;
 
+  jc->nak_retries = 100;
+
   /* SETUP packet */
   j = usb_xfer_job_prep(jc, USB_PID_SETUP, USB_DIRECTION_OUT, request, sizeof(*request));
   if (IS_ERR(j)) {
@@ -346,6 +348,84 @@ out_err:
 }
 
 int hcd_transfer_bulk(
+  struct usb_hcd_pipe *pipe,
+  int direction,
+  void *addr,
+  int transfer_size,
+  usb_pid_t *pid,
+  int *out_num_bytes)
+{
+  int err = ERR_OK;
+  int completed ALIGNED(8) = 0;
+  struct usb_xfer_jobchain *jc;
+  struct usb_xfer_job *j;
+  // dwc2_transfer_status_t status;
+
+  transfer_id++;
+  pipe->ep_type = USB_ENDPOINT_TYPE_BULK;
+  HCDLOG("hcd_transfer_bulk, pipe:%p, type:%d,hub_port:%d, speed:%d, dir:%s, id:%d",
+    pipe, pipe->ls_hub_port, pipe->speed, pipe->ep_type,
+    direction == USB_DIRECTION_OUT ? "out" : "in",
+    transfer_id);
+
+  jc = usb_xfer_jobchain_create();
+  jc->nak_retries = 0;
+  if (IS_ERR(jc)) {
+    err = PTR_ERR(jc);
+    jc = NULL;
+    HCDERR("failed to create jobchain");
+    goto out_err;
+  }
+
+  j = usb_xfer_job_prep(jc, *pid, direction, addr, transfer_size);
+  if (IS_ERR(j)) {
+    err = PTR_ERR(j);
+    j = NULL;
+    HCDERR("failed to prepare job");
+    goto out_err;
+  }
+
+  list_add_tail(&j->jobs, &jc->jobs);
+  usb_xfer_job_print(DEBUG2, j, "usb_xfer_job_prep BULK");
+
+  jc->completed = control_chain_signal_completed;
+  jc->completed_arg = &completed;
+  jc->hcd_pipe = pipe;
+
+  /*
+   * For HOST-TO-DEVICE transfers flush the data first, so
+   * DMA could read it from RAM.
+   */
+  if (direction == USB_DIRECTION_OUT)
+    dcache_flush(addr, transfer_size);
+
+  usb_xfer_jobchain_enqueue(jc);
+
+  while(!completed)
+    asm volatile("wfe");
+  err = jc->err;
+  printf("BULK completed: err=%d\r\n", err);
+  if (err)
+    goto out_err;
+
+  *out_num_bytes = transfer_size;
+
+  /*
+   * For DEVICE-TO-HOST transfers flush the cache after DMA
+   * has delivered the data to the requested address, and the
+   * caller will be able to read it instead of reading outdated cache.
+   */
+  if (direction == USB_DIRECTION_IN)
+    dcache_flush(addr, transfer_size);
+
+  return ERR_OK;
+out_err:
+  if (jc)
+    usb_xfer_jobchain_destroy(jc);
+  return err;
+}
+
+int hcd_transfer_bulk_blocking(
   struct usb_hcd_pipe *pipe,
   int direction,
   void *addr,
