@@ -132,7 +132,11 @@ int usb_mass_reset(hcd_mass_t *m)
     .length       = 0,
   };
 
-  MASSLOG("usb_mass_reset: request=t:%02x,r:%02x,v:%02x,i:%02x,l:%02x", rq.request_type, rq.request, rq.value, rq.index, rq.length);
+  if (usb_mass_log_level > 0) {
+    char buf[512];
+    usb_rq_get_description(rq.raw, buf, sizeof(buf));
+    MASSLOG("usb_mass_reset: rq:%s", buf);
+  }
 
   err = HCD_TRANSFER_CONTROL(&m->d->pipe0, USB_DIRECTION_OUT, NULL, 0, rq.raw, &num_bytes);
   MASSLOG("usb_mass_reset complete err: %d", err);
