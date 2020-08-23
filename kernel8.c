@@ -415,6 +415,13 @@ void gpio_irq_test(int pin1, int pin2, int poll)
 }
 
 #ifndef CONFIG_QEMU
+
+// gpio_set_off(gpio_pin_dc);
+// gpio_set_on(gpio_pin_dc);
+// spidev->xmit_byte(spidev, cmd, NULL);
+// *(volatile uint32_t *)0x3f204000 = 0;
+// printf("%08x\r\n", r);
+
 void init_nokia5110_display(int report_exceptions, int run_test)
 {
   spi_dev_t *spidev;

@@ -296,7 +296,7 @@ int spi0_init()
   int err;
   RET_IF_ERR(spi_init_gpio);
   RET_IF_ERR(spi0_init_dev);
-  *SPI_CLK = 256;
+  *SPI_CLK = 32;
   *SPI_CS = SPI_CS_CLEAR;
   printf("spi0_init_poll completed: SPI_CS: %08x\n>", *SPI_CS);
   RET_IF_ERR(spi0_init_dma);

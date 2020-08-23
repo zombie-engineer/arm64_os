@@ -12,6 +12,7 @@
 #include <uart/pl011_uart.h>
 #include <drivers/usb/usbd.h>
 #include <mmu.h>
+#include <drivers/display/tft_lcd.h>
 
 static struct timer *test_timer;
 
@@ -112,6 +113,8 @@ static void scheduler_startup_idle(void)
 
   s->sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
   mmu_enable_configured();
+  if (get_cpu_num() == 1)
+    tft_lcd_init();
   printf("startup idle on cpu: %d\n", get_cpu_num());
   t = task_create(idle, "idle");
   BUG(IS_ERR(t), "failed to create idle task");
