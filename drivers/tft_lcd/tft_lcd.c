@@ -34,9 +34,19 @@ typedef struct tft_lcd_canvas_control {
 #define ILI9341_CMD_SLEEP_OUT    0x11
 #define ILI9341_CMD_DISPLAY_OFF  0x28
 #define ILI9341_CMD_DISPLAY_ON   0x29
-#define ILI9341_CMD_SET_CURSOR_X 0x2A
-#define ILI9341_CMD_SET_CURSOR_Y 0x2B
-#define ILI9341_CMD_WRITE_PIXELS 0x2C
+#define ILI9341_CMD_SET_CURSOR_X 0x2a
+#define ILI9341_CMD_SET_CURSOR_Y 0x2b
+#define ILI9341_CMD_WRITE_PIXELS 0x2c
+#define ILI9341_CMD_POWER_CTL_A  0xcb
+#define ILI9341_CMD_POWER_CTL_B  0xcf
+#define ILI9341_CMD_TIMING_CTL_A 0xe8
+#define ILI9341_CMD_TIMING_CTL_B 0xea
+#define ILI9341_CMD_POWER_ON_SEQ 0xed
+#define ILI9341_CMD_PUMP_RATIO   0xf7
+#define ILI9341_CMD_POWER_CTL_1  0xc0
+#define ILI9341_CMD_POWER_CTL_2  0xc1
+#define ILI9341_CMD_VCOM_CTL_1   0xc5
+#define ILI9341_CMD_VCOM_CTL_2   0xc7
 
 // ILI9341 displays are able to update at any rate between 61Hz to up to 119Hz. Default at power on is 70Hz.
 #define ILI9341_FRAMERATE_61_HZ 0x1F
@@ -167,6 +177,7 @@ void OPTIMIZED clear_screen2(int gpio_pin_dc)
 
 void OPTIMIZED tft_lcd_init(void)
 {
+  char data[512];
   const int gpio_pin_mosi  = 10;
   const int gpio_pin_miso  =  9;
   const int gpio_pin_sclk  = 11;
@@ -200,6 +211,39 @@ void OPTIMIZED tft_lcd_init(void)
   SEND_CMD(ILI9341_CMD_SOFT_RESET);
   wait_msec(5);
   SEND_CMD(ILI9341_CMD_DISPLAY_OFF);
+  data[0] = 0x39;
+  data[1] = 0x2c;
+  data[2] = 0x34;
+  data[3] = 0x02;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
+  data[0] = 0x00;
+  data[1] = 0xc1;
+  data[2] = 0x30;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_B, data, 3);
+  data[0] = 0x85;
+  data[1] = 0x00;
+  data[2] = 0x78;
+  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_A, data, 3);
+  data[0] = 0x00;
+  data[1] = 0x00;
+  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_B, data, 2);
+  data[0] = 0x64;
+  data[1] = 0x03;
+  data[2] = 0x12;
+  data[3] = 0x81;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_ON_SEQ, data, 4);
+  data[0] = 0x30;
+  SEND_CMD_DATA(ILI9341_CMD_PUMP_RATIO, data, 1);
+  data[0] = 0x23;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_1, data, 1);
+  data[0] = 0x10;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_2, data, 1);
+  data[0] = 0x3e;
+  data[1] = 0x28;
+  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_1, data, 2);
+  data[0] = 0x86;
+  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_2, data, 1);
+
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
   SEND_CMD(ILI9341_CMD_DISPLAY_ON);
