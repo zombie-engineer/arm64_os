@@ -31,6 +31,7 @@ typedef struct tft_lcd_canvas_control {
 // static struct spinlock tft_lcd_lock;
 
 #define ILI9341_CMD_SOFT_RESET   0x01
+#define ILI9341_CMD_READ_ID      0x04
 #define ILI9341_CMD_SLEEP_OUT    0x11
 #define ILI9341_CMD_DISPLAY_OFF  0x28
 #define ILI9341_CMD_DISPLAY_ON   0x29
@@ -47,6 +48,9 @@ typedef struct tft_lcd_canvas_control {
 #define ILI9341_CMD_POWER_CTL_2  0xc1
 #define ILI9341_CMD_VCOM_CTL_1   0xc5
 #define ILI9341_CMD_VCOM_CTL_2   0xc7
+#define ILI9341_CMD_FRAME_RATE_CTL 0xb1
+#define ILI9341_CMD_BLANK_PORCH  0xb5
+#define ILI9341_CMD_DISPL_FUNC   0xb6
 
 // ILI9341 displays are able to update at any rate between 61Hz to up to 119Hz. Default at power on is 70Hz.
 #define ILI9341_FRAMERATE_61_HZ 0x1F
@@ -128,6 +132,69 @@ typedef struct tft_lcd_canvas_control {
   }\
 } while(0)
 
+#define SEND_CMD_CHAR_REP(__cmd, __r, __g, __b, __reps) do { \
+  uint32_t r;\
+  int __rep = 0;\
+  SEND_CMD(__cmd);\
+  while(__rep++ < __reps) {\
+    r = read_reg(SPI_CS);\
+    if (r & SPI_CS_RXD) \
+      write_reg(SPI_CS, SPI_CS_TA | SPI_CS_CLEAR_RX);\
+    while(1) {\
+      r = read_reg(SPI_CS);\
+      if (r & SPI_CS_TXD)\
+        break;\
+      /*printf("rr:%08x\r\n", r);*/\
+    }\
+    write_reg(SPI_FIFO, __r);\
+    while(1) {\
+      r = read_reg(SPI_CS);\
+      if (r & SPI_CS_TXD)\
+        break;\
+      /*printf("rr:%08x\r\n", r);*/\
+    }\
+    write_reg(SPI_FIFO, __g);\
+    while(1) {\
+      r = read_reg(SPI_CS);\
+      if (r & SPI_CS_TXD)\
+        break;\
+      /*printf("rr:%08x\r\n", r);*/\
+    }\
+    write_reg(SPI_FIFO, __b);\
+  }\
+  while(1) {\
+    r = read_reg(SPI_CS);\
+    if (r & SPI_CS_DONE)\
+      break;\
+    /*printf("dr:%08x\r\n", r);*/\
+    if (r & SPI_CS_RXR) \
+      write_reg(SPI_CS, SPI_CS_TA | SPI_CS_CLEAR_RX);\
+  }\
+} while(0)
+
+#define RECV_CMD_DATA(__cmd, __data, __datalen) do { \
+  char *__ptr = (char *)(__data);\
+  char *__end = __ptr + __datalen;\
+  uint32_t r;\
+  SEND_CMD(__cmd);\
+  write_reg(SPI_CS, SPI_CS_CLEAR_RX | SPI_CS_CLEAR_TX);\
+  write_reg(SPI_CS, SPI_CS_CLEAR_RX | SPI_CS_CLEAR_TX | SPI_CS_TA);\
+  while(__ptr < __end) {\
+    uint8_t c;\
+    r = read_reg(SPI_CS);\
+    /*printf("reg:%08x\r\n", r);*/\
+    if (read_reg(SPI_CS) & SPI_CS_TXD) {\
+      write_reg(SPI_FIFO, 0);\
+      while (read_reg(SPI_CS) & SPI_CS_DONE);\
+      while (read_reg(SPI_CS) & SPI_CS_RXD) {\
+        c = read_reg(SPI_FIFO);\
+        /*printf("fifo:%08x\r\n", c);*/\
+        *(__ptr++) = c;\
+      }\
+    }\
+  }\
+} while(0)
+
 static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
 #define LO8(__v) (__v & 0xff)
@@ -142,10 +209,10 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 
 void OPTIMIZED clear_screen(int gpio_pin_dc)
 {
-  char data_rgb[3] = { 0, 0xff, 0 };
+  char data_rgb[3] = { 0, 0, 0xff };
   int x, y;
-  for (y = 0; y < DISPLAY_HEIGHT - 1; ++y) {
-    for (x = 0; x < DISPLAY_WIDTH - 1; ++x) {
+  for (y = 0; y < DISPLAY_HEIGHT; ++y) {
+    for (x = 0; x < DISPLAY_WIDTH; ++x) {
       tft_set_region_coords(gpio_pin_dc, x, y, x + 1, y + 1);
       SEND_CMD_DATA(0x2c, data_rgb, 3);
     }
@@ -154,8 +221,8 @@ void OPTIMIZED clear_screen(int gpio_pin_dc)
 
 void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, char r, char g, char b)
 {
-  char data_rgb[DISPLAY_WIDTH * 3];
-  int y, x;
+   char data_rgb[DISPLAY_WIDTH * 3];
+   int y, x;
 
   for (x = 0; x < (x1 - x0); ++x) {
     data_rgb[x * 3] = r;
@@ -163,6 +230,8 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
     data_rgb[x * 3 + 2] = b;
   }
 
+ // tft_set_region_coords(gpio_pin_dc, x0, y0, x1, y1);
+//  SEND_CMD_CHAR_REP(ILI9341_CMD_WRITE_PIXELS, r, g, b, DISPLAY_WIDTH * DISPLAY_HEIGHT * 3);
   for (y = y0; y < y1; ++y) {
     tft_set_region_coords(gpio_pin_dc, x0, y, x1, y + 1);
     SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, data_rgb, (x1 - x0) * 3);
@@ -171,17 +240,19 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
 
 void OPTIMIZED clear_screen2(int gpio_pin_dc)
 {
+  int i;
   printf("hello\r\n");
-  tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, 255);
+  for (i = 0; i < 1000; ++i)
+    tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, (i * 20) % 255);
 }
 
 void OPTIMIZED tft_lcd_init(void)
 {
-  char data[512];
+  // char data[512];
   const int gpio_pin_mosi  = 10;
   const int gpio_pin_miso  =  9;
   const int gpio_pin_sclk  = 11;
-  const int gpio_pin_ce0   = 8;
+  const int gpio_pin_ce0   =  8;
   const int gpio_pin_dc    = 22;
   const int gpio_pin_reset = 25;
 
@@ -211,45 +282,71 @@ void OPTIMIZED tft_lcd_init(void)
   SEND_CMD(ILI9341_CMD_SOFT_RESET);
   wait_msec(5);
   SEND_CMD(ILI9341_CMD_DISPLAY_OFF);
-  data[0] = 0x39;
-  data[1] = 0x2c;
-  data[2] = 0x34;
-  data[3] = 0x02;
-  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
-  data[0] = 0x00;
-  data[1] = 0xc1;
-  data[2] = 0x30;
-  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_B, data, 3);
-  data[0] = 0x85;
-  data[1] = 0x00;
-  data[2] = 0x78;
-  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_A, data, 3);
-  data[0] = 0x00;
-  data[1] = 0x00;
-  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_B, data, 2);
-  data[0] = 0x64;
-  data[1] = 0x03;
-  data[2] = 0x12;
-  data[3] = 0x81;
-  SEND_CMD_DATA(ILI9341_CMD_POWER_ON_SEQ, data, 4);
-  data[0] = 0x30;
-  SEND_CMD_DATA(ILI9341_CMD_PUMP_RATIO, data, 1);
-  data[0] = 0x23;
-  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_1, data, 1);
-  data[0] = 0x10;
-  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_2, data, 1);
-  data[0] = 0x3e;
-  data[1] = 0x28;
-  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_1, data, 2);
-  data[0] = 0x86;
-  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_2, data, 1);
+
+  // printf("read_id: %02x:%02x:%02x\r\n", data[0], data[1], data[2]);
+
+//  data[0] = 0x39;
+//  data[1] = 0x2c;
+//  data[2] = 0x34;
+//  data[3] = 0x02;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
+//  data[0] = 0x00;
+//  data[1] = 0xc1;
+//  data[2] = 0x30;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_B, data, 3);
+//  data[0] = 0x85;
+//  data[1] = 0x00;
+//  data[2] = 0x78;
+//  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_A, data, 3);
+//  data[0] = 0x00;
+//  data[1] = 0x00;
+//  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_B, data, 2);
+//  data[0] = 0x64;
+//  data[1] = 0x03;
+//  data[2] = 0x12;
+//  data[3] = 0x81;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_ON_SEQ, data, 4);
+  // data[0] = 0x20;
+  // SEND_CMD_DATA(ILI9341_CMD_PUMP_RATIO, data, 1);
+//  data[0] = 0x23;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_1, data, 1);
+//  data[0] = 0x10;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_2, data, 1);
+
+  //data[0] = 0x3e;
+  // data[1] = 0x28;
+  // SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_1, data, 2);
+
+  //data[0] = 0x86;
+  //SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_2, data, 1);
+
+//  data[0] = 0x10;
+//  SEND_CMD_DATA(ILI9341_CMD_FRAME_RATE_CTL, data, 1);
+//
+//  data[0] = 0x02;
+//  data[1] = 0x02;
+//  data[2] = 0x0a;
+//  data[3] = 0x14;
+//  SEND_CMD_DATA(ILI9341_CMD_BLANK_PORCH, data, 4);
+
+//  data[0] = 0x08;
+//  data[1] = 0x82;
+//  data[2] = 0x27;
+//  SEND_CMD_DATA(ILI9341_CMD_DISPL_FUNC, data, 3);
+
+//  data[0] = 0x02;
+//  SEND_CMD_DATA(0xf2, data, 1);
 
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
   SEND_CMD(ILI9341_CMD_DISPLAY_ON);
-  clear_screen2(gpio_pin_dc);
-  if (false)
-    clear_screen(gpio_pin_dc);
+//  while(1) {
+//    RECV_CMD_DATA(ILI9341_CMD_READ_ID, data, 2);
+//    wait_usec(10);
+//  }
+  if (0)
+    clear_screen2(gpio_pin_dc);
+  clear_screen(gpio_pin_dc);
   {
     int x = 0, y = 0;
     int g = 0;
