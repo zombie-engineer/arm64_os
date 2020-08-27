@@ -6,6 +6,7 @@
 #include <mem_access.h>
 #include <delays.h>
 #include <log.h>
+#include "dwc2.h"
 
 #define __MASS_PREFIX(__l) "[USB_MASS: %d "__l"] "
 #define __MASS_ARGS 0
@@ -171,6 +172,16 @@ static inline void usb_cbw_transfer_debug_send_cbw(hcd_mass_t *m,
     goto out_err;\
   }
 
+static usb_pid_t next_pids[2];
+
+static void next_pid_toggle(usb_pid_t *pid)
+{
+  if (*pid == USB_PID_DATA0)
+    *pid = USB_PID_DATA1;
+  else if (*pid == USB_PID_DATA1)
+    *pid = USB_PID_DATA0;
+}
+
 int usb_cbw_transfer(hcd_mass_t *m,
   int tag, int lun, void *cmd, int cmdsz, int data_direction, void *data, int datasz)
 {
@@ -216,16 +227,20 @@ int usb_cbw_transfer(hcd_mass_t *m,
   hexdump_memory(cmdbuf, sizeof(cmdbuf));
 
 retry:
+  next_pid = &next_pids[USB_DIRECTION_OUT];
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
   CHECK_RETRYABLE_ERROR("OUT:CBW");
+  next_pid_toggle(next_pid);
 
   if (data && datasz) {
     if (data_direction == USB_DIRECTION_IN) {
       p.ep = hcd_endpoint_get_number(m->ep_in);
       next_pid = &m->ep_in->next_toggle_pid;
+      next_pid = &next_pids[USB_DIRECTION_IN];
     }
     err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
     CHECK_RETRYABLE_ERROR("INOUT:DATA");
+    next_pid_toggle(next_pid);
   }
   if (cbw_log_level >= LOG_LEVEL_DEBUG2) {
     CBW_DBG2("transfer complete: ");
@@ -234,8 +249,10 @@ retry:
 
   p.ep = hcd_endpoint_get_number(m->ep_in);
   next_pid = &m->ep_in->next_toggle_pid;
+  next_pid = &next_pids[USB_DIRECTION_IN];
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_RETRYABLE_ERROR("IN:CSW");
+  next_pid_toggle(next_pid);
 
   if (!is_csw_valid(&status, num_bytes, tag)) {
     err = ERR_GENERIC;
@@ -453,6 +470,18 @@ void usb_mass_deinit_class(hcd_mass_t* m)
     usb_hcd_deallocate_mass(m);
 }
 
+int usb_mass_read(hcd_mass_t *m)
+{
+  int err;
+  char buf[512];
+  memset(buf, 0x66, sizeof(buf));
+  err = usb_mass_read10(m, 0, 0, buf, sizeof(buf));
+  CHECK_ERR("usb_mass_read10 failed");
+  hexdump_memory(buf, sizeof(buf));
+out_err:
+  return err;
+}
+
 int usb_mass_init(struct usb_hcd_device* d)
 {
   int err;
@@ -467,6 +496,8 @@ int usb_mass_init(struct usb_hcd_device* d)
     goto out_err;
   }
 
+  next_pids[USB_DIRECTION_OUT] = USB_PID_DATA0;
+  next_pids[USB_DIRECTION_IN] = USB_PID_DATA0;
   err = usb_mass_reset(m);
   CHECK_ERR("failed to reset mass storage device");
 
@@ -475,11 +506,16 @@ int usb_mass_init(struct usb_hcd_device* d)
   usb_mass_set_log_level(1);
   err = usb_mass_test_unit_ready(m, lun);
   CHECK_ERR("failed to test unit ready");
+  err = usb_mass_test_unit_ready(m, lun);
+  CHECK_ERR("failed to test unit ready");
+  err = usb_mass_test_unit_ready(m, lun);
+  CHECK_ERR("failed to test unit ready");
+  // dwc2_set_log_level(10);
   err = usb_mass_inquiry(m, lun);
   CHECK_ERR("failed to send INQUIRY request");
   err = usb_mass_read_capacity10(m, lun);
   CHECK_ERR("failed to get capacity");
-
+  usb_mass_read(m);
 out_err:
   if (err && m)
     usb_mass_deinit_class(m);
