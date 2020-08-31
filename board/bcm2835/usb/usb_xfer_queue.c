@@ -177,11 +177,10 @@ static void usb_xfer_process_running(void)
 {
   struct usb_xfer_jobchain *jc;
   struct usb_xfer_job *j, *tmp;
-  // printf("usb_xfer_process_running\n");
   list_for_each_entry_safe(j, tmp, &queue_state.jobs_running, jobs) {
     bool jobchain_completed = false;
-    // printf("usb_xfer_process_running: j:%p, %d\n", j, j->completed);
     if (j->completed) {
+      wait_msec(40);
       jc = j->jc;
       struct dwc2_channel *c = jc->channel;
       if (c->ctl->status == DWC2_STATUS_NYET) {

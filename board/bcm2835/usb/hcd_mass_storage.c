@@ -503,6 +503,7 @@ int usb_mass_init(struct usb_hcd_device* d)
 
   err = usb_mass_get_max_lun(d, &max_lun);
   CHECK_ERR("failed to get max lun");
+  printf("max_lun : %d\r\n", max_lun);
   usb_mass_set_log_level(1);
   err = usb_mass_test_unit_ready(m, lun);
   CHECK_ERR("failed to test unit ready");

@@ -342,21 +342,27 @@ void dwc2_enable_ahb_interrupts(void)
 void dwc2_unmask_all_interrupts(void)
 {
   int mask = 0xffffffff;
-  USB_GINTSTS_CLR_CURMODE_HOST(mask);
-  // USB_GINTSTS_CLR_RXFLVL(mask);
-  USB_GINTSTS_CLR_NPTXFEMP(mask);
-  USB_GINTSTS_CLR_PTXFEMP(mask);
-  USB_GINTSTS_CLR_SOF(mask);
+  mask = 0;
+//  USB_GINTSTS_CLR_CURMODE_HOST(mask);
+//  USB_GINTSTS_CLR_SET_RXFLVL(mask, 1);
+//
+//  USB_GINTSTS_CLR_SET_NPTXFEMP(mask, 1);
+//  USB_GINTSTS_CLR_SET_PTXFEMP(mask, 1);
+//  USB_GINTSTS_CLR_SET_SOF(mask, 1);
+  USB_GINTSTS_CLR_SET_HCHINT(mask, 1);
+  DWCDEBUG("dwc2_unmask_all_interrupts: %08x\r\n", mask);
   write_reg(USB_GINTMSK, mask);
 }
 
 void dwc2_enable_channel_interrupts(void)
 {
   uint32_t intmsk;
+  uint32_t oldintmsk;
   write_reg(USB_HAINTMSK, 0);
   write_reg(USB_HAINT, 0xffffffff);
-  intmsk = read_reg(USB_GINTMSK);
+  intmsk = oldintmsk = read_reg(USB_GINTMSK);
   USB_GINTSTS_CLR_SET_HCHINT(intmsk, 1);
+  DWCDEBUG("dwc2_enable_channel_interrupts: %08x -> %08x\r\n", oldintmsk, intmsk);
   write_reg(USB_GINTMSK, intmsk);
 }
 
@@ -365,7 +371,6 @@ void dwc2_unmask_port_interrupts(void)
   uint32_t reg = 0;
   USB_GINTSTS_CLR_SET_PRTINT(reg, 1);
   write_reg(USB_GINTMSK, reg);
-
 }
 
 void dwc2_clear_all_interrupts(void)
@@ -401,7 +406,10 @@ void dwc2_dump_int_registers(void)
 
 static inline void dwc2_irq_handle_sof(void)
 {
-  DWCDEBUG("SOF");
+  /*
+   * here should be a counter of reaction to Start of Frame.
+   * SOF arrives at 125 micro-second interval, this is checked on oscillo-scope
+   */
 }
 
 static inline void dwc2_hprt_to_port_status(uint32_t hprt, struct usb_hub_port_status *s)
@@ -456,6 +464,11 @@ static inline void dwc2_irq_handle_port_intr(void)
   }
 }
 
+static inline void dwc2_irq_handle_periodic_tx_empty()
+{
+  DWCDEBUG("periodic_tx_fifo_empty");
+}
+
 void dwc2_irq_handle_rx_fifo_lvl_intr()
 {
   uint32_t grxsts = read_reg(USB_GRXSTSP);
@@ -484,17 +497,17 @@ void dwc2_irq_handle_mode_mismatch(void)
 
 static inline void dwc2_irq_handle_early_susp(void)
 {
-  DWCDEBUG("early suspend");
+  DWCINFO("early suspend");
 }
 
 static inline void dwc2_irq_handle_usb_susp(void)
 {
-  DWCDEBUG("usb suspend");
+  DWCINFO("usb suspend");
 }
 
 static inline void dwc2_irq_handle_eopf(void)
 {
-  DWCDEBUG("EOPF");
+  DWCINFO("EOPF");
 }
 
 static inline void dwc2_irq_handle_non_periodic_tx_fifo_empty(void)
@@ -581,14 +594,17 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
    * it did not have space for the data. The host controller is expected ot retry the
    * transaction at some future time when the endpoint has space available. ...
    */
-  DWCDEBUG("channel irq NAK: channel: %d", c->id);
+  DWCERR("channel irq NAK: channel: %d", c->id);
   if (dwc2_channel_split_mode(c)) {
     dwc2_transfer_start(c);
     return;
   }
 
-  DWCDEBUG("ep_type:%d, compl:%p\r\n", c->pipe.u.ep_type, c->ctl->completion);
+  DWCERR("ep_type:%d, compl:%p\r\n", c->pipe.u.ep_type, c->ctl->completion);
   wait_msec(50);
+  dwc2_transfer_start(c);
+  return;
+
   c->ctl->status = DWC2_STATUS_NAK;
   if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);
@@ -632,6 +648,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   c = dwc2_channel_get_by_id(ch_id);
   GET_INTR();
   GET_INTRMSK();
+
   DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch_id, intrmsk, intr, intr & intrmsk);
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
@@ -687,12 +704,13 @@ static inline void dwc2_irq_handle_channel_int(void)
   }
 }
 
-void dwc2_irq_cb(void)
+void OPTIMIZED dwc2_irq_cb(void)
 {
   uint32_t intsts = read_reg(USB_GINTSTS);
   uint32_t intmsk = read_reg(USB_GINTMSK);
   uint32_t masked = intsts & intmsk;
   DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
+
   write_reg(USB_GINTSTS, masked);
   if (dwc2_log_level > 0)
     dwc2_dump_int_registers();
@@ -730,18 +748,14 @@ void dwc2_irq_cb(void)
   if (USB_GINTSTS_GET_RXFLVL(masked))
     dwc2_irq_handle_rx_fifo_lvl_intr();
 
-  /* non-periodic TX fifo empty */
-  // if (USB_GINTSTS_GET_NPTXFEMP(masked)) {
-  //  DWCINFO("NPTXFEMP");
-  // }
   /* port interrupts */
   if (USB_GINTSTS_GET_PRTINT(masked))
     dwc2_irq_handle_port_intr();
 
   /* periodic TX fifo empty */
-  // if (USB_GINTSTS_GET_PTXFEMP(masked)) {
-  //  DWCINFO("PTXFEMP");
-  // }
+  if (USB_GINTSTS_GET_PTXFEMP(masked))
+    dwc2_irq_handle_periodic_tx_empty();
+
   if (USB_GINTSTS_GET_LPMTRANRCVD(masked)) {
     DWCDEBUG("LPMTRANRCVD");
   }

@@ -196,7 +196,7 @@ int usb_hub_port_check_connection(usb_hub_t *h, int port)
 	struct usb_hub_port_status port_status ALIGNED(4);
 
   err = usb_hub_port_get_status(h, port, &port_status);
-  CHECK_ERR_SILENT();
+  CHECK_ERR("usb_hub_port_check_connection: failed to get status");
 
   HUBPORTDBG("status:%04x:%04x", port_status.status.raw, port_status.change.raw);
 	if (port_status.change.connected_changed) {
@@ -227,6 +227,7 @@ out_err:
 int usb_hub_power_on_ports(usb_hub_t *h)
 {
   int port, err;
+  uint32_t delay;
 
   err = ERR_OK;
 	HUBDBG("powering on all %d ports", h->descriptor.port_count);
@@ -237,8 +238,12 @@ int usb_hub_power_on_ports(usb_hub_t *h)
       HUBPORTERR("failed to power on, skipping");
       continue;
     }
-    HUBDBG("power_good_delay: %d msec", h->descriptor.power_good_delay);
-    wait_msec(h->descriptor.power_good_delay * 2 + 400);
+  }
+
+  delay = h->descriptor.power_good_delay * 2 + 100;
+  HUBLOG("power_good_delay: %d msec", delay);
+  wait_msec(delay);
+  for (port = 0; port < h->descriptor.port_count; ++port) {
     err = usb_hub_port_check_connection(h, port);
     if (err != ERR_OK) {
       HUBPORTERR("failed check connection, skipping");
