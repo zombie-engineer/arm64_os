@@ -195,6 +195,7 @@ int usb_hub_port_check_connection(usb_hub_t *h, int port)
 	int err = ERR_OK;
 	struct usb_hub_port_status port_status ALIGNED(4);
 
+  printf("port_get_status: %d\n", port);
   err = usb_hub_port_get_status(h, port, &port_status);
   CHECK_ERR("usb_hub_port_check_connection: failed to get status");
 

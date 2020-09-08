@@ -12,6 +12,7 @@ typedef enum {
   DWC2_STATUS_STALL,
   DWC2_STATUS_TIMEOUT,
   DWC2_STATUS_ERR,
+  DWC2_STATUS_HALTED,
 } dwc2_transfer_status_t;
 
 int dwc2_xfer_one_job(struct usb_xfer_job *j);

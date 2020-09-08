@@ -5,6 +5,7 @@
  */
 
 #define SCSI_OPCODE_TEST_UNIT_READY   0x00
+#define SCSI_OPCODE_REQUEST_SENSE     0x03
 #define SCSI_OPCODE_INQUIRY           0x12
 #define SCSI_OPCODE_READ_10           0x28
 #define SCSI_OPCODE_WRITE_10          0x2a
@@ -14,6 +15,15 @@
 struct scsi_op_test_unit_ready {
   uint8_t opcode          ;
   uint8_t reserved[4]     ; // +1
+  uint8_t control         ; // +5
+} PACKED;
+
+struct scsi_op_request_sense {
+  uint8_t opcode          ;
+  uint8_t desc         : 1; // +1
+  uint8_t reserved     : 7;
+  uint8_t reserved_2[2]   ; // +2
+  uint8_t alloc_length    ; // +4
   uint8_t control         ; // +5
 } PACKED;
 

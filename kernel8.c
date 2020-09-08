@@ -518,6 +518,7 @@ void spi_work()
   }
 }
 
+
 void max7219_work()
 {
   // Set spi device

@@ -73,6 +73,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
     return jc;
 
   jc->nak_retries = 100;
+  jc->wait_interval_ms = 0;
 
   /* SETUP packet */
   j = usb_xfer_job_prep(jc, USB_PID_SETUP, USB_DIRECTION_OUT, request, sizeof(*request));
@@ -164,6 +165,7 @@ int hcd_transfer_control(
     transfer_id, rq);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
+  jc->wait_interval_ms = 0;
   if (IS_ERR(jc)) {
     err = PTR_ERR(jc);
     goto out_err;
@@ -347,6 +349,14 @@ out_err:
   return err;
 }
 
+static inline void dwc2_print_tsize(void)
+{
+  volatile uint32_t *ch = (volatile uint32_t *)0x3f980500;
+  volatile uint32_t *tsiz = (volatile uint32_t *)0x3f980510;
+  printf("ch: %08x, tsize:%08x\n", *ch, *tsiz);
+  wait_msec(100);
+}
+
 int hcd_transfer_bulk(
   struct usb_hcd_pipe *pipe,
   int direction,
@@ -370,6 +380,7 @@ int hcd_transfer_bulk(
 
   jc = usb_xfer_jobchain_create();
   jc->nak_retries = 0;
+  jc->wait_interval_ms = 200;
   if (IS_ERR(jc)) {
     err = PTR_ERR(jc);
     jc = NULL;
@@ -401,8 +412,10 @@ int hcd_transfer_bulk(
 
   usb_xfer_jobchain_enqueue(jc);
 
-  while(!completed)
+  while(!completed) {
     asm volatile("wfe");
+    dwc2_print_tsize();
+  }
   err = jc->err;
   printf("BULK completed: err=%d\r\n", err);
   if (err)

@@ -84,3 +84,6 @@ static inline int is_csw_meaningful(void *buf, int transfer_length)
 }
 
 int cbw_transfer(struct usb_hcd_pipe *d, int dir, void *buf, int bufsz);
+
+#define CSW_STATUS_CHECK_GOOD      0
+#define CSW_STATUS_CHECK_CONDITION 1

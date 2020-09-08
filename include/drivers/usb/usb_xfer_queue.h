@@ -59,6 +59,7 @@ struct usb_xfer_jobchain {
   struct list_head list;
   // jobchain_status_t status;
   int nak_retries;
+  int wait_interval_ms;
   int err;
   struct usb_hcd_pipe *hcd_pipe;
   struct list_head jobs;

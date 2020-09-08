@@ -564,23 +564,24 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
     c->ctl->completion(c->ctl->completion_arg);
 }
 
-void dwc2_irq_mask_nak(struct dwc2_channel *c)
-{
-  int ch_id = c->id;
-  int intrmsk;
-  GET_INTRMSK();
-  USB_HOST_INTR_CLR_NAK(intrmsk);
-  SET_INTRMSK();
-}
 
-void dwc2_irq_unmask_nak(struct dwc2_channel *c)
-{
-  int ch_id = c->id;
-  int intrmsk;
-  GET_INTRMSK();
-  USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
-  SET_INTRMSK();
-}
+//void dwc2_irq_mask_nak(struct dwc2_channel *c)
+//{
+//  int ch_id = c->id;
+//  int intrmsk;
+//  GET_INTRMSK();
+//  USB_HOST_INTR_CLR_NAK(intrmsk);
+//  SET_INTRMSK();
+//}
+//
+//void dwc2_irq_unmask_nak(struct dwc2_channel *c)
+//{
+//  int ch_id = c->id;
+//  int intrmsk;
+//  GET_INTRMSK();
+//  USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
+//  SET_INTRMSK();
+//}
 
 static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
 {
@@ -601,9 +602,20 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
   }
 
   DWCERR("ep_type:%d, compl:%p\r\n", c->pipe.u.ep_type, c->ctl->completion);
-  wait_msec(50);
-  dwc2_transfer_start(c);
-  return;
+  if (c->pipe.u.ep_type == USB_ENDPOINT_TYPE_CONTROL) {
+
+    puts("%");
+    wait_msec(50);
+    dwc2_transfer_start(c);
+    return;
+  }
+
+  if (c->pipe.u.ep_type == USB_ENDPOINT_TYPE_BULK) {
+    puts("$");
+    wait_msec(50);
+    dwc2_transfer_start(c);
+    return;
+  }
 
   c->ctl->status = DWC2_STATUS_NAK;
   if (c->ctl->completion)
@@ -629,6 +641,47 @@ static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
      c->ctl->completion(c->ctl->completion_arg);
 }
 
+static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t old_intr)
+{
+  uint32_t intr, intrmsk, siz;
+  int ch_id = c->id;
+  bool xfer_complete;
+  GET_INTR();
+  GET_INTRMSK();
+  GET_SIZ();
+  USB_HOST_INTR_CLR_HALT(intr);
+  printf("old_intr: %08x, new_intr: %08x tsz: %08x,%s,a:%d,%s,%s\n",
+    old_intr, intr, siz,
+    usb_transfer_type_to_string(c->pipe.u.ep_type),
+    c->pipe.u.device_address,
+    usb_speed_to_string(c->pipe.u.speed),
+    usb_direction_to_string(c->ctl->direction)
+    );
+
+  xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(old_intr);
+  if (!xfer_complete) {
+    puts("NOT xfer_completed\r\n");
+    return;
+  }
+
+  USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
+
+  if (USB_HOST_INTR_GET_ACK(old_intr)) {
+    puts("+++");
+    dwc2_irq_handle_channel_ack(c, xfer_complete);
+    USB_HOST_INTR_CLR_ACK(intr);
+  }
+  if (USB_HOST_INTR_GET_NYET(old_intr)) {
+    dwc2_irq_handle_channel_nyet(c);
+    USB_HOST_INTR_CLR_NYET(intr);
+  }
+  if (USB_HOST_INTR_GET_NAK(old_intr)) {
+    dwc2_irq_handle_channel_nak(c);
+    USB_HOST_INTR_CLR_NAK(intr);
+  }
+}
+
+
 static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *c)
 {
   int next_pid = dwc2_channel_get_next_pid(c);
@@ -640,41 +693,39 @@ static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *
   dwc2_transfer_start(c);
 }
 
+volatile int xx = 0;
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
 {
-  bool xfer_complete;
   uint32_t intr, intrmsk;
   struct dwc2_channel *c;
   c = dwc2_channel_get_by_id(ch_id);
   GET_INTR();
   GET_INTRMSK();
-
-  DWCDEBUG("channel %d irq(hcint): %08x & %08x = %08x", ch_id, intrmsk, intr, intr & intrmsk);
-  xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(intr);
   SET_INTR();
-  USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
+  DWCINFO("channel %d irq(hcint): int: %08x & mask %08x = %08x++",
+    ch_id, intr,
+    intrmsk, intr & intrmsk);
 
-  if (USB_HOST_INTR_GET_ACK(intr)) {
-    dwc2_irq_handle_channel_ack(c, xfer_complete);
-    USB_HOST_INTR_CLR_ACK(intr);
+  if (xx++ == 4) {
+    while(xx);
+  }
+
+  if (USB_HOST_INTR_GET_HALT(intr)) {
+    dwc2_irq_handle_channel_halt(c, intr);
+    return;
+    USB_HOST_INTR_CLR_HALT(intr);
+  }
+  if (USB_HOST_INTR_GET_NAK(intr)) {
+    dwc2_irq_handle_channel_nak(c);
+    USB_HOST_INTR_CLR_NAK(intr);
   }
   if (USB_HOST_INTR_GET_AHB_ERR(intr)) {
     dwc2_irq_handle_channel_ahb_err(c);
     USB_HOST_INTR_CLR_AHB_ERR(intr);
   }
-  if (USB_HOST_INTR_GET_NYET(intr)) {
-    dwc2_irq_handle_channel_nyet(c);
-    USB_HOST_INTR_CLR_NYET(intr);
-  }
   if (USB_HOST_INTR_GET_DATTGGLERR(intr)) {
     dwc2_irq_handle_channel_data_toggle_err(c);
     USB_HOST_INTR_CLR_DATTGGLERR(intr);
-  }
-  if (USB_HOST_INTR_GET_NAK(intr)) {
-    dwc2_irq_handle_channel_nak(c);
-    USB_HOST_INTR_CLR_NAK(intr);
-    // GET_INTR();
-    // printf("---%08x\r\n", intr);
   }
   if (intr & ~(uint32_t)0x23) {
     char regbuf[512];

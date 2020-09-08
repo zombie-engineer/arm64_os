@@ -97,7 +97,7 @@ static inline void scsi_fill_cmd_test_unit_ready(struct scsi_op_inquiry *op)
 
 static inline void csw_print(struct csw *s)
 {
-  CBW_DBG("CSW: %08x:%08x:data_residue:%d,status:%d",
+  printf("CSW: %08x:%08x:data_residue:%d,status:%d\r\n",
     s->csw_signature,
     s->csw_tag,
     s->csw_data_residue,
@@ -183,7 +183,7 @@ static void next_pid_toggle(usb_pid_t *pid)
 }
 
 int usb_cbw_transfer(hcd_mass_t *m,
-  int tag, int lun, void *cmd, int cmdsz, int data_direction, void *data, int datasz)
+  int tag, int lun, void *cmd, int cmdsz, int data_direction, void *data, int datasz, int *csw_status)
 {
   int err;
   int num_bytes;
@@ -212,7 +212,7 @@ int usb_cbw_transfer(hcd_mass_t *m,
   char cmdbuf[31] ALIGNED(512);
   int retries = 5;
 
-  usb_pid_t *next_pid = &m->ep_out->next_toggle_pid;
+  usb_pid_t *next_pid;// = &m->ep_out->next_toggle_pid;
 
   if (cbw_log_level >= LOG_LEVEL_DEBUG)
     usb_cbw_transfer_debug_send_cbw(m, lun, cmd, cmdsz, datasz, data_direction);
@@ -229,13 +229,14 @@ int usb_cbw_transfer(hcd_mass_t *m,
 retry:
   next_pid = &next_pids[USB_DIRECTION_OUT];
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
+  printf("----------\r\n");
   CHECK_RETRYABLE_ERROR("OUT:CBW");
   next_pid_toggle(next_pid);
 
   if (data && datasz) {
     if (data_direction == USB_DIRECTION_IN) {
       p.ep = hcd_endpoint_get_number(m->ep_in);
-      next_pid = &m->ep_in->next_toggle_pid;
+      // next_pid = &m->ep_in->next_toggle_pid;
       next_pid = &next_pids[USB_DIRECTION_IN];
     }
     err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
@@ -248,7 +249,7 @@ retry:
   }
 
   p.ep = hcd_endpoint_get_number(m->ep_in);
-  next_pid = &m->ep_in->next_toggle_pid;
+  // next_pid = &m->ep_in->next_toggle_pid;
   next_pid = &next_pids[USB_DIRECTION_IN];
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_RETRYABLE_ERROR("IN:CSW");
@@ -269,8 +270,9 @@ retry:
     goto out_reset_recovery;
   }
 
-  if (cbw_log_level >= LOG_LEVEL_DEBUG)
-    csw_print(&status);
+ // if (cbw_log_level >= LOG_LEVEL_DEBUG)
+  csw_print(&status);
+  *csw_status = status.csw_status;
 
 out_err:
   return err;
@@ -289,12 +291,13 @@ out_reset_recovery:
 int usb_mass_read_capacity10(hcd_mass_t *m, int lun)
 {
   int err;
+  int csw_status = 0;
   struct scsi_op_read_capacity_10 cmd ALIGNED(4) = { 0 };
   struct scsi_read_capacity_param param ALIGNED(4);
   cmd.opcode = SCSI_OPCODE_READ_CAPACITY_10;
 
   MASSLOG("READ CAPACITY(10)");
-  err = usb_cbw_transfer(m, 3, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, &param, sizeof(param));
+  err = usb_cbw_transfer(m, 3, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, &param, sizeof(param), &csw_status);
   CHECK_ERR("READ CAPACITY(10) failed");
 out_err:
   return err;
@@ -304,14 +307,18 @@ int usb_mass_read10(hcd_mass_t *m,
   int lun, uint32_t offset, void *data_dst, int data_sz)
 {
   int err;
+  int csw_status = 0;
   struct scsi_op_read_10 cmd ALIGNED(4) = { 0 };
   cmd.opcode = SCSI_OPCODE_READ_10;
   set_unaligned_32_le(&cmd.lba, offset);
   set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
   MASSLOG("READ(10)");
+  usb_mass_set_log_level(10);
+  usb_hcd_set_log_level(10);
+  dwc2_set_log_level(10);
 
   memset(data_dst, 0, data_sz);
-  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz, &csw_status);
   CHECK_ERR("READ(10) command failed");
 out_err:
   return err;
@@ -322,24 +329,39 @@ int usb_mass_write10(hcd_mass_t *m,
 {
   int err;
   struct scsi_op_write_10 cmd ALIGNED(4) = { 0 };
+  int csw_status = 0;
   cmd.opcode = SCSI_OPCODE_WRITE_10;
   set_unaligned_32_le(&cmd.lba, offset);
   set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
   MASSLOG("WRITE(10)");
-  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_OUT, data_dst, data_sz);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_OUT, data_dst, data_sz, &csw_status);
   CHECK_ERR("WRITE(10) command failed");
 out_err:
   return err;
 }
 
-int usb_mass_test_unit_ready(hcd_mass_t *m, int lun)
+int usb_mass_test_unit_ready(hcd_mass_t *m, int lun, int *csw_status)
 {
   int err;
   struct scsi_op_test_unit_ready cmd ALIGNED(512) = { 0 };
   cmd.opcode = SCSI_OPCODE_TEST_UNIT_READY;
   MASSLOG("TEST UNIT READY: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0, csw_status);
   CHECK_ERR("TEST UNIT READY failed");
+out_err:
+  return err;
+}
+
+int usb_mass_request_sense(hcd_mass_t *m, int lun, int *csw_status)
+{
+  int err;
+  struct scsi_op_request_sense cmd ALIGNED(512) = { 0 };
+  cmd.opcode = SCSI_OPCODE_REQUEST_SENSE;
+  dwc2_set_log_level(20);
+  MASSLOG("REQUEST_SENSE: cmd size: %d", sizeof(cmd));
+  wait_msec(100);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0, csw_status);
+  CHECK_ERR("REQUEST_SENSE failed");
 out_err:
   return err;
 }
@@ -352,17 +374,18 @@ int usb_mass_inquiry(hcd_mass_t *m, int lun)
   struct scsi_op_inquiry cmd;
   struct scsi_response_inquiry *info = (struct scsi_response_inquiry *)buf;
   const int min_cmd_len = 5;
+  int csw_status = 0;
 
   memset(&cmd, 0, sizeof(cmd));
   memset(buf , 0, sizeof(buf));
 
   scsi_fill_cmd_inquiry(&cmd, 0, 0, min_cmd_len);
   MASSLOG("SCSI_OPCODE_INQUIRY: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, min_cmd_len);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, min_cmd_len, &csw_status);
   CHECK_ERR("Failed to get INQUIRY data length");
   scsi_fill_cmd_inquiry(&cmd, 0, 0, info->additional_length);
   MASSLOG("SCSI_OPCODE_INQUIRY 2: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, info->additional_length);
+  err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, info->additional_length, &csw_status);
   CHECK_ERR("Failed to get full INQUIRY data");
   scsi_inquiry_data_to_string(description, sizeof(description), info);
   MASSLOG("%s", description);
@@ -487,6 +510,7 @@ int usb_mass_init(struct usb_hcd_device* d)
   int err;
   int max_lun = 0;
   int lun = 0;
+  int csw_status = 0;
   hcd_mass_t *m = NULL;
 
   m = usb_mass_init_class(d);
@@ -504,19 +528,25 @@ int usb_mass_init(struct usb_hcd_device* d)
   err = usb_mass_get_max_lun(d, &max_lun);
   CHECK_ERR("failed to get max lun");
   printf("max_lun : %d\r\n", max_lun);
-  usb_mass_set_log_level(1);
-  err = usb_mass_test_unit_ready(m, lun);
+  // err = usb_mass_inquiry(m, lun);
+  // CHECK_ERR("failed to send INQUIRY request");
+  usb_mass_set_log_level(20);
+  wait_msec(50);
+  err = usb_mass_test_unit_ready(m, lun, &csw_status);
   CHECK_ERR("failed to test unit ready");
-  err = usb_mass_test_unit_ready(m, lun);
+  if (csw_status == CSW_STATUS_CHECK_CONDITION) {
+    err = usb_mass_request_sense(m, lun, &csw_status);
+  }
+
+  wait_msec(500);
+  usb_mass_read(m);
+  err = usb_mass_test_unit_ready(m, lun, &csw_status);
   CHECK_ERR("failed to test unit ready");
-  err = usb_mass_test_unit_ready(m, lun);
+  err = usb_mass_test_unit_ready(m, lun, &csw_status);
   CHECK_ERR("failed to test unit ready");
   // dwc2_set_log_level(10);
-  err = usb_mass_inquiry(m, lun);
-  CHECK_ERR("failed to send INQUIRY request");
   err = usb_mass_read_capacity10(m, lun);
   CHECK_ERR("failed to get capacity");
-  usb_mass_read(m);
 out_err:
   if (err && m)
     usb_mass_deinit_class(m);

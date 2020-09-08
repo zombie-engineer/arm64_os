@@ -104,15 +104,19 @@ static void usb_xfer_handle_completed(void *arg)
   struct usb_xfer_jobchain *jc = j->jc;
   struct dwc2_channel *c = jc->channel;
 
-  if (c->ctl->status == DWC2_STATUS_NAK) {
-    if (jc->nak_retries > 0) {
+  switch(c->ctl->status) {
+  case DWC2_STATUS_NAK:
+    if (jc->nak_retries > 0)
       jc->nak_retries--;
-      return;
-    }
     j->err = ERR_RETRY;
-    dwc2_irq_mask_nak(c);
-  } else {
+    // dwc2_irq_mask_nak(c);
+    break;
+  case DWC2_STATUS_HALTED:
+    j->err = ERR_FATAL;
+    break;
+  default:
     j->err = ERR_OK;
+    break;
   }
 
   j->completed = true;
@@ -180,9 +184,10 @@ static void usb_xfer_process_running(void)
   list_for_each_entry_safe(j, tmp, &queue_state.jobs_running, jobs) {
     bool jobchain_completed = false;
     if (j->completed) {
-      wait_msec(40);
       jc = j->jc;
       struct dwc2_channel *c = jc->channel;
+      if (jc->wait_interval_ms)
+        wait_msec(jc->wait_interval_ms);
       if (c->ctl->status == DWC2_STATUS_NYET) {
         usb_xfer_job_set_running(j);
         continue;
@@ -191,7 +196,9 @@ static void usb_xfer_process_running(void)
       if (j->err != ERR_OK) {
         if (j->err == ERR_RETRY) {
           dwc2_transfer_stop(c);
-          dwc2_irq_unmask_nak(c);
+//          dwc2_irq_unmask_nak(c);
+        }
+        if (j->err == ERR_FATAL) {
         }
 
         jc->err = j->err;
