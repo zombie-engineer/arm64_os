@@ -650,7 +650,7 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
   GET_INTRMSK();
   GET_SIZ();
   USB_HOST_INTR_CLR_HALT(intr);
-  printf("old_intr: %08x, new_intr: %08x tsz: %08x,%s,a:%d,%s,%s\n",
+  printf("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s\n",
     old_intr, intr, siz,
     usb_transfer_type_to_string(c->pipe.u.ep_type),
     c->pipe.u.device_address,
@@ -702,11 +702,11 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   GET_INTR();
   GET_INTRMSK();
   SET_INTR();
-  DWCINFO("channel %d irq(hcint): int: %08x & mask %08x = %08x++",
+  DWCINFO("channel %d irq(hcint): int: %08x & mask %08x = %08x, int#:%d#",
     ch_id, intr,
-    intrmsk, intr & intrmsk);
+    intrmsk, intr & intrmsk, xx);
 
-  if (xx++ == 4) {
+  if (xx++ == 400) {
     while(xx);
   }
 

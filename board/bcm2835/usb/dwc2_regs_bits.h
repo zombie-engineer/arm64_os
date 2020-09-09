@@ -183,6 +183,7 @@ static inline int usb_host_intr_bitmask_to_string(char *buf, int bufsz, uint32_t
 {
   int n = 0;
   int first = 1;
+  memset(buf, 0, bufsz);
   if (USB_HOST_INTR_GET_XFER_COMPLETE(v)) {
     n += snprintf(buf + n, bufsz - n, "%sXFER_COMPLETE", first ? "" : ",");
     first = 0;

@@ -276,6 +276,9 @@ void dwc2_transfer_prepare(struct dwc2_channel *c)
     usb_direction_to_string(c->ctl->direction),
     dwc2_channel_is_speed_high(c) ? " (HS)" : "(FS/LS)");
 
+  if (c->next_pid == USB_PID_SETUP)
+    hexdump_memory((void *)c->ctl->dma_addr_base, 8);
+
   BUG((uint64_t)c->ctl->dma_addr_base & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
   dwc2_channel_enable(c->id);
   dwc2_channel_set_intmsk(c);

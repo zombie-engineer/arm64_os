@@ -365,6 +365,7 @@ int hcd_transfer_bulk(
   usb_pid_t *pid,
   int *out_num_bytes)
 {
+  int wait_timeout = 0;
   int err = ERR_OK;
   int completed ALIGNED(8) = 0;
   struct usb_xfer_jobchain *jc;
@@ -413,6 +414,12 @@ int hcd_transfer_bulk(
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed) {
+    if (wait_timeout++ > 20) {
+      jc->err = ERR_OK;
+      dwc2_print_tsize();
+      hexdump_memory(addr, transfer_size);
+      break;
+    }
     asm volatile("wfe");
     dwc2_print_tsize();
   }
