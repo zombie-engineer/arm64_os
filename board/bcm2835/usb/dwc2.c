@@ -650,7 +650,7 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
   GET_INTRMSK();
   GET_SIZ();
   USB_HOST_INTR_CLR_HALT(intr);
-  printf("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s\n",
+  DWCDEBUG2("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s\n",
     old_intr, intr, siz,
     usb_transfer_type_to_string(c->pipe.u.ep_type),
     c->pipe.u.device_address,
@@ -693,29 +693,23 @@ static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *
   dwc2_transfer_start(c);
 }
 
-struct dwc2_stats {
-  /* number of channel interrupts */
-  uint64_t num_ch_int;
-};
-
-static struct dwc2_stats dwc2_st = { 0 };
-
+volatile int xx = 0;
 static inline void dwc2_irq_handle_channel_int_one(int ch_id)
 {
   uint32_t intr, intrmsk;
   struct dwc2_channel *c;
   c = dwc2_channel_get_by_id(ch_id);
-  dwc2_st.num_ch_int++;
   GET_INTR();
   GET_INTRMSK();
   SET_INTR();
+  wait_msec(50);
   DWCDEBUG2("channel %d irq(hcint): int: %08x & mask %08x = %08x, int#:%d#",
-  ch_id, intr,
-  intrmsk, intr & intrmsk, dwc2_st.num_ch_int);
+    ch_id, intr,
+    intrmsk, intr & intrmsk, xx);
 
-//  if (dwc2_st.num_ch_int++ == 400) {
-//    while(xx);
-//  }
+  if (xx++ == 400) {
+    while(xx);
+  }
 
   if (USB_HOST_INTR_GET_HALT(intr)) {
     dwc2_irq_handle_channel_halt(c, intr);

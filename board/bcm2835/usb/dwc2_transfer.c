@@ -261,15 +261,15 @@ void dwc2_channel_set_intmsk(struct dwc2_channel *c)
   // USB_HOST_INTR_CLR_SET_AHB_ERR(intrmsk, 1);
   // USB_HOST_INTR_CLR_SET_XFER_COMPLETE(intrmsk, 1);
   // USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
-  printf("setintr:%08x\n", intrmsk);
+  // printf("?setintr:%08x\n", intrmsk);
   SET_INTRMSK();
-  GET_INTRMSK();
-  printf("getintr:%08x\n", intrmsk);
+  //GET_INTRMSK();
+  // printf("getintr:%08x\n", intrmsk);
 }
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
 {
-  DWCINFO("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s%s",
+  DWCDEBUG2("dwc2_transfer_prepare: 00 addr:%p, sz:%d, pid:%s, dir:%s%s",
     c->ctl->dma_addr_base,
     c->ctl->transfer_size,
     usb_pid_t_to_string(c->next_pid),
@@ -388,7 +388,7 @@ int dwc2_xfer_one_job(struct usb_xfer_job *j)
   c->ctl->direction = j->direction;
   c->ctl->transfer_size = j->transfer_size;
 
-  printf("dwc2_xfer_one_job: %s, j:%p, sz:%d\n", 
+  DWCDEBUG2("dwc2_xfer_one_job: %s, j:%p, sz:%d\n", 
     j->direction == USB_DIRECTION_OUT ? "out" : "in",
     j,
     j->transfer_size);
