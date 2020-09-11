@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-UUID=C57B-81FF
+UUID=9F12-EAC7
 SD_DIR=/mnt/sdcard
 DEV_NAME=$(sudo blkid -U $UUID)
 if make; then
