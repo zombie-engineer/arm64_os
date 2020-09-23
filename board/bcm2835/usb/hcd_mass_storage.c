@@ -313,9 +313,9 @@ int usb_mass_read10(hcd_mass_t *m,
   set_unaligned_32_le(&cmd.lba, offset);
   set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
   MASSLOG("READ(10)");
-  usb_mass_set_log_level(10);
-  usb_hcd_set_log_level(10);
-  dwc2_set_log_level(10);
+  // usb_mass_set_log_level(10);
+  // usb_hcd_set_log_level(10);
+  // dwc2_set_log_level(10);
 
   memset(data_dst, 0, data_sz);
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz, &csw_status);

@@ -535,10 +535,12 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
 {
   DWCDEBUG("channel irq ack: %d", c->id);
   if (!xfer_complete) {
+#if 0
     uint32_t intr;
     int ch_id = c->id;
     GET_INTR();
     printf("%08x"__endline, intr);
+#endif
     BUG(!dwc2_channel_is_split_enabled(c), "dwc2_ack_interrupt logic error");
     dwc2_transfer_start(c);
     return;
@@ -667,7 +669,7 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
 
   if (USB_HOST_INTR_GET_ACK(old_intr)) {
-    puts("+++");
+    // puts("A");
     dwc2_irq_handle_channel_ack(c, xfer_complete);
     USB_HOST_INTR_CLR_ACK(intr);
   }
@@ -764,8 +766,8 @@ void OPTIMIZED dwc2_irq_cb(void)
   DWCDEBUG("global irq(gintsts): %08x & %08x = %08x", intsts, intmsk, masked);
 
   write_reg(USB_GINTSTS, masked);
-  if (dwc2_log_level > 0)
-    dwc2_dump_int_registers();
+  // if (dwc2_log_level > 0)
+  //  dwc2_dump_int_registers();
 
   if (USB_GINTSTS_GET_HCHINT(masked))
     dwc2_irq_handle_channel_int();

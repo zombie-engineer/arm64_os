@@ -417,7 +417,6 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev)
 
   rq = USB_DEV_RQ_MAKE_GET_DESCRIPTOR(USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
       to_transfer_size);
-  printf("to_default_state:get_descriptor: %d\n");
   err = HCD_TRANSFER_CONTROL(&dev->pipe0, USB_DIRECTION_IN,
       &desc, to_transfer_size, rq, &num_bytes);
   CHECK_ERR_SILENT();
