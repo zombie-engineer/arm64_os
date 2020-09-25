@@ -224,9 +224,9 @@ int usb_cbw_transfer(hcd_mass_t *m,
   memcpy(cmdbuf + sizeof(cbw), cmd, cmdsz);
   memcpy(&status, 0, sizeof(status));
   dcache_flush(cmdbuf, sizeof(cmdbuf));
-  hexdump_memory(cmdbuf, sizeof(cmdbuf));
 
 retry:
+  p.ep = hcd_endpoint_get_number(m->ep_out),
   next_pid = &next_pids[USB_DIRECTION_OUT];
   err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
   printf("----------\r\n");
@@ -251,6 +251,7 @@ retry:
   p.ep = hcd_endpoint_get_number(m->ep_in);
   // next_pid = &m->ep_in->next_toggle_pid;
   next_pid = &next_pids[USB_DIRECTION_IN];
+  memset(&status, 0, sizeof(status));
   err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
   CHECK_RETRYABLE_ERROR("IN:CSW");
   next_pid_toggle(next_pid);
@@ -357,9 +358,8 @@ int usb_mass_request_sense(hcd_mass_t *m, int lun, int *csw_status)
   int err;
   struct scsi_op_request_sense cmd ALIGNED(512) = { 0 };
   cmd.opcode = SCSI_OPCODE_REQUEST_SENSE;
-  dwc2_set_log_level(20);
   MASSLOG("REQUEST_SENSE: cmd size: %d", sizeof(cmd));
-  wait_msec(100);
+  // next_pids[USB_DIRECTION_OUT] = USB_PID_DATA1;
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0, csw_status);
   CHECK_ERR("REQUEST_SENSE failed");
 out_err:
@@ -500,10 +500,22 @@ int usb_mass_read(hcd_mass_t *m)
   memset(buf, 0x66, sizeof(buf));
   err = usb_mass_read10(m, 0, 0, buf, sizeof(buf));
   CHECK_ERR("usb_mass_read10 failed");
-  hexdump_memory(buf, sizeof(buf));
 out_err:
   return err;
 }
+
+#if 0
+static inline void usb_mass_init_debug()
+{
+  wait_msec(500);
+  usb_mass_read(m);
+  err = usb_mass_test_unit_ready(m, lun, &csw_status);
+  CHECK_ERR("failed to test unit ready");
+  err = usb_mass_test_unit_ready(m, lun, &csw_status);
+  CHECK_ERR("failed to test unit ready");
+  // dwc2_set_log_level(10);
+}
+#endif
 
 int usb_mass_init(struct usb_hcd_device* d)
 {
@@ -531,20 +543,13 @@ int usb_mass_init(struct usb_hcd_device* d)
   // err = usb_mass_inquiry(m, lun);
   // CHECK_ERR("failed to send INQUIRY request");
   usb_mass_set_log_level(20);
-  wait_msec(50);
+  wait_msec(100);
   err = usb_mass_test_unit_ready(m, lun, &csw_status);
   CHECK_ERR("failed to test unit ready");
   if (csw_status == CSW_STATUS_CHECK_CONDITION) {
     err = usb_mass_request_sense(m, lun, &csw_status);
   }
 
-  wait_msec(500);
-  usb_mass_read(m);
-  err = usb_mass_test_unit_ready(m, lun, &csw_status);
-  CHECK_ERR("failed to test unit ready");
-  err = usb_mass_test_unit_ready(m, lun, &csw_status);
-  CHECK_ERR("failed to test unit ready");
-  // dwc2_set_log_level(10);
   err = usb_mass_read_capacity10(m, lun);
   CHECK_ERR("failed to get capacity");
 out_err:

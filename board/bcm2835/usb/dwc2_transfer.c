@@ -269,7 +269,7 @@ void dwc2_channel_set_intmsk(struct dwc2_channel *c)
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
 {
-  DWCDEBUG2("dwc2_transfer_prepare: 00 addr:%p, sz:%d, pid:%s, dir:%s%s",
+  DWCDEBUG2("dwc2_transfer_prepare: addr:%p, sz:%d, pid:%s, dir:%s%s",
     c->ctl->dma_addr_base,
     c->ctl->transfer_size,
     usb_pid_t_to_string(c->next_pid),
@@ -343,6 +343,10 @@ int dwc2_transfer_recalc_next(struct dwc2_xfer_control *ctl)
   int packets_left;
   int bytes_left;
   int ch_id = ctl->c->id;
+  if (dwc2_log_level > 1) {
+    GET_SIZ();
+    DWCDEBUG("%s tsiz_compl:%08x\r\n", ctl->direction == USB_DIRECTION_IN ? " IN" : "OUT", siz);
+  }
   if (ctl->direction == USB_DIRECTION_IN) {
     GET_SIZ();
     bytes_left = USB_HOST_SIZE_GET_SIZE(siz);

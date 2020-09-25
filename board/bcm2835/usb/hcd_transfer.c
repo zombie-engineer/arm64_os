@@ -124,6 +124,16 @@ static void control_chain_signal_completed(void *arg)
 }
 
 static int transfer_id = 0;
+static inline void dwc2_print_tsize()
+{
+  volatile uint32_t *ch = (volatile uint32_t *)0x3f980500;
+  volatile uint32_t *tsiz = (volatile uint32_t *)0x3f980510;
+  int direction = (*ch >> 15) & 1;
+  printf("%s: ch: %08x, tsize:%08x\n", 
+    direction == USB_DIRECTION_OUT ? "OUT" : " IN",
+    *ch, *tsiz);
+}
+
 
 /*
  * hcd_transfer_control - transfer control message to USB device.
@@ -189,8 +199,9 @@ int hcd_transfer_control(
 
   usb_xfer_jobchain_enqueue(jc);
 
-  while(!completed)
+  while(!completed) {
     asm volatile("wfe");
+  }
   err = jc->err;
   *out_num_bytes = transfer_size;
 
@@ -349,14 +360,6 @@ out_err:
   return err;
 }
 
-static inline void dwc2_print_tsize(void)
-{
-  volatile uint32_t *ch = (volatile uint32_t *)0x3f980500;
-  volatile uint32_t *tsiz = (volatile uint32_t *)0x3f980510;
-  printf("ch: %08x, tsize:%08x\n", *ch, *tsiz);
-  wait_msec(100);
-}
-
 int hcd_transfer_bulk(
   struct usb_hcd_pipe *pipe,
   int direction,
@@ -374,10 +377,10 @@ int hcd_transfer_bulk(
 
   transfer_id++;
   pipe->ep_type = USB_ENDPOINT_TYPE_BULK;
-  HCDLOG("hcd_transfer_bulk, pipe:%p, type:%d,hub_port:%d, speed:%d, dir:%s, id:%d",
+  HCDLOG("hcd_transfer_bulk:pipe:%p,type:%d,hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
     pipe, pipe->ls_hub_port, pipe->speed, pipe->ep_type,
     direction == USB_DIRECTION_OUT ? "out" : "in",
-    transfer_id);
+    transfer_id, transfer_size, *pid);
 
   jc = usb_xfer_jobchain_create();
   jc->nak_retries = 0;
@@ -408,16 +411,18 @@ int hcd_transfer_bulk(
    * For HOST-TO-DEVICE transfers flush the data first, so
    * DMA could read it from RAM.
    */
-  if (direction == USB_DIRECTION_OUT)
+  if (direction == USB_DIRECTION_OUT) {
+    hexdump_memory_ex("HCD_BULK_OUT: ", 16, addr, transfer_size);
     dcache_flush(addr, transfer_size);
+  }
 
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed) {
+    wait_msec(100);
     if (wait_timeout++ > 20) {
       jc->err = ERR_OK;
       dwc2_print_tsize();
-      hexdump_memory(addr, transfer_size);
       break;
     }
     asm volatile("wfe");
@@ -435,8 +440,10 @@ int hcd_transfer_bulk(
    * has delivered the data to the requested address, and the
    * caller will be able to read it instead of reading outdated cache.
    */
-  if (direction == USB_DIRECTION_IN)
+  if (direction == USB_DIRECTION_IN) {
     dcache_flush(addr, transfer_size);
+    hexdump_memory_ex("HCD_BULK_IN: ", 16, addr, transfer_size);
+  }
 
   return ERR_OK;
 out_err:

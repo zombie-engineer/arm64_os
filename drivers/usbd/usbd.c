@@ -130,7 +130,7 @@ void usbd_monitor(void)
   while(1) {
     wait_on_timer_ms(1000);
     usb_hub_probe_ports(h1);
-    usbd_print_device_tree();
+    // usbd_print_device_tree();
     usb_hub_probe_ports(h2);
   }
 }

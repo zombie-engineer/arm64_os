@@ -246,24 +246,84 @@ void OPTIMIZED clear_screen2(int gpio_pin_dc)
     tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, (i * 20) % 255);
 }
 
+#if 0
+static void tft_lcd_init2(void)
+{
+  printf("read_id: %02x:%02x:%02x\r\n", data[0], data[1], data[2]);
+
+  data[0] = 0x39;
+  data[1] = 0x2c;
+  data[2] = 0x34;
+  data[3] = 0x02;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
+  data[0] = 0x00;
+  data[1] = 0xc1;
+  data[2] = 0x30;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_B, data, 3);
+  data[0] = 0x85;
+  data[1] = 0x00;
+  data[2] = 0x78;
+  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_A, data, 3);
+  data[0] = 0x00;
+  data[1] = 0x00;
+  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_B, data, 2);
+  data[0] = 0x64;
+  data[1] = 0x03;
+  data[2] = 0x12;
+  data[3] = 0x81;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_ON_SEQ, data, 4);
+  data[0] = 0x20;
+  SEND_CMD_DATA(ILI9341_CMD_PUMP_RATIO, data, 1);
+  data[0] = 0x23;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_1, data, 1);
+  data[0] = 0x10;
+  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_2, data, 1);
+
+  data[0] = 0x3e;
+  data[1] = 0x28;
+  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_1, data, 2);
+
+  data[0] = 0x86;
+  SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_2, data, 1);
+
+  data[0] = 0x10;
+  SEND_CMD_DATA(ILI9341_CMD_FRAME_RATE_CTL, data, 1);
+
+  data[0] = 0x02;
+  data[1] = 0x02;
+  data[2] = 0x0a;
+  data[3] = 0x14;
+  SEND_CMD_DATA(ILI9341_CMD_BLANK_PORCH, data, 4);
+
+  data[0] = 0x08;
+  data[1] = 0x82;
+  data[2] = 0x27;
+  SEND_CMD_DATA(ILI9341_CMD_DISPL_FUNC, data, 3);
+
+  data[0] = 0x02;
+  SEND_CMD_DATA(0xf2, data, 1);
+}
+#endif
+
 void OPTIMIZED tft_lcd_init(void)
 {
   // char data[512];
   const int gpio_pin_mosi  = 10;
   const int gpio_pin_miso  =  9;
   const int gpio_pin_sclk  = 11;
-  const int gpio_pin_ce0   =  8;
-  const int gpio_pin_dc    = 22;
-  const int gpio_pin_reset = 25;
+  const int gpio_pin_bkl   =  8;
+
+  const int gpio_pin_dc    = 25;
+  const int gpio_pin_reset = 24;
 
   gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_sclk, GPIO_FUNC_ALT_0);
-  gpio_set_function(gpio_pin_ce0, GPIO_FUNC_OUT);
+  gpio_set_function(gpio_pin_bkl, GPIO_FUNC_OUT);
   gpio_set_function(gpio_pin_reset, GPIO_FUNC_OUT);
   gpio_set_function(gpio_pin_dc, GPIO_FUNC_OUT);
   gpio_set_on(gpio_pin_dc);
-  gpio_set_off(gpio_pin_ce0);
+  gpio_set_on(gpio_pin_bkl);
   gpio_set_off(gpio_pin_reset);
 
   *SPI_CS = SPI_CS_CLEAR_TX | SPI_CS_CLEAR_RX;
@@ -282,60 +342,6 @@ void OPTIMIZED tft_lcd_init(void)
   SEND_CMD(ILI9341_CMD_SOFT_RESET);
   wait_msec(5);
   SEND_CMD(ILI9341_CMD_DISPLAY_OFF);
-
-  // printf("read_id: %02x:%02x:%02x\r\n", data[0], data[1], data[2]);
-
-//  data[0] = 0x39;
-//  data[1] = 0x2c;
-//  data[2] = 0x34;
-//  data[3] = 0x02;
-//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
-//  data[0] = 0x00;
-//  data[1] = 0xc1;
-//  data[2] = 0x30;
-//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_B, data, 3);
-//  data[0] = 0x85;
-//  data[1] = 0x00;
-//  data[2] = 0x78;
-//  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_A, data, 3);
-//  data[0] = 0x00;
-//  data[1] = 0x00;
-//  SEND_CMD_DATA(ILI9341_CMD_TIMING_CTL_B, data, 2);
-//  data[0] = 0x64;
-//  data[1] = 0x03;
-//  data[2] = 0x12;
-//  data[3] = 0x81;
-//  SEND_CMD_DATA(ILI9341_CMD_POWER_ON_SEQ, data, 4);
-  // data[0] = 0x20;
-  // SEND_CMD_DATA(ILI9341_CMD_PUMP_RATIO, data, 1);
-//  data[0] = 0x23;
-//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_1, data, 1);
-//  data[0] = 0x10;
-//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_2, data, 1);
-
-  //data[0] = 0x3e;
-  // data[1] = 0x28;
-  // SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_1, data, 2);
-
-  //data[0] = 0x86;
-  //SEND_CMD_DATA(ILI9341_CMD_VCOM_CTL_2, data, 1);
-
-//  data[0] = 0x10;
-//  SEND_CMD_DATA(ILI9341_CMD_FRAME_RATE_CTL, data, 1);
-//
-//  data[0] = 0x02;
-//  data[1] = 0x02;
-//  data[2] = 0x0a;
-//  data[3] = 0x14;
-//  SEND_CMD_DATA(ILI9341_CMD_BLANK_PORCH, data, 4);
-
-//  data[0] = 0x08;
-//  data[1] = 0x82;
-//  data[2] = 0x27;
-//  SEND_CMD_DATA(ILI9341_CMD_DISPL_FUNC, data, 3);
-
-//  data[0] = 0x02;
-//  SEND_CMD_DATA(0xf2, data, 1);
 
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
