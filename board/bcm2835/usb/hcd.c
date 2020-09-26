@@ -76,6 +76,9 @@ DECL_STATIC_SLOT(struct usb_hcd_device, usb_hcd_device, 12)
 
 static int usb_utmi_initialized = 0;
 
+static struct list_head usb_devices = LIST_HEAD_INIT(usb_devices);
+static struct spinlock usb_devices_lock;
+
 static inline void print_usb_device(struct usb_hcd_device *dev)
 {
   printf("usb_device:parent:(%p:%d),pipe0:(max:%d,spd:%d,ep:%d,address:%d,hubaddr:%d,hubport:%d)",
@@ -99,6 +102,7 @@ static inline void print_usb_device(struct usb_hcd_device *dev)
 
 struct usb_hcd_device *usb_hcd_allocate_device()
 {
+  int irqflags;
   struct usb_hcd_device *dev;
   dev = usb_hcd_device_alloc();
   if (dev == NULL)
@@ -110,11 +114,22 @@ struct usb_hcd_device *usb_hcd_allocate_device()
   dev->class = NULL;
   dev->pipe0.address = 0;
   INIT_LIST_HEAD(&dev->hub_children);
+  INIT_LIST_HEAD(&dev->usb_devices);
+  spinlock_lock_disable_irq(&usb_devices_lock, irqflags);
+  list_add_tail(&dev->usb_devices, &usb_devices);
+  spinlock_unlock_restore_irq(&usb_devices_lock, irqflags);
+  HCDDEBUG("usb_hcd_allocate_device: dev:%p", dev);
   return dev;
 }
 
 void usb_hcd_deallocate_device(struct usb_hcd_device *d)
 {
+  int irqflags;
+  spinlock_lock_disable_irq(&usb_devices_lock, irqflags);
+  list_del_init(&d->usb_devices);
+  spinlock_unlock_restore_irq(&usb_devices_lock, irqflags);
+  HCDDEBUG("usb_hcd_deallocate_device: %p", d);
+
   list_del_init(&d->hub_children);
   if (d->class) {
     switch(d->class->device_class) {
@@ -849,6 +864,7 @@ int usb_hcd_init()
   err = usb_hcd_start();
   CHECK_ERR("hcd start failed");
   usb_xfer_queue_init();
+  spinlock_init(&usb_devices_lock);
 
   err = usb_hcd_attach_root_hub();
   CHECK_ERR("attach root hub failed");
@@ -1034,4 +1050,16 @@ int hcd_endpoint_set_feature(struct usb_hcd_endpoint *ep, int feature)
 void usb_hcd_print_intr_regs(void)
 {
   dwc2_print_intr_regs();
+}
+
+void usb_hcd_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg)
+{
+  int irqflags;
+  struct usb_hcd_device *d;
+  spinlock_lock_disable_irq(&usb_devices_lock, irqflags);
+  list_for_each_entry(d, &usb_devices, usb_devices) {
+    if (fn(d, fn_arg) == USB_HCD_ITER_STOP)
+      break;
+  }
+  spinlock_unlock_restore_irq(&usb_devices_lock, irqflags);
 }

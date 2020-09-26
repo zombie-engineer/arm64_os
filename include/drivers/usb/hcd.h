@@ -102,6 +102,7 @@ static inline struct usb_hcd_endpoint *hcd_interface_get_endpoint(struct usb_hcd
 
 struct usb_hcd_device {
   struct list_head STATIC_SLOT_OBJ_FIELD(usb_hcd_device);
+  struct list_head usb_devices;
 
   /*
    * unique address one of 127 addresses, assigned at transition
@@ -263,3 +264,7 @@ int usb_hcd_start();
 int usb_hcd_set_log_level(int);
 
 void usb_hcd_print_intr_regs(void);
+
+#define USB_HCD_ITER_CONTINUE 0
+#define USB_HCD_ITER_STOP     1
+void usb_hcd_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg);

@@ -33,3 +33,10 @@ void usb_hcd_get_topo_addr(const struct usb_hcd_device *d, struct usb_topo_addr 
 int usb_topo_addr_to_string(char *buf, int bufsz, const struct usb_topo_addr *ta);
 
 struct usb_hcd_device *usbd_find_device_by_topo_addr(const struct usb_topo_addr *ta);
+
+/*
+ * List all usb devices and apply function fn to each device
+ */
+#define USB_ITER_CONTINUE 0
+#define USB_ITER_STOP     1
+void usb_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg);

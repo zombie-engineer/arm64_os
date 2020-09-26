@@ -191,3 +191,7 @@ int usb_topo_addr_to_string(char *buf, int bufsz, const struct usb_topo_addr *ta
   return n;
 }
 
+void usb_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg)
+{
+  usb_hcd_iter_devices(fn, fn_arg);
+}
