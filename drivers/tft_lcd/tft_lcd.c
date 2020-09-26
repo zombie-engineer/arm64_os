@@ -207,6 +207,38 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 #undef HI8
 }
 
+#include <drivers/usb/usbd.h>
+#include <drivers/usb/hcd.h>
+#include <drivers/usb/usb_mass_storage.h>
+
+struct usb_find_device_fn_arg {
+  hcd_mass_t *device;
+};
+
+int usb_find_device_fn(struct usb_hcd_device *d, void *priv)
+{
+  struct usb_find_device_fn_arg *arg = priv;
+  hcd_mass_t *m = NULL;
+  if (m || arg);
+  printf("---------------- %p", d);
+  // m = usb_hcd_device_to_mass(d);
+  // if (d->
+  return USB_ITER_CONTINUE;
+}
+
+void OPTIMIZED display_payload(int gpio_pin_dc)
+{
+  int i;
+  struct usb_find_device_fn_arg arg = { 0 };
+  wait_msec(10 * 1000);
+  for (i = 0; i < 10; ++i) {
+    usb_iter_devices(usb_find_device_fn, &arg);
+    if (!arg.device)
+      printf("Failed to find mass storage device\r\n");
+    wait_msec(10 * 1000);
+  }
+}
+
 void OPTIMIZED clear_screen(int gpio_pin_dc)
 {
   char data_rgb[3] = { 0, 0, 0xff };
@@ -353,6 +385,7 @@ void OPTIMIZED tft_lcd_init(void)
   if (0)
     clear_screen2(gpio_pin_dc);
   clear_screen(gpio_pin_dc);
+  display_payload(gpio_pin_dc);
   {
     int x = 0, y = 0;
     int g = 0;
