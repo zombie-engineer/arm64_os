@@ -60,6 +60,7 @@ void hexdump_memory_ex(const char *tag, int line_width, const void *addr, size_t
   while(sz) {
     last_sz = min(line_width, sz);
     puts(tag);
+    puts(" ");
     __hexdump_line(ptr, last_sz);
     ptr += last_sz;
     sz -= last_sz;
