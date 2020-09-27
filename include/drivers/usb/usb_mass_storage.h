@@ -37,3 +37,5 @@ struct usb_hcd_device_class_mass *usb_hcd_allocate_mass();
 void usb_hcd_deallocate_mass(struct usb_hcd_device_class_mass *h);
 
 void usb_hcd_mass_init();
+
+int usb_mass_read(hcd_mass_t *m, uint32_t offset, void *data_dst, int data_sz);

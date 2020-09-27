@@ -377,14 +377,14 @@ int hcd_transfer_bulk(
 
   transfer_id++;
   pipe->ep_type = USB_ENDPOINT_TYPE_BULK;
-  HCDLOG("hcd_transfer_bulk:pipe:%p,type:%d,hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
+  HCDDEBUG("hcd_transfer_bulk:pipe:%p,type:%d,hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
     pipe, pipe->ls_hub_port, pipe->speed, pipe->ep_type,
     direction == USB_DIRECTION_OUT ? "out" : "in",
     transfer_id, transfer_size, *pid);
 
   jc = usb_xfer_jobchain_create();
   jc->nak_retries = 0;
-  jc->wait_interval_ms = 200;
+  // jc->wait_interval_ms = 2;
   if (IS_ERR(jc)) {
     err = PTR_ERR(jc);
     jc = NULL;
@@ -412,24 +412,25 @@ int hcd_transfer_bulk(
    * DMA could read it from RAM.
    */
   if (direction == USB_DIRECTION_OUT) {
-    hexdump_memory_ex("HCD_BULK_OUT: ", 16, addr, transfer_size);
+    // hexdump_memory_ex("HCD_BULK_OUT: ", 16, addr, transfer_size);
     dcache_flush(addr, transfer_size);
   }
 
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed) {
-    wait_msec(100);
-    if (wait_timeout++ > 20) {
+    if (wait_timeout++ > 100) {
       jc->err = ERR_OK;
-      dwc2_print_tsize();
+      // dwc2_print_tsize();
       break;
     }
     asm volatile("wfe");
-    dwc2_print_tsize();
+    // putc('.');
+    // wait_msec(100);
+    // dwc2_print_tsize();
   }
   err = jc->err;
-  printf("BULK completed: err=%d\r\n", err);
+  // printf("BULK completed: err=%d\r\n", err);
   if (err)
     goto out_err;
 
@@ -442,7 +443,7 @@ int hcd_transfer_bulk(
    */
   if (direction == USB_DIRECTION_IN) {
     dcache_flush(addr, transfer_size);
-    hexdump_memory_ex("HCD_BULK_IN: ", 16, addr, transfer_size);
+    // hexdump_memory_ex("HCD_BULK_IN: ", 16, addr, transfer_size);
   }
 
   return ERR_OK;

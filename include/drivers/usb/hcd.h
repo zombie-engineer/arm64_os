@@ -141,9 +141,24 @@ struct usb_hcd_device {
   char string_configuration[64];
 };
 
+static inline int hcd_device_get_class(struct usb_hcd_device *d)
+{
+  return d->class ? d->class->device_class : -1;
+}
+
 static inline int hcd_endpoint_get_address(struct usb_hcd_endpoint *ep)
 {
   return ep->device->address;
+}
+
+static inline int hcd_device_get_num_interfaces(struct usb_hcd_device *d)
+{
+  return d->num_interfaces;
+}
+
+static inline int hcd_device_get_state(struct usb_hcd_device *d)
+{
+  return d->state;
 }
 
 static inline int usb_hcd_get_interface_class(struct usb_hcd_device *d, int interface_num)

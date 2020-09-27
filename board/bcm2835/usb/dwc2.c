@@ -663,7 +663,7 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(old_intr);
   if (!xfer_complete) {
     puts("NOT xfer_completed\r\n");
-    return;
+    // return;
   }
 
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -696,22 +696,35 @@ static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *
 }
 
 volatile int xx = 0;
-static inline void dwc2_irq_handle_channel_int_one(int ch_id)
+
+#if 0
+static inline void dwc2_irq_handle_channel_int_one_dbg(int ch_id, int intr)
 {
-  uint32_t intr, intrmsk;
-  struct dwc2_channel *c;
-  c = dwc2_channel_get_by_id(ch_id);
-  GET_INTR();
+  uint32_t intrmsk;
   GET_INTRMSK();
-  SET_INTR();
-  wait_msec(50);
   DWCDEBUG2("channel %d irq(hcint): int: %08x & mask %08x = %08x, int#:%d#",
     ch_id, intr,
     intrmsk, intr & intrmsk, xx);
 
   if (xx++ == 400) {
+    printf("HALTING 666777\r\n");
     while(xx);
   }
+}
+#endif
+
+static inline void dwc2_irq_handle_channel_int_one(int ch_id)
+{
+  uint32_t intr;
+  struct dwc2_channel *c;
+  c = dwc2_channel_get_by_id(ch_id);
+  GET_INTR();
+  SET_INTR();
+  wait_msec(1);
+
+#if 0
+  dwc2_irq_handle_channel_int_one_dbg(ch_id, intr);
+#endif
 
   if (USB_HOST_INTR_GET_HALT(intr)) {
     dwc2_irq_handle_channel_halt(c, intr);

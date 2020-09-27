@@ -232,6 +232,7 @@ int usb_hub_power_on_ports(usb_hub_t *h)
   err = ERR_OK;
 	HUBDBG("powering on all %d ports", h->descriptor.port_count);
   for (port = 0; port < h->descriptor.port_count; ++port) {
+    wait_msec(100);
 	  HUBPORTDBG("powering on port");
     err = usb_hub_port_power_on(h, port);
     if (err != ERR_OK) {
