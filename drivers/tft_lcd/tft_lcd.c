@@ -339,37 +339,90 @@ void OPTIMIZED clear_screen(int gpio_pin_dc)
   }
 }
 
+/*
+ * tft_fill_rect
+ * gpio_pin_dc - used in SPI macro to send command
+ * x0, x1 - range of fill from [x0, x1), x1 not included
+ * x1, x2 - range of fill from [y0, y1), y1 not included
+ * r,g,b  - obviously color components of fill
+ *
+ * Speed: optimized version is using 3 64-bit values to compress rgb inside of them
+ * this way 3 stores of 64bit words substitute 8 * 3 = 24 char stores, which are slower
+ * anyway even in 1:1 compare.
+ * Counts are incremented 19200000 per second = 19.2MHz
+ * Rates are:
+ * - buffer fill with chars                 : 269449  (0.014  sec) (14 millisec)
+ * - buffer fill with 64-bitwords           : 16817   (0.0008 sec) (0.800 millisec)
+ * - buffer transfer via SPI CLK=34 no DLEN : 5414663 (0.2820 sec) (280 millisec)
+ * - buffer transfer via SPI CLK=34         : 4813039 (0.2506 sec) (250 millisec)
+ * - buffer transfer via SPI CLK=32         : 4529939 (0.2359 sec) (239 millisec)
+ * - buffer transfer via SPI CLK=24         : 3397452 (0.1769 sec) (176 millisec)
+ * - buffer transfer via SPI CLK=16         : 2501551 (0.1302 sec) (130 millisec)
+ * - buffer transfer via SPI CLK=8          : 2194014 (0.1142 sec) (114 millisec) < best
+ * - buffer transfer via SPI CLK=4          : 2448441 (0.1275 sec) (127 millisec)
+ * DLEN = 2 gives a considerable optimization
+ */
 void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, char r, char g, char b)
 {
   char canvas[DISPLAY_WIDTH * DISPLAY_HEIGHT * 3] ALIGNED(64);
   int y, x;
   int local_width, local_height;
   char *c;
+  uint64_t t1, t2;
 
   local_width = x1 - x0;
   local_height = y1 - y0;
-  c = canvas;
+  if (local_width * local_height > 8) {
+    uint64_t v1, v2, v3, iters;
+    uint64_t *p;
+#define BP(v, p) ((uint64_t)v << (p * 8))
+    v1 = BP(r, 0) | BP(g, 1) | BP(b, 2) | BP(r, 3) | BP(g, 4) | BP(b, 5) | BP(r, 6) | BP(g, 7);
+    v2 = BP(b, 0) | BP(r, 1) | BP(g, 2) | BP(b, 3) | BP(r, 4) | BP(g, 5) | BP(b, 6) | BP(r, 7);
+    v3 = BP(g, 0) | BP(b, 1) | BP(r, 2) | BP(g, 3) | BP(b, 4) | BP(r, 5) | BP(g, 6) | BP(b, 7);
+#undef BP
+    // printf("%016llx:%016llx:%016llx\r\n", v1, v2, v3);
+    iters = local_width * local_height / 8;
 
-  for (x = 0; x < local_width; ++x) {
-    for (y = 0; y < local_height; ++y) {
-      c = canvas + (y * local_width + x) * 3;
-      *(c++) = r;
-      *(c++) = g;
-      *(c++) = b;
+    p = (uint64_t *)canvas;
+    // t1 = read_cpu_counter_64();
+    while(iters--) {
+      // printf("iters = %d\r\n", iters);
+      *p++ = v1;
+      *p++ = v2;
+      *p++ = v3;
     }
+    // t2 = read_cpu_counter_64();
+    // printf("iters = %d, lw:%d, lh:%d, count: %lld\r\n", iters, local_width, local_height, t2-t1);
+    // count = 16817
+  } else {
+    c = canvas;
+    // t1 = read_cpu_counter_64();
+    for (x = 0; x < local_width; ++x) {
+      for (y = 0; y < local_height; ++y) {
+        c = canvas + (y * local_width + x) * 3;
+        *(c++) = r;
+        *(c++) = g;
+        *(c++) = b;
+      }
+    }
+    // t2 = read_cpu_counter_64();
+    // printf("count: %lld\r\n", t2-t1); count = 269449
   }
-
- tft_set_region_coords(gpio_pin_dc, x0, y0, x1, y1);
- SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, canvas, local_width * local_height * 3);
+  tft_set_region_coords(gpio_pin_dc, x0, y0, x1, y1);
+  t1 = read_cpu_counter_64();
+  SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, canvas, local_width * local_height * 3);
+  t2 = read_cpu_counter_64();
+  // printf("%lld\r\n", get_cpu_counter_64_freq());
+  printf("output: %lld\r\n", t2-t1); // count = 4813039
 }
 
 void OPTIMIZED clear_screen2(int gpio_pin_dc)
 {
-  // int i;
-  printf("hello\r\n");
+  // while(1) {
   tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, 255);
   tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 255, 0, 0);
   tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 255, 0);
+  // }
 }
 
 #if 0
@@ -453,7 +506,7 @@ void OPTIMIZED tft_lcd_init(void)
   gpio_set_off(gpio_pin_reset);
 
   *SPI_CS = SPI_CS_CLEAR_TX | SPI_CS_CLEAR_RX;
-  *SPI_CLK = 34;
+  *SPI_CLK = 8;
   *SPI_DLEN = 2;
 
   gpio_set_on(gpio_pin_reset);
@@ -468,6 +521,13 @@ void OPTIMIZED tft_lcd_init(void)
   SEND_CMD(ILI9341_CMD_SOFT_RESET);
   wait_msec(5);
   SEND_CMD(ILI9341_CMD_DISPLAY_OFF);
+
+//  char data[8];
+//  data[0] = 0x39;
+//  data[1] = 0x2c;
+//  data[2] = 0x34;
+//  data[3] = 0x02;
+//  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
 
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
