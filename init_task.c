@@ -39,8 +39,12 @@ static int run_uart_thread()
 int usb_init_func()
 {
   usbd_init();
-  usbd_print_device_tree();
-  usbd_monitor();
+  // usbd_print_device_tree();
+  tft_lcd_init();
+  // usbd_monitor();
+  while(1) {
+    asm volatile("wfe");
+  }
 
   while(1) {
     blink_led_2(12, 100);
@@ -113,8 +117,8 @@ static void scheduler_startup_idle(void)
 
   s->sched_timer = timer_get(TIMER_ID_ARM_GENERIC_TIMER);
   mmu_enable_configured();
-  if (get_cpu_num() == 1)
-    tft_lcd_init();
+  // if (get_cpu_num() == 1)
+  //  tft_lcd_init();
   printf("startup idle on cpu: %d\n", get_cpu_num());
   t = task_create(idle, "idle");
   BUG(IS_ERR(t), "failed to create idle task");
