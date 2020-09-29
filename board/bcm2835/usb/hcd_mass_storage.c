@@ -199,20 +199,8 @@ int usb_cbw_transfer(hcd_mass_t *m,
 
   struct csw status ALIGNED(4);
 
-  struct usb_hcd_pipe p ALIGNED(4) = {
-    .address         = hcd_endpoint_get_address(m->ep_out),
-    .ep              = hcd_endpoint_get_number(m->ep_out),
-    .speed           = m->d->pipe0.speed,
-    .max_packet_size = hcd_endpoint_get_max_packet_size(m->ep_out),
-    .ls_hub_port     = m->d->pipe0.ls_hub_port,
-    .ls_hub_address  = m->d->pipe0.ls_hub_address,
-    .ep_type         = USB_ENDPOINT_TYPE_BULK,
-  };
-
   char cmdbuf[31] ALIGNED(512);
   int retries = 5;
-
-  usb_pid_t *next_pid;// = &m->ep_out->next_toggle_pid;
 
   if (cbw_log_level >= LOG_LEVEL_DEBUG)
     usb_cbw_transfer_debug_send_cbw(m, lun, cmd, cmdsz, datasz, data_direction);
@@ -226,34 +214,23 @@ int usb_cbw_transfer(hcd_mass_t *m,
   dcache_flush(cmdbuf, sizeof(cmdbuf));
 
 retry:
-  p.ep = hcd_endpoint_get_number(m->ep_out),
-  next_pid = &next_pids[USB_DIRECTION_OUT];
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_OUT, cmdbuf, sizeof(cmdbuf), next_pid, &num_bytes);
+  err = hcd_transfer_bulk(m->ep_out, cmdbuf, sizeof(cmdbuf), &num_bytes);
   CHECK_RETRYABLE_ERROR("OUT:CBW");
-  next_pid_toggle(next_pid);
 
   if (data && datasz) {
-    if (data_direction == USB_DIRECTION_IN) {
-      p.ep = hcd_endpoint_get_number(m->ep_in);
-      // next_pid = &m->ep_in->next_toggle_pid;
-      next_pid = &next_pids[USB_DIRECTION_IN];
-    }
-    err = hcd_transfer_bulk(&p, data_direction, data, datasz, next_pid, &num_bytes);
+    err = hcd_transfer_bulk(
+      data_direction == USB_DIRECTION_OUT ? m->ep_out : m->ep_in,
+      data, datasz, &num_bytes);
     CHECK_RETRYABLE_ERROR("INOUT:DATA");
-    next_pid_toggle(next_pid);
   }
   if (cbw_log_level >= LOG_LEVEL_DEBUG2) {
     CBW_DBG2("transfer complete: ");
     CBW_DBG2_DUMP(data, datasz);
   }
 
-  p.ep = hcd_endpoint_get_number(m->ep_in);
-  // next_pid = &m->ep_in->next_toggle_pid;
-  next_pid = &next_pids[USB_DIRECTION_IN];
   memset(&status, 0, sizeof(status));
-  err = hcd_transfer_bulk(&p, USB_DIRECTION_IN, &status, sizeof(status), next_pid, &num_bytes);
+  err = hcd_transfer_bulk(m->ep_in, &status, sizeof(status), &num_bytes);
   CHECK_RETRYABLE_ERROR("IN:CSW");
-  next_pid_toggle(next_pid);
 
   if (!is_csw_valid(&status, num_bytes, tag)) {
     err = ERR_GENERIC;
@@ -313,12 +290,12 @@ static int usb_mass_read10(hcd_mass_t *m,
   cmd.opcode = SCSI_OPCODE_READ_10;
   set_unaligned_32_le(&cmd.lba, offset / 512);
   set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
-  MASSDBG("READ(10) %08x", offset);
+  MASSLOG("READ(10) offset:%08x, size:%08x", offset, data_sz);
   // usb_mass_set_log_level(10);
   // usb_hcd_set_log_level(10);
-  // dwc2_set_log_level(10);
+  dwc2_set_log_level(10);
 
-  memset(data_dst, 0, data_sz);
+  // memset(data_dst, 0, data_sz);
   err = usb_cbw_transfer(m, 2, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz, &csw_status);
   CHECK_ERR("READ(10) command failed");
 out_err:

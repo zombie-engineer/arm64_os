@@ -301,17 +301,24 @@ void OPTIMIZED display_payload(int gpio_pin_dc)
   memset(buf, 0, sizeof(buf));
   dcache_flush(m, sizeof(*m));
   dcache_flush(m->d, sizeof(*(m->d)));
+  memset(tft_lcd_canvas, 0, sizeof(tft_lcd_canvas));
 
   tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
-  for (i = 0; i < 450; ++i) {
+  for (i = 0; i < sizeof(tft_lcd_canvas) / 1024; ++i) {
     //printf("reading i:%d, offset:%d\r\n", i, i * 512);
-    err = usb_mass_read(arg.mass_device, i * 512, tft_lcd_canvas, 512);
+    err = usb_mass_read(arg.mass_device, i * 1024, tft_lcd_canvas + i * 1024, 1024);
+    hexdump_memory(tft_lcd_canvas, 1024);
     if (err != ERR_OK) {
       printf("tft_lcd: failed to read mass storage device\r\n");
       goto err;
     }
-    SEND_CMD_DATA(ILI9341_CMD_WRITE_MEMORY_CONTINUE, tft_lcd_canvas, 512);
+    if (*(uint64_t *)(tft_lcd_canvas + i * 512) == 0) {
+      printf("tft_lcd: buf is zero at i=%d\r\n", i);
+    }
+    break;
   }
+  SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, tft_lcd_canvas, sizeof(tft_lcd_canvas));
+    while(1);
   puts("end\r\n");
   while(1);
   ptr = tft_lcd_canvas;
@@ -362,19 +369,46 @@ void OPTIMIZED clear_screen(int gpio_pin_dc)
  * - buffer transfer via SPI CLK=4          : 2448441 (0.1275 sec) (127 millisec)
  * DLEN = 2 gives a considerable optimization
  */
+
+#define fastfill(__dst, __count, __v1, __v2, __v3) \
+  asm volatile(\
+    "mov x0, %0\n"\
+    "to .req x0\n"\
+    "mov x1, #3\n"\
+    "mul x1, x1, %1\n"\
+    "add x1, x0, x1, lsl 3\n"\
+    "to_end .req x1\n"\
+    "mov x2, %2\n"\
+    "val1 .req x2\n"\
+    "mov x3, %3\n"\
+    "val2 .req x3\n"\
+    "mov x4, %4\n"\
+    "val3 .req x4\n"\
+    "1:\n"\
+    "stp val1, val2, [to], #16\n"\
+    "str val3, [to], #8\n"\
+    "cmp to, to_end\n"\
+    "bne 1b\n"\
+    ".unreq to\n"\
+    ".unreq to_end\n"\
+    ".unreq val1\n"\
+    ".unreq val2\n"\
+    ".unreq val3\n"\
+    ::"r"(__dst), "r"(__count), "r"(__v1), "r"(__v2), "r"(__v3): "x0", "x1", "x2", "x3", "x4")
+
 void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, char r, char g, char b)
 {
   char canvas[DISPLAY_WIDTH * DISPLAY_HEIGHT * 3] ALIGNED(64);
   int y, x;
   int local_width, local_height;
   char *c;
-  uint64_t t1, t2;
+//  uint64_t t1, t2;
 
   local_width = x1 - x0;
   local_height = y1 - y0;
   if (local_width * local_height > 8) {
     uint64_t v1, v2, v3, iters;
-    uint64_t *p;
+ //   volatile uint64_t *p;
 #define BP(v, p) ((uint64_t)v << (p * 8))
     v1 = BP(r, 0) | BP(g, 1) | BP(b, 2) | BP(r, 3) | BP(g, 4) | BP(b, 5) | BP(r, 6) | BP(g, 7);
     v2 = BP(b, 0) | BP(r, 1) | BP(g, 2) | BP(b, 3) | BP(r, 4) | BP(g, 5) | BP(b, 6) | BP(r, 7);
@@ -383,16 +417,17 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
     // printf("%016llx:%016llx:%016llx\r\n", v1, v2, v3);
     iters = local_width * local_height / 8;
 
-    p = (uint64_t *)canvas;
-    // t1 = read_cpu_counter_64();
-    while(iters--) {
-      // printf("iters = %d\r\n", iters);
-      *p++ = v1;
-      *p++ = v2;
-      *p++ = v3;
-    }
-    // t2 = read_cpu_counter_64();
-    // printf("iters = %d, lw:%d, lh:%d, count: %lld\r\n", iters, local_width, local_height, t2-t1);
+//    p = (uint64_t *)canvas;
+//    t1 = read_cpu_counter_64();
+    fastfill(canvas, iters, v1, v2, v3);
+//    while(iters--) {
+//      // printf("iters = %d\r\n", iters);
+//      *p++ = v1;
+//      *p++ = v2;
+//      *p++ = v3;
+//    }
+//    t2 = read_cpu_counter_64();
+//    printf("iters = %d, lw:%d, lh:%d, count: %lld\r\n", iters, local_width, local_height, t2-t1);
     // count = 16817
   } else {
     c = canvas;
@@ -408,21 +443,18 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
     // t2 = read_cpu_counter_64();
     // printf("count: %lld\r\n", t2-t1); count = 269449
   }
+  // hexdump_memory_ex("-", 24, canvas, sizeof(canvas));
   tft_set_region_coords(gpio_pin_dc, x0, y0, x1, y1);
-  t1 = read_cpu_counter_64();
+//  t1 = read_cpu_counter_64();
   SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, canvas, local_width * local_height * 3);
-  t2 = read_cpu_counter_64();
+//  t2 = read_cpu_counter_64();
   // printf("%lld\r\n", get_cpu_counter_64_freq());
-  printf("output: %lld\r\n", t2-t1); // count = 4813039
+//  printf("output: %lld\r\n", t2-t1); // count = 4813039
 }
 
 void OPTIMIZED clear_screen2(int gpio_pin_dc)
 {
-  // while(1) {
   tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, 255);
-  tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 255, 0, 0);
-  tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 255, 0);
-  // }
 }
 
 #if 0
@@ -494,6 +526,7 @@ void OPTIMIZED tft_lcd_init(void)
 
   const int gpio_pin_dc    = 25;
   const int gpio_pin_reset = 24;
+ // clear_screen2(gpio_pin_dc);
 
   gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
@@ -532,6 +565,7 @@ void OPTIMIZED tft_lcd_init(void)
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
   SEND_CMD(ILI9341_CMD_DISPLAY_ON);
+  wait_msec(120);
 //  while(1) {
 //    RECV_CMD_DATA(ILI9341_CMD_READ_ID, data, 2);
 //    wait_usec(10);

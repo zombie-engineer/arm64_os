@@ -4,6 +4,7 @@
 #include <usb/usb_pid.h>
 #include <usb/usb_printers.h>
 #include <memory/static_slot.h>
+#include <usb/usb_descriptor_helpers.h>
 
 /*
  * Looks like the device class is not really needed
@@ -28,23 +29,24 @@ extern struct usb_hcd_device *root_hub;
 #define HCDLOGPREFIX(__log_level) "[USBHCD "#__log_level"] "
 
 #define HCDLOG(__fmt, ...)     printf(HCDLOGPREFIX(INFO) __fmt __endline, ##__VA_ARGS__)
-#define HCDERR(__fmt, ...)     logf(HCDLOGPREFIX(ERR), "err: %d: "__fmt, err, ##__VA_ARGS__)
+#define HCDERR(__fmt, ...)     logf(HCDLOGPREFIX(ERR), "%s: err: %d: "__fmt, __func__, err, ##__VA_ARGS__)
 #define HCDDEBUG(__fmt, ...)   if (usb_hcd_log_level)\
-                               printf(HCDLOGPREFIX(DBG) __fmt __endline, ##__VA_ARGS__)
+                               printf(HCDLOGPREFIX(DBG) "%s: " __fmt __endline, __func__, ##__VA_ARGS__)
 #define HCDDEBUG2(__fmt, ...)  if (usb_hcd_log_level > 1)\
-                                 printf(HCDLOGPREFIX(DBG) __fmt __endline, ##__VA_ARGS__)
-#define HCDWARN(__fmt, ...)    logf(HCDLOGPREFIX(WARN), __fmt, ##__VA_ARGS__)
+                                 printf(HCDLOGPREFIX(DBG) "%s: " __fmt __endline, __func__, ##__VA_ARGS__)
+#define HCDWARN(__fmt, ...)    logf(HCDLOGPREFIX(WARN), "%s: "__fmt, __func__, ##__VA_ARGS__)
 
 struct usb_hcd_pipe {
-  int address;
-  int ep;
-  int ep_type;
-  int ep_dir;
-  int speed;
+  int device_address;
+  int device_speed;
+  int endpoint_num;
+  int endpoint_type;
+  int endpoint_dir;
   int max_packet_size;
   int ls_hub_port;
   int ls_hub_address;
   int channel;
+  usb_pid_t next_pid;
 };
 
 struct usb_hcd_device_class_base {
@@ -59,22 +61,27 @@ struct usb_hcd_device_location {
 struct usb_hcd_endpoint {
   struct usb_hcd_device *device;
   struct usb_endpoint_descriptor descriptor ALIGNED(4);
-  usb_pid_t next_toggle_pid;
+  struct usb_hcd_pipe pipe;
 };
 
 static inline int hcd_endpoint_get_number(struct usb_hcd_endpoint *ep)
 {
-  return ep->descriptor.endpoint_address & 0x7f;
+  return usb_endpoint_descriptor_get_number(&ep->descriptor);
 }
 
 static inline int hcd_endpoint_get_direction(struct usb_hcd_endpoint *ep)
 {
-  return ep->descriptor.endpoint_address & 0x80;
+  return usb_endpoint_descriptor_get_direction(&ep->descriptor);
 }
 
 static inline int hcd_endpoint_get_max_packet_size(struct usb_hcd_endpoint *ep)
 {
-  return ep->descriptor.max_packet_size;
+  return usb_endpoint_descriptor_get_max_packet_size(&ep->descriptor);
+}
+
+static inline int hcd_endpoint_get_type(struct usb_hcd_endpoint *ep)
+{
+  return usb_endpoint_descriptor_get_type(&ep->descriptor);
 }
 
 int hcd_endpoint_clear_feature(struct usb_hcd_endpoint *ep, int feature);
@@ -262,14 +269,11 @@ int hcd_transfer_interrupt(
  * direction: IN/OUT
  * buf: source/desctination
  * sz: transfer size
- * pid: PID packet type to provide. Will be overwritten by next pid
  */
 int hcd_transfer_bulk(
-  struct usb_hcd_pipe *pipe,
-  int direction,
+  struct usb_hcd_endpoint *ep,
   void *buf,
   int sz,
-  usb_pid_t *pid,
   int *out_num_bytes);
 
 int usb_hcd_init();

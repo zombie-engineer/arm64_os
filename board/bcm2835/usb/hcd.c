@@ -85,9 +85,9 @@ static inline void print_usb_device(struct usb_hcd_device *dev)
       dev->location.hub,
       dev->location.hub_port,
       dev->pipe0.max_packet_size,
-      dev->pipe0.speed,
-      dev->pipe0.ep,
-      dev->pipe0.address,
+      dev->pipe0.device_speed,
+      dev->pipe0.endpoint_num,
+      dev->pipe0.device_address,
       dev->pipe0.ls_hub_address,
       dev->pipe0.ls_hub_port
       );
@@ -112,7 +112,7 @@ struct usb_hcd_device *usb_hcd_allocate_device()
   dev->location.hub = NULL;
   dev->location.hub_port = 0;
   dev->class = NULL;
-  dev->pipe0.address = 0;
+  dev->pipe0.device_address = 0;
   INIT_LIST_HEAD(&dev->hub_children);
   INIT_LIST_HEAD(&dev->usb_devices);
   spinlock_lock_disable_irq(&usb_devices_lock, irqflags);
@@ -201,18 +201,11 @@ int usb_hcd_read_string_descriptor(struct usb_hcd_pipe *pipe, int string_index, 
   struct usb_descriptor_header *header;
   char desc_buffer[256] ALIGNED(4);
   uint16_t lang_ids[96] ALIGNED(4);
-  // HCDLOG("reading string with index %d", string_index);
   GET_DESC(pipe, STRING,            0,     0,    lang_ids, sizeof(lang_ids)   );
   GET_DESC(pipe, STRING, string_index, 0x409, desc_buffer, sizeof(desc_buffer));
 
   header = (struct usb_descriptor_header *)desc_buffer;
-  // HCDLOG("string read to %p, size: %d", header, header->length);
-  // hexdump_memory(desc_buffer, header->length);
-
   wtomb(buf, buf_sz, desc_buffer + 2, header->length - 2);
-  // buf[((header->length - 2) / 2) - 1] = 0;
-  // hexdump_memory(buf, buf_sz);
-  // HCDLOG("string:%s", buf);
 out_err:
   return err;
 }
@@ -265,7 +258,6 @@ out_err:
 static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *cfgbuf, int cfgbuf_sz)
 {
   const struct usb_descriptor_header *hdr;
-
   struct usb_hcd_interface *i = NULL;
   struct usb_hcd_interface *end_i = dev->interfaces + USB_MAX_INTERFACES_PER_DEVICE;
   struct usb_hcd_endpoint *ep = NULL, *end_ep = NULL;
@@ -317,18 +309,30 @@ static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *c
         }
 			  memcpy(&ep->descriptor, hdr, sizeof(struct usb_endpoint_descriptor));
         ep->device = dev;
-        ep->next_toggle_pid = USB_PID_DATA0;
+
+        ep->pipe.device_address  = dev->address;
+        ep->pipe.device_speed    = dev->pipe0.device_speed;
+        ep->pipe.ls_hub_port     = dev->pipe0.ls_hub_port;
+        ep->pipe.ls_hub_address  = dev->pipe0.ls_hub_address;
+
+        ep->pipe.max_packet_size = usb_endpoint_descriptor_get_max_packet_size(&ep->descriptor);
+        ep->pipe.endpoint_dir    = usb_endpoint_descriptor_get_direction(&ep->descriptor);
+        ep->pipe.endpoint_num    = usb_endpoint_descriptor_get_number(&ep->descriptor);
+        ep->pipe.endpoint_type   = usb_endpoint_descriptor_get_type(&ep->descriptor);
+        ep->pipe.channel         = -1;
+        ep->pipe.next_pid        = USB_PID_DATA0;
+
         HCDDEBUG("---- address:%d,interface:%d,endpoint:%d,dir:%s,attr:%02x(%s,%s,%s),packet_size:%d,int:%d",
           dev->address,
-          i->descriptor.number,
-          ep->descriptor.endpoint_address & 0x7f,
-          usb_direction_to_string(ep->descriptor.endpoint_address >> 7),
-          ep->descriptor.attributes,
-          usb_endpoint_type_to_string(ep->descriptor.attributes & 3),
-          usb_endpoint_synch_type_to_string((ep->descriptor.attributes >> 2) & 3),
-          usb_endpoint_usage_type_to_string((ep->descriptor.attributes >> 4) & 3),
-          ep->descriptor.max_packet_size,
-          ep->descriptor.interval
+          usb_interface_descriptor_get_number(&i->descriptor),
+          usb_endpoint_descriptor_get_number(&ep->descriptor),
+          usb_direction_to_string(usb_endpoint_descriptor_get_direction(&ep->descriptor)),
+          usb_endpoint_descriptor_get_attributes(&ep->descriptor),
+          usb_endpoint_type_to_string(usb_endpoint_descriptor_get_type(&ep->descriptor)),
+          usb_endpoint_synch_type_to_string(usb_endpoint_descriptor_get_sync_type(&ep->descriptor)),
+          usb_endpoint_usage_type_to_string(usb_endpoint_descriptor_get_use_type(&ep->descriptor)),
+          usb_endpoint_descriptor_get_max_packet_size(&ep->descriptor),
+          usb_endpoint_descriptor_get_interval(&ep->descriptor)
         );
         ep++;
         break;
@@ -421,8 +425,8 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev)
     HCDDEBUG("setting DEFAULT state for root hub device");
   }
 
-  dev->pipe0.address = USB_DEFAULT_ADDRESS;
-  if (dev->pipe0.speed == USB_SPEED_HIGH)
+  dev->pipe0.device_address = USB_DEFAULT_ADDRESS;
+  if (dev->pipe0.device_speed == USB_SPEED_HIGH)
     dev->pipe0.max_packet_size = 64;
   else
     dev->pipe0.max_packet_size = USB_DEFAULT_PACKET_SIZE;
@@ -442,8 +446,6 @@ static int usb_hcd_to_default_state(struct usb_hcd_device *dev)
     err = ERR_GENERIC;
     goto out_err;
   }
-
-  // print_usb_device_descriptor(&dev_desc);
 
   dev->pipe0.max_packet_size = desc.max_packet_size_0;
   dev->state = USB_DEVICE_STATE_DEFAULT;
@@ -500,7 +502,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
   err = usb_hcd_set_address(&dev->pipe0, device_address);
   CHECK_ERR_SILENT();
 
-  dev->address = dev->pipe0.address = device_address;
+  dev->address = dev->pipe0.device_address = device_address;
 
   wait_on_timer_ms(10);
   dev->state = USB_DEVICE_STATE_ADDRESSED;
@@ -767,7 +769,7 @@ static int usb_hcd_attach_root_hub()
    */
   usb_root_hub_device_number = USB_DEFAULT_ADDRESS;
   root_hub->state = USB_DEVICE_STATE_POWERED;
-  root_hub->pipe0.speed = USB_SPEED_FULL;
+  root_hub->pipe0.device_speed = USB_SPEED_FULL;
   root_hub->pipe0.max_packet_size = 64;
   err = usb_hcd_enumerate_device(root_hub);
   if (err != ERR_OK)
@@ -866,6 +868,11 @@ int usb_hcd_init()
   usb_xfer_queue_init();
   spinlock_init(&usb_devices_lock);
 
+#if 0
+  usb_hcd_set_log_level(10);
+  dwc2_set_log_level(10);
+#endif
+
   err = usb_hcd_attach_root_hub();
   CHECK_ERR("attach root hub failed");
 
@@ -956,8 +963,8 @@ static int usb_hcd_device_to_string_r(struct usb_hcd_device *dev, const char *pr
     prefix,
     dev->address,
     dev->configuration,
-    dev->pipe0.address,
-    dev->pipe0.ep,
+    dev->pipe0.device_address,
+    dev->pipe0.endpoint_num,
     dev->pipe0.max_packet_size);
   return n;
   switch (dev->class->device_class) {

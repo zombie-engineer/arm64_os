@@ -3,7 +3,6 @@
 #include <stringlib.h>
 #include "dwc2_regs.h"
 #include "dwc2_regs_bits.h"
-#include "dwc2_pipe.h"
 
 static inline void dwc2_get_core_reg_description(char *buf, int bufsz)
 {
@@ -140,16 +139,4 @@ static inline const char *dwc2_transfer_status_to_string(dwc2_transfer_status_t 
   case DWC2_STATUS_ERR: return "DWC2_STATUS_ERR";
   default: return "UNKNOWN";
   }
-}
-
-static inline int dwc2_pipe_desc_to_string(dwc2_pipe_desc_t desc, char *buf, int bufsz)
-{
-  return snprintf(buf, bufsz, "%016lx:ep:%s(%d),addr:%d,ep:%d,dir:n/a,speed:%s(%d),sz:%d,ch:%d",
-      desc.u.raw,
-      usb_endpoint_type_to_short_string(desc.u.ep_type), desc.u.ep_type,
-      desc.u.device_address, desc.u.ep_address,
-      // usb_direction_to_string(desc.u.ep_direction),
-      usb_speed_to_string(desc.u.speed), desc.u.speed,
-      desc.u.max_packet_size,
-      desc.u.dwc_channel);
 }

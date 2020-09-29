@@ -123,21 +123,18 @@ static int usb_hub_port_connected(usb_hub_t *h, int port)
   HUBPORTDBG("status: %04x:%04x", port_status.status, port_status.change);
 
 	if (port_status.status.high_speed)
-    port_dev->pipe0.speed = USB_SPEED_HIGH;
-  else if (port_status.status.low_speed) {
-		port_dev->pipe0.speed = USB_SPEED_LOW;
-    HUBPORTDBG("low speed device");
-	}
-	else {
-    port_dev->pipe0.speed = USB_SPEED_FULL;
-    HUBPORTDBG("full speed device");
-  }
+    port_dev->pipe0.device_speed = USB_SPEED_HIGH;
+  else if (port_status.status.low_speed)
+		port_dev->pipe0.device_speed = USB_SPEED_LOW;
+	else
+    port_dev->pipe0.device_speed = USB_SPEED_FULL;
+
+  HUBPORTDBG("device speed: %s", usb_speed_to_string(port_dev->pipe0.device_speed));
+
   if (!port_status.status.high_speed) {
 		port_dev->pipe0.ls_hub_address = h->d->address;
 		port_dev->pipe0.ls_hub_port = port;
   }
-
-  HUBPORTDBG("device speed: %s(%d)", usb_speed_to_string(port_dev->pipe0.speed));
 
   err = usb_hcd_enumerate_device(port_dev);
   if (err != ERR_OK) {

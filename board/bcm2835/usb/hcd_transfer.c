@@ -12,7 +12,8 @@ static inline void hcd_transfer_control_prologue(struct usb_hcd_pipe *pipe, uint
   char rq_desc[256];
   if (usb_hcd_log_level) {
     usb_rq_get_description(rq, rq_desc, sizeof(rq_desc));
-    HCDDEBUG("SUBMIT: device_address:%d, max_packet:%d, ep:%d, req:%s", pipe->address, pipe->max_packet_size, pipe->ep, rq_desc);
+    HCDDEBUG("SUBMIT: device_address:%d, max_packet:%d, ep:%d, req:%s", pipe->device_address,
+      pipe->max_packet_size, pipe->endpoint_num, rq_desc);
   }
 }
 
@@ -45,7 +46,7 @@ out_err:
   return err;
 }
 
-static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *jc, int pid, int dir, void *addr, int transfer_size)
+static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *jc, int dir, void *addr, int transfer_size, usb_pid_t next_pid)
 {
   struct usb_xfer_job *j;
   j = usb_xfer_job_create();
@@ -53,11 +54,11 @@ static inline struct usb_xfer_job *usb_xfer_job_prep(struct usb_xfer_jobchain *j
   if (IS_ERR(j))
     return j;
 
-  j->pid = pid;
   j->addr = addr;
   j->transfer_size = transfer_size;
   j->direction = dir;
   j->jc = jc;
+  j->next_pid = next_pid;
   return j;
 }
 
@@ -76,7 +77,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   jc->wait_interval_ms = 0;
 
   /* SETUP packet */
-  j = usb_xfer_job_prep(jc, USB_PID_SETUP, USB_DIRECTION_OUT, request, sizeof(*request));
+  j = usb_xfer_job_prep(jc, USB_DIRECTION_OUT, request, sizeof(*request), USB_PID_SETUP);
   if (IS_ERR(j)) {
     err = PTR_ERR(j);
     goto out_err;
@@ -86,7 +87,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
 
   /* DATA packet */
   if (addr) {
-    j = usb_xfer_job_prep(jc, USB_PID_DATA1, direction, addr, transfer_size);
+    j = usb_xfer_job_prep(jc, direction, addr, transfer_size, USB_PID_DATA1);
     if (IS_ERR(j)) {
       err = PTR_ERR(j);
       goto out_err;
@@ -101,7 +102,7 @@ static inline struct usb_xfer_jobchain *usb_xfer_jobchain_prep_control(uint64_t 
   else
     ack_direction = USB_DIRECTION_IN;
 
-  j = usb_xfer_job_prep(jc, USB_PID_DATA1, ack_direction, NULL, 0);
+  j = usb_xfer_job_prep(jc, ack_direction, NULL, 0, USB_PID_DATA1);
   if (IS_ERR(j)) {
     err = PTR_ERR(j);
     goto out_err;
@@ -164,15 +165,19 @@ int hcd_transfer_control(
   struct usb_xfer_jobchain *jc;
   uint64_t rqbuf ALIGNED(64) = rq;
 
-  if (pipe->address == usb_root_hub_device_number)
+  if (pipe->device_address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
 
   transfer_id++;
 
-  HCDDEBUG("hcd_transfer_control, pipe:%p, hub_port:%d, speed:%d, dir:%s, id:%d, rq:%016llx",
-    pipe, pipe->ls_hub_port, pipe->speed,
-    direction == USB_DIRECTION_OUT ? "out" : "in",
-    transfer_id, rq);
+  HCDDEBUG("pipe:%p, hub_port:%d, speed:%d(%s), dir:%s, id:%d, pid:%s, rq:%016llx",
+    pipe,
+    pipe->ls_hub_port,
+    pipe->device_speed, usb_speed_to_string(pipe->device_speed),
+    usb_direction_to_string(direction),
+    transfer_id,
+    usb_pid_t_to_string(pipe->next_pid),
+    rq);
 
   jc = usb_xfer_jobchain_prep_control(&rqbuf, direction, addr, transfer_size);
   jc->wait_interval_ms = 0;
@@ -226,12 +231,12 @@ int hcd_transfer_control_blocking(
   uint64_t rq,
   int *out_num_bytes)
 {
-  struct dwc2_channel *c;
   int err;
+  struct dwc2_channel *c;
   uint64_t rqbuf ALIGNED(64) = rq;
-  DECL_PIPE_DESC(pipedesc, pipe);
+
   hcd_transfer_control_prologue(pipe, rq);
-  if (pipe->address == usb_root_hub_device_number)
+  if (pipe->device_address == usb_root_hub_device_number)
     return usb_root_hub_process_req(rq, addr, transfer_size, out_num_bytes);
 
   c = dwc2_channel_create();
@@ -248,7 +253,7 @@ int hcd_transfer_control_blocking(
     goto out_err;
   }
 
-  c->pipe = pipedesc;
+  c->pipe = pipe;
 
   if (out_num_bytes)
     *out_num_bytes = 0;
@@ -256,7 +261,7 @@ int hcd_transfer_control_blocking(
   /*
    * Send SETUP packet
    */
-  c->next_pid = USB_PID_SETUP;
+  c->pipe->next_pid = USB_PID_SETUP;
   c->ctl->dma_addr_base = (uint64_t)&rqbuf;
   c->ctl->transfer_size = sizeof(rqbuf);
   c->ctl->direction = USB_DIRECTION_OUT;
@@ -267,7 +272,7 @@ int hcd_transfer_control_blocking(
    * Transmit DATA packet
    */
   if (addr) {
-    c->next_pid = USB_PID_DATA1;
+    c->pipe->next_pid = USB_PID_DATA1;
     c->ctl->dma_addr_base = (uint64_t)addr;
     c->ctl->transfer_size = transfer_size;
     c->ctl->direction = direction;
@@ -283,7 +288,7 @@ int hcd_transfer_control_blocking(
   else
     c->ctl->direction = USB_DIRECTION_OUT;
 
-  c->next_pid = USB_PID_DATA1;
+  c->pipe->next_pid = USB_PID_DATA1;
   c->ctl->dma_addr_base = 0;
   c->ctl->transfer_size = 0;
   err = hcd_transfer_packet_blocking(c, "ACK", NULL);
@@ -311,19 +316,6 @@ int hcd_transfer_interrupt(
   dwc2_transfer_status_t status;
   int err;
 
-  dwc2_pipe_desc_t pipedesc = {
-    .u = {
-      .device_address  = pipe->address,
-      .ep_address      = pipe->ep,
-      .ep_type         = USB_ENDPOINT_TYPE_INTERRUPT,
-      .speed           = pipe->speed,
-      .max_packet_size = pipe->max_packet_size,
-      .dwc_channel     = 0,
-      .hub_address     = pipe->ls_hub_address,
-      .hub_port        = pipe->ls_hub_port
-    }
-  };
-
   c = dwc2_channel_create();
   if (!c) {
     err = ERR_RETRY;
@@ -338,8 +330,8 @@ int hcd_transfer_interrupt(
     goto out_err;
   }
 
-  c->pipe = pipedesc;
-  c->next_pid = USB_PID_DATA0;
+  c->pipe = pipe;
+  c->pipe->next_pid = USB_PID_DATA0;
   c->ctl->dma_addr_base = (uint64_t)addr;
   c->ctl->transfer_size = transfer_size;
   c->ctl->direction = USB_DIRECTION_OUT;
@@ -361,30 +353,27 @@ out_err:
 }
 
 int hcd_transfer_bulk(
-  struct usb_hcd_pipe *pipe,
-  int direction,
+  struct usb_hcd_endpoint *ep,
   void *addr,
   int transfer_size,
-  usb_pid_t *pid,
   int *out_num_bytes)
 {
   int wait_timeout = 0;
   int err = ERR_OK;
   int completed ALIGNED(8) = 0;
+  int direction = hcd_endpoint_get_direction(ep);
   struct usb_xfer_jobchain *jc;
   struct usb_xfer_job *j;
-  // dwc2_transfer_status_t status;
 
   transfer_id++;
-  pipe->ep_type = USB_ENDPOINT_TYPE_BULK;
-  HCDDEBUG("hcd_transfer_bulk:pipe:%p,type:%d,hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
-    pipe, pipe->ls_hub_port, pipe->speed, pipe->ep_type,
+  HCDDEBUG("hcd_transfer_bulk:hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
+    ep->pipe.ls_hub_port, ep->pipe.device_speed, ep->pipe.endpoint_type,
     direction == USB_DIRECTION_OUT ? "out" : "in",
-    transfer_id, transfer_size, *pid);
+    transfer_id, transfer_size, -1);
 
   jc = usb_xfer_jobchain_create();
   jc->nak_retries = 0;
-  // jc->wait_interval_ms = 2;
+  jc->wait_interval_ms = 0;
   if (IS_ERR(jc)) {
     err = PTR_ERR(jc);
     jc = NULL;
@@ -392,7 +381,7 @@ int hcd_transfer_bulk(
     goto out_err;
   }
 
-  j = usb_xfer_job_prep(jc, *pid, direction, addr, transfer_size);
+  j = usb_xfer_job_prep(jc, direction, addr, transfer_size, USB_PID_UNSET);
   if (IS_ERR(j)) {
     err = PTR_ERR(j);
     j = NULL;
@@ -405,7 +394,7 @@ int hcd_transfer_bulk(
 
   jc->completed = control_chain_signal_completed;
   jc->completed_arg = &completed;
-  jc->hcd_pipe = pipe;
+  jc->hcd_pipe = &ep->pipe;
 
   /*
    * For HOST-TO-DEVICE transfers flush the data first, so
@@ -419,18 +408,20 @@ int hcd_transfer_bulk(
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed) {
-    if (wait_timeout++ > 100) {
+    // dwc2_print_tsize();
+    if (wait_timeout++ > 200000) {
       jc->err = ERR_OK;
-      // dwc2_print_tsize();
       break;
     }
     asm volatile("wfe");
-    // putc('.');
+    if (wait_timeout > 1000 && wait_timeout % 200 == 0) {
+      putc('.');
+    }
     // wait_msec(100);
     // dwc2_print_tsize();
   }
   err = jc->err;
-  // printf("BULK completed: err=%d\r\n", err);
+  HCDDEBUG("BULK: completed: err=%d", err);
   if (err)
     goto out_err;
 
@@ -458,25 +449,11 @@ int hcd_transfer_bulk_blocking(
   int direction,
   void *addr,
   int transfer_size,
-  usb_pid_t *pid,
   int *out_num_bytes)
 {
   struct dwc2_channel *c;
   int err = ERR_OK;
   dwc2_transfer_status_t status;
-
-  dwc2_pipe_desc_t pipedesc = {
-    .u = {
-      .device_address  = pipe->address,
-      .ep_address      = pipe->ep,
-      .ep_type         = USB_ENDPOINT_TYPE_BULK,
-      .speed           = pipe->speed,
-      .max_packet_size = pipe->max_packet_size,
-      .dwc_channel     = 0,
-      .hub_address     = pipe->ls_hub_address,
-      .hub_port        = pipe->ls_hub_port
-    }
-  };
 
   c = dwc2_channel_create();
   if (!c) {
@@ -492,8 +469,7 @@ int hcd_transfer_bulk_blocking(
     goto out_err;
   }
 
-  c->pipe = pipedesc;
-  c->next_pid = *pid;
+  c->pipe = pipe;
   c->ctl->dma_addr_base = (uint64_t)addr;
   c->ctl->transfer_size = transfer_size;
   c->ctl->direction = direction;
@@ -504,7 +480,6 @@ int hcd_transfer_bulk_blocking(
     } else
       err = ERR_GENERIC;
   }
-  *pid = c->next_pid;
   CHECK_ERR("a");
 out_err:
   return err;

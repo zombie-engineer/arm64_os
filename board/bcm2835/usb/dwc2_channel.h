@@ -1,8 +1,10 @@
 #pragma once
-#include "dwc2_pipe.h"
 #include <compiler.h>
 #include <usb/usb_pid.h>
 #include <usb/usb.h>
+#include <bug.h>
+#include <common.h>
+#include <drivers/usb/hcd.h>
 
 struct dwc2_channel {
   /*
@@ -24,32 +26,66 @@ struct dwc2_channel {
   int id;
 
   /*
-   * pipe - DWC2 specific pipe description, used for programming channel control
-   * registers.
+   * pipe - pipe, used for programming channel control registers.
    */
-  dwc2_pipe_desc_t pipe ALIGNED(8);
+  struct usb_hcd_pipe *pipe;
 
   /*
    * ctl - DWC2 specific control, that stores transfer state like number of bytes
    * left to transfer, dma address and some options like split.
    */
   struct dwc2_xfer_control *ctl;
-  usb_pid_t next_pid;
 };
+
+static inline struct usb_hcd_pipe *dwc2_channel_get_pipe_safe(struct dwc2_channel *c)
+{
+  BUG(c->pipe == NULL, "dwc2_channel_get_pipe: pipe is NULL");
+  return c->pipe;
+}
 
 static inline int dwc2_channel_get_max_packet_size(struct dwc2_channel *c)
 {
-  return c->pipe.u.max_packet_size;
+  return dwc2_channel_get_pipe_safe(c)->max_packet_size;
 }
 
-static inline bool dwc2_channel_is_speed_low(struct dwc2_channel *c)
+static inline int dwc2_channel_get_ep_num(struct dwc2_channel *c)
 {
-  return c->pipe.u.speed == USB_SPEED_LOW;
+  return dwc2_channel_get_pipe_safe(c)->endpoint_num;
+}
+
+static inline int dwc2_channel_get_ep_type(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->endpoint_type;
+}
+
+static inline int dwc2_channel_get_device_address(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->device_address;
 }
 
 static inline bool dwc2_channel_is_speed_high(struct dwc2_channel *c)
 {
-  return c->pipe.u.speed == USB_SPEED_HIGH;
+  return dwc2_channel_get_pipe_safe(c)->device_speed == USB_SPEED_HIGH;
+}
+
+static inline bool dwc2_channel_is_speed_low(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->device_speed == USB_SPEED_LOW;
+}
+
+static inline bool dwc2_channel_get_pipe_speed(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->device_speed;
+}
+
+static inline usb_pid_t dwc2_channel_get_next_pid(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->next_pid;
+}
+
+static inline void dwc2_channel_set_next_pid(struct dwc2_channel *c, usb_pid_t next_pid)
+{
+  dwc2_channel_get_pipe_safe(c)->next_pid = next_pid;
 }
 
 static inline bool dwc2_channel_split_mode(struct dwc2_channel *c)

@@ -73,23 +73,21 @@ out_err:
   return err;
 }
 
-int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int ep)
+int usb_hid_mouse_get_report(struct usb_hcd_device *dev, int endpoint_num)
 {
   int err;
   int num_bytes;
   char buf[64] ALIGNED(4);
+  struct usb_hcd_interface *i;
+  struct usb_hcd_endpoint *ep;
 
-  struct usb_hcd_pipe pipe = {
-    .address = dev->pipe0.address,
-    .ep = ep,
-    .speed = dev->pipe0.speed,
-    .max_packet_size = dev->pipe0.max_packet_size,
-    .ls_hub_port = dev->pipe0.ls_hub_port,
-    .ls_hub_address = dev->pipe0.ls_hub_address
-  };
+  i = hcd_device_get_interface(dev, 0);
+  BUG(!i, "interface is NULL");
+  ep = hcd_interface_get_endpoint(i, endpoint_num);
+  BUG(!ep, "endpoint is NULL");
 
   memset(buf, 0x66, sizeof(buf));
-  err = hcd_transfer_interrupt(&pipe, buf, 7, &num_bytes);
+  err = hcd_transfer_interrupt(&ep->pipe, buf, 7, &num_bytes);
   CHECK_ERR("a");
   hexdump_memory(buf, 8);
 out_err:

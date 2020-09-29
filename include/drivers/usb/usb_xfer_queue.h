@@ -24,7 +24,7 @@ struct usb_xfer_job {
   int direction;
   void *addr;
   int transfer_size;
-  int pid;
+  usb_pid_t next_pid;
 
   int err;
   void (*completion)(void*);
@@ -37,8 +37,8 @@ struct usb_xfer_job {
 
 #define usb_xfer_job_print(__log_level, __j, __tag)\
   do {\
-    USBQ_INFO("usb_xfer_job:[%s] %p, pid:%d, dir:%d, addr:%p, size:%d, prev:%p, next:%p",\
-      __tag, __j, __j->pid, __j->direction, __j->addr, __j->transfer_size,\
+    USBQ_INFO("usb_xfer_job:[%s] %p, pid:%s, dir:%d, addr:%p, size:%d, prev:%p, next:%p",\
+      __tag, __j, usb_pid_t_to_string(__j->next_pid), __j->direction, __j->addr, __j->transfer_size,\
       __j->jobs.prev, __j->jobs.next);\
   } while(0)
 
@@ -73,7 +73,7 @@ struct usb_xfer_jobchain {
   do {\
     struct usb_xfer_job *j;\
     USBQ_LOG(__log_level, "jobchain [%s]: %p, pipe:%p, speed:%d, list.prev:%p,list.next:%p",\
-      __tag, __jc, __jc->hcd_pipe, __jc->hcd_pipe->speed,\
+      __tag, __jc, __jc->hcd_pipe, __jc->hcd_pipe->device_speed,\
       __jc->list.prev, __jc->list.next);\
     list_for_each_entry(j, &__jc->jobs, jobs)\
       usb_xfer_job_print(__log_level, j, __tag);\

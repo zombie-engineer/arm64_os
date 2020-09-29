@@ -142,15 +142,16 @@ static inline void usb_xfer_jobchain_start(struct usb_xfer_jobchain *jc)
 {
   struct usb_xfer_job *j;
   struct dwc2_channel *c = NULL;
-  DECL_PIPE_DESC(dwc2_pipe, jc->hcd_pipe);
 
   uxb_xfer_jobchain_print(DEBUG2, jc, "running");
 
   c = dwc2_channel_create();
   BUG(!c, "Failed to create dwc2_channel");
   c->ctl = dwc2_xfer_control_create();
+  c->ctl->c = c;
   BUG(!c->ctl, "Failed to create dwc2_xfer_control");
-  c->pipe.u.raw = dwc2_pipe.u.raw;
+  c->pipe = jc->hcd_pipe;
+  BUG(!c->pipe, "dwc pipe is NULL");
   jc->channel = c;
   jc->err = ERR_OK;
   BUG(list_empty(&jc->jobs), "Trying to process jobchain with 0 jobs");

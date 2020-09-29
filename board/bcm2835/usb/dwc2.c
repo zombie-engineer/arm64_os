@@ -561,7 +561,7 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
    * if (c->ctl->direction == USB_DIRECTION_IN)
    *   dcache_flush(c->ctl->dma_addr_base, c->ctl->transfer_size);
    */
-  c->next_pid = dwc2_channel_get_next_pid(c);
+  // c->next_pid = dwc2_channel_get_next_pid(c);
   if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);
 }
@@ -587,6 +587,7 @@ static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer
 
 static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
 {
+  int ep_type;
   /*
    * According to Universal Serial Bus Specification Revision 2.0
    * 8.5.1 NAK Limiting via Ping Flow Control
@@ -602,9 +603,10 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
     dwc2_transfer_start(c);
     return;
   }
+  ep_type = dwc2_channel_get_ep_type(c);
 
-  DWCERR("ep_type:%d, compl:%p\r\n", c->pipe.u.ep_type, c->ctl->completion);
-  if (c->pipe.u.ep_type == USB_ENDPOINT_TYPE_CONTROL) {
+  DWCERR("ep_type:%d, compl:%p\r\n", ep_type, c->ctl->completion);
+  if (ep_type == USB_ENDPOINT_TYPE_CONTROL) {
 
     puts("%");
     wait_msec(50);
@@ -612,7 +614,7 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
     return;
   }
 
-  if (c->pipe.u.ep_type == USB_ENDPOINT_TYPE_BULK) {
+  if (ep_type == USB_ENDPOINT_TYPE_BULK) {
     puts("$");
     wait_msec(50);
     dwc2_transfer_start(c);
@@ -626,9 +628,8 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
 
 static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
 {
-  int next_pid = dwc2_channel_get_next_pid(c);
-  DWCDEBUG("channel irq nyet: channel: %d, current_pid: %d, next_pid: %d, first_packet: %d", c->id,
-    c->next_pid,
+  usb_pid_t next_pid = dwc2_channel_get_next_pid(c);
+  DWCDEBUG("channel irq nyet: channel: %d, next_pid: %d, first_packet: %d", c->id,
     next_pid,
     c->ctl->first_packet);
 
@@ -645,25 +646,27 @@ static inline void dwc2_irq_handle_channel_nyet(struct dwc2_channel *c)
 
 static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t old_intr)
 {
-  uint32_t intr, intrmsk, siz;
+  uint32_t intr, siz;
+  int ep_type;
   int ch_id = c->id;
   bool xfer_complete;
+
+  ep_type = dwc2_channel_get_ep_type(c);
   GET_INTR();
-  GET_INTRMSK();
+  // GET_INTRMSK();
   GET_SIZ();
   USB_HOST_INTR_CLR_HALT(intr);
-  DWCDEBUG2("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s\n",
+  DWCDEBUG2("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s",
     old_intr, intr, siz,
-    usb_transfer_type_to_string(c->pipe.u.ep_type),
-    c->pipe.u.device_address,
-    usb_speed_to_string(c->pipe.u.speed),
-    usb_direction_to_string(c->ctl->direction)
-    );
+    usb_transfer_type_to_string(ep_type),
+    dwc2_channel_get_device_address(c),
+    usb_speed_to_string(dwc2_channel_get_pipe_speed(c)),
+    usb_direction_to_string(c->ctl->direction));
 
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(old_intr);
   if (!xfer_complete) {
     puts("NOT xfer_completed\r\n");
-    // return;
+    return;
   }
 
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -686,29 +689,28 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
 
 static inline void dwc2_irq_handle_channel_data_toggle_err(struct dwc2_channel *c)
 {
-  int next_pid = dwc2_channel_get_next_pid(c);
-  DWCERR("DATA TOGGLE_ERR, next_pid: %d, expected: %d\n", c->next_pid, next_pid);
+  DWCERR("DATA TOGGLE_ERR, next_pid: %d\n", dwc2_channel_get_next_pid(c));
   /*
    * TODO: This is a fast patch to the problem, but it needs more attention later
    */
-  c->next_pid = next_pid;
+  while(1);
   dwc2_transfer_start(c);
 }
 
-volatile int xx = 0;
+volatile int irq_num = 0;
 
-#if 0
+#if 1
 static inline void dwc2_irq_handle_channel_int_one_dbg(int ch_id, int intr)
 {
   uint32_t intrmsk;
   GET_INTRMSK();
-  DWCDEBUG2("channel %d irq(hcint): int: %08x & mask %08x = %08x, int#:%d#",
+  DWCDEBUG2("channel %d irq(hcint): int: %08x & mask %08x = %08x, irq_num:%d",
     ch_id, intr,
-    intrmsk, intr & intrmsk, xx);
+    intrmsk, intr & intrmsk, irq_num);
 
-  if (xx++ == 400) {
+  if (irq_num++ == 40000) {
     printf("HALTING 666777\r\n");
-    while(xx);
+    while(1);
   }
 }
 #endif
@@ -722,7 +724,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   SET_INTR();
   wait_msec(1);
 
-#if 0
+#if 1
   dwc2_irq_handle_channel_int_one_dbg(ch_id, intr);
 #endif
 
