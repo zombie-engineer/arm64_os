@@ -21,7 +21,7 @@ struct cbw {
   uint8_t  reserved1 : 4;
   uint8_t  cbw_length : 5;  // +14
   uint8_t  reserved2  : 3;
-  char     cbw_block[0];    // +15
+  char     cbw_block[16];    // +15
 } PACKED;
 
 static inline char cbw_make_flags(int direction)
