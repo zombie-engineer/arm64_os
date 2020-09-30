@@ -1,4 +1,5 @@
 #pragma once
+#include <drivers/usb/usb_mass_storage.h>
 
 int usbd_init(void);
 
@@ -40,3 +41,5 @@ struct usb_hcd_device *usbd_find_device_by_topo_addr(const struct usb_topo_addr 
 #define USB_ITER_CONTINUE 0
 #define USB_ITER_STOP     1
 void usb_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg);
+
+hcd_mass_t *detect_any_usb_mass_device(void);

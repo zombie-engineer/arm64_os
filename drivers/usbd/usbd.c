@@ -4,6 +4,7 @@
 #include <error.h>
 #include <common.h>
 #include <sched.h>
+#include <delays.h>
 
 int usbd_init(void)
 {
@@ -194,4 +195,58 @@ int usb_topo_addr_to_string(char *buf, int bufsz, const struct usb_topo_addr *ta
 void usb_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg)
 {
   usb_hcd_iter_devices(fn, fn_arg);
+}
+
+struct usb_find_device_fn_arg {
+  hcd_mass_t *mass_device;
+};
+
+static int usb_find_device_fn(struct usb_hcd_device *d, void *priv)
+{
+  struct usb_find_device_fn_arg *arg = priv;
+  int device_class, interface_class;
+  hcd_mass_t *m = NULL;
+  int i;
+
+  arg->mass_device = NULL;
+  device_class = hcd_device_get_class(d);
+  printf("device_class: %d\r\n", device_class);
+  if (device_class == USB_HCD_DEVICE_CLASS_MASS) {
+    m = usb_hcd_device_to_mass(d);
+  } else if (device_class == USB_HCD_DEVICE_CLASS_UNDEFINED) {
+    for (i = 0; i < hcd_device_get_num_interfaces(d); ++i) {
+      printf("interface: %d\r\n", i);
+      interface_class = usb_hcd_get_interface_class(d, i);
+      if (interface_class == USB_INTERFACE_CLASS_MASSSTORAGE) {
+        m = usb_hcd_device_to_mass(d);
+        break;
+      }
+    }
+  }
+  if (m) {
+    printf("state: %d\r\n", hcd_device_get_state(d));
+    if (hcd_device_get_state(d) == USB_DEVICE_STATE_CONFIGURED) {
+      arg->mass_device = m;
+      return USB_ITER_STOP;
+    }
+  }
+  return USB_ITER_CONTINUE;
+}
+
+hcd_mass_t *detect_any_usb_mass_device(void)
+{
+  int i;
+  struct usb_find_device_fn_arg arg = { 0 };
+
+  for (i = 0; i < 10; ++i) {
+    usb_iter_devices(usb_find_device_fn, &arg);
+    if (arg.mass_device)
+      break;
+    printf("mass storage device not found yet. continue\r\n");
+    wait_msec(10 * 1000);
+  }
+
+  if (!arg.mass_device)
+    printf("tft_lcd: failed to detect usb mass storage device\r\n");
+  return arg.mass_device;
 }

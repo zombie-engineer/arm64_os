@@ -9,6 +9,7 @@
 #include <cpu.h>
 #include <debug.h>
 #include <sched.h>
+// #include <dma_area.h>
 
 //DECL_GPIO_SET_KEY(tft_lcd_gpio_set_key, "TFT_LCD___GPIO0");
 
@@ -213,112 +214,56 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 #include <drivers/usb/hcd.h>
 #include <drivers/usb/usb_mass_storage.h>
 
-struct usb_find_device_fn_arg {
-  hcd_mass_t *mass_device;
-};
-
-int usb_find_device_fn(struct usb_hcd_device *d, void *priv)
-{
-  struct usb_find_device_fn_arg *arg = priv;
-  int device_class, interface_class;
-  hcd_mass_t *m = NULL;
-  int i;
-
-  arg->mass_device = NULL;
-  device_class = hcd_device_get_class(d);
-  printf("device_class: %d\r\n", device_class);
-  if (device_class == USB_HCD_DEVICE_CLASS_MASS) {
-    m = usb_hcd_device_to_mass(d);
-  } else if (device_class == USB_HCD_DEVICE_CLASS_UNDEFINED) {
-    for (i = 0; i < hcd_device_get_num_interfaces(d); ++i) {
-      printf("interface: %d\r\n", i);
-      interface_class = usb_hcd_get_interface_class(d, i);
-      if (interface_class == USB_INTERFACE_CLASS_MASSSTORAGE) {
-        m = usb_hcd_device_to_mass(d);
-        break;
-      }
-    }
-  }
-  if (m) {
-    printf("state: %d\r\n", hcd_device_get_state(d));
-    if (hcd_device_get_state(d) == USB_DEVICE_STATE_CONFIGURED) {
-      arg->mass_device = m;
-      return USB_ITER_STOP;
-    }
-  }
-  return USB_ITER_CONTINUE;
-}
-
 char tft_lcd_canvas[DISPLAY_WIDTH * DISPLAY_HEIGHT * 3];
 
-void __attribute__((optimize("O0"))) payload(int gpio_pin_dc)
+void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, int offset, int read_size)
 {
-  int i;
-  char buff[9];
-  tft_set_region_coords(gpio_pin_dc, 0, 0, 2, 1);
-  for (i = 0; i < 1000; ++i) {
-    putc('c');
-    buff[0] = 0xff; buff[1] = 0x00; buff[2] = 0x00;
-    buff[3] = 0x00; buff[4] = 0xff; buff[5] = 0x00;
-    buff[6] = 0x00; buff[7] = 0x00; buff[8] = 0xff;
-    SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, buff, 9);
-    wait_msec(700);
-    buff[0] = 0x00; buff[1] = 0xff; buff[2] = 0x00;
-    buff[3] = 0x00; buff[4] = 0x00; buff[5] = 0xff;
-    buff[6] = 0xff; buff[7] = 0x00; buff[8] = 0x00;
-    SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, buff, 9);
-    wait_msec(700);
-    buff[0] = 0x00; buff[1] = 0x00; buff[2] = 0xff;
-    buff[3] = 0x00; buff[4] = 0xff; buff[5] = 0x00;
-    buff[6] = 0x00; buff[7] = 0x00; buff[8] = 0xff;
-    SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, buff, 9);
-    wait_msec(700);
+  int err;
+  uint64_t *ptr = (uint64_t *)(tft_lcd_canvas + offset + read_size - 8);
+  while(1) {
+    *ptr = 0;
+    // memset(tft_lcd_canvas + offset, 0, read_size);
+    err = usb_mass_read(m, offset, tft_lcd_canvas + offset, read_size);
+    if (err != ERR_OK) {
+      printf("tft_lcd: failed to read mass storage device\r\n");
+      break;
+    }
+    if (*ptr)
+      break;
+    printf("tft_lcd: buf is zero at offset %d\r\n", offset);
   }
 }
+
 void OPTIMIZED display_payload(int gpio_pin_dc)
 {
   int i, y;
-  int err;
-  struct usb_find_device_fn_arg arg = { 0 };
   char buf[256];
   const char *ptr;
   hcd_mass_t *m = NULL;
 
-  for (i = 0; i < 10; ++i) {
-    usb_iter_devices(usb_find_device_fn, &arg);
-    if (arg.mass_device)
-      break;
-    printf("mass storage device not found yet. continue\r\n");
-    wait_msec(10 * 1000);
-  }
-  if (!arg.mass_device) {
-    printf("tft_lcd: failed to detect usb mass storage device\r\n");
+  m = detect_any_usb_mass_device();
+  if (!m) {
     goto err;
   }
-  m = arg.mass_device;
 
   printf("mass storage device found\r\n");
   memset(buf, 0, sizeof(buf));
   dcache_flush(m, sizeof(*m));
   dcache_flush(m->d, sizeof(*(m->d)));
-  memset(tft_lcd_canvas, 0, sizeof(tft_lcd_canvas));
+  memset(tft_lcd_canvas, 0xcc, sizeof(tft_lcd_canvas));
+  dcache_flush(tft_lcd_canvas, sizeof(tft_lcd_canvas));
 
   tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
-  for (i = 0; i < sizeof(tft_lcd_canvas) / 1024; ++i) {
+#define READ_SIZE (512 * 16)
+  for (i = 0; i < sizeof(tft_lcd_canvas) / READ_SIZE; ++i) {
+    display_read_frame(gpio_pin_dc, m, i * READ_SIZE, READ_SIZE);
     //printf("reading i:%d, offset:%d\r\n", i, i * 512);
-    err = usb_mass_read(arg.mass_device, i * 1024, tft_lcd_canvas + i * 1024, 1024);
-    hexdump_memory(tft_lcd_canvas, 1024);
-    if (err != ERR_OK) {
-      printf("tft_lcd: failed to read mass storage device\r\n");
-      goto err;
-    }
-    if (*(uint64_t *)(tft_lcd_canvas + i * 512) == 0) {
-      printf("tft_lcd: buf is zero at i=%d\r\n", i);
-    }
-    break;
+    // hexdump_memory(tft_lcd_canvas, 1024);
   }
+  display_read_frame(gpio_pin_dc, m, i * READ_SIZE, 1024);
+
   SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, tft_lcd_canvas, sizeof(tft_lcd_canvas));
-    while(1);
+  while(1);
   puts("end\r\n");
   while(1);
   ptr = tft_lcd_canvas;
@@ -331,18 +276,6 @@ void OPTIMIZED display_payload(int gpio_pin_dc)
 err:
   while(1) {
     asm volatile("wfe");
-  }
-}
-
-void OPTIMIZED clear_screen(int gpio_pin_dc)
-{
-  char data_rgb[3] = { 0, 0, 0xff };
-  int x, y;
-  for (y = 0; y < DISPLAY_HEIGHT; ++y) {
-    for (x = 0; x < DISPLAY_WIDTH; ++x) {
-      tft_set_region_coords(gpio_pin_dc, x, y, x + 1, y + 1);
-      SEND_CMD_DATA(0x2c, data_rgb, 3);
-    }
   }
 }
 
@@ -402,33 +335,20 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
   int y, x;
   int local_width, local_height;
   char *c;
+  uint64_t v1, v2, v3, iters;
 //  uint64_t t1, t2;
 
   local_width = x1 - x0;
   local_height = y1 - y0;
   if (local_width * local_height > 8) {
-    uint64_t v1, v2, v3, iters;
  //   volatile uint64_t *p;
 #define BP(v, p) ((uint64_t)v << (p * 8))
     v1 = BP(r, 0) | BP(g, 1) | BP(b, 2) | BP(r, 3) | BP(g, 4) | BP(b, 5) | BP(r, 6) | BP(g, 7);
     v2 = BP(b, 0) | BP(r, 1) | BP(g, 2) | BP(b, 3) | BP(r, 4) | BP(g, 5) | BP(b, 6) | BP(r, 7);
     v3 = BP(g, 0) | BP(b, 1) | BP(r, 2) | BP(g, 3) | BP(b, 4) | BP(r, 5) | BP(g, 6) | BP(b, 7);
 #undef BP
-    // printf("%016llx:%016llx:%016llx\r\n", v1, v2, v3);
     iters = local_width * local_height / 8;
-
-//    p = (uint64_t *)canvas;
-//    t1 = read_cpu_counter_64();
     fastfill(canvas, iters, v1, v2, v3);
-//    while(iters--) {
-//      // printf("iters = %d\r\n", iters);
-//      *p++ = v1;
-//      *p++ = v2;
-//      *p++ = v3;
-//    }
-//    t2 = read_cpu_counter_64();
-//    printf("iters = %d, lw:%d, lh:%d, count: %lld\r\n", iters, local_width, local_height, t2-t1);
-    // count = 16817
   } else {
     c = canvas;
     // t1 = read_cpu_counter_64();
@@ -452,7 +372,7 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
 //  printf("output: %lld\r\n", t2-t1); // count = 4813039
 }
 
-void OPTIMIZED clear_screen2(int gpio_pin_dc)
+void OPTIMIZED fill_screen(int gpio_pin_dc)
 {
   tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, 255);
 }
@@ -526,7 +446,7 @@ void OPTIMIZED tft_lcd_init(void)
 
   const int gpio_pin_dc    = 25;
   const int gpio_pin_reset = 24;
- // clear_screen2(gpio_pin_dc);
+ // fill_screen(gpio_pin_dc);
 
   gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
@@ -570,11 +490,8 @@ void OPTIMIZED tft_lcd_init(void)
 //    RECV_CMD_DATA(ILI9341_CMD_READ_ID, data, 2);
 //    wait_usec(10);
 //  }
-  // if (0)
-  clear_screen2(gpio_pin_dc);
- // clear_screen(gpio_pin_dc);
+  fill_screen(gpio_pin_dc);
 //  wait_msec(10 * 1000);
- // payload(gpio_pin_dc);
   display_payload(gpio_pin_dc);
   {
     int x = 0, y = 0;
