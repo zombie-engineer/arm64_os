@@ -19,3 +19,5 @@ void tft_lcd_init(void);
 
 /* Pulse RST pin to reset the device */
 int tft_lcd_reset(void);
+
+void tft_lcd_run(void);

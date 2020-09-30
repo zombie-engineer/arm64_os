@@ -9,7 +9,7 @@
 #include <cpu.h>
 #include <debug.h>
 #include <sched.h>
-// #include <dma_area.h>
+#include <memory/dma_area.h>
 
 //DECL_GPIO_SET_KEY(tft_lcd_gpio_set_key, "TFT_LCD___GPIO0");
 
@@ -198,6 +198,14 @@ typedef struct tft_lcd_canvas_control {
   }\
 } while(0)
 
+static int gpio_pin_mosi  = 10;
+static int gpio_pin_miso  =  9;
+static int gpio_pin_sclk  = 11;
+static int gpio_pin_bkl   =  8;
+
+static int gpio_pin_dc    = 25;
+static int gpio_pin_reset = 24;
+
 static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
 #define LO8(__v) (__v & 0xff)
@@ -234,7 +242,7 @@ void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, int offset, in
   }
 }
 
-void OPTIMIZED display_payload(int gpio_pin_dc)
+void OPTIMIZED display_payload(void)
 {
   int i, y;
   char buf[256];
@@ -436,17 +444,48 @@ static void tft_lcd_init2(void)
 }
 #endif
 
+void OPTIMIZED tft_lcd_cube_animation(void)
+{
+  int x = 0, y = 0;
+  int g = 0;
+  int x_speed = 2;
+  int y_speed = 5;
+  while(1) {
+    tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, g, 0);
+    wait_msec(1000 / 60);
+    tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, 0, 255);
+    wait_msec(1);
+    if (x_speed > 0) {
+      if (x > DISPLAY_WIDTH - 10) {
+        x_speed *= -1;
+        g += 10;
+      }
+    } else {
+      if (x == 0)
+        x_speed *= -1;
+    }
+    if (y_speed > 0) {
+      if (y > DISPLAY_HEIGHT - 10)
+        y_speed *= -1;
+    } else {
+      if (y == 0)
+        y_speed *= -1;
+    }
+    x += x_speed;
+    y += y_speed;
+  }
+}
+
 void OPTIMIZED tft_lcd_init(void)
 {
   // char data[512];
-  const int gpio_pin_mosi  = 10;
-  const int gpio_pin_miso  =  9;
-  const int gpio_pin_sclk  = 11;
-  const int gpio_pin_bkl   =  8;
+  gpio_pin_mosi  = 10;
+  gpio_pin_miso  =  9;
+  gpio_pin_sclk  = 11;
+  gpio_pin_bkl   =  8;
 
-  const int gpio_pin_dc    = 25;
-  const int gpio_pin_reset = 24;
- // fill_screen(gpio_pin_dc);
+  gpio_pin_dc    = 25;
+  gpio_pin_reset = 24;
 
   gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
@@ -491,37 +530,10 @@ void OPTIMIZED tft_lcd_init(void)
 //    wait_usec(10);
 //  }
   fill_screen(gpio_pin_dc);
-//  wait_msec(10 * 1000);
-  display_payload(gpio_pin_dc);
-  {
-    int x = 0, y = 0;
-    int g = 0;
-    int x_speed = 2;
-    int y_speed = 5;
-    while(1) {
-      tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, g, 0);
-      wait_msec(1000 / 60);
-      tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, 0, 255);
-      wait_msec(1);
-      if (x_speed > 0) {
-        if (x > DISPLAY_WIDTH - 10) {
-          x_speed *= -1;
-          g += 10;
-        }
-      } else {
-        if (x == 0)
-          x_speed *= -1;
-      }
-      if (y_speed > 0) {
-        if (y > DISPLAY_HEIGHT - 10)
-          y_speed *= -1;
-      } else {
-        if (y == 0)
-          y_speed *= -1;
-      }
-      x += x_speed;
-      y += y_speed;
-    }
-  }
-  wait_usec(100);
+}
+
+void tft_lcd_run(void)
+{
+  display_payload();
+  tft_lcd_cube_animation();
 }
