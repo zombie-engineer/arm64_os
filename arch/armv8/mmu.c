@@ -80,6 +80,16 @@
 #define MEMATTR_IDX_NORMAL    0
 #define MEMATTR_IDX_DEV_NGNRE 1
 #define MEMATTR_IDX_NORMAL2   2
+#define MEMATTR_IDX_MMIO      3
+
+/*
+ * Shareability Bits in stage 1 VMSAv8-64 Block and Page descriptors
+ */
+#define SH_BITS_NON_SHAREABLE   0
+#define SH_BITS_RESERVED        1
+#define SH_BITS_OUTER_SHAREABLE 2
+#define SH_BITS_INNER_SHAREABLE 3
+
 
   // MAP a range of 32 megabytes
   // map range 32Mb
@@ -114,9 +124,11 @@
 #define PTE_LO_ATTR(lo_attr)   BITS_AT_POS(lo_attr,  2,  0x3ff)
 #define PTE_UP_ATTR(up_attr)   BITS_AT_POS(up_attr, 51, 0x1fff)
 
-#define MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr) (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(phys_page_idx) | PTE_LO_ATTR(lo_attr) | 0b11)
+#define MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr) \
+  (PTE_UP_ATTR(up_attr) | PTE_OUT_ADDR(phys_page_idx) | PTE_LO_ATTR(lo_attr) | 0b11)
 
-#define MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr) MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr)
+#define MAKE_PAGE_PTE(up_attr, phys_page_idx, lo_attr) \
+  MAKE_PAGE_PTE_VALID_PAGE_4KB(up_attr, phys_page_idx, lo_attr)
 
 #define MAKE_PAGE_PTE_LO_ATTR(attr_idx, ns, ap, sh, af, ng) \
   BITS_AT_POS(attr_idx, 0, 0b111) | BIT_AT_POS(ns, 3) | BITS_AT_POS(ap, 4, 0b11) \
@@ -147,6 +159,8 @@ typedef struct pt_mem_range {
   uint64_t num_pages;
   // Index of memory attribute in MAIR register
   int mem_attr_idx;
+  // SH bits [8:7] in lower attributes of a page table entry
+  char sh_bits;
 } pt_mem_range_t;
 
 
@@ -167,10 +181,59 @@ typedef struct pt_config {
   pt_mem_range_t mem_ranges[64];
 } pt_config_t;
 
+static inline void mair_to_string(char attr, char *attr_desc, int attr_desc_len)
+{
+  int i, n = 0;
+  if (!attr_desc_len)
+    return;
+
+  *attr_desc = 0;
+  if ((attr & 0x0c) == attr) {
+    n = snprintf(attr_desc, attr_desc_len, "Device, ");
+    switch(attr >> 2) {
+        /* read documentation of mmu_memattr.h */
+      case 0: snprintf(attr_desc + n, attr_desc_len - n, "nGnRnE"); return;
+      case 1: snprintf(attr_desc + n, attr_desc_len - n, "nGnRE");  return;
+      case 2: snprintf(attr_desc + n, attr_desc_len - n, "nGRE");   return;
+      case 3: snprintf(attr_desc + n, attr_desc_len - n, "GRE");    return;
+      default: return;
+    }
+  }
+  if (attr == 0xf0) {
+    snprintf(attr_desc, attr_desc_len, "Tagged Normal In/Out Write-Back Non-Trans Rd/Wr-Alloc");
+    return;
+  }
+  if ((attr & 0xf0) && (attr & 0x0f)) {
+    const char *in_out_string[2] = {"In", "Out"};
+    n = snprintf(attr_desc, attr_desc_len, "Normal");
+    for (i = 0; i < 2; ++i) {
+      char nattr = (attr >> (4 * i)) & 0xf;
+      n += snprintf(attr_desc + n, attr_desc_len - n, ",%s", in_out_string[i]);
+      if (nattr == 0xc) {
+        n += snprintf(attr_desc + n, attr_desc_len - n, ",Non-Cacheable");
+      } else {
+        switch(nattr & 0xc) {
+          case 0x0: n += snprintf(attr_desc + n, attr_desc_len - n, ",Wr-Thr Trans"); break;
+          case 0x4: n += snprintf(attr_desc + n, attr_desc_len - n, " Wr-Back Trans"); break;
+          case 0x8: n += snprintf(attr_desc + n, attr_desc_len - n, " Wr-Thr Non-Trans"); break;
+          case 0xc: n += snprintf(attr_desc + n, attr_desc_len - n, " Wr-Back Non-Trans"); break;
+        }
+        if (nattr & 1)
+          n += snprintf(attr_desc + n, attr_desc_len - n, " WrAlloc");
+        if (nattr & 2)
+          n += snprintf(attr_desc + n, attr_desc_len - n, " RdAlloc");
+      }
+    }
+  }
+}
+
 void pt_config_print(pt_config_t *p)
 {
   int i;
   uint64_t total_l3_ptes = 0;
+  uint64_t mair_el1;
+  char attr_desc[256];
+  memset(attr_desc, 0, sizeof(attr_desc));
 
   printf("mmu: ttbr0:%p, ttbr1:%p"__endline, p->base_address, p->base_address);
   for (i = 0; i < p->num_ranges; ++i) {
@@ -186,9 +249,23 @@ void pt_config_print(pt_config_t *p)
   printf("mmu_table at: [0x%08x:0x%08x] (%d ptes)" __endline,
     p->base_address,
     p->base_address + total_l3_ptes * 8, total_l3_ptes);
+
+  mair_el1 = armv8_get_mair_el1();
+  printf("memory attributes: mair_el1: %016llx:" __endline, mair_el1);
+  for (i = 0; i < 8; ++i) {
+    char attr = (mair_el1 >> (i * 8)) & 0xff;
+    mair_to_string(attr, attr_desc, sizeof(attr_desc));
+    printf("- %d: %02x: %s"__endline, i, attr, attr_desc );
+  }
+
 }
 
-void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pages, int mem_attr_idx)
+void map_page_ptes(
+  mmu_pte_t *page_pte,
+  uint64_t phys_page_idx,
+  uint64_t num_pages,
+  int mem_attr_idx,
+  char sh_bits)
 {
   int i;
   uint64_t lo_attr, up_attr;
@@ -198,7 +275,7 @@ void map_page_ptes(mmu_pte_t *page_pte, uint64_t phys_page_idx, uint64_t num_pag
     mem_attr_idx,
     1 /* ns */,
     0 /* ap */,
-    3 /* sh */,
+    sh_bits /* sh */,
     1 /* af */,
     0 /* ng */);
 
@@ -285,21 +362,45 @@ void map_linear_range(uint64_t start_va, mmu_caps_t *mmu_caps, pt_config_t *pt_c
    */
   for (i = 0; i < pt_config->num_ranges; ++i) {
     range = &pt_config->mem_ranges[i];
-    map_page_ptes(l3_pt + range->va_start_page, range->pa_start_page, range->num_pages, range->mem_attr_idx);
+    map_page_ptes(l3_pt + range->va_start_page, range->pa_start_page, range->num_pages, range->mem_attr_idx, range->sh_bits);
   }
 }
 
 extern void __armv8_enable_mmu(uint64_t, uint64_t);
+
 extern char __mmu_table_base;
+
+static inline void par_to_string(uint64_t par, char *par_desc, int par_desc_len)
+{
+  char sh, memattr;
+  const char *sh_str;
+
+  if (!par_desc_len)
+    return;
+
+  *par_desc = 0;
+  sh = (par >> 7) & 3;
+  memattr = (par >> 56) & 0xff;
+  switch(sh) {
+    case 0: sh_str = "Non-Shareable"  ; break;
+    case 1: sh_str = "Reserved"       ; break;
+    case 2: sh_str = "Outer-Shareable"; break;
+    case 3: sh_str = "Inner-Shareable"; break;
+    default:sh_str = "Undefined"      ; break;
+  }
+  snprintf(par_desc, par_desc_len, "memattr:%02x,sh:%d(%s)", memattr, sh, sh_str);
+}
 
 void mmu_self_test(void)
 {
   {
 #define check_translation(addr) {\
-    uint64_t from = addr;\
-    uint64_t to = 0xffffffff;\
-    asm volatile ("at s1e1r, %1\nmrs %0, PAR_EL1" : "=r"(to) : "r"(from));\
-    printf("----%llx -> %llx" __endline, from, to);\
+    uint64_t va = addr;\
+    uint64_t par = 0xffffffff;\
+    char par_desc[256];\
+    asm volatile ("at s1e1r, %1\nmrs %0, PAR_EL1" : "=r"(par) : "r"(va));\
+    par_to_string(par, par_desc, sizeof(par_desc));\
+    printf("----%016llx -> %016llx %s" __endline, va, par, par_desc);\
 }
     check_translation(0);
     check_translation(0x80000);
@@ -307,14 +408,19 @@ void mmu_self_test(void)
     check_translation(0x3fffffff);
     check_translation(0x40000000);
     check_translation(0x40000040);
+    check_translation(0x013d2000);
+    check_translation(0xb64400);
+    printf("%llx\r\n", *(uint64_t*)0x013d2000);
+    *(uint64_t*)0x013d2000 = 0x6666;
   }
 }
 
-#define DECL_RANGE(__start, __num, __memattr) \
+#define DECL_RANGE(__start, __num, __memattr, __sh) \
   mmu_info.pt_config.mem_ranges[num_ranges].pa_start_page = __start;\
   mmu_info.pt_config.mem_ranges[num_ranges].va_start_page = __start;\
   mmu_info.pt_config.mem_ranges[num_ranges].num_pages     = __num;\
   mmu_info.pt_config.mem_ranges[num_ranges].mem_attr_idx  = MEMATTR_IDX_ ## __memattr;\
+  mmu_info.pt_config.mem_ranges[num_ranges].sh_bits  = __sh;\
   num_ranges++
 
 struct mmu_info {
@@ -332,12 +438,16 @@ void mmu_init(void)
 
   int pg_norm_off = 0;
   int pg_norm_num = dma_area_get_start_addr() / MMU_PAGE_GRANULE;
+
   int pg_dma_off  = pg_norm_num;
   int pg_dma_num  = dma_area_get_end_addr() / MMU_PAGE_GRANULE - pg_dma_off;
+
   int pg_shar_off = pg_dma_off + pg_norm_num;
   int pg_shar_num = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE - pg_shar_off;
+
   int pg_peri_off = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
   int pg_peri_num = (PERIPHERAL_ADDR_RANGE_END - PERIPHERAL_ADDR_RANGE_START) / MMU_PAGE_GRANULE;
+
   int pg_locl_off = LOCAL_PERIPH_ADDR_START / MMU_PAGE_GRANULE;
   int pg_locl_num = (LOCAL_PERIPH_ADDR_END - LOCAL_PERIPH_ADDR_START) / MMU_PAGE_GRANULE;
 
@@ -348,25 +458,25 @@ void mmu_init(void)
   mmu_info.pt_config.pa_start = 0;
   mmu_info.pt_config.pa_end = LOCAL_PERIPH_ADDR_END;//(uint64_t)2 * 1024 * 1024 * 1024;
 
-  DECL_RANGE(pg_norm_off, pg_norm_num, NORMAL);
-  DECL_RANGE(pg_dma_off , pg_dma_num , DEV_NGNRE);
-  DECL_RANGE(pg_shar_off, pg_shar_num, NORMAL2);
-  DECL_RANGE(pg_peri_off, pg_peri_num, DEV_NGNRE);
-  DECL_RANGE(pg_locl_off, pg_locl_num, DEV_NGNRE);
+  DECL_RANGE(pg_norm_off, pg_norm_num, NORMAL, SH_BITS_OUTER_SHAREABLE);
+  DECL_RANGE(pg_dma_off , pg_dma_num , MMIO, SH_BITS_OUTER_SHAREABLE);
+  DECL_RANGE(pg_shar_off, pg_shar_num, NORMAL2, SH_BITS_OUTER_SHAREABLE);
+  DECL_RANGE(pg_peri_off, pg_peri_num, DEV_NGNRE, SH_BITS_OUTER_SHAREABLE);
+  DECL_RANGE(pg_locl_off, pg_locl_num, DEV_NGNRE, SH_BITS_OUTER_SHAREABLE);
 
   mmu_info.pt_config.num_ranges = num_ranges;
-  pt_config_print(&mmu_info.pt_config);
 
   memset(&mmu_info.mair_repr, 0, sizeof(mmu_info.mair_repr));
 
   // memory region attributes of 0xff enable stxr / ldxr operations
-  mmu_info.mair_repr.memattrs[MEMATTR_IDX_NORMAL]   = MAKE_MEMATTR_NORMAL(
+  mmu_info.mair_repr.memattrs[MEMATTR_IDX_NORMAL]    = MAKE_MEMATTR_NORMAL(
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
   mmu_info.mair_repr.memattrs[MEMATTR_IDX_DEV_NGNRE] = MEMATTR_DEVICE_NGNRE;
   mmu_info.mair_repr.memattrs[MEMATTR_IDX_NORMAL2]   = MAKE_MEMATTR_NORMAL(
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA),
       MEMATTR_WRITEBACK_NONTRANS(MEMATTR_RA, MEMATTR_WA));
+  mmu_info.mair_repr.memattrs[MEMATTR_IDX_MMIO]      = MEMATTR_DEVICE_NGNRE;
 
   armv8_set_mair_el1(mair_repr_64_to_value(&mmu_info.mair_repr));
 
@@ -378,6 +488,7 @@ void mmu_init(void)
     mmu_info.pt_config.base_address,
     mmu_info.pt_config.base_address);
   // dcache_flush(&mmu_info, sizeof(mmu_info));
+  pt_config_print(&mmu_info.pt_config);
   mmu_self_test();
 }
 
