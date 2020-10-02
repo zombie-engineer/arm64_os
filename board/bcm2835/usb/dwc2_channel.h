@@ -48,6 +48,11 @@ static inline int dwc2_channel_get_max_packet_size(struct dwc2_channel *c)
   return dwc2_channel_get_pipe_safe(c)->max_packet_size;
 }
 
+static inline int dwc2_channel_get_direction(struct dwc2_channel *c)
+{
+  return dwc2_channel_get_pipe_safe(c)->endpoint_dir;
+}
+
 static inline int dwc2_channel_get_ep_num(struct dwc2_channel *c)
 {
   return dwc2_channel_get_pipe_safe(c)->endpoint_num;
