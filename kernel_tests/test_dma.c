@@ -5,6 +5,23 @@
 #include <delays.h>
 #include <reg_access.h>
 #include <memory.h>
+#include <mmu.h>
+
+#define DMA_CS_0       ((reg32_t)0x3f007000)
+#define DMA_CB_ADDR_0  ((reg32_t)0x3f007004)
+#define DMA_TI_0       ((reg32_t)0x3f007008)
+#define DMA_SRC_0      ((reg32_t)0x3f00700c)
+#define DMA_DST_0      ((reg32_t)0x3f007010)
+#define DMA_TXFR_LEN_0 ((reg32_t)0x3f007014)
+#define DMA_STRIDE_0   ((reg32_t)0x3f007018)
+#define DMA_NEXT_CB_0  ((reg32_t)0x3f00701c)
+#define DMA_DEBUG_0    ((reg32_t)0x3f007020)
+#define DMA_INT        ((reg32_t)0x3f007fe0)
+#define DMA_ENA        ((reg32_t)0x3f007ff0)
+
+#define DMA_CS_ACTIVE (1<<0)
+#define DMA_CS_END    (1<<1)
+#define DMA_CS_RESET  (1<<31)
 
 static inline void test_mmio_dma_flush(const char *tag, void *addr, int sz, int mmu_on)
 {
@@ -32,18 +49,6 @@ static inline void test_mmio_dma_prep_dst(char *dst, int sz, int mmu_on)
   memset(dst, 0x11, sz);
   test_mmio_dma_flush("dst", dst, sz, mmu_on);
 }
-
-#define DMA_CS_0       ((reg32_t)0x3f007000)
-#define DMA_CB_ADDR_0  ((reg32_t)0x3f007004)
-#define DMA_TI_0       ((reg32_t)0x3f007008)
-#define DMA_SRC_0      ((reg32_t)0x3f00700c)
-#define DMA_DST_0      ((reg32_t)0x3f007010)
-#define DMA_TXFR_LEN_0 ((reg32_t)0x3f007014)
-#define DMA_STRIDE_0   ((reg32_t)0x3f007018)
-#define DMA_NEXT_CB_0  ((reg32_t)0x3f00701c)
-#define DMA_DEBUG_0    ((reg32_t)0x3f007020)
-#define DMA_INT        ((reg32_t)0x3f007fe0)
-#define DMA_ENA        ((reg32_t)0x3f007ff0)
 
 static inline void test_mmio_dump_dma(const char *tag)
 {
@@ -81,8 +86,10 @@ static inline void test_mmio_dma_init(void)
 void test_mmio_dma(int mmu_on)
 {
   char src[512] ALIGNED(1024);
-  // char dst[512] ALIGNED(1024) ;
   char *dst = (char *)0x13d2000;
+  if (mmu_on) {
+    mmu_print_va((uint64_t)dst, 1);
+  }
 
   struct dma_control_block cb ALIGNED(256);
 
@@ -91,10 +98,6 @@ void test_mmio_dma(int mmu_on)
   test_mmio_dma_prep_cb(&cb, src, dst, sizeof(src));
 
   test_mmio_dma_init();
-
-#define DMA_CS_ACTIVE (1<<0)
-#define DMA_CS_END    (1<<1)
-#define DMA_CS_RESET  (1<<31)
 
   printf("Resetting" __endline);
   write_reg(DMA_CS_0, DMA_CS_RESET);
