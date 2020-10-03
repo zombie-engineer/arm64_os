@@ -391,28 +391,34 @@ static inline void par_to_string(uint64_t par, char *par_desc, int par_desc_len)
   snprintf(par_desc, par_desc_len, "memattr:%02x,sh:%d(%s)", memattr, sh, sh_str);
 }
 
+void mmu_print_va(uint64_t addr, int verbose)
+{
+    uint64_t va = addr;
+    uint64_t par = 0xffffffff;
+    char par_desc[256];
+    char attr_desc[256];
+    char memattr;
+    asm volatile ("at s1e1r, %1\nmrs %0, PAR_EL1" : "=r"(par) : "r"(va));
+    par_to_string(par, par_desc, sizeof(par_desc));
+    printf("MMUINFO: VA:%016llx -> PAR:%016llx %s" __endline, va, par, par_desc);
+    if (verbose) {
+      attr_desc[0] = 0;
+      memattr = (par >> 56) & 0xff;
+      mair_to_string(memattr, attr_desc, sizeof(attr_desc));
+      printf("-------: MEMATTR:%02x %s" __endline, memattr, attr_desc);
+    }
+}
+
 void mmu_self_test(void)
 {
-  {
-#define check_translation(addr) {\
-    uint64_t va = addr;\
-    uint64_t par = 0xffffffff;\
-    char par_desc[256];\
-    asm volatile ("at s1e1r, %1\nmrs %0, PAR_EL1" : "=r"(par) : "r"(va));\
-    par_to_string(par, par_desc, sizeof(par_desc));\
-    printf("----%016llx -> %016llx %s" __endline, va, par, par_desc);\
-}
-    check_translation(0);
-    check_translation(0x80000);
-    check_translation(0x3f000000);
-    check_translation(0x3fffffff);
-    check_translation(0x40000000);
-    check_translation(0x40000040);
-    check_translation(0x013d2000);
-    check_translation(0xb64400);
-    printf("%llx\r\n", *(uint64_t*)0x013d2000);
-    *(uint64_t*)0x013d2000 = 0x6666;
-  }
+  mmu_print_va(0, 0);
+  mmu_print_va(0x80000, 0);
+  mmu_print_va(0x3f000000, 0);
+  mmu_print_va(0x3fffffff, 0);
+  mmu_print_va(0x40000000, 0);
+  mmu_print_va(0x40000040, 0);
+  mmu_print_va(0x013d2000, 0);
+  mmu_print_va(0xb64400, 0);
 }
 
 #define DECL_RANGE(__start, __num, __memattr, __sh) \
