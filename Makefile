@@ -23,7 +23,8 @@ WARNINGS_AS_ERR := \
  	-Werror=int-conversion\
 	-Werror=implicit-function-declaration\
 	-Werror=shift-count-overflow\
-  -Werror=unused-value
+  -Werror=unused-value\
+	-Wparentheses
 
 CFLAGS = $(WARNINGS_AS_ERR) -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
