@@ -64,7 +64,8 @@ OBJS := \
 	unhandled_exception.o\
 	vcanvas.o\
 	viewport_console.o\
-	video_console.o
+	video_console.o\
+	kernel_tests/test_dma.o
 
 all: kernel8.img
 

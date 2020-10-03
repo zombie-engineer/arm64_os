@@ -45,6 +45,14 @@
 #include <drivers/servo/sg90.h>
 #include <drivers/usb/usbd.h>
 
+/*
+ * This is a garbage can for all possible test code
+ * injected straight into main function for fast
+ * development and experiments.
+ * Leave your litter in that file.
+ */
+#include <kernel_tests.h>
+
   // hexdump_addr(0x100);
   // 0x0000000000001122
   // PARange  2: 40 bits, 1TB 0x2
@@ -1036,7 +1044,9 @@ void main()
   //    bsc_slave_debug();
   //  while(1);
 
+  test_mmio_dma(0);
   mmu_init();
+  test_mmio_dma(1);
   print_memory_map();
   // test_pic(19);
   // nokia5110_draw_text("MMU OK!", 0, 0);
