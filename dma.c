@@ -71,7 +71,7 @@
 #define DMA_DEBUG_LITE                    (1 << 28)
 
 
-static ALIGNED(32) dma_cb_t dma_channels[16];
+static ALIGNED(32) struct dma_control_block dma_channels[16];
 
 int dma_set_transfer_width(int channel, int width)
 {
@@ -89,7 +89,7 @@ int dma_set_transfer_width(int channel, int width)
   return ERR_OK;
 }
 
-int dma_set_control_block(int channel, dma_cb_t *cb)
+int dma_set_control_block(int channel, struct dma_control_block *cb)
 {
   *DMA_CONBLK_AD(channel) = RAM_PHY_TO_BUS_UNCACHED(cb);
   return ERR_OK;
@@ -132,7 +132,7 @@ int dma_reset(int channel)
 
 int dma_setup(dma_ch_opts_t *o)
 {
-  dma_cb_t *cb = &dma_channels[o->channel];
+  struct dma_control_block *cb = &dma_channels[o->channel];
 
   cb->ti = DMA_TI_PERMAP(((o->src_dreq) | (o->dst_dreq)))
          | (o->src_inc  ? DMA_TI_SRC_INC   : 0)
