@@ -224,18 +224,22 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 
 char tft_lcd_canvas[DISPLAY_WIDTH * DISPLAY_HEIGHT * 3];
 
-void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, int offset, int read_size)
+void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, char *dst, int offset, int read_size, int clean_first)
 {
   int err;
-  uint64_t *ptr = (uint64_t *)(tft_lcd_canvas + offset + read_size - 8);
+  uint64_t *ptr = (uint64_t *)(dst + read_size - 8);
   while(1) {
     *ptr = 0;
-    // memset(tft_lcd_canvas + offset, 0, read_size);
-    err = usb_mass_read(m, offset, tft_lcd_canvas + offset, read_size);
+    if (clean_first) {
+      memset(dst, 0, read_size);
+      dcache_flush(dst, read_size);
+    }
+    err = usb_mass_read(m, offset, dst, read_size);
     if (err != ERR_OK) {
       printf("tft_lcd: failed to read mass storage device\r\n");
       break;
     }
+    dcache_flush(dst, read_size);
     if (*ptr)
       break;
     printf("tft_lcd: buf is zero at offset %d\r\n", offset);
@@ -245,8 +249,7 @@ void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, int offset, in
 void OPTIMIZED display_payload(void)
 {
   int i, y;
-  char buf[256];
-  const char *ptr;
+  char *ptr;
   hcd_mass_t *m = NULL;
 
   m = detect_any_usb_mass_device();
@@ -254,21 +257,21 @@ void OPTIMIZED display_payload(void)
     goto err;
   }
 
-  printf("mass storage device found\r\n");
-  memset(buf, 0, sizeof(buf));
   dcache_flush(m, sizeof(*m));
   dcache_flush(m->d, sizeof(*(m->d)));
+  printf("mass storage device found\r\n");
+  ptr = (char *)0x03d2000;
+
+  printf("dma_buf allocated: %p(%d)\r\n", ptr, 4096);
   memset(tft_lcd_canvas, 0xcc, sizeof(tft_lcd_canvas));
-  dcache_flush(tft_lcd_canvas, sizeof(tft_lcd_canvas));
 
   tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
-#define READ_SIZE (512 * 16)
+#define READ_SIZE (512 * 8)
   for (i = 0; i < sizeof(tft_lcd_canvas) / READ_SIZE; ++i) {
-    display_read_frame(gpio_pin_dc, m, i * READ_SIZE, READ_SIZE);
-    //printf("reading i:%d, offset:%d\r\n", i, i * 512);
-    // hexdump_memory(tft_lcd_canvas, 1024);
+    display_read_frame(gpio_pin_dc, m, ptr, i * READ_SIZE, READ_SIZE, 1);
+    memcpy(tft_lcd_canvas + i * READ_SIZE, ptr, READ_SIZE);
   }
-  display_read_frame(gpio_pin_dc, m, i * READ_SIZE, 1024);
+  display_read_frame(gpio_pin_dc, m, ptr, i * READ_SIZE, 1024, 1);
 
   SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, tft_lcd_canvas, sizeof(tft_lcd_canvas));
   while(1);
