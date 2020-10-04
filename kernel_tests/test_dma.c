@@ -41,6 +41,7 @@ static inline void test_mmio_dma_prep_src(char *src, int sz, int mmu_on)
   for (i = 0; i < sz; ++i)
     src[i] = (i + mmu_on * 0xe0) & 0xff;
   test_mmio_dma_flush("src", src, sz, mmu_on);
+  hexdump_memory_ex("src", 32, src, 8);
 }
 
 static inline void test_mmio_dma_prep_dst(char *dst, int sz, int mmu_on)
@@ -48,6 +49,7 @@ static inline void test_mmio_dma_prep_dst(char *dst, int sz, int mmu_on)
   printf("dst:%p" __endline, dst);
   memset(dst, 0x11, sz);
   test_mmio_dma_flush("dst", dst, sz, mmu_on);
+  hexdump_memory_ex("dst", 32, dst, 8);
 }
 
 static inline void test_mmio_dump_dma(const char *tag)
@@ -85,7 +87,7 @@ static inline void test_mmio_dma_init(void)
 
 void test_mmio_dma(int mmu_on)
 {
-  char src[512] ALIGNED(1024);
+  char src[512] ALIGNED(64);
   char *dst = (char *)0x13d2000;
   if (mmu_on) {
     mmu_print_va((uint64_t)dst, 1);
@@ -114,11 +116,11 @@ void test_mmio_dma(int mmu_on)
   while((read_reg(DMA_CS_0) & 3) != 2) {
     puts("Transfer not completed yet"__endline);
     test_mmio_dump_dma("in flight");
-    wait_msec(500);
   }
 
   puts("DMA transfer is complete" __endline);
   write_reg(DMA_CS_0, DMA_CS_END);
   test_mmio_dma_flush("dst,post", dst, sizeof(src), mmu_on);
-  hexdump_memory_ex("after_copy dst", 32, dst, 128);
+  hexdump_memory_ex("after_copy dst", 32, dst + 0 , 8);
+  hexdump_memory_ex("after_copy dst", 32, dst + 64, 8);
 }
