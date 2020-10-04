@@ -1044,9 +1044,10 @@ void main()
   //    bsc_slave_debug();
   //  while(1);
 
-  test_mmio_dma(0);
+  test_mmio_dma(false, false);
   mmu_init();
-  test_mmio_dma(1);
+  test_mmio_dma(true, true);
+  while(1);
   print_memory_map();
   // test_pic(19);
   // nokia5110_draw_text("MMU OK!", 0, 0);

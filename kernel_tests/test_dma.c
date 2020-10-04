@@ -23,32 +23,55 @@
 #define DMA_CS_END    (1<<1)
 #define DMA_CS_RESET  (1<<31)
 
-static inline void test_mmio_dma_flush(const char *tag, void *addr, int sz, int mmu_on)
+static inline void test_mmio_dma_flush(
+  const char *tag,
+  void *addr,
+  int sz,
+  int mmu_on,
+  int is_device_memory)
 {
+  bool should_flush = mmu_on && !is_device_memory;
   printf("MMU %s. %s cache (\"%s\") at %p(+%d)"__endline,
     mmu_on ? "on" : "off",
-    mmu_on ? "Flushing" : "Not flushing",
+    should_flush ? "Flushing" : "Not flushing",
     tag, addr, sz);
 
-  if (mmu_on)
+  if (should_flush)
     dcache_flush(addr, sz);
 }
 
-static inline void test_mmio_dma_prep_src(char *src, int sz, int mmu_on)
+static inline void test_mmio_dma_invalidate_cache(
+  const char *tag,
+  void *addr,
+  int sz,
+  int mmu_on,
+  int is_device_memory)
+{
+  bool should_inval = mmu_on && !is_device_memory;
+  printf("MMU %s. %s cache (\"%s\") at %p(+%d)"__endline,
+    mmu_on ? "on" : "off",
+    should_inval ? "Flushing" : "Not flushing",
+    tag, addr, sz);
+
+  if (should_inval)
+    dcache_invalidate(addr, sz);
+}
+
+static inline void test_mmio_dma_prep_src(char *src, int sz, int mmu_on, int is_device_mem)
 {
   int i;
   printf("src:%p" __endline, src);
   for (i = 0; i < sz; ++i)
     src[i] = (i + mmu_on * 0xe0) & 0xff;
-  test_mmio_dma_flush("src", src, sz, mmu_on);
+  test_mmio_dma_flush("src", src, sz, mmu_on, is_device_mem);
   hexdump_memory_ex("src", 32, src, 8);
 }
 
-static inline void test_mmio_dma_prep_dst(char *dst, int sz, int mmu_on)
+static inline void test_mmio_dma_prep_dst(char *dst, int sz, int mmu_on, int is_device_mem)
 {
   printf("dst:%p" __endline, dst);
   memset(dst, 0x11, sz);
-  test_mmio_dma_flush("dst", dst, sz, mmu_on);
+  test_mmio_dma_flush("dst", dst, sz, mmu_on, is_device_mem);
   hexdump_memory_ex("dst", 32, dst, 8);
 }
 
@@ -66,13 +89,20 @@ static inline void test_mmio_dump_dma(const char *tag)
   );
 }
 
-static inline void test_mmio_dma_prep_cb(struct dma_control_block *c, char *src, char *dst, int sz)
+static inline void test_mmio_dma_prep_cb(
+  struct dma_control_block *c,
+  char *src,
+  char *dst,
+  int sz,
+  bool mmu_on,
+  bool is_device_mem)
 {
   memset(c, 0, sizeof(*c));
   c->ti = DMA_TI_DEST_INC|DMA_TI_SRC_INC|DMA_TI_WAIT_RESP;
   c->src_addr = RAM_PHY_TO_BUS_UNCACHED(src);
   c->dst_addr = RAM_PHY_TO_BUS_UNCACHED(dst);
   c->transfer_length = sz;
+  test_mmio_dma_flush("cb", c, sizeof(*c), mmu_on, is_device_mem);
 }
 
 static inline void test_mmio_dma_init(void)
@@ -85,19 +115,26 @@ static inline void test_mmio_dma_init(void)
 
 }
 
-void test_mmio_dma(int mmu_on)
+void test_mmio_dma(int mmu_on, int dst_is_device_memory)
 {
   char src[512] ALIGNED(64);
-  char *dst = (char *)0x13d2000;
+  char localdst[512] ALIGNED(64);
+  char *dst;
+  if (dst_is_device_memory)
+    dst = (char *)0x13d2000;
+  else
+    dst = localdst;
+
   if (mmu_on) {
     mmu_print_va((uint64_t)dst, 1);
   }
 
+  /* 256 byte alignment is required by DMA controller */
   struct dma_control_block cb ALIGNED(256);
 
-  test_mmio_dma_prep_src(src, sizeof(src), mmu_on);
-  test_mmio_dma_prep_dst(dst, sizeof(src), mmu_on);
-  test_mmio_dma_prep_cb(&cb, src, dst, sizeof(src));
+  test_mmio_dma_prep_src(src, sizeof(src), mmu_on, 0 /* not device mem */);
+  test_mmio_dma_prep_dst(dst, sizeof(src), mmu_on, dst_is_device_memory);
+  test_mmio_dma_prep_cb(&cb, src, dst, sizeof(src), mmu_on, 0 /* not device mem */);
 
   test_mmio_dma_init();
 
@@ -106,7 +143,6 @@ void test_mmio_dma(int mmu_on)
   write_reg(DMA_CS_0, DMA_CS_END);
 
   printf("Setting control block" __endline);
-  test_mmio_dma_flush("cb", &cb, sizeof(cb), mmu_on);
   write_reg(DMA_CB_ADDR_0, RAM_PHY_TO_BUS_UNCACHED(&cb));
 
   test_mmio_dump_dma("before start");
@@ -120,7 +156,8 @@ void test_mmio_dma(int mmu_on)
 
   puts("DMA transfer is complete" __endline);
   write_reg(DMA_CS_0, DMA_CS_END);
-  test_mmio_dma_flush("dst,post", dst, sizeof(src), mmu_on);
+
+  test_mmio_dma_invalidate_cache("dst,post", dst, sizeof(src), mmu_on, dst_is_device_memory);
   hexdump_memory_ex("after_copy dst", 32, dst + 0 , 8);
   hexdump_memory_ex("after_copy dst", 32, dst + 64, 8);
 }

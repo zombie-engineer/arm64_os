@@ -438,6 +438,30 @@ FUNC(dcache_clean_and_invalidate_rng):
   dsb sy
   ret
 
+FUNC(dcache_invalidate_rng):
+  /*
+   * 1. Get line width from
+   * CTR_EL0 DminLine [16:19]
+   * Log2 of number of words in the smallest cache line
+   */
+  mrs  x3, CTR_EL0
+  lsr  x3, x3, #16
+  and  x3, x3, #0xf
+  mov  x2, #4
+  lsl  x2, x2, x3
+  /* Now we know cache line size in x2 */
+  sub x3, x2, #1
+                       // x0 = aligned(start)
+                       // align address to cache line offset
+  bic x0, x0, x3   // x0 = start & ~(4^(DminLine) - 1)
+1:
+  dc  ivac, x0    // clean & invalidate data or unified cache
+  add x0, x0, x2   // x0 += DminLine
+  cmp x0, x1       // check end reached
+  b.lo  1b
+  dsb sy
+  ret
+
 FUNC(dcache_line_width):
   /*
    * IN CTL_EL0 DminLine is Log2 of number of WORDS(4bytes)

@@ -1,4 +1,5 @@
 #pragma once
+#include <types.h>
 
 /*
  * This is a garbage can for all possible test code
@@ -7,4 +8,4 @@
  * Leave your litter in that file.
  */
 
-void test_mmio_dma(int mmu_on);
+void test_mmio_dma(bool mmu_on, bool dst_is_device_mem);
