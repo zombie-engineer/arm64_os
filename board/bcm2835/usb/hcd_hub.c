@@ -221,12 +221,30 @@ out_err:
   return err;
 }
 
+int usb_hub_read_all_port_status(usb_hub_t *h, const char *tag)
+{
+  char buf[512];
+  int err, port;
+  struct usb_hub_port_status port_status ALIGNED(4);
+
+  for (port = 0; port < h->descriptor.port_count; ++port) {
+    memset(buf, 0, sizeof(buf));
+    err = usb_hub_port_get_status(h, port, &port_status);
+    usb_status_to_string(&port_status, buf, sizeof(buf));
+
+    HUBPORTLOG("get_port_status(%s): port:%d,err:%d,%s", tag, port, err, buf);
+  }
+  return err;
+}
+
 int usb_hub_power_on_ports(usb_hub_t *h)
 {
   int port, err;
   uint32_t delay;
-
   err = ERR_OK;
+
+  err = usb_hub_read_all_port_status(h, "before power on");
+
 	HUBDBG("powering on all %d ports", h->descriptor.port_count);
   for (port = 0; port < h->descriptor.port_count; ++port) {
     wait_msec(100);
@@ -241,6 +259,9 @@ int usb_hub_power_on_ports(usb_hub_t *h)
   delay = h->descriptor.power_good_delay * 2 + 100;
   HUBLOG("power_good_delay: %d msec", delay);
   wait_msec(delay);
+
+  err = usb_hub_read_all_port_status(h, "after power on");
+
   for (port = 0; port < h->descriptor.port_count; ++port) {
     err = usb_hub_port_check_connection(h, port);
     if (err != ERR_OK) {
