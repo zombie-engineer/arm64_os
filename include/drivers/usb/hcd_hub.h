@@ -127,4 +127,9 @@ static inline int usb_hub_port_power_on(usb_hub_t *h, int port)
   return usb_hub_port_set_feature(h, port, USB_HUB_FEATURE_PORT_POWER);
 }
 
+static inline int usb_hub_port_power_off(usb_hub_t *h, int port)
+{
+  return usb_hub_port_clear_feature(h, port, USB_HUB_FEATURE_PORT_POWER);
+}
+
 int usb_hub_probe_ports(usb_hub_t *h);
