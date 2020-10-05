@@ -665,8 +665,20 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
 
   xfer_complete = USB_HOST_INTR_GET_XFER_COMPLETE(old_intr);
   if (!xfer_complete) {
-    puts("NOT xfer_completed\r\n");
-    return;
+    printf("NOT xfer_completed:\n");
+    DWCERR("old_intr: %08x, new_intr: %08x tsz: %08x,%s,dev_addr:%d,%s,%s",
+      old_intr, intr, siz,
+      usb_transfer_type_to_string(ep_type),
+      dwc2_channel_get_device_address(c),
+      usb_speed_to_string(dwc2_channel_get_pipe_speed(c)),
+      usb_direction_to_string(c->ctl->direction));
+    if (dwc2_channel_is_split_enabled(c)) {
+      puts("SPLIT enabled\r\n");
+    }
+    else  {
+      puts("SPLIT not enabled\r\n");
+      return;
+    }
   }
 
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
@@ -755,7 +767,6 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
       DWCERR("+++ %08x\n", intr);
     }
   }
-  // putc('#');
 }
 
 static inline void dwc2_irq_handle_channel_int(void)
