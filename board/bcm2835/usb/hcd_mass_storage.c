@@ -95,16 +95,16 @@ static inline void scsi_fill_cmd_test_unit_ready(struct scsi_op_inquiry *op)
   op->control = 0;
 }
 
+static int usb_mass_log_level = 0;
+
 static inline void csw_print(struct csw *s)
 {
-  printf("CSW: %08x:%08x:data_residue:%d,status:%d\r\n",
+  MASSDBG("CSW: %08x:%08x:data_residue:%d,status:%d\r\n",
     s->csw_signature,
     s->csw_tag,
     s->csw_data_residue,
     s->csw_status);
 }
-
-static int usb_mass_log_level = 0;
 
 int usb_mass_reset_recovery(hcd_mass_t *m)
 {
@@ -273,21 +273,21 @@ out_err:
 }
 
 static int usb_mass_read10(hcd_mass_t *m,
-  int lun, uint32_t offset, void *data_dst, int data_sz)
+  int lun, void *dst, uint32_t offset, int size)
 {
   int err;
   int csw_status = 0;
   struct scsi_op_read_10 cmd ALIGNED(4) = { 0 };
   cmd.opcode = SCSI_OPCODE_READ_10;
   set_unaligned_32_le(&cmd.lba, offset / 512);
-  set_unaligned_16_le(&cmd.transfer_len, data_sz / 512);
+  set_unaligned_16_le(&cmd.transfer_len, size / 512);
   // MASSLOG("READ(10) offset:%08x, size:%08x", offset, data_sz);
   // usb_mass_set_log_level(10);
   // usb_hcd_set_log_level(10);
   // dwc2_set_log_level(10);
 
   // memset(data_dst, 0, data_sz);
-  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, data_dst, data_sz, &csw_status);
+  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, dst, size, &csw_status);
   CHECK_ERR("READ(10) command failed");
 out_err:
   return err;
@@ -461,10 +461,10 @@ void usb_mass_deinit_class(hcd_mass_t* m)
     usb_hcd_deallocate_mass(m);
 }
 
-int usb_mass_read(hcd_mass_t *m, uint32_t offset, void *buf, int bufsz)
+int usb_mass_read(hcd_mass_t *m, void *dst, uint32_t offset, int size)
 {
   int err;
-  err = usb_mass_read10(m, 0, offset, buf, bufsz);
+  err = usb_mass_read10(m, 0, dst, offset, size);
   return err;
 }
 
@@ -473,7 +473,7 @@ static int usb_mass_read_debug(hcd_mass_t *m)
   int err;
   char buf[512];
   memset(buf, 0x66, sizeof(buf));
-  err = usb_mass_read10(m, 0, 0, buf, sizeof(buf));
+  err = usb_mass_read10(m, 0, buf, 0, sizeof(buf));
   CHECK_ERR("usb_mass_read10 failed");
 out_err:
   return err;

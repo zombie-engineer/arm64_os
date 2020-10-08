@@ -222,33 +222,28 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 #include <drivers/usb/hcd.h>
 #include <drivers/usb/usb_mass_storage.h>
 
-char tft_lcd_canvas[DISPLAY_WIDTH * DISPLAY_HEIGHT * 3];
+#define BYTES_PER_PIXEL 3
+#define BYTES_PER_FRAME (DISPLAY_WIDTH * DISPLAY_HEIGHT * BYTES_PER_PIXEL)
+#define NUM_FRAMES 2
+static char tft_lcd_canvas[BYTES_PER_FRAME * NUM_FRAMES];
 
-void OPTIMIZED display_read_frame(int gpio_pin_dc, hcd_mass_t *m, char *dst, int offset, int read_size, int clean_first)
+int OPTIMIZED display_read_frame(
+  hcd_mass_t *m,
+  char *dst,
+  int offset,
+  int read_size)
 {
   int err;
-  uint64_t *ptr = (uint64_t *)(dst + read_size - 8);
-  while(1) {
-    *ptr = 0;
-    if (clean_first) {
-      memset(dst, 0, read_size);
-      dcache_flush(dst, read_size);
-    }
-    err = usb_mass_read(m, offset, dst, read_size);
-    if (err != ERR_OK) {
-      printf("tft_lcd: failed to read mass storage device\r\n");
-      break;
-    }
-    dcache_flush(dst, read_size);
-    if (*ptr)
-      break;
-    printf("tft_lcd: buf is zero at offset %d\r\n", offset);
+  err = usb_mass_read(m, dst, offset, read_size);
+  if (err != ERR_OK) {
+    printf("tft_lcd: failed to read mass storage device\r\n");
   }
+  return err;
 }
 
 void OPTIMIZED display_payload(void)
 {
-  int i, y;
+  int i;
   char *ptr;
   hcd_mass_t *m = NULL;
 
@@ -266,24 +261,14 @@ void OPTIMIZED display_payload(void)
   memset(tft_lcd_canvas, 0xcc, sizeof(tft_lcd_canvas));
 
   tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
-#define READ_SIZE (512 * 8)
+#define READ_SIZE (512 * 128)
   for (i = 0; i < sizeof(tft_lcd_canvas) / READ_SIZE; ++i) {
-    display_read_frame(gpio_pin_dc, m, ptr, i * READ_SIZE, READ_SIZE, 1);
+    display_read_frame(m, ptr, i * READ_SIZE, READ_SIZE);
     memcpy(tft_lcd_canvas + i * READ_SIZE, ptr, READ_SIZE);
   }
-  display_read_frame(gpio_pin_dc, m, ptr, i * READ_SIZE, 1024, 1);
+  display_read_frame(m, ptr, i * READ_SIZE, 1024);
 
   SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, tft_lcd_canvas, sizeof(tft_lcd_canvas));
-  while(1);
-  puts("end\r\n");
-  while(1);
-  ptr = tft_lcd_canvas;
-  for (y = 0; y < DISPLAY_HEIGHT; ++y) {
-    tft_set_region_coords(gpio_pin_dc, 0, y, DISPLAY_WIDTH - 1, y + 1);
-    SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, ptr, DISPLAY_WIDTH * 3);
-    ptr += DISPLAY_WIDTH * 3;
-  }
-
 err:
   while(1) {
     asm volatile("wfe");
