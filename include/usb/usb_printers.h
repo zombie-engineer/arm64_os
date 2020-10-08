@@ -321,26 +321,20 @@ static inline const char *usb_speed_to_string(int s)
 
 static inline int usb_status_to_string(struct usb_hub_port_status *s, char *buf, int bufsz)
 {
-  int n;
-  n = snprintf(buf, bufsz, "port status: ");
-  if (s->status.low_speed)
-    n += snprintf(buf + n, bufsz - n, "LS");
-  else if (s->status.high_speed)
-    n += snprintf(buf + n, bufsz - n, "HS");
-  else
-    n += snprintf(buf + n, bufsz - n, "FS");
+  return snprintf(buf, bufsz, "ST:%s%s%s%s%s%s%s%s%s CH:%s%s%s",
+    s->status.connected   ? " CONN" : "",
+    s->status.enabled     ? " ENA"  : "",
+    s->status.suspended   ? " SUS"  : "",
+    s->status.overcurrent ? " CURR"  : "",
 
-  return snprintf(buf + n, bufsz - n, "%s%s%s%s%s%s%s%s%s%s%s",
-    s->status.connected   ? " st:con" : "",
-    s->status.enabled     ? " st:ena"  : "",
-    s->status.suspended   ? " st:sus"  : "",
-    s->status.overcurrent ? " st:cur"  : "",
-    s->status.reset       ? " st:rst"  : "",
-    s->status.power       ? " st:pow"  : "",
-    s->status.low_speed   ? " st:low"  : "",
-    s->status.high_speed  ? " st:his"  : "",
-    s->change.connected_changed   ? " ch:con"  : "",
-    s->change.enabled_changed     ? " ch:ena"  : "",
-    s->change.overcurrent_changed ? " ch:cur"  : ""
+    s->status.reset       ? " RST"  : "",
+    s->status.power       ? " PWR"  : "",
+    s->status.low_speed   ? " LS"  : "",
+    s->status.high_speed  ? " HS"  : "",
+
+    (!s->status.low_speed && !s->status.high_speed)  ? " FS"  : "",
+    s->change.connected_changed   ? " CH_CON"  : "",
+    s->change.enabled_changed     ? " CH_ENA"  : "",
+    s->change.overcurrent_changed ? " CH_CUR"  : ""
   );
 }
