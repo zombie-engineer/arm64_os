@@ -210,7 +210,7 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
   return err;
 }
 
-static inline void hub_get_port_status(struct usb_hub_port_status *s)
+void root_hub_get_port_status(struct usb_hub_port_status *s)
 {
   uint32_t r = read_reg(USB_HPRT);
   RHDEBUG("dwc2 port status: %08x", r);
@@ -249,7 +249,7 @@ static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_by
       break;
     case USB_RQ_TYPE_HUB_GET_PORT_STATUS:
       if (index == 1) {
-        hub_get_port_status(&port_status);
+        root_hub_get_port_status(&port_status);
         reply = &port_status;
         reply_sz = sizeof(port_status);
       } else
