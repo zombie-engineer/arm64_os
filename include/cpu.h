@@ -109,6 +109,30 @@ uint64_t get_cpu_counter_64_freq(void);
  */
 uint64_t read_cpu_counter_64(void);
 
+/*
+ * time since boot in milliseconds
+ */
+static inline uint64_t get_boottime_msec(void)
+{
+  /*
+   *  19200000 counts = 1000 millisec
+   *  19200    counts = 1    millisec
+   *  CNT counts      = X millisec
+   *
+   *  X = CNT / 192000
+   *  X = (cnt * 1000) / (freq)
+   */
+  uint64_t freq, cnt;
+  asm volatile(
+    "mrs %0, cntfrq_el0\n"
+    "ubfx %0, %0, #0, #32\n"
+    "mrs %1, cntpct_el0\n"
+    :"=r"(freq), "=r"(cnt)
+    :
+    :"memory");
+  return (cnt * 1000) / freq;
+}
+
 void print_cpu_flags();
 
 int get_cpu_num();
