@@ -40,6 +40,7 @@ typedef struct tft_lcd_canvas_control {
 #define ILI9341_CMD_SET_CURSOR_X 0x2a
 #define ILI9341_CMD_SET_CURSOR_Y 0x2b
 #define ILI9341_CMD_WRITE_PIXELS 0x2c
+#define ILI9341_CMD_MEM_ACCESS_CONTROL 0x36
 #define ILI9341_CMD_WRITE_MEMORY_CONTINUE 0x3c
 #define ILI9341_CMD_POWER_CTL_A  0xcb
 #define ILI9341_CMD_POWER_CTL_B  0xcf
@@ -78,8 +79,13 @@ typedef struct tft_lcd_canvas_control {
 // lowest latency, perhaps 61 Hz might give least amount of tearing, although this can be quite subjective.
 #define ILI9341_UPDATE_FRAMERATE ILI9341_FRAMERATE_119_HZ
 
+#ifdef DISPLAY_MODE_PORTRAIT
 #define DISPLAY_WIDTH  240
 #define DISPLAY_HEIGHT 320
+#else
+#define DISPLAY_WIDTH  320
+#define DISPLAY_HEIGHT 240
+#endif
 
 #define SPI_CS   ((volatile uint32_t *)0x3f204000)
 #define SPI_FIFO ((volatile uint32_t *)0x3f204004)
@@ -224,7 +230,7 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 
 #define BYTES_PER_PIXEL 3
 #define BYTES_PER_FRAME (DISPLAY_WIDTH * DISPLAY_HEIGHT * BYTES_PER_PIXEL)
-#define NUM_FRAMES 72
+#define NUM_FRAMES 400
 static char tft_lcd_canvas[BYTES_PER_FRAME * NUM_FRAMES];
 
 int OPTIMIZED display_read_frame(
@@ -475,6 +481,7 @@ void OPTIMIZED tft_lcd_cube_animation(void)
 
 void OPTIMIZED tft_lcd_init(void)
 {
+  char data[8];
   // char data[512];
   gpio_pin_mosi  = 10;
   gpio_pin_miso  =  9;
@@ -511,12 +518,36 @@ void OPTIMIZED tft_lcd_init(void)
   wait_msec(5);
   SEND_CMD(ILI9341_CMD_DISPLAY_OFF);
 
-//  char data[8];
 //  data[0] = 0x39;
 //  data[1] = 0x2c;
 //  data[2] = 0x34;
 //  data[3] = 0x02;
 //  SEND_CMD_DATA(ILI9341_CMD_POWER_CTL_A, data, 4);
+//
+/* horizontal refresh direction */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_MH  (1<<2)
+/* pixel format default is bgr, with this flag it's rgb */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_BGR (1<<3)
+/* horizontal refresh direction */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_ML  (1<<4)
+/*
+ * swap rows and columns default is PORTRAIT, this flags makes it ALBUM
+ */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_MV  (1<<5)
+/* column address order */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_MX  (1<<6)
+/* row address order */
+#define ILI9341_CMD_MEM_ACCESS_CONTROL_MY  (1<<7)
+  data[0] = ILI9341_CMD_MEM_ACCESS_CONTROL_BGR
+#ifndef DISPLAY_MODE_PORTRAIT
+    | ILI9341_CMD_MEM_ACCESS_CONTROL_MV
+#endif
+  //  | ILI9341_CMD_MEM_ACCESS_CONTROL_ML
+  //  | ILI9341_CMD_MEM_ACCESS_CONTROL_MH
+  //  | ILI9341_CMD_MEM_ACCESS_CONTROL_MX
+  //  | ILI9341_CMD_MEM_ACCESS_CONTROL_MY
+  ;
+  SEND_CMD_DATA(ILI9341_CMD_MEM_ACCESS_CONTROL, data, 1);
 
   SEND_CMD(ILI9341_CMD_SLEEP_OUT);
   wait_msec(120);
