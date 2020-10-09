@@ -42,6 +42,11 @@ static inline int usb_hcd_hub_get_power_mode(struct usb_hcd_device_class_hub *h)
   return h->descriptor.attributes.raw16 & 3;
 }
 
+static inline int hcd_hub_get_power_on_delay(struct usb_hcd_device_class_hub *h)
+{
+  return h->descriptor.power_good_delay;
+}
+
 void usb_hcd_hub_destroy(struct usb_hcd_device_class_hub *h);
 
 void usb_hcd_hub_init();

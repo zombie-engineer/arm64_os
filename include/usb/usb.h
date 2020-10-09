@@ -229,7 +229,7 @@ struct usb_hub_port_status {
       uint16_t overcurrent : 1; // 3
       uint16_t reset       : 1; // 4
       uint16_t unused5     : 3; // 7:5
-      uint16_t power       : 1; // 8
+      uint16_t powered     : 1; // 8
       uint16_t low_speed   : 1; // 9
       uint16_t high_speed  : 1; // 10
       uint16_t test_mode   : 1; // 11

@@ -220,7 +220,7 @@ void root_hub_get_port_status(struct usb_hub_port_status *s)
   s->status.suspended   = USB_HPRT_GET_SUSP(r);
   s->status.overcurrent = USB_HPRT_GET_OVR_CURR_ACT(r);
   s->status.reset       = USB_HPRT_GET_RST(r);
-  s->status.power       = USB_HPRT_GET_PWR(r);
+  s->status.powered     = USB_HPRT_GET_PWR(r);
   s->status.low_speed   = USB_HPRT_GET_SPD(r) == USB_SPEED_LOW  ? 1 : 0;
   s->status.high_speed  = USB_HPRT_GET_SPD(r) == USB_SPEED_HIGH ? 1 : 0;
 
@@ -330,6 +330,7 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_ENABLE_CHANGE:
+        // case USB_PORT_STATUS_CH_BIT_ENABLED_CHANGED:(same)
           r = read_reg(USB_HPRT);
           r &= USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_EN_CHNG);
@@ -358,6 +359,7 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
           write_reg(USB_HPRT, r);
           break;
         case USB_HUB_FEATURE_CONNECTION_CHANGE:
+        case USB_PORT_STATUS_CH_BIT_CONNECTED_CHANGED:
           r = read_reg(USB_HPRT) & USB_HPRT_WRITE_MASK;
           BIT_SET_U32(r, USB_HPRT_CONN_DET);
           write_reg(USB_HPRT, r);

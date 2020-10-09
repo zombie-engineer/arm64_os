@@ -328,7 +328,7 @@ static inline int usb_status_to_string(struct usb_hub_port_status *s, char *buf,
     s->status.overcurrent ? " CURR"  : "",
 
     s->status.reset       ? " RST"  : "",
-    s->status.power       ? " PWR"  : "",
+    s->status.powered     ? " PWR"  : "",
     s->status.low_speed   ? " LS"  : "",
     s->status.high_speed  ? " HS"  : "",
 
