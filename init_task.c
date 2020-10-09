@@ -39,7 +39,7 @@ static int run_uart_thread()
 int usb_init_func()
 {
   usbd_init();
-  // usbd_print_device_tree();
+  usbd_print_device_tree();
   tft_lcd_init();
   tft_lcd_run();
   // usbd_monitor();
