@@ -224,7 +224,7 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 
 #define BYTES_PER_PIXEL 3
 #define BYTES_PER_FRAME (DISPLAY_WIDTH * DISPLAY_HEIGHT * BYTES_PER_PIXEL)
-#define NUM_FRAMES 2
+#define NUM_FRAMES 72
 static char tft_lcd_canvas[BYTES_PER_FRAME * NUM_FRAMES];
 
 int OPTIMIZED display_read_frame(
@@ -243,7 +243,7 @@ int OPTIMIZED display_read_frame(
 
 void OPTIMIZED display_payload(void)
 {
-  int i;
+  int i, frame;
   char *ptr;
   hcd_mass_t *m = NULL;
 
@@ -260,15 +260,24 @@ void OPTIMIZED display_payload(void)
   printf("dma_buf allocated: %p(%d)\r\n", ptr, 4096);
   memset(tft_lcd_canvas, 0xcc, sizeof(tft_lcd_canvas));
 
-  tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
-#define READ_SIZE (512 * 128)
-  for (i = 0; i < sizeof(tft_lcd_canvas) / READ_SIZE; ++i) {
-    display_read_frame(m, ptr, i * READ_SIZE, READ_SIZE);
-    memcpy(tft_lcd_canvas + i * READ_SIZE, ptr, READ_SIZE);
-  }
-  display_read_frame(m, ptr, i * READ_SIZE, 1024);
+#define READ_SIZE (512 * 512)
+  for (frame = 0; frame < NUM_FRAMES; frame++) {
+    for (i = 0; i < BYTES_PER_FRAME / READ_SIZE + 1; ++i) {
+      display_read_frame(m, ptr, frame * BYTES_PER_FRAME + i * READ_SIZE, READ_SIZE);
+      memcpy(tft_lcd_canvas + frame * BYTES_PER_FRAME + i * READ_SIZE, ptr, READ_SIZE);
+    }
 
-  SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, tft_lcd_canvas, sizeof(tft_lcd_canvas));
+  }
+  // display_read_frame(m, ptr, i * READ_SIZE, 1024);
+  while(1) {
+    for (frame = 0; frame < NUM_FRAMES; frame++) {
+      // tft_set_region_coords(gpio_pin_dc, 0, 0, 239, DISPLAY_HEIGHT - 1);
+      SEND_CMD_DATA(
+        ILI9341_CMD_WRITE_PIXELS,
+        tft_lcd_canvas + frame * BYTES_PER_FRAME,
+        BYTES_PER_FRAME);
+    }
+  }
 err:
   while(1) {
     asm volatile("wfe");
