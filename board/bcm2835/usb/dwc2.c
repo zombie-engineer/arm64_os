@@ -274,10 +274,10 @@ void dwc2_setup_fifo_sizes(int rx_fifo_sz, int non_periodic_fifo_sz, int periodi
   write_reg(USB_HPTXFSIZ, (periodic_fifo_sz<<16)|(rx_fifo_sz + non_periodic_fifo_sz));
 }
 
-void dwc2_set_otg_hnp(void)
+void dwc2_clear_otg_hnp(void)
 {
   uint32_t otg = read_reg(USB_GOTGCTL);
-  BIT_SET_U32(otg, USB_GOTGCTL_HST_SET_HNP_EN);
+  BIT_CLEAR_U32(otg, USB_GOTGCTL_HST_SET_HNP_EN);
   write_reg(USB_GOTGCTL, otg);
 }
 

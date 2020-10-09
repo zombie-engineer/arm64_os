@@ -74,8 +74,6 @@ static inline const char *usb_hcd_device_state_to_string(int s)
 
 DECL_STATIC_SLOT(struct usb_hcd_device, usb_hcd_device, 12)
 
-static int usb_utmi_initialized = 0;
-
 static struct list_head usb_devices = LIST_HEAD_INIT(usb_devices);
 static struct spinlock usb_devices_lock;
 
@@ -497,14 +495,17 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
    * address.
    */
   device_address = usb_hcd_allocate_device_address();
-  HCDDEBUG("setting device address to %d", device_address);
 
   err = usb_hcd_set_address(&dev->pipe0, device_address);
   CHECK_ERR_SILENT();
 
   dev->address = dev->pipe0.device_address = device_address;
+  HCDLOG("Device %04x:%04x was set to address %d",
+    hcd_device_get_vendor_id(dev),
+    hcd_device_get_product_id(dev),
+    device_address
+  );
 
-  wait_on_timer_ms(10);
   dev->state = USB_DEVICE_STATE_ADDRESSED;
 out_err:
   return err;
@@ -650,27 +651,23 @@ int usb_hcd_start()
   dwc2_start_vbus();
   dwc2_reset();
 
-  if (!usb_utmi_initialized) {
-    HCDLOG("initializing USB to UTMI+,no PHY");
-    dwc2_set_ulpi_no_phy();
-    dwc2_reset();
-    usb_utmi_initialized = 1;
-  }
+  HCDLOG("initializing USB to UTMI+,no PHY");
+  dwc2_set_ulpi_no_phy();
+  dwc2_reset();
 
   hs_iface = dwc2_get_hs_iface();
   fs_iface = dwc2_get_fs_iface();
 
   HCDLOG("HW config: high speed interface:%d(%s)", hs_iface, dwc2_hs_iface_to_string(hs_iface));
   HCDLOG("HW config: full speed interface:%d(%s)", fs_iface, dwc2_fs_iface_to_string(fs_iface));
-  if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED)
-    fsls_mode_ena = 1;
+  fsls_mode_ena = 1;
 
   dwc2_set_fsls_config(fsls_mode_ena);
   HCDLOG("ULPI: setting FSLS configuration to %sabled", fsls_mode_ena ? "en" : "dis");
 
   dwc2_set_dma_mode();
 
-  opmode = dwc2_get_op_mode();
+  opmode = DWC2_OP_MODE_NO_HNP_SRP_CAPABLE;
   dwc2_enable_channel_interrupts();
   HCDLOG("dwc2 op mode: %s", dwc2_op_mode_to_string(opmode));
   switch(opmode) {
@@ -704,17 +701,22 @@ int usb_hcd_start()
   dwc2_set_host_ls_support();
   HCDLOG("enabled host low-speed support");
 
+#define USB_RECV_FIFO_SIZE         1024
+#define USB_NON_PERIODIC_FIFO_SIZE 1024
+#define USB_PERIODIC_FIFO_SIZE     1024
+
   dwc2_setup_fifo_sizes(
     USB_RECV_FIFO_SIZE,
     USB_NON_PERIODIC_FIFO_SIZE,
     USB_PERIODIC_FIFO_SIZE);
+
   HCDLOG("fifos set to recv:%d non-peridic:%d periodic:%d",
     USB_RECV_FIFO_SIZE,
     USB_NON_PERIODIC_FIFO_SIZE,
     USB_PERIODIC_FIFO_SIZE);
 
-  dwc2_set_otg_hnp();
-	HCDLOG("OTG host is set with HNP enabled.");
+  dwc2_clear_otg_hnp();
+	 HCDLOG("OTG host is set with HNP disabled.");
 
   hcd_tx_fifo_flush(16);
   hcd_rx_fifo_flush();
@@ -769,7 +771,7 @@ static int usb_hcd_attach_root_hub()
    */
   usb_root_hub_device_number = USB_DEFAULT_ADDRESS;
   root_hub->state = USB_DEVICE_STATE_POWERED;
-  root_hub->pipe0.device_speed = USB_SPEED_FULL;
+  root_hub->pipe0.device_speed = USB_SPEED_HIGH;
   root_hub->pipe0.max_packet_size = 64;
   err = usb_hcd_enumerate_device(root_hub);
   if (err != ERR_OK)

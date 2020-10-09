@@ -175,6 +175,16 @@ static inline int usb_hcd_get_interface_class(struct usb_hcd_device *d, int inte
   return d->interfaces[interface_num].descriptor.class;
 }
 
+static inline int hcd_device_get_vendor_id(struct usb_hcd_device *d)
+{
+  return d->descriptor.id_vendor;
+}
+
+static inline int hcd_device_get_product_id(struct usb_hcd_device *d)
+{
+  return d->descriptor.id_product;
+}
+
 static inline struct usb_hcd_interface *hcd_device_get_interface(struct usb_hcd_device *d, int index)
 {
   if (d->num_interfaces <= index)

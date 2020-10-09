@@ -140,7 +140,7 @@ void dwc2_set_host_speed(dwc2_clk_speed_t);
 
 void dwc2_set_host_ls_support(void);
 
-void dwc2_set_otg_hnp(void);
+void dwc2_clear_otg_hnp(void);
 
 void dwc2_tx_fifo_flush(int fifonum);
 
