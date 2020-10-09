@@ -506,6 +506,7 @@ static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
     device_address
   );
 
+  // wait_on_timer_ms(10);
   dev->state = USB_DEVICE_STATE_ADDRESSED;
 out_err:
   return err;
@@ -634,12 +635,17 @@ static int hcd_tx_fifo_flush(int fifo)
 
 int usb_hcd_start()
 {
+  char buf[256];
+  struct usb_hub_port_status s;
   int err = ERR_OK;
   dwc2_fs_iface fs_iface;
   dwc2_hs_iface hs_iface;
   dwc2_op_mode_t opmode;
   int fsls_mode_ena = 0;
 
+  root_hub_get_port_status(&s);
+  usb_status_to_string(&s, buf, sizeof(buf));
+  printf("root_hub port 1 status: %s\r\n", buf);
   err = irq_set(get_cpu_num(), ARM_BASIC_USB, dwc2_irq_cb);
   dwc2_enable_ahb_interrupts();
   dwc2_clear_all_interrupts();
@@ -650,19 +656,29 @@ int usb_hcd_start()
 
   dwc2_start_vbus();
   dwc2_reset();
+  root_hub_get_port_status(&s);
+  usb_status_to_string(&s, buf, sizeof(buf));
+  printf("root_hub port 1 status (after reset 1): %s\r\n", buf);
 
   HCDLOG("initializing USB to UTMI+,no PHY");
   dwc2_set_ulpi_no_phy();
+  root_hub_get_port_status(&s);
+  usb_status_to_string(&s, buf, sizeof(buf));
+  printf("root_hub port 1 status (after set ulpi): %s\r\n", buf);
   dwc2_reset();
+  root_hub_get_port_status(&s);
+  usb_status_to_string(&s, buf, sizeof(buf));
+  printf("root_hub port 1 status (after reset 2): %s\r\n", buf);
 
   hs_iface = dwc2_get_hs_iface();
   fs_iface = dwc2_get_fs_iface();
 
   HCDLOG("HW config: high speed interface:%d(%s)", hs_iface, dwc2_hs_iface_to_string(hs_iface));
   HCDLOG("HW config: full speed interface:%d(%s)", fs_iface, dwc2_fs_iface_to_string(fs_iface));
+  // if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED)
   fsls_mode_ena = 1;
 
-  dwc2_set_fsls_config(fsls_mode_ena);
+  dwc2_set_fsls_config(1);
   HCDLOG("ULPI: setting FSLS configuration to %sabled", fsls_mode_ena ? "en" : "dis");
 
   dwc2_set_dma_mode();
@@ -690,15 +706,16 @@ int usb_hcd_start()
 
   HCDLOG("setting host clock...");
   dwc2_power_clock_off();
-  if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED && dwc2_is_ulpi_fs_ls_only()) {
-    dwc2_set_host_speed(DWC2_CLK_48MHZ);
-    HCDLOG("host clock set to 48MHz");
-  } else {
-    HCDLOG("host clock set to 30-60MHz");
-    dwc2_set_host_speed(DWC2_CLK_30_60MHZ);
-  }
-
-  dwc2_set_host_ls_support();
+  dwc2_set_host_speed(DWC2_CLK_48MHZ);
+//  if (hs_iface == DWC2_HS_I_ULPI && fs_iface == DWC2_FS_I_DEDICATED && dwc2_is_ulpi_fs_ls_only()) {
+//    dwc2_set_host_speed(DWC2_CLK_48MHZ);
+//    HCDLOG("host clock set to 48MHz");
+//  } else {
+//    HCDLOG("host clock set to 30-60MHz");
+//    dwc2_set_host_speed(DWC2_CLK_30_60MHZ);
+//  }
+//
+ // dwc2_set_host_ls_support();
   HCDLOG("enabled host low-speed support");
 
 #define USB_RECV_FIFO_SIZE         1024
@@ -716,7 +733,7 @@ int usb_hcd_start()
     USB_PERIODIC_FIFO_SIZE);
 
   dwc2_clear_otg_hnp();
-	 HCDLOG("OTG host is set with HNP disabled.");
+	// HCDLOG("OTG host is set with HNP enabled.");
 
   hcd_tx_fifo_flush(16);
   hcd_rx_fifo_flush();

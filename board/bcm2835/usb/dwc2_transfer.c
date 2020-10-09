@@ -230,11 +230,23 @@ static inline void dwc2_channel_start_transmit(struct dwc2_channel *c)
 {
   uint32_t chr;
   int ch_id = c->id;
+  int intsts;
+  int f;
+
+  disable_irq_save_flags(f);
+  intsts = read_reg(USB_GINTSTS);
+  USB_GINTSTS_CLR_SET_SOF(intsts, 1);
+  write_reg(USB_GINTSTS, intsts);
+  do {
+    //   printf("inter: %08x\r\n", intsts);
+    intsts = read_reg(USB_GINTSTS);
+  } while(!USB_GINTSTS_GET_SOF(intsts));
 
   GET_CHAR();
   USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
   USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
   SET_CHAR();
+  restore_irq_flags(f);
 }
 
 bool dwc2_channel_is_split_enabled(struct dwc2_channel *c)
