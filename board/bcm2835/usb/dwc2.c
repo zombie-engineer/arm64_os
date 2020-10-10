@@ -420,7 +420,7 @@ static inline void dwc2_hprt_to_port_status(uint32_t hprt, struct usb_hub_port_s
   s->status.suspended   = USB_HPRT_GET_SUSP(hprt);
   s->status.overcurrent = USB_HPRT_GET_OVR_CURR_ACT(hprt);
   s->status.reset       = USB_HPRT_GET_RST(hprt);
-  s->status.power       = USB_HPRT_GET_PWR(hprt);
+  s->status.powered     = USB_HPRT_GET_PWR(hprt);
   s->status.low_speed   = USB_HPRT_GET_SPD(hprt) == USB_SPEED_LOW  ? 1 : 0;
   s->status.high_speed  = USB_HPRT_GET_SPD(hprt) == USB_SPEED_HIGH ? 1 : 0;
 
@@ -734,7 +734,7 @@ static inline void dwc2_irq_handle_channel_int_one(int ch_id)
   c = dwc2_channel_get_by_id(ch_id);
   GET_INTR();
   SET_INTR();
-  wait_msec(1);
+  wait_msec(50);
 
 #if 1
   dwc2_irq_handle_channel_int_one_dbg(ch_id, intr);

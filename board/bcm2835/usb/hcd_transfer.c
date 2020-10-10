@@ -373,7 +373,7 @@ int hcd_transfer_bulk(
 
   jc = usb_xfer_jobchain_create();
   jc->nak_retries = 0;
-  jc->wait_interval_ms = 0;
+  // jc->wait_interval_ms = 0;
   if (IS_ERR(jc)) {
     err = PTR_ERR(jc);
     jc = NULL;
@@ -408,8 +408,9 @@ int hcd_transfer_bulk(
   usb_xfer_jobchain_enqueue(jc);
 
   while(!completed) {
+    wait_msec(100);
     // dwc2_print_tsize();
-    if (wait_timeout++ > 200000) {
+    if (wait_timeout++ > 20) {
       jc->err = ERR_OK;
       break;
     }
