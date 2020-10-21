@@ -34,3 +34,5 @@
 #define STACK_SIZE_EL1_LOG 20
 
 #define DMA_AREA_SIZE 65536
+
+#define ENABLE_JTAG

@@ -1,4 +1,5 @@
 #include <asm_macros.h>
+#include <config.h>
 #include <arch/armv8/armv8_asm_macros.h>
 #include <arch/armv8/percpu_asm_macros.h>
 #include "irq_macros.h"
@@ -53,6 +54,9 @@
  * - Branches to _start
  */
 _start:
+#ifdef ENABLE_JTAG
+b _start
+#endif
   /*
    * Starting in EL2/SP_EL2, exceptions masked, non-MMU
    */

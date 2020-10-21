@@ -169,6 +169,14 @@ qemuds: $(TARGET_QEMU_IMG)
 qemuat:
 	/mnt/sdb1/binutils-gdb/gdb/gdb -x rungdb.gdb
 
+.PHONY: jtag
+jtag:
+	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg
+
+.PHONY: jtagd
+jtagd:
+	/mnt/sdb1/binutils-gdb/gdb/gdb -x openocd-jtag.gdb kernel8.elf
+
 .PHONY: serial
 serial:
 	minicom -b 115200 -D /dev/ttyUSB0 -C uart_capture_$$(date +%S).bin
