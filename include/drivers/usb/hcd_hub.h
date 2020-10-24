@@ -56,7 +56,14 @@ int usb_hub_enumerate(struct usb_hcd_device *dev);
 /*
  * port given in 0-based form
  */
-int usb_hub_port_reset(usb_hub_t *h, int port);
+
+typedef enum {
+  HUB_PORT_RESET_STATUS_SUCCESS = 0,
+  HUB_PORT_RESET_STATUS_TIMEOUT,
+  HUB_PORT_RESET_STATUS_ERROR
+} hub_port_reset_status_t;
+
+hub_port_reset_status_t usb_hub_port_reset(usb_hub_t *h, int port, struct usb_hcd_device *port_dev);
 
 struct usb_hcd_device *usb_hub_get_device_at_port(usb_hub_t *h, int port);
 

@@ -1,4 +1,5 @@
 #include <drivers/usb/usb_mass_storage.h>
+#include <drivers/usb/hcd_hub.h>
 #include <common.h>
 #include <drivers/usb/usb_dev_rq.h>
 #include "usb_mass_cbw.h"
@@ -276,8 +277,8 @@ static int usb_mass_read10(hcd_mass_t *m,
   int lun, void *dst, uint32_t offset, int size)
 {
   int err;
-  int csw_status = 0;
-  struct scsi_op_read_10 cmd ALIGNED(4) = { 0 };
+  int csw_status ALIGNED(512) = 0;
+  struct scsi_op_read_10 cmd ALIGNED(512) = { 0 };
   cmd.opcode = SCSI_OPCODE_READ_10;
   set_unaligned_32_le(&cmd.lba, offset / 512);
   set_unaligned_16_le(&cmd.transfer_len, size / 512);
@@ -464,6 +465,12 @@ void usb_mass_deinit_class(hcd_mass_t* m)
 int usb_mass_read(hcd_mass_t *m, void *dst, uint32_t offset, int size)
 {
   int err;
+  int port = m->d->location.hub_port;
+  char buf[512];
+  struct usb_hub_port_status port_status ALIGNED(4);
+  err = usb_hub_port_get_status(usb_hcd_device_to_hub(m->d->location.hub), port, &port_status);
+  usb_status_to_string(&port_status, buf, sizeof(buf));
+  printf("get_port_status(%s): port:%d,err:%d,%s", "before_usb_read", port, err, buf);
   err = usb_mass_read10(m, 0, dst, offset, size);
   return err;
 }
@@ -500,6 +507,7 @@ int usb_mass_init(struct usb_hcd_device* d)
   int lun = 0;
   int csw_status = 0;
   hcd_mass_t *m = NULL;
+  char buf[512];
 
   m = usb_mass_init_class(d);
   if (IS_ERR(m)) {
@@ -514,8 +522,6 @@ int usb_mass_init(struct usb_hcd_device* d)
   err = usb_mass_get_max_lun(d, &max_lun);
   CHECK_ERR("failed to get max lun");
   printf("max_lun : %d\r\n", max_lun);
-  // err = usb_mass_inquiry(m, lun);
-  // CHECK_ERR("failed to send INQUIRY request");
   // usb_mass_set_log_level(20);
   // wait_msec(100);
   err = usb_mass_test_unit_ready(m, lun, &csw_status);
@@ -523,8 +529,11 @@ int usb_mass_init(struct usb_hcd_device* d)
   if (csw_status == CSW_STATUS_CHECK_CONDITION) {
     err = usb_mass_request_sense(m, lun, &csw_status);
   }
+  // err = usb_mass_inquiry(m, lun);
+  // CHECK_ERR("failed to send INQUIRY request");
   // wait_msec(2 * 1000);
   // usb_mass_read_debug(m);
+  usb_mass_read(m, buf, 0, 1);
 
 
   // err = usb_mass_read_capacity10(m, lun);

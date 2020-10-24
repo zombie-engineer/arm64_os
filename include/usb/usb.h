@@ -208,16 +208,21 @@
 #define USB_PORT_STATUS_BIT_INDICATOR  12
 
 struct usb_hub_status {
-  struct {
-    uint16_t local_power_source : 1;
-    uint16_t overcurrent        : 1;
-    uint16_t unused             :14;
-  } status;
-  struct {
-    uint16_t local_power_source : 1;
-    uint16_t overcurrent        : 1;
-    uint16_t unused             :14;
-  } change;
+  union {
+    struct {
+      struct {
+        uint16_t local_power_source : 1;
+        uint16_t overcurrent        : 1;
+        uint16_t unused             :14;
+      } status;
+      struct {
+        uint16_t local_power_source : 1;
+        uint16_t overcurrent        : 1;
+        uint16_t unused             :14;
+      } change;
+    };
+    uint32_t raw32;
+  } u;
 } PACKED;
 
 struct usb_hub_port_status {
@@ -314,9 +319,11 @@ struct usb_other_speed_configuration_descriptor {
 #define USB_INTERFACE_CLASS_APPLICATIONSPECIFIC  0xfe
 #define USB_INTERFACE_CLASS_VENDORSPECIFIC       0xff
 
-#define USB_SPEED_HIGH 0
-#define USB_SPEED_FULL 1
-#define USB_SPEED_LOW  2
+typedef enum {
+  USB_SPEED_HIGH = 0,
+  USB_SPEED_FULL = 1,
+  USB_SPEED_LOW = 2
+} usb_speed_t;
 
 #define USB_ENDPOINT_TYPE_CONTROL     0
 #define USB_ENDPOINT_TYPE_ISOCHRONOUS 1

@@ -38,7 +38,7 @@ extern struct usb_hcd_device *root_hub;
 
 struct usb_hcd_pipe {
   int device_address;
-  int device_speed;
+  usb_speed_t device_speed;
   int endpoint_num;
   int endpoint_type;
   int endpoint_dir;
@@ -202,6 +202,8 @@ int usb_hcd_device_to_string(struct usb_hcd_device *dev, const char *prefix, cha
 
 const char *usb_hcd_device_class_to_string(int c);
 
+void hcd_device_set_speed(struct usb_hcd_device *d, usb_speed_t speed);
+
 void usb_hcd_print_device(struct usb_hcd_device *dev);
 
 int usb_hcd_get_descriptor(struct usb_hcd_pipe *p, int desc_type, int desc_idx, int lang_id,
@@ -297,3 +299,17 @@ void usb_hcd_print_intr_regs(void);
 #define USB_HCD_ITER_CONTINUE 0
 #define USB_HCD_ITER_STOP     1
 void usb_hcd_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_arg);
+
+int usb_hcd_to_addressed_state(struct usb_hcd_device *d);
+
+int usb_hcd_parse_configuration(struct usb_hcd_device *d, const void *config, int config_size);
+
+int usb_hcd_get_descriptor_first(struct usb_hcd_device *d);
+
+int usb_hcd_get_descriptor_second(struct usb_hcd_device *d);
+
+int usb_hcd_to_configured_state(struct usb_hcd_device *d);
+
+int usb_hcd_configure_class(struct usb_hcd_device *d);
+
+int usb_hcd_allocate_device_address(void);

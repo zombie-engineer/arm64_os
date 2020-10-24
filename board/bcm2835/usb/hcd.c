@@ -253,7 +253,7 @@ out_err:
   return err;
 }
 
-static int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *cfgbuf, int cfgbuf_sz)
+int usb_hcd_parse_configuration(struct usb_hcd_device *dev, const void *cfgbuf, int cfgbuf_sz)
 {
   const struct usb_descriptor_header *hdr;
   struct usb_hcd_interface *i = NULL;
@@ -370,7 +370,7 @@ out_err:
   if (__dev->state != USB_DEVICE_STATE_##__from) {\
     err = ERR_INVAL_ARG;\
     HCDERR("can't promote device %d to "#__to" state from current %s",\
-      dev->address, usb_hcd_device_state_to_string(dev->state));\
+      __dev->address, usb_hcd_device_state_to_string(__dev->state));\
     goto out_err;\
   }
 
@@ -409,7 +409,7 @@ static inline void usb_hcd_device_descriptor_to_nice_string(struct usb_device_de
  * First GET_DESCRIPTOR is performed on default address with minimal packet size of 8 bytes.
  * By spec, we only need 8 bytes of descriptor to get it's max_packet_size.
  */
-static int usb_hcd_to_default_state(struct usb_hcd_device *dev)
+int usb_hcd_get_descriptor_first(struct usb_hcd_device *dev)
 {
   const int to_transfer_size = 8;
   int err, num_bytes;
@@ -453,7 +453,7 @@ out_err:
   return err;
 }
 
-static inline int usb_hcd_allocate_device_address()
+int usb_hcd_allocate_device_address(void)
 {
   return usb_hcd_unique_device_address++;
 }
@@ -472,41 +472,52 @@ out_err:
  * By this time device has been set to DEFAULT state.
  * We allocate a unique device address from 127 address space.
  */
-static int usb_hcd_to_addressed_state(struct usb_hcd_device *dev)
+int usb_hcd_to_addressed_state(struct usb_hcd_device *d)
 {
   int err;
   int device_address;
 
-  HCD_ASSERT_DEVICE_STATE_CHANGE(dev, DEFAULT, ADDRESSED);
+  HCD_ASSERT_DEVICE_STATE_CHANGE(d, DEFAULT, ADDRESSED);
   dwc2_dump_int_registers();
 
-  /*
-   * Ritual routine to support devices that still want to give us
-   * last part of device descriptor, that we asked at DEFAULT state.
-   */
-  if (dev->location.hub) {
-    err = usb_hub_port_reset(usb_hcd_device_to_hub(dev->location.hub),
-        dev->location.hub_port);
-    CHECK_ERR("failed to reset parent hub port");
-  }
-
+//  /*
+//   * Ritual routine to support devices that still want to give us
+//   * last part of device descriptor, that we asked at DEFAULT state.
+//   */
+//  if (d->location.hub) {
+//    err = usb_hub_port_reset(usb_hcd_device_to_hub(d->location.hub),
+//        d->location.hub_port, d);
+//    CHECK_ERR("failed to reset parent hub port");
+//  }
+//
   /*
    * send SET_ADDRESS to a device, after which it will respond at this
    * address.
    */
   device_address = usb_hcd_allocate_device_address();
 
-  err = usb_hcd_set_address(&dev->pipe0, device_address);
+  err = usb_hcd_set_address(&d->pipe0, device_address);
   CHECK_ERR_SILENT();
 
-  dev->address = dev->pipe0.device_address = device_address;
+  d->address = d->pipe0.device_address = device_address;
   HCDLOG("Device %04x:%04x was set to address %d",
-    hcd_device_get_vendor_id(dev),
-    hcd_device_get_product_id(dev),
+    hcd_device_get_vendor_id(d),
+    hcd_device_get_product_id(d),
     device_address
   );
 
-  dev->state = USB_DEVICE_STATE_ADDRESSED;
+  d->state = USB_DEVICE_STATE_ADDRESSED;
+out_err:
+  return err;
+}
+
+int usb_hcd_get_descriptor_second(struct usb_hcd_device *dev)
+{
+  int err;
+  int num_bytes;
+  GET_DESC(&dev->pipe0, DEVICE, 0, 0, &dev->descriptor, sizeof(dev->descriptor));
+  if (usb_hcd_log_level > 2)
+    usb_hcd_device_descriptor_to_nice_string(&dev->descriptor, "got full device descriptor", 1);
 out_err:
   return err;
 }
@@ -518,7 +529,7 @@ out_err:
  * it all. After that we send SET_CONFIGURATION to it and put it in
  * a final CONFIGURED state, and that will complete it's enumeration
  */
-static int usb_hcd_to_configured_state(struct usb_hcd_device *dev)
+int usb_hcd_to_configured_state(struct usb_hcd_device *dev)
 {
   int err, num_bytes;
   uint64_t rq;
@@ -533,9 +544,6 @@ static int usb_hcd_to_configured_state(struct usb_hcd_device *dev)
 
   HCD_ASSERT_DEVICE_STATE_CHANGE(dev, ADDRESSED, CONFIGURED);
 
-  GET_DESC(&dev->pipe0, DEVICE       , 0, 0, &dev->descriptor, sizeof(dev->descriptor));
-  if (usb_hcd_log_level > 2)
-    usb_hcd_device_descriptor_to_nice_string(&dev->descriptor, "got full device descriptor", 1);
 
   GET_DESC(&dev->pipe0, CONFIGURATION, 0, 0, &config_desc    , sizeof(config_desc));
   HCDDEBUG("got configuration header: total size: %d", config_desc.total_length);
@@ -581,39 +589,23 @@ out_err:
   return err;
 }
 
-int usb_hcd_enumerate_device(struct usb_hcd_device *dev)
+int usb_hcd_configure_class(struct usb_hcd_device *d)
 {
-  int err = ERR_OK;
+  int err;
 
-  HCDDEBUG("=============================================================");
-  HCDDEBUG("********************* ENUMERATE DEVICE **********************");
-  HCDDEBUG("=============================================================");
-
-  // http://microsin.net/adminstuff/windows/how-usb-stack-enumerate-device.html
-
-  err = usb_hcd_to_default_state(dev);
-  CHECK_ERR_SILENT();
-
-  err = usb_hcd_to_addressed_state(dev);
-  CHECK_ERR_SILENT();
-
-  err = usb_hcd_to_configured_state(dev);
-  CHECK_ERR_SILENT();
-
-  if (dev->descriptor.device_class == USB_INTERFACE_CLASS_HUB) {
-      err = usb_hub_enumerate(dev);
+  if (d->descriptor.device_class == USB_INTERFACE_CLASS_HUB) {
+      HCDLOG("Enumerating HUB");
+      err = usb_hub_enumerate(d);
       CHECK_ERR_SILENT();
-  } else if (dev->class && dev->class->device_class == USB_HCD_DEVICE_CLASS_HID) {
-      HCDLOG("Enumerate HID");
-      err = usb_hid_enumerate(dev);
+  } else if (d->class && d->class->device_class == USB_HCD_DEVICE_CLASS_HID) {
+      HCDLOG("Enumerating HID");
+      err = usb_hid_enumerate(d);
       CHECK_ERR_SILENT();
-  } else if (usb_hcd_get_interface_class(dev, 0) == USB_INTERFACE_CLASS_MASSSTORAGE) {
-      usb_mass_init(dev);
+  } else if (usb_hcd_get_interface_class(d, 0) == USB_INTERFACE_CLASS_MASSSTORAGE) {
+      HCDLOG("Enumerating MASS STORAGE");
+      usb_mass_init(d);
   }
 out_err:
-  HCDDEBUG("=============================================================");
-  HCDDEBUG("********************* ENUMERATE DEVICE END ******************");
-  HCDDEBUG("=============================================================");
   return err;
 }
 
@@ -640,8 +632,9 @@ int usb_hcd_start()
   dwc2_op_mode_t opmode;
   int fsls_mode_ena = 0;
 
-  err = irq_set(get_cpu_num(), ARM_BASIC_USB, dwc2_irq_cb);
+  // dwc2_disable_ahb_interrupts();
   dwc2_enable_ahb_interrupts();
+  err = irq_set(get_cpu_num(), ARM_BASIC_USB, dwc2_irq_cb);
   dwc2_clear_all_interrupts();
 
   intr_ctl_usb_irq_enable();
@@ -698,9 +691,6 @@ int usb_hcd_start()
     dwc2_set_host_speed(DWC2_CLK_30_60MHZ);
   }
 
-  dwc2_set_host_ls_support();
-  HCDLOG("enabled host low-speed support");
-
 #define USB_RECV_FIFO_SIZE         1024
 #define USB_NON_PERIODIC_FIFO_SIZE 1024
 #define USB_PERIODIC_FIFO_SIZE     1024
@@ -715,23 +705,26 @@ int usb_hcd_start()
     USB_NON_PERIODIC_FIFO_SIZE,
     USB_PERIODIC_FIFO_SIZE);
 
-  dwc2_clear_otg_hnp();
-	 HCDLOG("OTG host is set with HNP disabled.");
+  //  dwc2_set_host_ls_support();
+  // HCDLOG("enabled host low-speed support");
+
+  // dwc2_clear_otg_hnp();
+	//  HCDLOG("OTG host is set with HNP disabled.");
 
   hcd_tx_fifo_flush(16);
   hcd_rx_fifo_flush();
   if (!dwc2_is_dma_enabled())
     dwc2_init_channels();
 
-  if (!dwc2_is_port_pwr_enabled()) {
-    dwc2_port_set_pwr_enabled(true);
+  // if (!dwc2_is_port_pwr_enabled()) {
+  //  dwc2_port_set_pwr_enabled(true);
     // HCDLOG("host power enabled");
-  }
+ //  }
 
-  dwc2_port_reset();
-  wait_on_timer_ms(60);
-  dwc2_port_reset_clear();
-  HCDLOG("host reset done");
+  // dwc2_port_reset();
+  // wait_on_timer_ms(60);
+  // dwc2_port_reset_clear();
+  // HCDLOG("host reset done");
   // if (usb_hcd_log_level > 0)
   //  dwc2_dump_int_registers();
   HCDLOG("host controller device started");
@@ -741,7 +734,6 @@ int usb_hcd_start()
 static int usb_hcd_attach_root_hub()
 {
   int err;
-  struct usb_hcd_device_class_hub *h = NULL;
 
   if (root_hub) {
     err = ERR_BUSY;
@@ -755,29 +747,16 @@ static int usb_hcd_attach_root_hub()
     goto out_err;
   }
 
-  h = usb_hcd_hub_create();
-  if (!h) {
-    err = ERR_NO_RESOURCE;
-    HCDERR("failed to allocate hub device object");
-    goto out_err;
-  }
-
-  h->d = root_hub;
-  root_hub->class = &h->base;
-
   /*
    * by default our root hub is in not in ADDRESSED state,
    * so it should respond on default address.
    */
-  usb_root_hub_device_number = USB_DEFAULT_ADDRESS;
-  root_hub->state = USB_DEVICE_STATE_POWERED;
-  root_hub->pipe0.device_speed = USB_SPEED_HIGH;
-  root_hub->pipe0.max_packet_size = 64;
-  err = usb_hcd_enumerate_device(root_hub);
-  if (err != ERR_OK)
-    HCDERR("failed to add root hub. err: %d", err);
-  else
-    HCDDEBUG("root hub added");
+  err = init_root_hub_device(root_hub);
+  CHECK_ERR("Failed to initialize root hub");
+
+  err = usb_hub_enumerate(root_hub);
+  CHECK_ERR("Root hub enumeration failed");
+  HCDDEBUG("Root hub enumeration completed with success.");
 out_err:
   return err;
 }
@@ -1072,3 +1051,21 @@ void usb_hcd_iter_devices(int (*fn)(struct usb_hcd_device *, void *), void *fn_a
   }
   spinlock_unlock_restore_irq(&usb_devices_lock, irqflags);
 }
+
+void hcd_device_set_speed(struct usb_hcd_device *d, usb_speed_t speed)
+{
+  struct usb_hcd_device_location *l = &d->location;
+
+  d->pipe0.device_speed = speed;
+
+  if (speed != USB_SPEED_HIGH) {
+    if (l->hub) {
+	    d->pipe0.ls_hub_address = l->hub->address;
+    	d->pipe0.ls_hub_port = l->hub_port;
+    }
+  } else {
+    d->pipe0.ls_hub_address = 0;
+    d->pipe0.ls_hub_port = 0;
+  }
+}
+

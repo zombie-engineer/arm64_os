@@ -2,6 +2,7 @@
 #include <usb/usb.h>
 
 extern int usb_root_hub_device_number;
+struct usb_hcd_device;
 
 struct root_hub_configuration {
 	struct usb_configuration_descriptor cfg;
@@ -17,3 +18,5 @@ struct usb_root_hub_string_descriptor0 {
 int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_bytes);
 
 void root_hub_get_port_status(struct usb_hub_port_status *s);
+
+int init_root_hub_device(struct usb_hcd_device *d);

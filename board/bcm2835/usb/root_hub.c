@@ -213,7 +213,7 @@ static int usb_rh_get_descriptor(uint64_t rq, void *buf, int buf_sz, int *out_nu
 void root_hub_get_port_status(struct usb_hub_port_status *s)
 {
   uint32_t r = read_reg(USB_HPRT);
-  RHDEBUG("dwc2 port status: %08x", r);
+  RHLOG("dwc2 port status: %08x", r);
   s->status.raw         = 0;
   s->status.connected   = USB_HPRT_GET_CONN_STS(r);
   s->status.enabled     = USB_HPRT_GET_ENA(r);
@@ -243,7 +243,7 @@ static int usb_rh_get_status(uint64_t rq, void *buf, int buf_sz, int *out_num_by
 
   switch (type) {
     case USB_RQ_TYPE_HUB_GET_HUB_STATUS:
-      hub_status.status.local_power_source = 1;
+      hub_status.u.status.local_power_source = 1;
       reply = &hub_status;
       reply_sz = sizeof(hub_status);
       break;
@@ -290,7 +290,7 @@ static int usb_rh_rq_set_feature(uint64_t rq, void *buf, int buf_sz, int *out_nu
           break;
         case USB_HUB_FEATURE_RESET:
           // dwc2_reset_clock_root();
-          dwc2_port_reset_root();
+          dwc2_port_reset();
           break;
         default:
           RHWARN("Unsupported request value: %04x\n", value);
@@ -339,6 +339,13 @@ static int usb_rh_rq_clear_feature(uint64_t rq, void *buf, int buf_sz, int *out_
         case USB_HUB_FEATURE_RESET_CHANGE:
           r = read_reg(USB_HPRT);
           RHDEBUG("USB_HUB_FEATURE_RESET_CHANGE:%08x", r);
+          break;
+        case USB_HUB_FEATURE_RESET:
+          r = read_reg(USB_HPRT);
+          r &= USB_HPRT_WRITE_MASK;
+          USB_HPRT_CLR_RST(r);
+          write_reg(USB_HPRT, r);
+          RHDEBUG("clear feature USB_HUB_FEATURE_RESET:%08x", r);
           break;
         case USB_HUB_FEATURE_SUSPEND_CHANGE:
           /* power and clock register to 0 */
@@ -427,5 +434,22 @@ int usb_root_hub_process_req(uint64_t rq, void *buf, int buf_sz, int *out_num_by
       break;
   }
   RHDEBUG("root hub control message processed with status: %d, bytes:%d", err, *out_num_bytes);
+  return err;
+}
+
+int init_root_hub_device(struct usb_hcd_device *d)
+{
+  int err;
+  d->address = usb_root_hub_device_number = usb_hcd_allocate_device_address();
+  RHLOG("Root hub at address %d", d->address);
+  d->state = USB_DEVICE_STATE_POWERED;
+  d->pipe0.device_address = d->address;
+  d->pipe0.device_speed = USB_SPEED_HIGH;
+  d->pipe0.max_packet_size = 64;
+  memcpy(&d->descriptor, &usb_root_hub_descriptor, sizeof(d->descriptor));
+  err = usb_hcd_parse_configuration(d, &usb_root_hub_configuration, sizeof(usb_root_hub_configuration));
+  if (err != ERR_OK) {
+    RHERR("Failed to parse root hub configuration");
+  }
   return err;
 }

@@ -127,24 +127,36 @@ void dwc2_reset_clock_root(void)
   wait_msec(1);
   write_reg(USB_PCGCR, 0);
 }
-void dwc2_port_reset_root(void)
+
+void dwc2_port_reset(void)
 {
-  uint32_t r;
-  uint32_t irqflags;
-  disable_irq_save_flags(irqflags);
-  r = read_reg(USB_HPRT);
-  r &= USB_HPRT_WRITE_MASK;
-  BIT_SET_U32(r, USB_HPRT_RST);
-  // BIT_SET_U32(r, USB_HPRT_PWR);
-  // BIT_CLEAR_U32(r, USB_HPRT_SUSP);
-  write_reg(USB_HPRT, r);
-  wait_msec(TDRSTR_MS);
-  r = read_reg(USB_HPRT);
-  r &= USB_HPRT_WRITE_MASK;
-  BIT_CLEAR_U32(r, USB_HPRT_RST);
-  write_reg(USB_HPRT, r);
-  restore_irq_flags(irqflags);
+  uint32_t hostport = read_reg(USB_HPRT);
+  hostport &= USB_HPRT_WRITE_MASK;
+  USB_HPRT_CLR_SET_RST(hostport, 1);
+  DWCINFO("resetting hprt: %08x", hostport);
+  write_reg(USB_HPRT, hostport);
 }
+
+//void dwc2_port_reset_root(void)
+//{
+//  uint32_t r;
+//  uint32_t irqflags;
+//
+//  disable_irq_save_flags(irqflags);
+//
+//  r = read_reg(USB_HPRT);
+//  r &= USB_HPRT_WRITE_MASK;
+//  BIT_SET_U32(r, USB_HPRT_RST);
+//  // BIT_SET_U32(r, USB_HPRT_PWR);
+//  // BIT_CLEAR_U32(r, USB_HPRT_SUSP);
+//  write_reg(USB_HPRT, r);
+//  wait_msec(TDRSTR_MS);
+//  r = read_reg(USB_HPRT);
+//  r &= USB_HPRT_WRITE_MASK;
+//  BIT_CLEAR_U32(r, USB_HPRT_RST);
+//  write_reg(USB_HPRT, r);
+//  restore_irq_flags(irqflags);
+//}
 
 void dwc2_port_reset_clear(void)
 {
@@ -159,7 +171,7 @@ void dwc2_set_ulpi_no_phy(void)
 {
   uint32_t ctl = read_reg(USB_GUSBCFG);
   /* Set mode UTMI */
-  BIT_SET_U32(ctl, USB_GUSBCFG_ULPI_UTMI_SEL);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_UTMI_SEL);
   /* Disable PHY */
   BIT_CLEAR_U32(ctl, USB_GUSBCFG_PHY_IF);
   write_reg(USB_GUSBCFG, ctl);
@@ -319,15 +331,6 @@ void dwc2_port_set_pwr_enabled(bool enabled)
   uint32_t hostport = read_reg(USB_HPRT);
   hostport &= USB_HPRT_WRITE_MASK;
   USB_HPRT_CLR_SET_PWR(hostport, enabled);
-  write_reg(USB_HPRT, hostport);
-}
-
-void dwc2_port_reset(void)
-{
-  uint32_t hostport = read_reg(USB_HPRT);
-  hostport &= USB_HPRT_WRITE_MASK;
-  USB_HPRT_CLR_SET_RST(hostport, 1);
-  DWCDEBUG("resetting hprt: %08x", hostport);
   write_reg(USB_HPRT, hostport);
 }
 
