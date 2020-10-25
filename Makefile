@@ -175,7 +175,7 @@ jtag:
 
 .PHONY: jtagd
 jtagd:
-	/mnt/sdb1/binutils-gdb/gdb/gdb -x openocd-jtag.gdb kernel8.elf
+	/mnt/sdb1/binutils-gdb/gdb/gdb -q -x openocd-jtag.gdb kernel8.elf
 
 .PHONY: serial
 serial:
