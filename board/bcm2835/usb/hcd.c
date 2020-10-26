@@ -629,10 +629,18 @@ int usb_hcd_start()
   int err = ERR_OK;
   dwc2_fs_iface fs_iface;
   dwc2_hs_iface hs_iface;
-  dwc2_op_mode_t opmode;
-  int fsls_mode_ena = 0;
 
-  // dwc2_disable_ahb_interrupts();
+  dwc2_init_core();
+  dwc2_init_host();
+
+  HCDLOG("initializing USB to UTMI+,no PHY");
+
+  hs_iface = dwc2_get_hs_iface();
+  fs_iface = dwc2_get_fs_iface();
+
+  HCDLOG("HW config: high speed interface:%d(%s)", hs_iface, dwc2_hs_iface_to_string(hs_iface));
+  HCDLOG("HW config: full speed interface:%d(%s)", fs_iface, dwc2_fs_iface_to_string(fs_iface));
+
   dwc2_enable_ahb_interrupts();
   err = irq_set(get_cpu_num(), ARM_BASIC_USB, dwc2_irq_cb);
   dwc2_clear_all_interrupts();
@@ -641,44 +649,7 @@ int usb_hcd_start()
   HCDLOG("before IRQ enable");
   enable_irq();
 
-  dwc2_start_vbus();
-  dwc2_reset();
-
-  HCDLOG("initializing USB to UTMI+,no PHY");
-  dwc2_set_ulpi_no_phy();
-  dwc2_reset();
-
-  hs_iface = dwc2_get_hs_iface();
-  fs_iface = dwc2_get_fs_iface();
-
-  HCDLOG("HW config: high speed interface:%d(%s)", hs_iface, dwc2_hs_iface_to_string(hs_iface));
-  HCDLOG("HW config: full speed interface:%d(%s)", fs_iface, dwc2_fs_iface_to_string(fs_iface));
-  fsls_mode_ena = 1;
-
-  dwc2_set_fsls_config(fsls_mode_ena);
-  HCDLOG("ULPI: setting FSLS configuration to %sabled", fsls_mode_ena ? "en" : "dis");
-
-  dwc2_set_dma_mode();
-
-  opmode = DWC2_OP_MODE_NO_HNP_SRP_CAPABLE;
   dwc2_enable_channel_interrupts();
-  HCDLOG("dwc2 op mode: %s", dwc2_op_mode_to_string(opmode));
-  switch(opmode) {
-    case DWC2_OP_MODE_HNP_SRP_CAPABLE:
-      dwc2_set_otg_cap(DWC2_OTG_CAP_HNP_SRP);
-      break;
-    case DWC2_OP_MODE_SRP_ONLY_CAPABLE:
-    case DWC2_OP_MODE_SRP_CAPABLE_DEVICE:
-    case DWC2_OP_MODE_SRP_CAPABLE_HOST:
-      dwc2_set_otg_cap(DWC2_OTG_CAP_SRP);
-      break;
-    case DWC2_OP_MODE_NO_HNP_SRP_CAPABLE:
-    case DWC2_OP_MODE_NO_SRP_CAPABLE_DEVICE:
-    case DWC2_OP_MODE_NO_SRP_CAPABLE_HOST:
-      dwc2_set_otg_cap(DWC2_OTG_CAP_NONE);
-      break;
-  }
-  HCDLOG("core started");
   // dwc2_unmask_all_interrupts();
 
   HCDLOG("setting host clock...");

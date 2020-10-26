@@ -366,7 +366,7 @@ int hcd_transfer_bulk(
   struct usb_xfer_job *j;
 
   transfer_id++;
-  HCDDEBUG("hcd_transfer_bulk:hub_port:%d,speed:%d,dir:%s,id:%d,sz:%d,pid:%d",
+  HCDDEBUG("hub_port:%d,speed:%d,ep_type:%d,dir:%s,id:%d,sz:%d,pid:%d",
     ep->pipe.ls_hub_port, ep->pipe.device_speed, ep->pipe.endpoint_type,
     direction == USB_DIRECTION_OUT ? "out" : "in",
     transfer_id, transfer_size, -1);
@@ -410,7 +410,7 @@ int hcd_transfer_bulk(
   while(!completed) {
     wait_msec(100);
     // dwc2_print_tsize();
-    if (wait_timeout++ > 20) {
+    if (wait_timeout++ > 200) {
       jc->err = ERR_OK;
       break;
     }

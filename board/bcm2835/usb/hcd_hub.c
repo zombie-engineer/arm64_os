@@ -310,17 +310,21 @@ int usb_hub_read_all_port_status(usb_hub_t *h, const char *tag)
 }
 
 int usb_hub_port_ensure_powered(usb_hub_t *h, int port,
-  struct usb_hcd_device *port_dev)
+  struct usb_hcd_device *port_dev, bool *connected)
 {
   int err;
   struct usb_hub_port_status port_status ALIGNED(4);
   uint64_t tnow;
   int delay_msec;
 
-  delay_msec = h->descriptor.power_good_delay * 2;
+  *connected = false;
+
+  delay_msec = h->descriptor.power_good_delay * 2 + 510;
   err = usb_hub_read_port_status(h, port, "check powered", 1, &port_status);
   CHECK_ERR("Failed to check if port is powered");
-  if (!port_status.status.powered) {
+  *connected = port_status.status.connected ? true : false;
+
+  if (!port_status.status.powered && !port_status.status.connected) {
     tnow = get_boottime_msec();
     err = usb_hub_port_power_on(h, port);
     CHECK_ERR("failed to power on, skipping");
@@ -329,6 +333,9 @@ int usb_hub_port_ensure_powered(usb_hub_t *h, int port,
       err = usb_hub_read_port_status(h, port, "powering", 1, &port_status);
       if (err)
         HUBPORTERR("Failed to read port status");
+      *connected = port_status.status.connected ? true : false;
+      if (*connected)
+        break;
     } while(tnow + delay_msec > get_boottime_msec());
   }
 
@@ -364,6 +371,7 @@ int usb_hub_enumerate_port(usb_hub_t *h, int port)
   int enum_state;
   hub_port_reset_status_t rst_status;
   struct usb_hcd_device *port_dev = NULL;
+  bool connected;
 
   port_dev = usb_hcd_allocate_device();
   if (!port_dev) {
@@ -378,9 +386,13 @@ int usb_hub_enumerate_port(usb_hub_t *h, int port)
   while(enum_state != ENUM_STATE_COMPLETED) {
     switch(enum_state) {
       case ENUM_STATE_STABILIZATION_DEBOUNCE:
-        err = usb_hub_port_ensure_powered(h, port, port_dev);
+        err = usb_hub_port_ensure_powered(h, port, port_dev, &connected);
         CHECK_ERR("Failed to enumerate port, failed to establish power status");
         enum_state = ENUM_STATE_FIRST_PORT_RESET;
+        if (!connected) {
+          enum_state = ENUM_STATE_COMPLETED;
+          usb_hcd_deallocate_device(port_dev);
+        }
         break;
       case ENUM_STATE_FIRST_PORT_RESET:
 reset_retry:
@@ -435,9 +447,11 @@ reset_retry:
         enum_state = ENUM_STATE_REPORT_TO_TREE;
         break;
       case ENUM_STATE_REPORT_TO_TREE:
+        HUBPORTLOG("hub: %p, adding device %p to port, h->children:%p,dev:%04x:%04x", h, port_dev, &h->children,
+          port_dev->descriptor.id_vendor, port_dev->descriptor.id_product);
         list_add(&port_dev->hub_children, &h->children);
-        HUBPORTDBG("hub: %p, adding device %p to port, h->children:%p", h, port_dev, &h->children);
         enum_state = ENUM_STATE_COMPLETED;
+        err = ERR_OK;
         break;
       default:
         HUBPORTLOG("Enumeration logic failed");
@@ -468,22 +482,19 @@ handle_reset_timeout:
 int usb_hub_enumerate_ports(usb_hub_t *h)
 {
   int port, err;
-  // uint32_t delay;
   err = ERR_OK;
-  // volatile int do_retry = 0;
-  // struct usb_hub_port_status port_status[MAX_PORTS] ALIGNED(4);
   struct usb_hub_status hub_status ALIGNED(4);
 
   err = usb_hub_get_status(h, &hub_status);
   HUBLOG("hub status: %08x", hub_status.u.raw32);
 
-	// HUBDBG("powering on all %d ports", h->descriptor.port_count);
   for (port = 0; port < h->descriptor.port_count; ++port) {
     err = usb_hub_enumerate_port(h, port);
-    if (err = ERR_TIMEOUT) {
+    if (err == ERR_TIMEOUT) {
       err = ERR_OK;
     }
   }
+
   return err;
 }
 
@@ -511,8 +522,6 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   HCDDEBUG("=============================================================");
   HCDDEBUG("===================== ENUMERATE HUB =========================");
   HCDDEBUG("=============================================================");
-  HCDLOG("HUB: %04x:%04x, mps:%d", dev->descriptor.id_vendor, dev->descriptor.id_product,
-    dev->descriptor.max_packet_size_0);
 
   h = usb_hcd_hub_create();
 
@@ -525,6 +534,8 @@ int usb_hub_enumerate(struct usb_hcd_device *dev)
   h->d = dev;
   dev->class = &h->base;
   GET_DESC(&h->d->pipe0, HUB, 0, 0, &h->descriptor, sizeof(h->descriptor));
+  HCDLOG("HUB: %04x:%04x, mps:%d, num_ports:%d", dev->descriptor.id_vendor, dev->descriptor.id_product,
+    dev->descriptor.max_packet_size_0, h->descriptor.port_count);
 
   err = usb_hub_get_status(h, &status);
   CHECK_ERR("failed to read hub status. Enumeration will not continue");

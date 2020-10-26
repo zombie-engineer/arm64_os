@@ -144,12 +144,37 @@ usb_pid_t dwc_pid_to_usb_pid(int pid)
   }
 }
 
+static inline uint32_t dwc2_channel_ensure_disabled(struct dwc2_channel *c)
+{
+  int ch_id = c->id;
+  uint32_t chr, intr;
+
+  GET_CHAR();
+  if (USB_HOST_CHAR_GET_CHAN_ENABLE(chr)) {
+    USB_HOST_CHAR_CLR_SET_CHAN_DISABLE(chr, 1);
+    USB_HOST_CHAR_CLR_CHAN_ENABLE(chr);
+    SET_CHAR();
+    while(1) {
+      GET_INTR();
+      SET_INTR();
+      if (USB_HOST_INTR_GET_HALT(intr))
+        break;
+      USB_HOST_INTR_CLR_HALT(intr);
+      BUG(intr, "interrupt disable logic error");
+    }
+  }
+  GET_CHAR();
+  BUG(USB_HOST_CHAR_GET_CHAN_ENABLE(chr), "Channel not disabled");
+  return chr;
+}
+
 static inline void dwc2_channel_program_char(struct dwc2_channel *c)
 {
   uint32_t chr;
   int ch_id = c->id;
   /* Program the channel. */
-  chr = 0;
+  chr = dwc2_channel_ensure_disabled(c);
+
   USB_HOST_CHAR_CLR_SET_MAX_PACK_SZ(chr, dwc2_channel_get_max_packet_size(c));
   USB_HOST_CHAR_CLR_SET_EP(chr, dwc2_channel_get_ep_num(c));
   USB_HOST_CHAR_CLR_SET_EP_DIR(chr, c->ctl->direction);
@@ -226,6 +251,37 @@ void dwc2_channel_set_split_complete(struct dwc2_channel *c)
   SET_SPLT();
 }
 
+void dwc2_channel_set_intmsk(struct dwc2_channel *c)
+{
+  uint32_t intrmsk;
+  int ch_id = c->id;
+  int ep_type;
+  bool is_split;
+
+  ep_type = dwc2_channel_get_ep_type(c);
+  is_split = dwc2_channel_split_mode(c);
+
+  intrmsk = 0;
+  USB_HOST_INTR_CLR_SET_HALT(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_XFER_COMPLETE(intrmsk, 1);
+
+  USB_HOST_INTR_CLR_SET_AHB_ERR(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_STALL(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_FRMOVRN(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_TRNSERR(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_BABBLERR(intrmsk, 1);
+  USB_HOST_INTR_CLR_SET_DATTGGLERR(intrmsk, 1);
+
+  if (usb_is_periodic_ep_type(ep_type) || is_split) {
+    USB_HOST_INTR_CLR_SET_ACK(intrmsk, 1);
+    USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
+    USB_HOST_INTR_CLR_SET_NYET(intrmsk, 1);
+  }
+
+  // printf("SETINTR:%08x\n", intrmsk);
+  SET_INTRMSK();
+}
+
 static inline void dwc2_channel_start_transmit(struct dwc2_channel *c)
 {
   uint32_t chr;
@@ -235,6 +291,8 @@ static inline void dwc2_channel_start_transmit(struct dwc2_channel *c)
   USB_HOST_CHAR_CLR_CHAN_DISABLE(chr);
   USB_HOST_CHAR_CLR_SET_CHAN_ENABLE(chr, 1);
   SET_CHAR();
+  dwc2_channel_set_intmsk(c);
+  dwc2_channel_enable(ch_id);
 }
 
 bool dwc2_channel_is_split_enabled(struct dwc2_channel *c)
@@ -245,26 +303,11 @@ bool dwc2_channel_is_split_enabled(struct dwc2_channel *c)
   return USB_HOST_SPLT_GET_SPLT_ENABLE(splt) ? true : false;
 }
 
-static inline void dwc2_channel_clear_intr(struct dwc2_channel *c)
+static inline void dwc2_channel_clear_pending(struct dwc2_channel *c)
 {
   int ch_id = c->id;
   CLEAR_INTR();
   CLEAR_INTRMSK();
-}
-
-void dwc2_channel_set_intmsk(struct dwc2_channel *c)
-{
-  uint32_t intrmsk;
-  int ch_id = c->id;
-  intrmsk = 0;
-  USB_HOST_INTR_CLR_SET_HALT(intrmsk, 1);
-  // USB_HOST_INTR_CLR_SET_AHB_ERR(intrmsk, 1);
-  // USB_HOST_INTR_CLR_SET_XFER_COMPLETE(intrmsk, 1);
-  // USB_HOST_INTR_CLR_SET_NAK(intrmsk, 1);
-  // printf("?setintr:%08x\n", intrmsk);
-  SET_INTRMSK();
-  //GET_INTRMSK();
-  // printf("getintr:%08x\n", intrmsk);
 }
 
 void dwc2_transfer_prepare(struct dwc2_channel *c)
@@ -286,8 +329,8 @@ void dwc2_transfer_prepare(struct dwc2_channel *c)
     hexdump_memory((void *)c->ctl->dma_addr_base, 8);
 
   BUG((uint64_t)c->ctl->dma_addr_base & 3, "dwc2_transfer:buffer not aligned to 4 bytes");
-  dwc2_channel_enable(c->id);
-  dwc2_channel_set_intmsk(c);
+  dwc2_channel_disable(c->id);
+  dwc2_channel_clear_pending(c);
 
   c->ctl->status = DWC2_TRANSFER_STATUS_STARTED;
   dwc2_channel_program_char(c);
@@ -427,7 +470,7 @@ dwc2_transfer_status_t dwc2_transfer_blocking(struct dwc2_channel *c, int *out_n
   dwc2_transfer_prepare(c);
 
   while(1) {
-    dwc2_channel_clear_intr(c);
+    dwc2_channel_clear_pending(c);
     dwc2_transfer_start(c);
 
     status = dwc2_wait_halted(ch_id);
@@ -441,7 +484,7 @@ dwc2_transfer_status_t dwc2_transfer_blocking(struct dwc2_channel *c, int *out_n
     }
 
     if (dwc2_channel_is_split_enabled(c)) {
-      dwc2_channel_clear_intr(c);
+      dwc2_channel_clear_pending(c);
       dwc2_transfer_start(c);
       status = dwc2_wait_halted(ch_id);
       if (status != DWC2_STATUS_ACK) {

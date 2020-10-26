@@ -324,11 +324,13 @@ out_err:
 
 int usb_mass_request_sense(hcd_mass_t *m, int lun, int *csw_status)
 {
+  char buf[18] ALIGNED(64);
   int err;
   struct scsi_op_request_sense cmd ALIGNED(512) = { 0 };
   cmd.opcode = SCSI_OPCODE_REQUEST_SENSE;
+  cmd.alloc_length = sizeof(buf);
   MASSLOG("REQUEST_SENSE: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, NULL, 0, csw_status);
+  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, sizeof(buf), csw_status);
   CHECK_ERR("REQUEST_SENSE failed");
 out_err:
   return err;
@@ -341,20 +343,22 @@ int usb_mass_inquiry(hcd_mass_t *m, int lun)
   char description[256];
   struct scsi_op_inquiry cmd;
   struct scsi_response_inquiry *info = (struct scsi_response_inquiry *)buf;
-  const int min_cmd_len = 5;
+  int inquiry_data_size = 36;
   int csw_status = 0;
 
   memset(&cmd, 0, sizeof(cmd));
   memset(buf , 0, sizeof(buf));
 
-  scsi_fill_cmd_inquiry(&cmd, 0, 0, min_cmd_len);
-  MASSLOG("SCSI_OPCODE_INQUIRY: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, min_cmd_len, &csw_status);
+  scsi_fill_cmd_inquiry(&cmd, 0, 0, inquiry_data_size);
+  MASSLOG("SCSI_OPCODE_INQUIRY: cmd size: %d", sizeof(*info));
+  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, inquiry_data_size, &csw_status);
   CHECK_ERR("Failed to get INQUIRY data length");
-  scsi_fill_cmd_inquiry(&cmd, 0, 0, info->additional_length);
-  MASSLOG("SCSI_OPCODE_INQUIRY 2: cmd size: %d", sizeof(cmd));
-  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, info->additional_length, &csw_status);
-  CHECK_ERR("Failed to get full INQUIRY data");
+
+//  inquiry_data_size = info->additional_length;
+//  scsi_fill_cmd_inquiry(&cmd, 0, 0, inquiry_data_size);
+//  MASSLOG("SCSI_OPCODE_INQUIRY 2: cmd size: %d", sizeof(cmd));
+//  err = usb_cbw_transfer(m, lun, &cmd, sizeof(cmd), USB_DIRECTION_IN, buf, inquiry_data_size, &csw_status);
+//  CHECK_ERR("Failed to get full INQUIRY data");
   scsi_inquiry_data_to_string(description, sizeof(description), info);
   MASSLOG("%s", description);
 out_err:
@@ -465,13 +469,14 @@ void usb_mass_deinit_class(hcd_mass_t* m)
 int usb_mass_read(hcd_mass_t *m, void *dst, uint32_t offset, int size)
 {
   int err;
-  int port = m->d->location.hub_port;
-  char buf[512];
-  struct usb_hub_port_status port_status ALIGNED(4);
-  err = usb_hub_port_get_status(usb_hcd_device_to_hub(m->d->location.hub), port, &port_status);
-  usb_status_to_string(&port_status, buf, sizeof(buf));
-  printf("get_port_status(%s): port:%d,err:%d,%s", "before_usb_read", port, err, buf);
+  // int port = m->d->location.hub_port;
+  // char buf[512];
+  // struct usb_hub_port_status port_status ALIGNED(4);
+  // err = usb_hub_port_get_status(usb_hcd_device_to_hub(m->d->location.hub), port, &port_status);
+  // usb_status_to_string(&port_status, buf, sizeof(buf));
+  // printf("get_port_status(%s): port:%d,err:%d,%s", "before_usb_read", port, err, buf);
   err = usb_mass_read10(m, 0, dst, offset, size);
+  printf("MASS_READ: completed: offset: %d, size: %d, %d\r\n", offset, size, err);
   return err;
 }
 
@@ -507,7 +512,7 @@ int usb_mass_init(struct usb_hcd_device* d)
   int lun = 0;
   int csw_status = 0;
   hcd_mass_t *m = NULL;
-  char buf[512];
+//  char buf[512];
 
   m = usb_mass_init_class(d);
   if (IS_ERR(m)) {
@@ -517,26 +522,23 @@ int usb_mass_init(struct usb_hcd_device* d)
   }
 
   err = usb_mass_reset(m);
-  CHECK_ERR("failed to reset mass storage device");
-
+  // CHECK_ERR("failed to reset mass storage device");
+  // usb_mass_set_log_level(20);
+  // dwc2_set_log_level(20);
   err = usb_mass_get_max_lun(d, &max_lun);
   CHECK_ERR("failed to get max lun");
   printf("max_lun : %d\r\n", max_lun);
-  // usb_mass_set_log_level(20);
   // wait_msec(100);
+  err = usb_mass_inquiry(m, lun);
+  CHECK_ERR("failed to send INQUIRY request");
+
   err = usb_mass_test_unit_ready(m, lun, &csw_status);
   CHECK_ERR("failed to test unit ready");
   if (csw_status == CSW_STATUS_CHECK_CONDITION) {
     err = usb_mass_request_sense(m, lun, &csw_status);
   }
-  // err = usb_mass_inquiry(m, lun);
-  // CHECK_ERR("failed to send INQUIRY request");
-  // wait_msec(2 * 1000);
-  // usb_mass_read_debug(m);
-  usb_mass_read(m, buf, 0, 1);
 
-
-  // err = usb_mass_read_capacity10(m, lun);
+  err = usb_mass_read_capacity10(m, lun);
   CHECK_ERR("failed to get capacity");
 out_err:
   if (err && m) {

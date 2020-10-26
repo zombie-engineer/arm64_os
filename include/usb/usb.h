@@ -421,3 +421,9 @@ static inline int size_to_usb_packet_size(uint32_t size)
     return USB_PACKET_SIZE_32;
   return USB_PACKET_SIZE_64;
 }
+
+static inline bool usb_is_periodic_ep_type(int ep_type)
+{
+  return ep_type == USB_ENDPOINT_TYPE_ISOCHRONOUS || 
+    ep_type == USB_ENDPOINT_TYPE_INTERRUPT;
+}

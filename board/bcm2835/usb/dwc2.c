@@ -114,6 +114,7 @@ void dwc2_reset(void)
   do {
     rst = read_reg(USB_GRSTCTL);
   } while(!USB_GRSTCTL_GET_AHB_IDLE(rst) || USB_GRSTCTL_GET_C_SFT_RST(rst));
+  wait_msec(100);
   DWCDEBUG("reset done.");
 }
 
@@ -222,10 +223,6 @@ void dwc2_set_fsls_config(int enabled)
 
 void dwc2_set_dma_mode(void)
 {
-  uint32_t ahb = read_reg(USB_GAHBCFG);
-  USB_GAHBCFG_CLR_SET_DMA_EN(ahb, 1);
-  USB_GAHBCFG_CLR_AHB_SINGLE(ahb);
-  write_reg(USB_GAHBCFG, ahb);
 }
 
 dwc2_op_mode_t dwc2_get_op_mode(void)
@@ -296,8 +293,8 @@ void dwc2_clear_otg_hnp(void)
 void dwc2_tx_fifo_flush(int fifonum)
 {
   uint32_t rst = read_reg(USB_GRSTCTL);
-  USB_GRSTCTL_CLR_SET_TXF_NUM(rst, fifonum);
   USB_GRSTCTL_CLR_SET_TXF_FLSH(rst, 1);
+  USB_GRSTCTL_CLR_SET_TXF_NUM(rst, fifonum);
   write_reg(USB_GRSTCTL, rst);
   do {
     rst = read_reg(USB_GRSTCTL);
@@ -332,6 +329,16 @@ void dwc2_port_set_pwr_enabled(bool enabled)
   hostport &= USB_HPRT_WRITE_MASK;
   USB_HPRT_CLR_SET_PWR(hostport, enabled);
   write_reg(USB_HPRT, hostport);
+}
+
+#define USB_GAHBCFG_CLR_SET_WAIT_AXI_WRITES(r, val) r |= (1<<4)
+
+void dwc2_wait_axi_writes(void)
+{
+  uint32_t ahb = read_reg(USB_GAHBCFG);
+  USB_GAHBCFG_CLR_SET_WAIT_AXI_WRITES(ahb, 1);
+  DWCDEBUG("enabling wait axi writes interrupts: %08x<-%08x", USB_GAHBCFG, ahb);
+  write_reg(USB_GAHBCFG, ahb);
 }
 
 void dwc2_enable_ahb_interrupts(void)
@@ -699,6 +706,13 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
     dwc2_irq_handle_channel_nak(c);
     USB_HOST_INTR_CLR_NAK(intr);
   }
+
+  if (dwc2_transfer_recalc_next(c->ctl)) {
+      dwc2_transfer_start(c);
+      return;
+  }
+  if (c->ctl->completion)
+    c->ctl->completion(c->ctl->completion_arg);
 }
 
 
@@ -876,13 +890,11 @@ static inline void dwc2_deinit_channel_int(int ch_id)
 
 void dwc2_channel_enable(int ch_id)
 {
-  // dwc2_init_channel_int(ch_id);
   dwc2_enable_channel_int(ch_id);
 }
 
 void dwc2_channel_disable(int ch_id)
 {
-  dwc2_deinit_channel_int(ch_id);
   dwc2_disable_channel_int(ch_id);
 }
 
@@ -900,3 +912,38 @@ void dwc2_print_intr_regs(void)
   printf("intsts:%08x, gotint:%08x, hprt:%08x\n", intsts, gotint, hprt);
 }
 
+void dwc2_init_host(void)
+{
+}
+
+void dwc2_init_core(void)
+{
+  uint32_t ctl, ahb;
+  ctl  = read_reg(USB_GUSBCFG);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_EXT_VBUS_DRV);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_TERM_SEL_DL_PULSE);
+  write_reg(USB_GUSBCFG, ctl);
+  dwc2_reset();
+
+  ctl  = read_reg(USB_GUSBCFG);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_UTMI_SEL);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_PHY_IF);
+  write_reg(USB_GUSBCFG, ctl);
+
+  ctl  = read_reg(USB_GUSBCFG);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_FS_LS);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_ULPI_CLK_SUS_M);
+  write_reg(USB_GUSBCFG, ctl);
+
+  ahb = read_reg(USB_GAHBCFG);
+  USB_GAHBCFG_CLR_SET_DMA_EN(ahb, 1);
+  USB_GAHBCFG_CLR_AHB_SINGLE(ahb);
+  USB_GAHBCFG_CLR_SET_WAIT_AXI_WRITES(ahb, 1);
+  write_reg(USB_GAHBCFG, ahb);
+
+  ctl = read_reg(USB_GUSBCFG);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_HNP_CAP);
+  BIT_CLEAR_U32(ctl, USB_GUSBCFG_SRP_CAP);
+  write_reg(USB_GUSBCFG, ctl);
+  HCDLOG("core started");
+}

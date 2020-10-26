@@ -200,3 +200,5 @@ void dwc2_channel_set_split_complete(struct dwc2_channel *c);
 
 void dwc2_irq_mask_nak(struct dwc2_channel *c);
 void dwc2_irq_unmask_nak(struct dwc2_channel *c);
+void dwc2_init_host(void);
+void dwc2_init_core(void);
