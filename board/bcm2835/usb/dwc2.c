@@ -541,42 +541,6 @@ static inline void dwc2_irq_handle_channel_ahb_err(struct dwc2_channel *c)
   dwc2_transfer_start(c);
 }
 
-static inline void dwc2_irq_handle_channel_ack(struct dwc2_channel *c, bool xfer_complete)
-{
-  DWCDEBUG("channel irq ack: %d", c->id);
-  if (!xfer_complete) {
-#if 0
-    uint32_t intr;
-    int ch_id = c->id;
-    GET_INTR();
-    printf("%08x"__endline, intr);
-#endif
-    BUG(!dwc2_channel_is_split_enabled(c), "dwc2_ack_interrupt logic error");
-    dwc2_transfer_start(c);
-    return;
-  }
-
-  dwc2_transfer_completed_debug(c);
-  if (dwc2_transfer_recalc_next(c->ctl)) {
-      dwc2_transfer_start(c);
-      return;
-  }
-
-  /*
-   * This is one of the possible locations to put flush_dcache in
-   * case we have recieved some data via usb dma, but it looks like
-   * we don't have enough information about the address, we are
-   * writing to, maybe we do not need to flush at all.
-   *
-   * if (c->ctl->direction == USB_DIRECTION_IN)
-   *   dcache_flush(c->ctl->dma_addr_base, c->ctl->transfer_size);
-   */
-  // c->next_pid = dwc2_channel_get_next_pid(c);
-  if (c->ctl->completion)
-    c->ctl->completion(c->ctl->completion_arg);
-}
-
-
 //void dwc2_irq_mask_nak(struct dwc2_channel *c)
 //{
 //  int ch_id = c->id;
@@ -617,7 +581,6 @@ static inline void dwc2_irq_handle_channel_nak(struct dwc2_channel *c)
 
   DWCERR("ep_type:%d, compl:%p\r\n", ep_type, c->ctl->completion);
   if (ep_type == USB_ENDPOINT_TYPE_CONTROL) {
-
     puts("%");
     wait_msec(50);
     dwc2_transfer_start(c);
@@ -694,23 +657,35 @@ static inline void dwc2_irq_handle_channel_halt(struct dwc2_channel *c, uint32_t
   USB_HOST_INTR_CLR_XFER_COMPLETE(intr);
 
   if (USB_HOST_INTR_GET_ACK(old_intr)) {
-    // puts("A");
-    dwc2_irq_handle_channel_ack(c, xfer_complete);
     USB_HOST_INTR_CLR_ACK(intr);
+    if (!xfer_complete) {
+      BUG(!dwc2_channel_is_split_enabled(c), "dwc2_ack_interrupt logic error");
+      dwc2_transfer_start(c);
+      return;
+    }
   }
+
   if (USB_HOST_INTR_GET_NYET(old_intr)) {
     dwc2_irq_handle_channel_nyet(c);
     USB_HOST_INTR_CLR_NYET(intr);
   }
+
   if (USB_HOST_INTR_GET_NAK(old_intr)) {
     dwc2_irq_handle_channel_nak(c);
     USB_HOST_INTR_CLR_NAK(intr);
   }
 
+  /*
+   * recalc checks if the whole transfer is completed.
+   * if it is not, we need to start CHAR for the next portion of data
+   * If recalc returns 0, then the whole transfer is complete and we
+   * can callback to the client
+   */
   if (dwc2_transfer_recalc_next(c->ctl)) {
       dwc2_transfer_start(c);
       return;
   }
+
   if (c->ctl->completion)
     c->ctl->completion(c->ctl->completion_arg);
 }
