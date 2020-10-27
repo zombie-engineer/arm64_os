@@ -486,10 +486,10 @@ void OPTIMIZED tft_lcd_init(void)
   gpio_pin_mosi  = 10;
   gpio_pin_miso  =  9;
   gpio_pin_sclk  = 11;
-  gpio_pin_bkl   =  8;
+  gpio_pin_bkl   =  6;
 
-  gpio_pin_dc    = 25;
-  gpio_pin_reset = 24;
+  gpio_pin_dc    = 13;
+  gpio_pin_reset = 19;
 
   gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
   gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
