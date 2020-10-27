@@ -37,6 +37,7 @@
 #include <arch/armv8/armv8_generic_timer.h>
 #include <init_task.h>
 #include <memory/dma_area.h>
+#include <jtag.h>
 
 #include <cpu.h>
 #include <list.h>
@@ -993,6 +994,7 @@ void main()
   mbox_init();
   debug_init();
   gpio_set_init();
+  jtag_init();
   dma_area_init();
   // spi_emulated_init();
   init_unhandled_exception_reporters();

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+vim $(ls -t uart_*.bin | head -1)

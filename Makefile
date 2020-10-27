@@ -48,6 +48,7 @@ OBJS := \
 	init_task.o\
 	intr_ctl.o\
 	irq.o\
+	jtag.o\
 	kernel_panic.o\
 	percpu.o\
 	pipe.o\
