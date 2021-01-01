@@ -51,9 +51,9 @@
  * Read GPIO_REG_GPLEVn register and read the value
  * of corresponding bit;
  * Pseudocode:
- * reg_value = read(GPIO_REG_GPLEVn), where n = gpio number / 32 
+ * reg_value = read(GPIO_REG_GPLEVn), where n = gpio number / 32
  * return reg_value >> (gpio_number % 32) & 1
- * x0 - number of gpio pin 
+ * x0 - number of gpio pin
  */
 
 /*
@@ -97,11 +97,11 @@ FUNC(gpio_is_set):
   and x0, x0, regval
   .unreq gpio_num
   .unreq regvalw
-  .unreq regval 
+  .unreq regval
   .unreq bitpos
   ret
 
-/* 
+/*
  * gpio_read_and_set_64(uin32_t *base_reg_addr, uint32_t pin_nr)
  * x0 - base_reg_addr
  * w1 - pin_nr
@@ -122,7 +122,7 @@ FUNC(gpio_read_and_set_64):
   lsl w1, w2, w1
 
   /*
-   * *addr |= OR_value 
+   * *addr |= OR_value
    */
   ldr w3, [x0]
   orr w3, w3, w1
@@ -136,7 +136,7 @@ ret
   lsr   \regid, \regid, #35
 .endm
 
-/* 
+/*
  * gpio_read_and_set_3(uin32_t *base_reg_addr, uint32_t pin_nr, uint32_t mode)
  * x0 - base_reg_addr
  * w1 - pin_nr
@@ -160,7 +160,7 @@ regidx .req w4
   add   regidx, regidx, regidx, lsl #2
   lsl   regidx, regidx, #1
 .unreq gpionr
-bitpos .req w1  
+bitpos .req w1
   sub   bitpos, bitpos, regidx
 .unreq regidx
 
@@ -171,7 +171,7 @@ bitpos .req w1
   lsl   mode, mode, bitpos
 
   /*
-   * bit mask = is argument to bic away old value, 
+   * bit mask = is argument to bic away old value,
    * ex: 0b00001110
    */
 bitmask .req w3
