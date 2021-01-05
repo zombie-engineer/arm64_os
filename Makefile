@@ -172,7 +172,7 @@ qemuat:
 
 .PHONY: jtag
 jtag:
-	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg
+	/mnt/ssd240/openocd-code/src/openocd -d -f openocd-jtag.cfg
 
 .PHONY: jtagd
 jtagd:
