@@ -13,6 +13,16 @@ def print_getter(reg, name, offset, width):
     f = '#define {:<40} BF_EXTRACT(v, {:<2}, {:<2})'.format(f, offset, width)
     print(f)
 
+def print_bit_mask(reg, name, offset, width):
+    f = '{}_MASK_{}'.format(reg, name)
+    f = '#define {:<40} BF_MASK_AT_32({}, {})'.format(f, offset, width)
+    print(f)
+
+def print_bit_shift(reg, name, offset, width):
+    f = '{}_SHIFT_{}'.format(reg, name)
+    f = '#define {:<40} {}'.format(f, offset)
+    print(f)
+
 def print_setter(reg, name, offset, width):
     f = '{}_CLR_SET_{}(v, set)'.format(reg, name)
     f = '#define {:<48} BF_CLEAR_AND_SET(v, set, {:<2}, {:<2})'.format(f, offset, width)
@@ -88,6 +98,8 @@ def main(specfile):
         iter_bf(s, reg, print_getter)
         iter_bf(s, reg, print_setter)
         iter_bf(s, reg, print_cleaner)
+        iter_bf(s, reg, print_bit_mask)
+        iter_bf(s, reg, print_bit_shift)
         if is_true_bitmask(s, reg):
             print_bitmask_printer(s, reg)
         print_printer(s, reg)
