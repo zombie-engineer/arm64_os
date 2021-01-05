@@ -28,7 +28,7 @@
 
 #define BF_SHIFT(val, offset) ((val)<<offset)
 
-#define BF_MASK_32(width) (BF_SHIFT((uint32_t)1, width)-1)
+#define BF_MASK_32(width) ((uint32_t)(BF_SHIFT((uint64_t)1, width)-1))
 
 #define BF_MASK_AT_32(offset, width) (BF_MASK_32(width)<<offset)
 
