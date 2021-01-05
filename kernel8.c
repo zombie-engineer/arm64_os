@@ -9,6 +9,7 @@
 #include <arch/armv8/armv8.h>
 #include <avr_update.h>
 #include <spinlock.h>
+#include <emmc.h>
 #include <i2c.h>
 #include <font.h>
 #include <vcanvas.h>
@@ -1010,6 +1011,7 @@ void main()
   init_uart(1);
   init_consoles();
   self_test();
+  emmc_init();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);

@@ -1,0 +1,188 @@
+EMMC_BLKSIZECNT:
+  - [ BLKSIZE, 0, 10]
+  - [ BLKCNT, 16, 16]
+
+EMMC_ARG1:
+  - [ ARGUMENT, 0, 32]
+
+EMMC_CMDTM:
+  - [ TM_BLKCNT_EN,   1,  1]
+  - [ TM_AUTOCMD_EN,  2,  2]
+  - [ TM_DAT_DIR,     4,  1]
+  - [ TM_MULTI_BLOCK, 5,  1]
+  - [ CMD_RSPNS_TYPE, 16, 2]
+  - [ CMD_CRCCHK_EN , 19, 1]
+  - [ CMD_IXCHK_EN  , 20, 1]
+  - [ CMD_ISDATA    , 21, 1]
+  - [ CMD_TYPE      , 22, 2]
+  - [ CMD_INDEX     , 24, 6]
+
+EMMC_RESP0:
+  - [ RESPONSE, 0, 32]
+
+EMMC_RESP1:
+  - [ RESPONSE, 0, 32]
+
+EMMC_RESP2:
+  - [ RESPONSE, 0, 32]
+
+EMMC_RESP3:
+  - [ RESPONSE, 0, 32]
+
+EMMC_DATA:
+  - [ DATA, 0, 32]
+
+EMMC_STATUS:
+  - [ CMD_INHIBIT   , 0, 1]
+  - [ DAT_INHIBIT   , 1, 1]
+  - [ DAT_ACTIVE    , 2, 1]
+  - [ WRITE_TRANSFER, 8, 1]
+  - [ READ_TRANSFER , 9, 1]
+  - [ DAT_LEVEL0    ,20, 4]
+  - [ CMD_LEVEL     ,24, 1]
+  - [ DAT_LEVEL1    ,25, 4]
+
+EMMC_CONTROL0:
+  - [ HCTL_DWIDTH , 1, 1]
+  - [ HCTL_HS_EN  , 2, 1]
+  - [ HCTL_8BIT   , 5, 1]
+  - [ GAP_STOP    ,16, 1]
+  - [ GAP_RESTART ,17, 1]
+  - [ READWAIT_EN ,18, 1]
+  - [ GAP_IEN     ,19, 1]
+  - [ SPI_MODE    ,20, 1]
+  - [ BOOT_EN     ,21, 1]
+  - [ ALT_BOOT_EN ,22, 1]
+
+EMMC_CONTROL1:
+  - [ CLK_INTLEN  , 0, 1]
+  - [ CLK_STABLE  , 1, 1]
+  - [ CLK_EN      , 2, 1]
+  - [ CLK_GENSEL  , 5, 1]
+  - [ CLK_FREQ_MS2, 6, 2]
+  - [ CLK_FREQ8   , 8, 6]
+  - [ DATA_TOUNIT ,16, 4]
+  - [ SRST_HC     ,24, 1]
+  - [ SRST_CMD    ,25, 1]
+  - [ SRST_DATA   ,26, 1]
+
+EMMC_INTERRUPT:
+  - [ CMD_DONE, 0, 1]
+  - [ DATA_DONE, 1, 1]
+  - [ BLOCK_GAP, 2, 1]
+  - [ WRITE_RDY , 4, 1]
+  - [ READ_RDY, 5, 1]
+  - [ CARD, 8, 1]
+  - [ RETUNE, 12, 1]
+  - [ BOOTACK, 13, 1]
+  - [ ENDBOOT, 14, 1]
+  - [ ERR, 15, 1]
+  - [ CTO_ERR, 16, 1]
+  - [ CCRC_ERR, 17, 1]
+  - [ CEND_ERR, 18, 1]
+  - [ CBAD_ERR, 19, 1]
+  - [ DTO_ERR, 20, 1]
+  - [ DCRC_ERR, 21, 1]
+  - [ DEND_ERR, 22, 1]
+  - [ ACMD_ERR, 24, 1]
+
+EMMC_IRPT_MASK:
+  - [ CMD_DONE, 0, 1]
+  - [ DATA_DONE, 1, 1]
+  - [ BLOCK_GAP, 2, 1]
+  - [ WRITE_RDY , 4, 1]
+  - [ READ_RDY, 5, 1]
+  - [ CARD, 8, 1]
+  - [ RETUNE, 12, 1]
+  - [ BOOTACK, 13, 1]
+  - [ ENDBOOT, 14, 1]
+  - [ ERR, 15, 1]
+  - [ CTO_ERR, 16, 1]
+  - [ CCRC_ERR, 17, 1]
+  - [ CEND_ERR, 18, 1]
+  - [ CBAD_ERR, 19, 1]
+  - [ DTO_ERR, 20, 1]
+  - [ DCRC_ERR, 21, 1]
+  - [ DEND_ERR, 22, 1]
+  - [ ACMD_ERR, 24, 1]
+
+EMMC_IRPT_EN:
+  - [ CMD_DONE, 0, 1]
+  - [ DATA_DONE, 1, 1]
+  - [ BLOCK_GAP, 2, 1]
+  - [ WRITE_RDY , 4, 1]
+  - [ READ_RDY, 5, 1]
+  - [ CARD, 8, 1]
+  - [ RETUNE, 12, 1]
+  - [ BOOTACK, 13, 1]
+  - [ ENDBOOT, 14, 1]
+  - [ ERR, 15, 1]
+  - [ CTO_ERR, 16, 1]
+  - [ CCRC_ERR, 17, 1]
+  - [ CEND_ERR, 18, 1]
+  - [ CBAD_ERR, 19, 1]
+  - [ DTO_ERR, 20, 1]
+  - [ DCRC_ERR, 21, 1]
+  - [ DEND_ERR, 22, 1]
+  - [ ACMD_ERR, 24, 1]
+
+EMMC_FORCE_IRPT:
+  - [ CMD_DONE, 0, 1]
+  - [ DATA_DONE, 1, 1]
+  - [ BLOCK_GAP, 2, 1]
+  - [ WRITE_RDY , 4, 1]
+  - [ READ_RDY, 5, 1]
+  - [ CARD, 8, 1]
+  - [ RETUNE, 12, 1]
+  - [ BOOTACK, 13, 1]
+  - [ ENDBOOT, 14, 1]
+  - [ ERR, 15, 1]
+  - [ CTO_ERR, 16, 1]
+  - [ CCRC_ERR, 17, 1]
+  - [ CEND_ERR, 18, 1]
+  - [ CBAD_ERR, 19, 1]
+  - [ DTO_ERR, 20, 1]
+  - [ DCRC_ERR, 21, 1]
+  - [ DEND_ERR, 22, 1]
+  - [ ACMD_ERR, 24, 1]
+
+EMMC_CONTROL2:
+  - [ ACKNOX_ERR, 0, 1]
+  - [ ACTO_ERR, 1, 1]
+  - [ ACCRC_ERR, 2, 1]
+  - [ ACEND_ERR, 3, 1]
+  - [ ACBAD_ERR, 4, 1]
+  - [ NOTC12_ERR, 7, 1]
+  - [ UHSMODE, 16, 3]
+  - [ TUNEON, 22, 1]
+  - [ TUNED, 23, 1]
+
+EMMC_BOOT_TIMEOUT:
+  - [ TIMEOUT, 0, 32]
+
+EMMC_DBG_SEL:
+  - [ SELECT, 0, 1]
+
+EMMC_EXRDFIFO_CFG:
+  - [ RD_THRSH, 0, 3]
+
+EMMC_EXRDFIFO_EN:
+  - [ ENABLE, 0, 1]
+
+EMMC_TUNE_STEP:
+  - [ DELAY, 0, 3]
+
+EMMC_TUNE_STEPS_STD:
+  - [ STEPS, 0, 6]
+
+EMMC_TUNE_STEPS_DDR:
+  - [ STEPS, 0, 6]
+
+EMMC_SPI_INT_SPT:
+  - [ SELECT, 0, 8]
+
+EMMC_SLOTISR_VER:
+  - [ SLOT_STATUS, 0, 8]
+  - [ SDVERSION, 16, 8]
+  - [ VENDOR, 24, 8]
+
