@@ -67,10 +67,14 @@ out_match:
   return 0;
 }
 
-static inline int emmc_interrupt_wait_done_or_err(uint64_t timeout_usec, bool blocking, uint32_t *intval)
+static inline int emmc_interrupt_wait_done_or_err(uint64_t timeout_usec, bool waitcmd, bool waitdat, bool blocking, uint32_t *intval)
 {
   uint32_t intmask;
-  intmask = EMMC_INTERRUPT_MASK_CMD_DONE | EMMC_INTERRUPT_MASK_ERR;
+  intmask = EMMC_INTERRUPT_MASK_ERR;
+  if (waitcmd)
+    intmask |= EMMC_INTERRUPT_MASK_CMD_DONE;
+  if (waitdat)
+    intmask |= EMMC_INTERRUPT_MASK_DATA_DONE;
   return emmc_wait_reg_value(EMMC_INTERRUPT, 0, intmask, timeout_usec, blocking, intval);
 }
 

@@ -32,7 +32,33 @@
 
 #define EMMC_CONTROL1_SRST_HC 24
 
-#define EMMC_RESPONCE_TYPE_NONE         0b00
-#define EMMC_RESPONCE_TYPE_136_BITS     0b01
-#define EMMC_RESPONCE_TYPE_48_BITS      0b10
-#define EMMC_RESPONCE_TYPE_48_BITS_BUSY 0b11
+#define EMMC_RESPONSE_TYPE_NONE         0b00
+#define EMMC_RESPONSE_TYPE_136_BITS     0b01
+#define EMMC_RESPONSE_TYPE_48_BITS      0b10
+#define EMMC_RESPONSE_TYPE_48_BITS_BUSY 0b11
+
+#define EMMC_STATE_IDLE  0
+#define EMMC_STATE_READY 1
+#define EMMC_STATE_IDENT 2
+#define EMMC_STATE_STBY  3
+#define EMMC_STATE_TRAN  4
+#define EMMC_STATE_DATA  5
+#define EMMC_STATE_RCV   6
+#define EMMC_STATE_PRG   7
+#define EMMC_STATE_DIS   8
+
+static inline const char *emmc_state_to_string(int state)
+{
+  switch(state) {
+    case EMMC_STATE_IDLE: return "IDLE";
+    case EMMC_STATE_READY: return "READY";
+    case EMMC_STATE_IDENT: return "IDENT";
+    case EMMC_STATE_STBY: return "STBY";
+    case EMMC_STATE_TRAN: return "TRAN";
+    case EMMC_STATE_DATA: return "DATA";
+    case EMMC_STATE_RCV: return "RCV";
+    case EMMC_STATE_PRG: return "PRG";
+    case EMMC_STATE_DIS: return "DIS";
+    default: return "UNKNOWN";
+  }
+}

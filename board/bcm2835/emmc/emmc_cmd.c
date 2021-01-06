@@ -1,5 +1,6 @@
 #include <bits_api.h>
 #include <stringlib.h>
+#include <emmc.h>
 #include "emmc_cmd.h"
 #include "emmc_utils.h"
 #include "emmc_regs_bits.h"
@@ -7,131 +8,261 @@
 
 extern bool emmc_mode_blocking;
 
-#define CMDTM_GEN(__idx, __resp_type, __crc_enable)\
+/*
+ * P1 Physical Layer Simplified Specification.
+ * 4.9 Responces
+ */
+
+/*
+ * 4.9.1 R1 (normal response command)
+ */
+#define RESP_TYPE_R1  EMMC_RESPONSE_TYPE_48_BITS
+
+/*
+ * 4.9.2 R1b
+ */
+#define RESP_TYPE_R1b  EMMC_RESPONSE_TYPE_48_BITS_BUSY
+
+/*
+ * 4.9.3 R2 (CID, CSD register)
+ */
+#define RESP_TYPE_R2  EMMC_RESPONSE_TYPE_136_BITS
+
+/*
+ * 4.9.4 R3 (OCR register)
+ */
+#define RESP_TYPE_R3  EMMC_RESPONSE_TYPE_48_BITS
+
+/*
+ * 4.9.5 R6 (Published RCA response)
+ */
+#define RESP_TYPE_R6  EMMC_RESPONSE_TYPE_48_BITS
+
+/*
+ * 4.9.5 R7 (Card interface condition)
+ */
+#define RESP_TYPE_R7  EMMC_RESPONSE_TYPE_48_BITS
+
+/*
+ * Stub response type
+ */
+#define RESP_TYPE_NA  EMMC_RESPONSE_TYPE_NONE
+
+/*
+ * Transfer type host to card
+ */
+#define EMMC_TRANS_TYPE_DATA_HOST_TO_CARD 0
+
+/*
+ * Transfer type stub
+ */
+#define EMMC_TRANS_TYPE_DATA_NA 0
+
+/*
+ * Transfer type card to host
+ */
+#define EMMC_TRANS_TYPE_DATA_CARD_TO_HOST 1
+
+#define CMDTM_GEN(__idx, __resp_type, __crc_enable, __trans_type, __is_data)\
   ((__idx << EMMC_CMDTM_SHIFT_CMD_INDEX) |\
-  (EMMC_RESPONCE_TYPE_ ##  __resp_type << EMMC_CMDTM_SHIFT_CMD_RSPNS_TYPE) |\
-  (__crc_enable << EMMC_CMDTM_SHIFT_CMD_CRCCHK_EN))
+  (RESP_TYPE_ ## __resp_type << EMMC_CMDTM_SHIFT_CMD_RSPNS_TYPE) |\
+  (__crc_enable << EMMC_CMDTM_SHIFT_CMD_CRCCHK_EN) |\
+  (EMMC_TRANS_TYPE_DATA_ ## __trans_type << EMMC_CMDTM_SHIFT_TM_DAT_DIR) |\
+  (__is_data << EMMC_CMDTM_SHIFT_CMD_ISDATA))
+  
 
 static uint32_t sd_commands[] = {
-  CMDTM_GEN(0,  NONE,    0),
-  CMDTM_GEN(1,  NONE,    0),
-  CMDTM_GEN(2,  136_BITS,1),
-  CMDTM_GEN(3,  48_BITS, 1),
-  CMDTM_GEN(4,  NONE,    0),
-  CMDTM_GEN(5,  136_BITS,0),
-  CMDTM_GEN(6,  NONE,    0),
-  CMDTM_GEN(7,  NONE,    0),
-  CMDTM_GEN(8,  48_BITS, 1),
-  CMDTM_GEN(9,  NONE,    0),
-  CMDTM_GEN(10, NONE,    0),
-  CMDTM_GEN(11, NONE,    0),
-  CMDTM_GEN(12, NONE,    0),
-  CMDTM_GEN(13, NONE,    0),
-  CMDTM_GEN(14, NONE,    0),
-  CMDTM_GEN(15, NONE,    0),
-  CMDTM_GEN(16, NONE,    0),
-  CMDTM_GEN(17, NONE,    0),
-  CMDTM_GEN(18, NONE,    0),
-  CMDTM_GEN(19, NONE,    0),
-  CMDTM_GEN(20, NONE,    0),
-  CMDTM_GEN(21, NONE,    0),
-  CMDTM_GEN(22, NONE,    0),
-  CMDTM_GEN(23, NONE,    0),
-  CMDTM_GEN(24, NONE,    0),
-  CMDTM_GEN(25, NONE,    0),
-  CMDTM_GEN(26, NONE,    0),
-  CMDTM_GEN(27, NONE,    0),
-  CMDTM_GEN(28, NONE,    0),
-  CMDTM_GEN(29, NONE,    0),
-  CMDTM_GEN(30, NONE,    0),
-  CMDTM_GEN(31, NONE,    0),
-  CMDTM_GEN(32, NONE,    0),
-  CMDTM_GEN(33, NONE,    0),
-  CMDTM_GEN(34, NONE,    0),
-  CMDTM_GEN(35, NONE,    0),
-  CMDTM_GEN(36, NONE,    0),
-  CMDTM_GEN(37, NONE,    0),
-  CMDTM_GEN(38, NONE,    0),
-  CMDTM_GEN(39, NONE,    0),
-  CMDTM_GEN(40, NONE,    0),
-  CMDTM_GEN(41, NONE,    0),
-  CMDTM_GEN(42, NONE,    0),
-  CMDTM_GEN(43, NONE,    0),
-  CMDTM_GEN(44, NONE,    0),
-  CMDTM_GEN(45, NONE,    0),
-  CMDTM_GEN(46, NONE,    0),
-  CMDTM_GEN(47, NONE,    0),
-  CMDTM_GEN(48, NONE,    0),
-  CMDTM_GEN(49, NONE,    0),
-  CMDTM_GEN(50, NONE,    0),
-  CMDTM_GEN(51, NONE,    0),
-  CMDTM_GEN(52, NONE,    0),
-  CMDTM_GEN(53, NONE,    0),
-  CMDTM_GEN(54, NONE,    0),
-  CMDTM_GEN(55, 48_BITS, 1),
-  CMDTM_GEN(56, NONE,    0),
-  CMDTM_GEN(57, NONE,    0),
-  CMDTM_GEN(58, NONE,    0),
-  CMDTM_GEN(59, NONE,    0)
+  CMDTM_GEN(0,  NA,      0, NA, 0),
+  CMDTM_GEN(1,  NA,      0, NA, 0),
+  CMDTM_GEN(2,  R2,      1, NA, 0),
+  CMDTM_GEN(3,  R6,      1, NA, 0),
+  CMDTM_GEN(4,  NA,      0, NA, 0),
+  CMDTM_GEN(5,  R2,      0, NA, 0),
+  CMDTM_GEN(6,  NA,      0, NA, 0),
+  CMDTM_GEN(7,  R1b,     1, NA, 0),
+  CMDTM_GEN(8,  R7,      1, NA, 0),
+  CMDTM_GEN(9,  R2,      0, NA, 0),
+  CMDTM_GEN(10, R2,      0, NA, 0),
+  CMDTM_GEN(11, R1,      1, NA, 0),
+  CMDTM_GEN(12, R1b,     1, NA, 0),
+  CMDTM_GEN(13, R1,      1, NA, 0),
+  CMDTM_GEN(14, NA,      0, NA, 0),
+  CMDTM_GEN(15, NA,      0, NA, 0),
+  CMDTM_GEN(16, R1,      1, NA, 0),
+  CMDTM_GEN(17, R1,      1, NA, 0),
+  CMDTM_GEN(18, R1,      1, NA, 0),
+  CMDTM_GEN(19, R1,      1, NA, 0),
+  CMDTM_GEN(20, R1b,     1, NA, 0),
+  CMDTM_GEN(21, R1,      1, NA, 0),
+  CMDTM_GEN(22, R1,      1, NA, 0),
+  CMDTM_GEN(23, R1,      1, NA, 0),
+  CMDTM_GEN(24, R1,      1, NA, 0),
+  CMDTM_GEN(25, R1,      1, NA, 0),
+  CMDTM_GEN(26, NA,      0, NA, 0),
+  CMDTM_GEN(27, R1,      1, NA, 0),
+  CMDTM_GEN(28, R1b,     1, NA, 0),
+  CMDTM_GEN(29, R1b,     1, NA, 0),
+  CMDTM_GEN(30, R1,      1, NA, 0),
+  CMDTM_GEN(31, NA,      0, NA, 0),
+  CMDTM_GEN(32, R1,      1, NA, 0),
+  CMDTM_GEN(33, R1,      1, NA, 0),
+  CMDTM_GEN(34, NA,      0, NA, 0),
+  CMDTM_GEN(35, NA,      0, NA, 0),
+  CMDTM_GEN(36, NA,      0, NA, 0),
+  CMDTM_GEN(37, NA,      0, NA, 0),
+  CMDTM_GEN(38, R1b,     1, NA, 0),
+  CMDTM_GEN(39, NA,      0, NA, 0),
+  CMDTM_GEN(40, R1,      1, NA, 0),
+  CMDTM_GEN(41, NA,      0, NA, 0),
+  CMDTM_GEN(42, R1,      1, NA, 0),
+  CMDTM_GEN(43, NA,    0, NA, 0),
+  CMDTM_GEN(44, NA,    0, NA, 0),
+  CMDTM_GEN(45, NA,    0, NA, 0),
+  CMDTM_GEN(46, NA,    0, NA, 0),
+  CMDTM_GEN(47, NA,    0, NA, 0),
+  CMDTM_GEN(48, NA,    0, NA, 0),
+  CMDTM_GEN(49, NA,    0, NA, 0),
+  CMDTM_GEN(50, NA,    0, NA, 0),
+  CMDTM_GEN(51, NA,    0, NA, 0),
+  CMDTM_GEN(52, NA,    0, NA, 0),
+  CMDTM_GEN(53, NA,    0, NA, 0),
+  CMDTM_GEN(54, NA,    0, NA, 0),
+  CMDTM_GEN(55, R1,      1, NA, 0),
+  CMDTM_GEN(56, R1,      1, NA, 0),
+  CMDTM_GEN(57, NA,    0, NA, 0),
+  CMDTM_GEN(58, NA,    0, NA, 0),
+  CMDTM_GEN(59, NA,    0, NA, 0)
 };
 
 static uint32_t sd_acommands[] = {
-  CMDTM_GEN(0, NONE,    0),
-  CMDTM_GEN(1, NONE,    0),
-  CMDTM_GEN(2, NONE,    0),
-  CMDTM_GEN(3, NONE,    0),
-  CMDTM_GEN(4, NONE,    0),
-  CMDTM_GEN(5, NONE,    0),
-  CMDTM_GEN(6, NONE,    0),
-  CMDTM_GEN(7, NONE,    0),
-  CMDTM_GEN(8, NONE,    0),
-  CMDTM_GEN(9, NONE,    0),
-  CMDTM_GEN(10, NONE,    0),
-  CMDTM_GEN(11, NONE,    0),
-  CMDTM_GEN(12, NONE,    0),
-  CMDTM_GEN(13, NONE,    0),
-  CMDTM_GEN(14, NONE,    0),
-  CMDTM_GEN(15, NONE,    0),
-  CMDTM_GEN(16, NONE,    0),
-  CMDTM_GEN(17, NONE,    0),
-  CMDTM_GEN(18, NONE,    0),
-  CMDTM_GEN(19, NONE,    0),
-  CMDTM_GEN(20, NONE,    0),
-  CMDTM_GEN(21, NONE,    0),
-  CMDTM_GEN(22, NONE,    0),
-  CMDTM_GEN(23, NONE,    0),
-  CMDTM_GEN(24, NONE,    0),
-  CMDTM_GEN(25, NONE,    0),
-  CMDTM_GEN(26, NONE,    0),
-  CMDTM_GEN(27, NONE,    0),
-  CMDTM_GEN(28, NONE,    0),
-  CMDTM_GEN(29, NONE,    0),
-  CMDTM_GEN(30, NONE,    0),
-  CMDTM_GEN(31, NONE,    0),
-  CMDTM_GEN(32, NONE,    0),
-  CMDTM_GEN(33, NONE,    0),
-  CMDTM_GEN(34, NONE,    0),
-  CMDTM_GEN(35, NONE,    0),
-  CMDTM_GEN(36, NONE,    0),
-  CMDTM_GEN(37, NONE,    0),
-  CMDTM_GEN(38, NONE,    0),
-  CMDTM_GEN(39, NONE,    0),
-  CMDTM_GEN(40, NONE,    0),
-  CMDTM_GEN(41, 48_BITS, 0),
-  CMDTM_GEN(42, NONE,    0),
-  CMDTM_GEN(43, NONE,    0),
-  CMDTM_GEN(44, NONE,    0),
-  CMDTM_GEN(45, NONE,    0),
-  CMDTM_GEN(46, NONE,    0),
-  CMDTM_GEN(47, NONE,    0),
-  CMDTM_GEN(48, NONE,    0),
-  CMDTM_GEN(49, NONE,    0)
+  CMDTM_GEN(0, NA,    0, NA, 0),
+  CMDTM_GEN(1, NA,    0, NA, 0),
+  CMDTM_GEN(2, NA,    0, NA, 0),
+  CMDTM_GEN(3, NA,    0, NA, 0),
+  CMDTM_GEN(4, NA,    0, NA, 0),
+  CMDTM_GEN(5, NA,    0, NA, 0),
+  CMDTM_GEN(6, NA,    0, NA, 0),
+  CMDTM_GEN(7, NA,    0, NA, 0),
+  CMDTM_GEN(8, NA,    0, NA, 0),
+  CMDTM_GEN(9, NA,    0, NA, 0),
+  CMDTM_GEN(10, NA,    0, NA, 0),
+  CMDTM_GEN(11, NA,    0, NA, 0),
+  CMDTM_GEN(12, NA,    0, NA, 0),
+  CMDTM_GEN(13, NA,    0, NA, 0),
+  CMDTM_GEN(14, NA,    0, NA, 0),
+  CMDTM_GEN(15, NA,    0, NA, 0),
+  CMDTM_GEN(16, NA,    0, NA, 0),
+  CMDTM_GEN(17, NA,    0, NA, 0),
+  CMDTM_GEN(18, NA,    0, NA, 0),
+  CMDTM_GEN(19, NA,    0, NA, 0),
+  CMDTM_GEN(20, NA,    0, NA, 0),
+  CMDTM_GEN(21, NA,    0, NA, 0),
+  CMDTM_GEN(22, NA,    0, NA, 0),
+  CMDTM_GEN(23, NA,    0, NA, 0),
+  CMDTM_GEN(24, NA,    0, NA, 0),
+  CMDTM_GEN(25, NA,    0, NA, 0),
+  CMDTM_GEN(26, NA,    0, NA, 0),
+  CMDTM_GEN(27, NA,    0, NA, 0),
+  CMDTM_GEN(28, NA,    0, NA, 0),
+  CMDTM_GEN(29, NA,    0, NA, 0),
+  CMDTM_GEN(30, NA,    0, NA, 0),
+  CMDTM_GEN(31, NA,    0, NA, 0),
+  CMDTM_GEN(32, NA,    0, NA, 0),
+  CMDTM_GEN(33, NA,    0, NA, 0),
+  CMDTM_GEN(34, NA,    0, NA, 0),
+  CMDTM_GEN(35, NA,    0, NA, 0),
+  CMDTM_GEN(36, NA,    0, NA, 0),
+  CMDTM_GEN(37, NA,    0, NA, 0),
+  CMDTM_GEN(38, NA,    0, NA, 0),
+  CMDTM_GEN(39, NA,    0, NA, 0),
+  CMDTM_GEN(40, NA,    0, NA, 0),
+  CMDTM_GEN(41, R3,    0, NA, 0),
+  CMDTM_GEN(42, NA,    0, NA, 0),
+  CMDTM_GEN(43, NA,    0, NA, 0),
+  CMDTM_GEN(44, NA,    0, NA, 0),
+  CMDTM_GEN(45, NA,    0, NA, 0),
+  CMDTM_GEN(46, NA,    0, NA, 0),
+  CMDTM_GEN(47, NA,    0, NA, 0),
+  CMDTM_GEN(48, NA,    0, NA, 0),
+  CMDTM_GEN(49, NA,    0, NA, 0),
+  CMDTM_GEN(50, R1,    1, NA, 0),
+  CMDTM_GEN(51, R1,    1, CARD_TO_HOST, 1),
+  CMDTM_GEN(52, NA,    0, NA, 0),
+  CMDTM_GEN(53, NA,    0, NA, 0),
+  CMDTM_GEN(54, NA,    0, NA, 0),
+  CMDTM_GEN(55, NA,    0, NA, 0),
+  CMDTM_GEN(56, NA,    0, NA, 0),
+  CMDTM_GEN(57, NA,    0, NA, 0),
+  CMDTM_GEN(58, NA,    0, NA, 0),
+  CMDTM_GEN(59, NA,    0, NA, 0)
 };
 
-#define EMMC_BLOCK_SIZE 1024
+static inline emmc_cmd_status_t emmc_cmd_process_single_block(
+  char *buf,
+  int size,
+  int is_write,
+  uint32_t intbits,
+  uint64_t timeout_usec,
+  bool blocking)
+{
+  uint32_t intval;
+  uint32_t *ptr, *end;
+
+  if (emmc_wait_reg_value(EMMC_INTERRUPT, 0, intbits, timeout_usec, blocking, &intval))
+    return EMMC_CMD_TIMEOUT;
+  if (intval & 0xffff0000) {
+    EMMC_ERR("emmc_cmd_process_single_block: error during wait for interrupt: %08x", intval);
+    return EMMC_CMD_ERR;
+  }
+
+  ptr = (uint32_t*)buf;
+  end = ptr + (size / sizeof(*ptr));
+
+  if (is_write) {
+    while(ptr != end)
+      write_reg(EMMC_DATA, *ptr++);
+  } else {
+    while(ptr != end)
+      *ptr++ = read_reg(EMMC_DATA);
+  }
+  return EMMC_CMD_OK;
+}
+
+static inline emmc_cmd_status_t emmc_cmd_process_data(
+  struct emmc_cmd *c,
+  uint32_t cmdreg,
+  uint64_t timeout_usec,
+  bool blocking)
+{
+  emmc_cmd_status_t status;
+  int block;
+  bool is_write;
+  uint32_t intbits = 0;
+  char *buf;
+
+  int volatile yy = 1;
+  while(yy);
+  is_write = EMMC_CMDTM_GET_TM_DAT_DIR(cmdreg) == EMMC_TRANS_TYPE_DATA_HOST_TO_CARD;
+
+  EMMC_INTERRUPT_CLR_SET_ERR(intbits, 1);
+  if (is_write) {
+    EMMC_INTERRUPT_CLR_SET_WRITE_RDY(intbits, 1);
+  } else {
+    EMMC_INTERRUPT_CLR_SET_READ_RDY(intbits, 1);
+  }
+
+  for (block = 0; block < c->num_blocks; ++block) {
+    buf = c->databuf + block * c->block_size;
+    status = emmc_cmd_process_single_block(buf, c->block_size, is_write, intbits, timeout_usec, blocking);
+    if (status != EMMC_CMD_OK)
+      return status;
+  }
+  return EMMC_CMD_OK;
+}
 
 static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t cmdreg, uint64_t timeout_usec)
 {
+  emmc_cmd_status_t data_status;
   int err;
   uint32_t blksizecnt;
   uint32_t intval, intval_cmp;
@@ -147,16 +278,13 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
     return -1;
 
   blksizecnt = 0;
-  EMMC_BLKSIZECNT_CLR_SET_BLKSIZE(blksizecnt, EMMC_BLOCK_SIZE);
+  EMMC_BLKSIZECNT_CLR_SET_BLKSIZE(blksizecnt, c->block_size);
   EMMC_BLKSIZECNT_CLR_SET_BLKCNT(blksizecnt, c->num_blocks);
   emmc_write_reg(EMMC_BLKSIZECNT, blksizecnt);
   emmc_write_reg(EMMC_ARG1, c->arg);
   emmc_write_reg(EMMC_CMDTM, cmdreg);
 
-  err = emmc_interrupt_wait_done_or_err(timeout_usec, emmc_mode_blocking, &intval);
-
-  /* Clear interrupts before proceeding */
-  emmc_write_reg(EMMC_INTERRUPT, intval);
+  err = emmc_interrupt_wait_done_or_err(timeout_usec, 1, 0, emmc_mode_blocking, &intval);
 
   if (err)
     return EMMC_CMD_TIMEOUT;
@@ -178,20 +306,41 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
   response_type = EMMC_CMDTM_GET_CMD_RSPNS_TYPE(cmdreg);
 
   switch(response_type) {
-    case EMMC_RESPONCE_TYPE_NONE:
+    case EMMC_RESPONSE_TYPE_NONE:
       break;
-    case EMMC_RESPONCE_TYPE_136_BITS:
+    case EMMC_RESPONSE_TYPE_136_BITS:
       c->resp0 = emmc_read_reg(EMMC_RESP0);
       c->resp1 = emmc_read_reg(EMMC_RESP1);
       c->resp2 = emmc_read_reg(EMMC_RESP2);
       c->resp3 = emmc_read_reg(EMMC_RESP3);
       break;
-    case EMMC_RESPONCE_TYPE_48_BITS:
+    case EMMC_RESPONSE_TYPE_48_BITS:
       c->resp0 = emmc_read_reg(EMMC_RESP0);
     break;
-    case EMMC_RESPONCE_TYPE_48_BITS_BUSY: break;
+    case EMMC_RESPONSE_TYPE_48_BITS_BUSY:
+      c->resp0 = emmc_read_reg(EMMC_RESP0);
+    break;
   }
-  EMMC_LOG("emmc_do_issue_cmd result: %d, resp: [%08x][%08x][%08x][%08x]", c->status, c->resp0, c->resp1, c->resp2, c->resp3);
+
+  if (EMMC_CMDTM_GET_CMD_ISDATA(cmdreg)) {
+    data_status = emmc_cmd_process_data(c, cmdreg, timeout_usec, emmc_mode_blocking);
+    if (data_status != EMMC_CMD_OK)
+      return data_status;
+  }
+
+  if (response_type == EMMC_RESPONSE_TYPE_48_BITS_BUSY) {
+    read_reg(EMMC_INTERRUPT);
+    err = emmc_interrupt_wait_done_or_err(timeout_usec, 0, 1, emmc_mode_blocking, &intval);
+    if (err)
+      return EMMC_CMD_TIMEOUT;
+    emmc_write_reg(EMMC_INTERRUPT, 0xffff0002);
+  }
+  EMMC_LOG("emmc_do_issue_cmd result: %d, resp: [%08x][%08x][%08x][%08x]",
+    c->status,
+    c->resp0,
+    c->resp1,
+    c->resp2,
+    c->resp3);
   return EMMC_CMD_OK;
 }
 
@@ -211,6 +360,9 @@ emmc_cmd_status_t emmc_cmd(struct emmc_cmd *c, uint64_t timeout_usec)
 
   if (EMMC_CMD_IS_ACMD(c->cmd_idx)) {
     emmc_cmd_init(&tmp_cmd, EMMC_CMD55 /* APP_CMD */, c->rca << 16);
+    tmp_cmd.num_blocks = c->num_blocks;
+    tmp_cmd.block_size = c->block_size;
+
     tmp_status = emmc_do_issue_cmd(&tmp_cmd, sd_commands[EMMC_CMD55], timeout_usec);
     if (tmp_status != EMMC_CMD_OK)
       return tmp_status;
