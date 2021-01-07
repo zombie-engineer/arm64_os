@@ -9,6 +9,16 @@ static inline uint16_t get_unaligned_16_le(void *addr)
   return (uint16_t)((__GET_BYTE(addr, 1) << 8) | (__GET_BYTE(addr, 0)));
 }
 
+static inline uint32_t get_unaligned_32_le(void *addr)
+{
+  return (uint32_t)(
+    (__GET_BYTE(addr, 3) << 24) |
+    (__GET_BYTE(addr, 2) << 16) |
+    (__GET_BYTE(addr, 1) <<  8) |
+    (__GET_BYTE(addr, 0) <<  0)
+  );
+}
+
 static inline void set_unaligned_16_le(void *a, uint16_t v)
 {
   __SET_BYTE(a, 0, BYTE_EXTRACT(v, 1));

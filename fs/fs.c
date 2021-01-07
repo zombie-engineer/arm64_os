@@ -1,5 +1,7 @@
 #include <fs/fs.h>
 #include <block_device.h>
+#include <partition_table.h>
+#include <partition_device.h>
 #include <common.h>
 #include <emmc.h>
 
@@ -49,13 +51,49 @@ static struct block_device emmc_block_device = {
   .sector_size = 512
 };
 
+static inline struct mbr_partition_entry *mbr_get_first_valid_partition(struct mbr *mbr)
+{
+  int i;
+  struct mbr_partition_entry *e;
+  for (i = 0; i < ARRAY_SIZE(mbr->entries); ++i) {
+    e = &mbr->entries[i];
+    if (e->part_type)
+      return e;
+  }
+  return NULL;
+}
+
 void fs_probe_early(void)
 {
+  int err;
   char buf[1024];
   struct block_device *bdev = &emmc_block_device;
+  struct mbr mbr ALIGNED(4);
+  struct mbr_partition_entry *pe;
+  struct partition_device pdev;
+  uint64_t start_sector;
 
   bdev->ops.read(bdev, buf, sizeof(buf), 0, 1);
   hexdump_memory_ex("emmc", 32, buf, 64);
   bdev->ops.read(bdev, buf, sizeof(buf), 0x2000, 1);
+  hexdump_memory_ex("emmc", 32, buf, 64);
+
+  err = mbr_read(bdev, &mbr);
+  if (err) {
+    printf("fs_probe_early: failed to read MBR from block_device %p\r\n", bdev);
+    return;
+  }
+  mbr_print_summary(&mbr);
+  pe = mbr_get_first_valid_partition(&mbr);
+  if (!pe) {
+    printf("fs_probe_early: no valid partitions in MBR table on block device %p\r\n", bdev);
+    return;
+  }
+
+  start_sector = mbr_partition_entry_get_lba(pe);
+  partition_device_init(&pdev, bdev,
+    start_sector,
+    start_sector + mbr_partition_entry_get_num_sectors(pe));
+  pdev.bdev.ops.read(&pdev.bdev, buf, sizeof(buf), 0, 1);
   hexdump_memory_ex("emmc", 32, buf, 64);
 }

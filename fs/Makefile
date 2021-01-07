@@ -1,5 +1,6 @@
 OBJS_FS := fat32/fat32\
 	partition_table\
+	partition_device\
 	fs
 
 DIRPATH := fs
