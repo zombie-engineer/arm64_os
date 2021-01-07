@@ -14,8 +14,16 @@
 #define EMMC_CMD7                 0x00000007
 /* SEND_IF_COND */
 #define EMMC_CMD8                 0x00000008
+/* STOP_TRANSMISSION */
+#define EMMC_CMD12                0x0000000c
 /* SEND_STATUS */
 #define EMMC_CMD13                0x0000000d
+/* READ_SINGLE_BLOCK */
+#define EMMC_CMD17                0x00000011
+/* READ_MULTIPLE_BLOCK */
+#define EMMC_CMD18                0x00000012
+/* WRITE_BLOCK */
+#define EMMC_CMD24                0x00000018
 /* APP_CMD */
 #define EMMC_CMD55                0x00000037
 
@@ -23,6 +31,11 @@
 #define ACMD(__idx) ((1<<ACMD_BIT) | __idx)
 #define EMMC_CMD_IS_ACMD(__cmd) (__cmd & (1<<ACMD_BIT) ? 1 : 0)
 #define EMMC_ACMD_RAW_IDX(__cmd) (__cmd & ~(1<<ACMD_BIT))
+
+/* SET_BUS_WIDTH */
+#define EMMC_BUS_WIDTH_1BIT 0
+#define EMMC_BUS_WIDTH_4BITS 2
+#define EMMC_ACMD6                0x80000006
 
 #define EMMC_ACMD41               0x80000029
 #define EMMC_ACMD51               0x80000033
@@ -90,3 +103,40 @@ static inline int emmc_cmd13(uint32_t rca, uint32_t *out_status)
   return 0;
 }
 
+/* READ_SINGLE_BLOCK */
+static inline int emmc_cmd17(uint32_t block_idx, char *dstbuf)
+{
+  emmc_cmd_status_t cmd_ret;
+  struct emmc_cmd c;
+
+  emmc_cmd_init(&c, EMMC_CMD17, block_idx);
+  c.databuf = dstbuf;
+  c.num_blocks = 1;
+  c.block_size = 512;
+
+  cmd_ret = emmc_cmd(&c, 0);
+
+  if (cmd_ret != EMMC_CMD_OK)
+    return -1;
+
+  return 0;
+}
+
+/* WRITE_BLOCK */
+static inline int emmc_cmd24(uint32_t block_idx, char *dstbuf)
+{
+  emmc_cmd_status_t cmd_ret;
+  struct emmc_cmd c;
+
+  emmc_cmd_init(&c, EMMC_CMD24, block_idx);
+  c.databuf = dstbuf;
+  c.num_blocks = 1;
+  c.block_size = 512;
+
+  cmd_ret = emmc_cmd(&c, 0);
+
+  if (cmd_ret != EMMC_CMD_OK)
+    return -1;
+
+  return 0;
+}

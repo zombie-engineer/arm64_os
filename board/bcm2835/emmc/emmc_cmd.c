@@ -89,14 +89,14 @@ static uint32_t sd_commands[] = {
   CMDTM_GEN(14, NA,      0, NA, 0),
   CMDTM_GEN(15, NA,      0, NA, 0),
   CMDTM_GEN(16, R1,      1, NA, 0),
-  CMDTM_GEN(17, R1,      1, NA, 0),
+  CMDTM_GEN(17, R1,      1, CARD_TO_HOST, 1),
   CMDTM_GEN(18, R1,      1, NA, 0),
   CMDTM_GEN(19, R1,      1, NA, 0),
   CMDTM_GEN(20, R1b,     1, NA, 0),
   CMDTM_GEN(21, R1,      1, NA, 0),
   CMDTM_GEN(22, R1,      1, NA, 0),
   CMDTM_GEN(23, R1,      1, NA, 0),
-  CMDTM_GEN(24, R1,      1, NA, 0),
+  CMDTM_GEN(24, R1,      1, HOST_TO_CARD, 1),
   CMDTM_GEN(25, R1,      1, NA, 0),
   CMDTM_GEN(26, NA,      0, NA, 0),
   CMDTM_GEN(27, R1,      1, NA, 0),
@@ -141,7 +141,7 @@ static uint32_t sd_acommands[] = {
   CMDTM_GEN(3, NA,    0, NA, 0),
   CMDTM_GEN(4, NA,    0, NA, 0),
   CMDTM_GEN(5, NA,    0, NA, 0),
-  CMDTM_GEN(6, NA,    0, NA, 0),
+  CMDTM_GEN(6, R1,    1, NA, 0),
   CMDTM_GEN(7, NA,    0, NA, 0),
   CMDTM_GEN(8, NA,    0, NA, 0),
   CMDTM_GEN(9, NA,    0, NA, 0),
@@ -205,15 +205,7 @@ static inline emmc_cmd_status_t emmc_cmd_process_single_block(
   uint64_t timeout_usec,
   bool blocking)
 {
-  uint32_t intval;
   uint32_t *ptr, *end;
-
-  if (emmc_wait_reg_value(EMMC_INTERRUPT, 0, intbits, timeout_usec, blocking, &intval))
-    return EMMC_CMD_TIMEOUT;
-  if (intval & 0xffff0000) {
-    EMMC_ERR("emmc_cmd_process_single_block: error during wait for interrupt: %08x", intval);
-    return EMMC_CMD_ERR;
-  }
 
   ptr = (uint32_t*)buf;
   end = ptr + (size / sizeof(*ptr));
@@ -228,6 +220,35 @@ static inline emmc_cmd_status_t emmc_cmd_process_single_block(
   return EMMC_CMD_OK;
 }
 
+static inline emmc_cmd_status_t emmc_report_interrupt_error(const char *tag, uint32_t intval)
+{
+  char buf[256];
+  emmc_interrupt_bitmask_to_string(buf, sizeof(buf), intval);
+  EMMC_ERR("%s: error bits in INTERRUPT register: %08x %s", intval, buf);
+  return EMMC_CMD_ERR;
+}
+
+static inline emmc_cmd_status_t emmc_wait_process_interrupts(
+  const char *tag,
+  uint32_t intbits,
+  bool blocking,
+  uint64_t timeout_usec)
+{
+  uint32_t intval;
+  wait_msec(1);
+  if (emmc_wait_reg_value(EMMC_INTERRUPT, 0, intbits, timeout_usec, blocking, &intval))
+    return EMMC_CMD_TIMEOUT;
+
+  /* clear received interrupts */
+  emmc_write_reg(EMMC_INTERRUPT, intval);
+  if (EMMC_INTERRUPT_GET_ERR(intval)) {
+    if (EMMC_INTERRUPT_GET_CTO_ERR(intval))
+      return EMMC_CMD_TIMEOUT;
+    return emmc_report_interrupt_error(tag, intval);
+  }
+  return EMMC_CMD_OK;
+}
+
 static inline emmc_cmd_status_t emmc_cmd_process_data(
   struct emmc_cmd *c,
   uint32_t cmdreg,
@@ -237,27 +258,69 @@ static inline emmc_cmd_status_t emmc_cmd_process_data(
   emmc_cmd_status_t status;
   int block;
   bool is_write;
-  uint32_t intbits = 0;
+  uint32_t intbits;
   char *buf;
 
-  int volatile yy = 1;
-  while(yy);
+  /*
+   * EMMC_INTERRUPT register works as follows:
+   * 0xffff0000 - is a bitmask to error interrupt bits.
+   * bit 15 - is ERR bit - means some error has happened.
+   * bits through 16-24 - details of error, hence 0xffff0000 - is a mask to all error types.
+   * bit 0 - CMD_DONE. To check that command has been received by SD card, we poll for CMD_DONE bit
+   * AND we also poll fro ERR bit at the same time. So, that we can know weather the command has
+   * been completed or the error has happened.
+   * After CMD_DONE shows up we know command has been processed successfully. If command also implies
+   * DATA, then we need a couple of other interrupt bits:
+   *
+   * bit 4 - WRITE_RDY - we poll for this bit if we want to write to data port.
+   * When WRITE_RDY shows up we can start writing to data port. The bit is set for each new block
+   *
+   * bit 5 - READ_RDY - we poll for this if we want to read some data from data port.
+   * When READ_RDY shows up we can start fetching words from data port.
+   * The bit is set for each new block
+   *
+   * bit 1 - DATA_DONE - controller sets this bit, when full amount of bytes, ordered in BLOCKSIZELEN
+   * register, has been processed. Ex: block size = 8 and number of blocks = 2, so the total amount of
+   * data is 16 bytes. After all 16 bytes have been processed by writing/reading them to/from data port
+   * this bit will be set. Another logic would be to do data port IOs until this bit is set, but I haven't
+   * tried it.
+   *
+   */
   is_write = EMMC_CMDTM_GET_TM_DAT_DIR(cmdreg) == EMMC_TRANS_TYPE_DATA_HOST_TO_CARD;
 
+  /*
+   * Decide which bits we should expect in the interrupt register.
+   * for read  operations this is 0x8020 (bit 15 ERR, bit 4 READ_RDY )
+   * for write operations this is 0x8010 (bit 15 ERR, bit 4 WRITE_RDY)
+   */
+  intbits = 0;
   EMMC_INTERRUPT_CLR_SET_ERR(intbits, 1);
   if (is_write) {
+    /* 0x8010 */
     EMMC_INTERRUPT_CLR_SET_WRITE_RDY(intbits, 1);
   } else {
+    /* 0x8020 */
     EMMC_INTERRUPT_CLR_SET_READ_RDY(intbits, 1);
   }
 
   for (block = 0; block < c->num_blocks; ++block) {
+    status = emmc_wait_process_interrupts("emmc_cmd_process_data.block",
+      intbits, timeout_usec, blocking);
+    if (status != EMMC_CMD_OK)
+      return status;
+
     buf = c->databuf + block * c->block_size;
     status = emmc_cmd_process_single_block(buf, c->block_size, is_write, intbits, timeout_usec, blocking);
     if (status != EMMC_CMD_OK)
       return status;
   }
-  return EMMC_CMD_OK;
+
+  intbits = 0;
+  EMMC_INTERRUPT_CLR_SET_ERR(intbits, 1);
+  EMMC_INTERRUPT_CLR_SET_DATA_DONE(intbits, 1);
+  /* 0x8002 */
+  return emmc_wait_process_interrupts("emmc_cmd_process_data.final",
+    intbits, timeout_usec, blocking);
 }
 
 static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t cmdreg, uint64_t timeout_usec)
@@ -284,6 +347,7 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
   emmc_write_reg(EMMC_ARG1, c->arg);
   emmc_write_reg(EMMC_CMDTM, cmdreg);
 
+  wait_msec(1);
   err = emmc_interrupt_wait_done_or_err(timeout_usec, 1, 0, emmc_mode_blocking, &intval);
 
   if (err)

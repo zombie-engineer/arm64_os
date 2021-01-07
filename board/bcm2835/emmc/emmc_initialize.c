@@ -109,6 +109,20 @@ static inline int emmc_cmd8(void)
   return 0;
 }
 
+static inline int emmc_acmd6(uint32_t rca, uint32_t bus_width_bit)
+{
+  emmc_cmd_status_t cmd_ret;
+  struct emmc_cmd c;
+
+  emmc_cmd_init(&c, EMMC_ACMD6, bus_width_bit);
+  c.rca = rca;
+  cmd_ret = emmc_cmd(&c, bus_width_bit);
+
+  if (cmd_ret != EMMC_CMD_OK)
+    return -1;
+  return 0;
+}
+
 static inline int emmc_acmd41(uint32_t arg, uint32_t *resp)
 {
   emmc_cmd_status_t cmd_ret;
@@ -140,7 +154,7 @@ static inline int emmc_acmd51(uint32_t rca, char *scrbuf, int scrbuf_len)
     return -1;
   }
 
-  emmc_cmd_init(&c, EMMC_ACMD51, 0);
+  emmc_cmd_init(&c, EMMC_ACMD51, 1000000);
 
   c.block_size = 8;
   c.num_blocks = 1;
@@ -162,6 +176,31 @@ static inline void emmc_set_block_size(uint32_t block_size)
   regval &= 0xffff;
   regval |= block_size;
   emmc_write_reg(EMMC_BLKSIZECNT, regval);
+}
+
+static inline int emmc_reset_handle_scr(uint32_t rca, uint32_t *scr)
+{
+  char *s = (char *)scr;
+  uint32_t control0;
+  uint32_t scr_le32 = (s[0]<<24)| (s[1]<<16) | (s[2]<<8) | s[3];
+  int sd_spec = BF_EXTRACT(scr_le32, (56-32), 4);
+  int sd_spec3 = BF_EXTRACT(scr_le32, (47-32), 1);
+  int sd_spec4 = BF_EXTRACT(scr_le32, (42-32), 1);
+  int sd_specx = BF_EXTRACT(scr_le32, (38-32), 4);
+  int bus_width = BF_EXTRACT(scr_le32, (48-32), 4);
+  EMMC_LOG("SCR: sd_spec:%d, sd_spec3:%d, sd_spec4:%d, sd_specx:%d",
+    sd_spec, sd_spec3, sd_spec4, sd_specx);
+  if (bus_width & 4) {
+    if (emmc_acmd6(rca, EMMC_BUS_WIDTH_4BITS)) {
+      EMMC_ERR("SCR setup: Failed to set bus to 4 bits");
+      return -1;
+    }
+    control0 = emmc_read_reg(EMMC_CONTROL0);
+    EMMC_CONTROL0_CLR_SET_HCTL_DWIDTH(control0, 1);
+    emmc_write_reg(EMMC_CONTROL0, control0);
+  }
+  emmc_write_reg(EMMC_INTERRUPT, 0xffffffff);
+  return 0;
 }
 
 int emmc_reset(void)
@@ -325,9 +364,10 @@ int emmc_reset(void)
   }
   EMMC_LOG("emmc_reset: SCR: %08x.%08x", scr[0], scr[1]);
 
-  volatile int yx;
-  yx = 1;
-  while(yx);
+  if (emmc_reset_handle_scr(emmc_rca, scr)) {
+    EMMC_ERR("emmc_reset: failed at SCR handling step");
+    return -1;
+  }
 
   EMMC_LOG("emmc_reset: completed successfully");
 

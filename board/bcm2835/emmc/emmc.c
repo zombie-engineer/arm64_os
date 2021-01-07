@@ -117,8 +117,42 @@ void emmc_report(void)
   EMMC_LOG("version %08x, VENDOR: %04x, SD: %04x, clock: %d", ver, vendor, sdver, clock_rate);
 }
 
-int emmc_read(int blocknum, int numblocks, char *buf, int bufsz)
+typedef enum {
+  EMMC_IO_READ = 0,
+  EMMC_IO_WRITE = 1
+} emmc_io_type_t;
+
+static inline int emmc_data_io(
+  emmc_io_type_t io_type,
+  char *buf,
+  uint64_t bufsz,
+  uint32_t first_block_idx,
+  uint32_t num_blocks)
 {
+  int cmd_err;
+  if (io_type == EMMC_IO_READ) {
+    /* READ_SINGLE_BLOCK */
+    cmd_err = emmc_cmd17(first_block_idx, buf);
+    if (cmd_err)
+      return -1;
+  } else if (io_type == EMMC_IO_WRITE) {
+    /* WRITE_BLOCK */
+    cmd_err = emmc_cmd24(first_block_idx, buf);
+    if (cmd_err)
+      return -1;
+  } else {
+    EMMC_ERR("emmc_data_io: unknown io type: %d", io_type);
+    return -1;
+  }
+
+  return 0;
+}
+
+int emmc_read(int first_block_idx, int num_blocks, char *buf, int bufsz)
+{
+  //volatile int yy = 1;
+  //while(yy);
+  return emmc_data_io(EMMC_IO_READ, buf, bufsz, first_block_idx, num_blocks);
   //int block;
   // int i;
  //  int num_fetches;
