@@ -74,6 +74,7 @@ void fs_probe_early(void)
   struct partition_device pdev;
   struct fat32_fs fat32fs;
   uint64_t start_sector;
+  struct fat_dentry d;
 
   bdev->ops.read(bdev, buf, sizeof(buf), 0, 1);
   hexdump_memory_ex("emmc", 32, buf, 64);
@@ -101,5 +102,8 @@ void fs_probe_early(void)
   err = fat32_open(&pdev.bdev, &fat32fs);
   if (err)
     return;
+  fat32_lookup(&fat32fs, "/u-boot.bin", &d);
   fat32_ls(&fat32fs, "/");
+  fat32_dump_file_cluster_chain(&fat32fs, "/");
 }
+

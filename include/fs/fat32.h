@@ -3,6 +3,8 @@
 #include <compiler.h>
 #include <mem_access.h>
 
+#define FAT32_ENTRY_SIZE 4
+#define FAT32_ENTRY_SIZE_LOG 2
 #define FAT32_ENTRY_END_OF_CHAIN     0x0fffffff
 #define FAT32_ENTRY_END_OF_CHAIN_ALT 0x0ffffff8
 #define FAT32_ENTRY_FREE             0x00000000
@@ -59,13 +61,13 @@ struct fat_dentry {
   uint32_t file_size;
 } PACKED;
 
-uint32_t fat32_dentry_get_cluster(struct fat_dentry *d)
+static inline uint32_t fat32_dentry_get_cluster(struct fat_dentry *d)
 {
   return (get_unaligned_16_le(&d->cluster_addr_high) << 16) |
     get_unaligned_16_le(&d->cluster_addr_low);
 }
 
-uint32_t fat32_dentry_get_file_size(struct fat_dentry *d)
+static inline uint32_t fat32_dentry_get_file_size(struct fat_dentry *d)
 {
   return (get_unaligned_32_le(&d->file_size));
 }
@@ -101,13 +103,13 @@ static inline bool fat32_dentry_is_end_mark(struct fat_dentry *d)
 static inline struct fat_dentry *fat32_dentry_next(
   struct fat_dentry *d,
   struct fat_dentry *d_end,
-  struct fat_dentry **first_lfn)
+  struct vfat_lfn_entry **first_lfn)
 {
   while(d != d_end) {
     d++;
     if (fat32_dentry_is_vfat_lfn(d)) {
       if (!*first_lfn)
-        *first_lfn = d;
+        *first_lfn = (struct vfat_lfn_entry *)d;
       continue;
     }
 
@@ -220,7 +222,7 @@ static inline uint16_t fat32_get_num_root_entries(struct fat32_fs *f)
   return get_unaligned_16_le(&f->boot_sector->ebpb.bpb_dos331.bpb_dos20.max_root_entries);
 }
 
-static inline uint32_t fat32_get_bytes_per_sector(struct fat32_fs *f)
+static inline uint32_t fat32_get_logical_sector_size(struct fat32_fs *f)
 {
   return get_unaligned_16_le(&f->boot_sector->ebpb.bpb_dos331.bpb_dos20.bytes_per_sector);
 }
@@ -232,7 +234,7 @@ static inline uint32_t fat32_get_sectors_per_cluster(struct fat32_fs *f)
 
 static inline uint32_t fat32_get_bytes_per_cluster(struct fat32_fs *f)
 {
-  return fat32_get_bytes_per_sector(f) * fat32_get_sectors_per_cluster(f);
+  return fat32_get_logical_sector_size(f) * fat32_get_sectors_per_cluster(f);
 }
 
 static inline uint16_t fat32_get_sectors_per_fat(struct fat32_fs *f)
@@ -252,7 +254,7 @@ static inline uint32_t fat32_get_num_fat_sectors(struct fat32_fs *f)
 
 static inline uint32_t fat32_get_num_root_dir_sectors(struct fat32_fs *f)
 {
-  return (fat32_get_num_root_entries(f) * sizeof(struct fat_dentry)) / fat32_get_bytes_per_sector(f);
+  return (fat32_get_num_root_entries(f) * sizeof(struct fat_dentry)) / fat32_get_logical_sector_size(f);
 }
 
 static inline uint64_t fat32_get_data_start_sector(struct fat32_fs *f)
@@ -270,3 +272,7 @@ int fat32_open(struct block_device *bdev, struct fat32_fs *f);
 void fat32_summary(struct fat32_fs *f);
 
 int fat32_ls(struct fat32_fs *f, const char *dirpath);
+
+int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename);
+
+int fat32_lookup(struct fat32_fs *f, const char *filepath, struct fat_dentry *out_dentry);
