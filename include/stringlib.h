@@ -59,7 +59,7 @@ int isprint(char c);
 
 int isdigit(char c);
 
-void wtomb(char *buf, size_t buf_sz, char *src, int src_sz);
+int wtomb(char *buf, size_t buf_sz, char *src, int src_sz);
 
 #define SKIP_WHITESPACES(ptr) for (;*ptr && _isspace(*ptr);++ptr)
 #define SKIP_WHITESPACES_BOUND(ptr, end) for (;ptr < end && *ptr && _isspace(*ptr);++ptr)

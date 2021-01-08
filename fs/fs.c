@@ -101,4 +101,5 @@ void fs_probe_early(void)
   err = fat32_open(&pdev.bdev, &fat32fs);
   if (err)
     return;
+  fat32_ls(&fat32fs, "/");
 }
