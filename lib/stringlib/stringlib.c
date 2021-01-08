@@ -152,7 +152,7 @@ void * memcpy(void *dst, const void *src, size_t n)
   return dst;
 }
 
-void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
+int wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
 {
   const char *sptr = src;
   const char *send = src + src_sz;
@@ -162,7 +162,7 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
   char c;
 
   if (dptr >= dend)
-    return;
+    return 0;
 
   c = *sptr++;
   while (1) {
@@ -183,4 +183,5 @@ void wtomb(char *buf, size_t buf_sz, char *src, int src_sz)
       break;
     }
   }
+  return dptr - buf;
 }
