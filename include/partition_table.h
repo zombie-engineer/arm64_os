@@ -14,6 +14,8 @@ struct mbr_partition_entry {
   uint32_t num_sectors;
 } PACKED;
 
+STRICT_SIZE(struct mbr_partition_entry, 16); 
+
 static inline uint32_t mbr_partition_entry_get_lba(struct mbr_partition_entry *e)
 {
   return get_unaligned_32_le(&e->lba);
@@ -24,7 +26,6 @@ static inline uint32_t mbr_partition_entry_get_num_sectors(struct mbr_partition_
   return get_unaligned_32_le(&e->num_sectors);
 }
 
-_Static_assert(sizeof(struct mbr_partition_entry) == 16, "Wrong MBR size at compile time");
 
 struct mbr {
   char bootstap_code[446];

@@ -1,4 +1,5 @@
 #include <fs/fs.h>
+#include <fs/fat32.h>
 #include <block_device.h>
 #include <partition_table.h>
 #include <partition_device.h>
@@ -71,6 +72,7 @@ void fs_probe_early(void)
   struct mbr mbr ALIGNED(4);
   struct mbr_partition_entry *pe;
   struct partition_device pdev;
+  struct fat32_fs fat32fs;
   uint64_t start_sector;
 
   bdev->ops.read(bdev, buf, sizeof(buf), 0, 1);
@@ -96,4 +98,7 @@ void fs_probe_early(void)
     start_sector + mbr_partition_entry_get_num_sectors(pe));
   pdev.bdev.ops.read(&pdev.bdev, buf, sizeof(buf), 0, 1);
   hexdump_memory_ex("emmc", 32, buf, 64);
+  err = fat32_open(&pdev.bdev, &fat32fs);
+  if (err)
+    return;
 }
