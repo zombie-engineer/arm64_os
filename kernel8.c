@@ -10,6 +10,7 @@
 #include <avr_update.h>
 #include <spinlock.h>
 #include <emmc.h>
+#include <fs/fs.h>
 #include <i2c.h>
 #include <font.h>
 #include <vcanvas.h>
@@ -1012,6 +1013,7 @@ void main()
   init_consoles();
   self_test();
   emmc_init();
+  fs_probe_early();
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);

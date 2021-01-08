@@ -6,6 +6,11 @@ struct fat32_boot_sector fat32_boot_sector ALIGNED(4);
 
 static char fatbuf[512] ALIGNED(4) = { 0 };
 
+typedef enum {
+  FAT_DIR_ITER_CONTINUE = 0,
+  FAT_DIR_ITER_STOP = 1
+} fat_dir_iter_status_t;
+
 static uint32_t fat32_get_next_cluster_num(struct fat32_fs *f, uint32_t cluster_idx)
 {
   int err;
@@ -118,7 +123,7 @@ void fat32_dentry_get_filename(struct fat_dentry *d, struct vfat_lfn_entry *le, 
     fat32_dentry_fill_name_short(d, buf, bufsz);
 }
 
-void fat32_dentry_print(struct fat_dentry *d, struct vfat_lfn_entry *le)
+fat_dir_iter_status_t fat32_dentry_print(struct fat_dentry *d, struct vfat_lfn_entry *le, void *cb_arg)
 {
   uint32_t cluster;
   char namebuf[128];
@@ -127,6 +132,7 @@ void fat32_dentry_print(struct fat_dentry *d, struct vfat_lfn_entry *le)
 
   cluster = fat32_dentry_get_cluster(d);
   printf("%s size: %d, data cluster: %d, attr: %02x\r\n", namebuf, d->file_size, cluster, d->file_attributes);
+  return FAT_DIR_ITER_CONTINUE;
 }
 
 /*
@@ -239,11 +245,6 @@ static inline void cl_sector_iter_next(struct cl_sector_iter *csi)
   csi->sector_idx++;
 }
 
-typedef enum {
-  FAT_DIR_ITER_CONTINUE = 0,
-  FAT_DIR_ITER_STOP = 1
-} fat_dir_iter_status_t;
-
 static int fat32_iterate_directory(
   struct fat32_fs *f,
   uint32_t dir_start_cluster,
@@ -268,9 +269,10 @@ static int fat32_iterate_directory(
       printf("fat32_iterate_directory: reading dir sector: sector: %lld\r\n", csi.sector_idx);
       err = f->bdev->ops.read(f->bdev, buf, sizeof(buf), csi.sector_idx, 1);
       if (err < 0) {
-        printf("fat32_ls: failed to read root dir cluster, err = %d\r\n", err);
+        printf("fat32_iterate_directory: failed to read root dir cluster, err = %d\r\n", err);
         goto stop_iter;
       }
+      err = ERR_OK;
 
       d = (struct fat_dentry *)buf;
       d_end = (struct fat_dentry *)(buf + sector_size);
@@ -291,7 +293,7 @@ static int fat32_iterate_directory(
           goto stop_iter;
 
         if (IS_ERR(d)) {
-          printf("fat32_ls: failed to get next dentry, err = %d\r\n",(uint32_t)PTR_ERR(d));
+          printf("fat32_iterate_directory: failed to get next dentry, err = %d\r\n",(uint32_t)PTR_ERR(d));
           err = PTR_ERR(d);
           goto stop_iter;
         }
@@ -332,6 +334,7 @@ fat_dir_iter_status_t fat32_compare_filename_cb(struct fat_dentry *d, struct vfa
 
   fat32_dentry_get_filename(d, le, namebuf, sizeof(namebuf));
   if (strcmp(namebuf, arg->filename) == 0) {
+    memcpy(&arg->dentry, d, sizeof(struct fat_dentry));
     arg->err = ERR_OK;
     return FAT_DIR_ITER_STOP;
   }
@@ -347,8 +350,8 @@ int fat32_lookup(struct fat32_fs *f, const char *filepath, struct fat_dentry *ou
   uint32_t dir_start_cluster_idx;
   char namebuf[128];
   struct fat32_compare_filename_arg arg;
-  volatile int xx = 1;
-  while(xx);
+  // volatile int xx = 1;
+  // while(xx);
 
   arg.f = f;
 
@@ -383,84 +386,67 @@ int fat32_lookup(struct fat32_fs *f, const char *filepath, struct fat_dentry *ou
         printf("fat32_lookup: unexpected error during directory iteration: %d\r\n", arg.err);
       return err;
     }
-    dir_start_cluster_idx = fat32_dentry_get_cluster(&arg.dentry);
   }
+  memcpy(out_dentry, &arg.dentry, sizeof(struct fat_dentry));
   return 0;
 }
 
-
 int fat32_ls(struct fat32_fs *f, const char *dirpath)
 {
-  char buf[512];
   int err;
   uint32_t cluster;
-  uint32_t sectors_per_cluster;
-  struct fat_dentry *d, *d_end;
-  struct vfat_lfn_entry *first_le;
-  uint64_t data_start_sector;
-  uint64_t sector;
-  uint32_t sector_size;
-
-  d = NULL;
-  data_start_sector = fat32_get_data_start_sector(f);
-  sector_size = fat32_get_logical_sector_size(f);
-
-  sectors_per_cluster = fat32_get_sectors_per_cluster(f);
 
   if (dirpath[0] == '/' && !dirpath[1])
     cluster = fat32_get_root_dir_cluster(f);
   else
     cluster = 2;
 
-  do {
-    printf("fat32_ls: reading dir cluster: %d\r\n", cluster, sector);
-    sector = data_start_sector + (cluster - FAT32_DATA_FIRST_CLUSTER) * sectors_per_cluster;
-    for (; sector < sector + sectors_per_cluster; ++sector) {
-      printf("fat32_ls: reading dir sector: sector: %lld\r\n", sector);
-      err = f->bdev->ops.read(f->bdev, buf, sizeof(buf), sector, 1);
-      if (err < 0) {
-        printf("fat32_ls: failed to read root dir cluster, err = %d\r\n", err);
-        return err;
-      }
-      d = (struct fat_dentry *)buf;
-      d_end = (struct fat_dentry *)(buf + sector_size);
+  err = fat32_iterate_directory(f, cluster, fat32_dentry_print, 0);
+  if (err) {
+    printf("fat32_lookup: failed to iterate directory entries\r\n");
+    return err;
+  }
 
-      /* print first directory */
-      first_le = fat32_dentry_is_vfat_lfn(d) ? (struct vfat_lfn_entry *)d : 0;
-      if (!first_le && fat32_dentry_is_valid(d))
-        fat32_dentry_print(d, first_le);
-
-      while(1) {
-        /* next directory */
-        d = fat32_dentry_next(d, d_end, &first_le);
-        /* no more entries */
-        if (!d)
-          goto end;
-
-        if (IS_ERR(d)) {
-          printf("fat32_ls: failed to get next dentry, err = %d\r\n",(uint32_t)PTR_ERR(d));
-          return PTR_ERR(d);
-        }
-
-        /* iterated to the end of sector */
-        if (d == d_end)
-          break;
-
-        fat32_dentry_print(d, first_le);
-        first_le = 0;
-      }
-    }
-    if (!d) {
-      /* EOF reached */
-      break;
-    }
-    cluster = fat32_get_next_cluster_num(f, cluster);
-  } while(cluster != FAT32_ENTRY_END_OF_CHAIN && cluster != FAT32_ENTRY_END_OF_CHAIN_ALT);
-end:
   return 0;
 }
 
 int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename)
 {
+  int err;
+  struct fat_dentry d;
+  struct cluster_it ci;
+  struct cl_sector_iter csi;
+  uint32_t size_bytes;
+  uint32_t size_sectors;
+  uint32_t num_sectors;
+  uint32_t sector_size;
+  uint32_t sectors_per_cluster;
+
+  err = fat32_lookup(f, filename, &d);
+  if (err) {
+    printf("fat32_dump_file_cluster_chain: failed to lookup file %s\r\n", filename);
+    return err;
+  }
+
+  sector_size = fat32_get_logical_sector_size(f);
+  sectors_per_cluster = fat32_get_sectors_per_cluster(f);
+
+  size_bytes = fat32_dentry_get_file_size(&d);
+  size_sectors = (size_bytes + sector_size - 1) / sector_size;
+  printf("file %s, size: %d bytes (%d sectors), clusters: \r\n", filename, size_bytes, size_sectors);
+
+  cluster_it_init(&ci, f, fat32_dentry_get_cluster(&d));
+  for(; size_sectors && cluster_it_valid(&ci); cluster_it_next(&ci)) {
+    cl_sector_iter_init(&csi, f, ci.cluster_idx);
+
+    num_sectors = (size_sectors > sectors_per_cluster) ? sectors_per_cluster : size_sectors;
+    size_sectors -= num_sectors;
+
+    printf("cluster %d, sectors  %lld +%d\r\n",
+      ci.cluster_idx,
+      csi.sector_idx,
+      num_sectors);
+  }
+
   return 0;
 }

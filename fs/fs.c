@@ -104,6 +104,6 @@ void fs_probe_early(void)
     return;
   fat32_lookup(&fat32fs, "/u-boot.bin", &d);
   fat32_ls(&fat32fs, "/");
-  fat32_dump_file_cluster_chain(&fat32fs, "/");
+  fat32_dump_file_cluster_chain(&fat32fs, "/u-boot.bin");
 }
 
