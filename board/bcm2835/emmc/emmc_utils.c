@@ -37,6 +37,7 @@ static inline int emmc_wait_clock_stabilized(uint64_t timeout_usec, bool blockin
 
 int emmc_set_clock(int target_hz)
 {
+  int err;
   uint32_t control1;
   uint32_t div;
 
@@ -44,11 +45,11 @@ int emmc_set_clock(int target_hz)
 
   if (div == 0) {
     EMMC_ERR("emmc_set_clock: failed to deduce clock divisor");
-    return -1;
+    return ERR_GENERIC;
   }
 
   if (emmc_wait_cmd_dat_ready())
-    return -1;
+    return ERR_GENERIC;
 
   EMMC_LOG("emmc_set_clock: status: %08x", emmc_read_reg(EMMC_STATUS));
 
@@ -60,12 +61,13 @@ int emmc_set_clock(int target_hz)
   emmc_write_reg(EMMC_CONTROL1, control1);
   wait_usec(6);
 
-  if (emmc_wait_clock_stabilized(1000, emmc_mode_blocking)) {
-    EMMC_LOG("emmc_set_clock: failed to stabilize clock");
-    return -1;
+  err = emmc_wait_clock_stabilized(1000, emmc_mode_blocking);
+  if (err) {
+    EMMC_LOG("emmc_set_clock: failed to stabilize clock, err: %d");
+    return err;
   }
 
-  return 0;
+  return ERR_OK;
 }
 
 const char *emmc_reg_address_to_name(reg32_t reg)

@@ -7,17 +7,21 @@
 
 const char *emmc_reg_address_to_name(reg32_t reg);
 
-static inline void emmc_write_reg(reg32_t reg, uint32_t val)
+static inline void OPTIMIZED emmc_write_reg(reg32_t reg, uint32_t val)
 {
+#ifdef CONFIG_EMMC_DEBUG2
   EMMC_DBG2("reg write: reg: %08x(%s), value:%08x", reg, emmc_reg_address_to_name(reg), val);
+#endif
   write_reg(reg, val);
 }
 
-static inline uint32_t emmc_read_reg(reg32_t reg)
+static inline uint32_t OPTIMIZED emmc_read_reg(reg32_t reg)
 {
   uint32_t val;
   val = read_reg(reg);
+#ifdef CONFIG_EMMC_DEBUG2
   EMMC_DBG2("reg read: reg: %08x(%s), value:%08x", reg, emmc_reg_address_to_name(reg), val);
+#endif
   return val;
 }
 
@@ -26,45 +30,37 @@ static inline uint32_t emmc_read_reg(reg32_t reg)
  * mask == 0xffffffff: Wait until reg value equals value
  * mask == any other : Wait until reg value equals (mask & value)
  */
-static inline int emmc_wait_reg_value(
+static inline int OPTIMIZED emmc_wait_reg_value(
   reg32_t regaddr,
   uint32_t mask,
   uint32_t value,
   uint64_t timeout_usec,
   bool blocking, uint32_t *val)
 {
-  uint64_t start_now_usec;
+  const uint64_t wait_step_usec = 100;
+  uint64_t wait_left_usec = timeout_usec;
   uint32_t regval;
 
-  if (timeout_usec)
-    start_now_usec = get_boottime_usec();
+  BUG(blocking == false, "Nonblocking timed wait not supported");
 
-  while(1) {
+  while(wait_left_usec >= wait_step_usec) {
     regval = emmc_read_reg(regaddr);
-    if (!mask) {
-      if (regval & value) {
-        goto out_match;
-      }
-    } else if ((regval & mask) == value) {
-      goto out_match;
+    if (mask) {
+      if ((regval & mask) == value)
+        goto wait_good;
+    } else {
+      if (regval & value)
+        goto wait_good;
     }
-
-    if (timeout_usec) {
-      if ((get_boottime_usec() - start_now_usec) > timeout_usec)
-        break;
-    }
-
-    if (blocking)
-      wait_usec(1000);
-    else
-      kernel_panic("Nonblocking timed wait not supported");
+    wait_usec(wait_step_usec);
+    wait_left_usec -= wait_step_usec;
   }
-  return -1;
+  return ERR_TIMEOUT;
 
-out_match:
+wait_good:
   if (val)
     *val = regval;
-  return 0;
+  return ERR_OK;
 }
 
 static inline int emmc_interrupt_wait_done_or_err(uint64_t timeout_usec, bool waitcmd, bool waitdat, bool blocking, uint32_t *intval)

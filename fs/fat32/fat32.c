@@ -350,8 +350,6 @@ int fat32_lookup(struct fat32_fs *f, const char *filepath, struct fat_dentry *ou
   uint32_t dir_start_cluster_idx;
   char namebuf[128];
   struct fat32_compare_filename_arg arg;
-  // volatile int xx = 1;
-  // while(xx);
 
   arg.f = f;
 

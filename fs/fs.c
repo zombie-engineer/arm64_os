@@ -5,6 +5,7 @@
 #include <partition_device.h>
 #include <common.h>
 #include <emmc.h>
+#include <stringlib.h>
 
 int emmc_block_device_read(struct block_device *bdev,
  char *buf,
@@ -22,7 +23,7 @@ int emmc_block_device_read(struct block_device *bdev,
   bufend = buf + bufsz;
   for (i = 0; i < num_sectors; ++i) {
     if (ptr >= bufend) {
-      printf("emmc_block_device_read: buffer too small size: %d, needed: %d\r\n", current_sector, bufsz);
+      printf("emmc_block_device_read: buffer too small: size: %d, needed: %d\r\n", current_sector, bufsz);
       return -1;
     }
     current_sector = i + start_sector;
@@ -38,16 +39,38 @@ int emmc_block_device_read(struct block_device *bdev,
 
 int emmc_block_device_write(struct block_device *bdev,
  char *buf,
- int bufsz,
+ uint32_t bufsz,
  uint64_t start_sector,
  uint32_t num_sectors)
 {
-  return -1;
+  uint32_t i;
+  uint64_t current_sector;
+  int err;
+  char *ptr;
+  char *bufend;
+
+  ptr = buf;
+  bufend = buf + bufsz;
+  for (i = 0; i < num_sectors; ++i) {
+    if (ptr >= bufend) {
+      printf("emmc_block_device_write: buffer too small: size: %d, needed: %d\r\n", current_sector, bufsz);
+      return -1;
+    }
+    current_sector = i + start_sector;
+    err = emmc_write(current_sector, 1, ptr, bufend - ptr);
+    if (err) {
+      printf("emmc_block_device_write: failed to read sector %d\r\n", current_sector);
+      return -1;
+    }
+    ptr += bdev->sector_size;
+  }
+  return num_sectors;
 }
 
 static struct block_device emmc_block_device = {
   .ops = {
     .read = emmc_block_device_read,
+    .write = emmc_block_device_write,
   },
   .sector_size = 512
 };
@@ -103,7 +126,16 @@ void fs_probe_early(void)
   if (err)
     return;
   fat32_lookup(&fat32fs, "/u-boot.bin", &d);
-  fat32_ls(&fat32fs, "/");
-  fat32_dump_file_cluster_chain(&fat32fs, "/u-boot.bin");
-}
+  {
+    struct fat32_fs *f = &fat32fs;
+    uint32_t cluster_to_write = fat32_dentry_get_cluster(&d);
+    uint64_t data_sector_idx = (cluster_to_write - FAT32_DATA_FIRST_CLUSTER) * fat32_get_sectors_per_cluster(f);
+    uint64_t sector_to_write = fat32_get_data_start_sector(f) + data_sector_idx;
 
+    memset(buf, 0xa5, sizeof(buf));
+    pdev.bdev.ops.write(&pdev.bdev, buf, sizeof(buf), sector_to_write, 1);
+  }
+
+  // fat32_ls(&fat32fs, "/");
+  // fat32_dump_file_cluster_chain(&fat32fs, "/u-boot.bin");
+}

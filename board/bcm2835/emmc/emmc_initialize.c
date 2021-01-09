@@ -14,17 +14,20 @@
 extern uint32_t *emmc_device_id;
 extern uint32_t emmc_rca;
 
+#define EMMC_CHECK_ERR(__fmt, ...)\
+  do {\
+    if (err != ERR_OK) {\
+      EMMC_ERR("%s err %d, " __fmt, __func__,  err, #__VA_ARGS__);\
+      return err;\
+    }\
+  } while(0)
+
 static inline int emmc_cmd0(void)
 {
-  emmc_cmd_status_t cmd_ret;
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD0, 0);
-  cmd_ret = emmc_cmd(&c, 0);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-  return 0;
+  return emmc_cmd_status_to_err(emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC));
 }
 
 /* SEND_ALL_CID */
@@ -34,17 +37,17 @@ static inline int emmc_cmd2(uint32_t *device_id)
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD2, 0);
-  cmd_ret = emmc_cmd(&c, 0);
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
 
   if (cmd_ret != EMMC_CMD_OK)
-    return -1;
+    return emmc_cmd_status_to_err(cmd_ret);
 
   device_id[0] = c.resp0;
   device_id[1] = c.resp1;
   device_id[2] = c.resp2;
   device_id[3] = c.resp3;
 
-  return 0;
+  return ERR_OK;
 }
 
 /* SEND_RELATIVE_ADDR */
@@ -61,10 +64,10 @@ static inline int emmc_cmd3(uint32_t *out_rca)
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD3, 0);
-  cmd_ret = emmc_cmd(&c, 0);
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
 
   if (cmd_ret != EMMC_CMD_OK)
-    return -1;
+    return emmc_cmd_status_to_err(cmd_ret);
 
   crc_error = BF_EXTRACT(c.resp0, 15, 1);
   illegal_cmd = BF_EXTRACT(c.resp0, 14, 1);
@@ -77,19 +80,21 @@ static inline int emmc_cmd3(uint32_t *out_rca)
     error, crc_error, illegal_cmd, status, ready, rca);
 
   if (error)
-    return -1;
+    return ERR_GENERIC;
 
   *out_rca = rca;
 
-  return 0;
+  return ERR_OK;
 }
 
-static inline emmc_cmd_status_t emmc_cmd5(void)
+static inline int emmc_cmd5(void)
 {
   struct emmc_cmd c;
+  emmc_cmd_status_t cmd_ret;
 
   emmc_cmd_init(&c, EMMC_CMD5, 0);
-  return emmc_cmd(&c, 1000000);
+  cmd_ret = emmc_cmd(&c, MSEC_TO_USEC(2));
+  return emmc_cmd_status_to_err(cmd_ret);
 }
 
 static inline int emmc_cmd8(void)
@@ -97,16 +102,16 @@ static inline int emmc_cmd8(void)
   emmc_cmd_status_t cmd_ret;
   struct emmc_cmd c;
 
-  emmc_cmd_init(&c, EMMC_CMD8, 0x1aa);
-  cmd_ret = emmc_cmd(&c, 0);
+  emmc_cmd_init(&c, EMMC_CMD8, EMMC_CMD8_ARG);
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
 
   if (cmd_ret != EMMC_CMD_OK)
-    return -1;
+    return emmc_cmd_status_to_err(cmd_ret);
 
-  if (c.resp0 != 0x1aa)
-    return -1;
+  if (c.resp0 != EMMC_CMD8_VALID_RESP)
+    return ERR_GENERIC;
 
-  return 0;
+  return ERR_OK;
 }
 
 static inline int emmc_acmd6(uint32_t rca, uint32_t bus_width_bit)
@@ -116,11 +121,8 @@ static inline int emmc_acmd6(uint32_t rca, uint32_t bus_width_bit)
 
   emmc_cmd_init(&c, EMMC_ACMD6, bus_width_bit);
   c.rca = rca;
-  cmd_ret = emmc_cmd(&c, bus_width_bit);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-  return 0;
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
+  return emmc_cmd_status_to_err(cmd_ret);
 }
 
 static inline int emmc_acmd41(uint32_t arg, uint32_t *resp)
@@ -129,19 +131,18 @@ static inline int emmc_acmd41(uint32_t arg, uint32_t *resp)
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_ACMD41, arg);
-  cmd_ret = emmc_cmd(&c, 0);
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
 
   if (cmd_ret != EMMC_CMD_OK)
-    return -1;
+    return emmc_cmd_status_to_err(cmd_ret);
 
   *resp = c.resp0;
-  return 0;
+  return ERR_OK;
 }
 
 /* SEND_SCR */
 static inline int emmc_acmd51(uint32_t rca, char *scrbuf, int scrbuf_len)
 {
-  emmc_cmd_status_t cmd_ret;
   struct emmc_cmd c;
 
   if (scrbuf_len < 8) {
@@ -154,19 +155,14 @@ static inline int emmc_acmd51(uint32_t rca, char *scrbuf, int scrbuf_len)
     return -1;
   }
 
-  emmc_cmd_init(&c, EMMC_ACMD51, 1000000);
+  emmc_cmd_init(&c, EMMC_ACMD51, 0);
 
   c.block_size = 8;
   c.num_blocks = 1;
   c.rca = rca;
   c.databuf = scrbuf;
 
-  cmd_ret = emmc_cmd(&c, 0);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-
-  return 0;
+  return emmc_cmd_status_to_err(emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC * 4));
 }
 
 static inline void emmc_set_block_size(uint32_t block_size)
@@ -180,6 +176,7 @@ static inline void emmc_set_block_size(uint32_t block_size)
 
 static inline int emmc_reset_handle_scr(uint32_t rca, uint32_t *scr)
 {
+  int err;
   char *s = (char *)scr;
   uint32_t control0;
   uint32_t scr_le32 = (s[0]<<24)| (s[1]<<16) | (s[2]<<8) | s[3];
@@ -188,25 +185,24 @@ static inline int emmc_reset_handle_scr(uint32_t rca, uint32_t *scr)
   int sd_spec4 = BF_EXTRACT(scr_le32, (42-32), 1);
   int sd_specx = BF_EXTRACT(scr_le32, (38-32), 4);
   int bus_width = BF_EXTRACT(scr_le32, (48-32), 4);
+
   EMMC_LOG("SCR: sd_spec:%d, sd_spec3:%d, sd_spec4:%d, sd_specx:%d",
     sd_spec, sd_spec3, sd_spec4, sd_specx);
   if (bus_width & 4) {
-    if (emmc_acmd6(rca, EMMC_BUS_WIDTH_4BITS)) {
-      EMMC_ERR("SCR setup: Failed to set bus to 4 bits");
-      return -1;
-    }
+    err = emmc_acmd6(rca, EMMC_BUS_WIDTH_4BITS);
+    EMMC_CHECK_ERR("failed to set bus to 4 bits");
+
     control0 = emmc_read_reg(EMMC_CONTROL0);
     EMMC_CONTROL0_CLR_SET_HCTL_DWIDTH(control0, 1);
     emmc_write_reg(EMMC_CONTROL0, control0);
   }
   emmc_write_reg(EMMC_INTERRUPT, 0xffffffff);
-  return 0;
+  return ERR_OK;
 }
 
 int emmc_reset(void)
 {
   int i, err;
-  emmc_cmd_status_t cmd_status;
   uint32_t status;
   uint32_t powered_on = 0, exists = 0;
   uint32_t control1;
@@ -218,18 +214,11 @@ int emmc_reset(void)
 
   emmc_write_reg(EMMC_CONTROL0, 0);
 
-  err = mbox_set_power_state(MBOX_DEVICE_ID_SD, &powered_on, 1, &exists);
-  if (err)
-    EMMC_ERR("emmc_reset: failed to power off SD");
-
   err = mbox_get_power_state(MBOX_DEVICE_ID_SD, &powered_on, &exists);
   if (err)
     EMMC_ERR("emmc_reset: failed to get SD power state");
   EMMC_LOG("emmc_reset: SD powered on: %d, exists: %d", powered_on, exists);
   powered_on = 1;
-  mbox_set_power_state(MBOX_DEVICE_ID_SD, &powered_on, 1, &exists);
-  mbox_get_power_state(MBOX_DEVICE_ID_SD, &powered_on, &exists);
-  EMMC_LOG("emmc_reset: SD powered on: %d, exists: %d", powered_on, exists);
 
   /* Disable and re-set clock */
   /*
@@ -250,7 +239,7 @@ int emmc_reset(void)
 
   if (i == 1000) {
     EMMC_ERR("SRST_HC timeout");
-    return -1;
+    return ERR_TIMEOUT;
   }
 
   EMMC_LOG("emmc_reset: after SRST_HC: control1: %08x", control1);
@@ -258,15 +247,16 @@ int emmc_reset(void)
   /*
    * Set low clock
    */
-  if (emmc_set_clock(EMMC_CLOCK_HZ_SETUP)) {
+  err = emmc_set_clock(EMMC_CLOCK_HZ_SETUP);
+  if (err != ERR_OK) {
     EMMC_ERR("failed to set clock to %d Hz", EMMC_CLOCK_HZ_SETUP);
-    return -1;
+    return err;
   }
 
   status = emmc_read_reg(EMMC_STATUS);
-  printf("STATUS: %08x\r\n", status);
+  EMMC_LOG("STATUS: %08x", status);
 
-  printf("Enabling SD clock\r\n");
+  EMMC_LOG("Enabling SD clock");
   wait_usec(2000);
   control1 = emmc_read_reg(EMMC_CONTROL1);
   EMMC_CONTROL1_CLR_SET_CLK_EN(control1, 1);
@@ -281,35 +271,35 @@ int emmc_reset(void)
   emmc_write_reg(EMMC_IRPT_MASK, intmsk);
   wait_usec(2000);
 
-  if (emmc_cmd0() != EMMC_CMD_OK) {
-    EMMC_ERR("emmc_reset: failed at CMD0 step");
-    return -1;
-  }
+  err = emmc_cmd0();
+  EMMC_CHECK_ERR("failed at CMD0 step");
 
-  if (emmc_cmd8() != EMMC_CMD_OK) {
-    EMMC_ERR("emmc_reset: failed at CMD8 step");
-    return -1;
-  }
+  err = emmc_cmd8();
+  EMMC_CHECK_ERR("failed at CMD8 step");
 
-  cmd_status = emmc_cmd5();
-  if (cmd_status == EMMC_CMD_OK) {
+  /* 
+   * CMD5 is CHECK_SDIO command, it will timeout for non-SDIO devices
+   */
+  err = emmc_cmd5();
+  if (err == ERR_OK) {
     EMMC_CRIT("emmc_reset: detected SDIO card. Not supported");
-    return -1;
-  } else if (cmd_status == EMMC_CMD_TIMEOUT) {
-    EMMC_LOG("emmc_reset: detected SD card");
-    if (emmc_reset_cmd()) {
-      printf("emmc_reset: failed to reset cmd");
-      return -1;
-    }
-  } else {
-    EMMC_ERR("emmc_reset: failed at CMD5 step");
-    return -1;
+    return ERR_NOT_IMPLEMENTED;
+  } 
+  if (err != ERR_TIMEOUT) {
+    EMMC_ERR("emmc_reset: failed at CMD5 step, err: %d", err);
+    return err;
   }
 
-  if (emmc_acmd41(0, &acmd41_resp)) {
-    EMMC_ERR("emmc_reset: failed at ACMD41");
-    return -1;
-  }
+  EMMC_LOG("emmc_reset: detected SD card");
+  /*
+   * After failed command (timeout) we should reset command state machine 
+   * to a known state.
+   */
+  err = emmc_reset_cmd();
+  EMMC_CHECK_ERR("failed to reset command after SDIO_CHECK");
+
+  err = emmc_acmd41(0, &acmd41_resp);
+  EMMC_CHECK_ERR("failed at ACMD41");
 
   while(BIT_IS_CLEAR(acmd41_resp, 31)) {
     emmc_acmd41(0x00ff8000 | (1<<28) | (1<<30), &acmd41_resp);
@@ -319,16 +309,12 @@ int emmc_reset(void)
   /*
    * Set normal clock
    */
-  if (emmc_set_clock(EMMC_CLOCK_HZ_NORMAL)) {
-    EMMC_ERR("failed to set clock to %d Hz", EMMC_CLOCK_HZ_NORMAL);
-    return -1;
-  }
+  err = emmc_set_clock(EMMC_CLOCK_HZ_NORMAL);
+  EMMC_CHECK_ERR("failed to set clock to %d Hz", EMMC_CLOCK_HZ_NORMAL);
 
   /* Get device id */
-  if (emmc_cmd2(emmc_device_id)) {
-    EMMC_ERR("emmc_reset: failed at CMD2 (SEND_ALL_CID) step");
-    return -1;
-  }
+  err = emmc_cmd2(emmc_device_id);
+  EMMC_CHECK_ERR("failed at CMD2 (SEND_ALL_CID) step");
 
   EMMC_LOG("emmc_reset: device_id: %08x.%08x.%08x.%08x",
     emmc_device_id[0],
@@ -336,21 +322,16 @@ int emmc_reset(void)
     emmc_device_id[2],
     emmc_device_id[3]);
 
-  if (emmc_cmd3(&emmc_rca)) {
-    EMMC_ERR("emmc_reset: failed at CMD3 (SEND_RELATIVE_ADDR) step");
-    return -1;
-  }
+  err = emmc_cmd3(&emmc_rca);
+  EMMC_CHECK_ERR("failed at CMD3 (SEND_RELATIVE_ADDR) step");
   EMMC_LOG("emmc_reset: RCA: %08x", emmc_rca);
 
-  if (emmc_cmd7(emmc_rca)) {
-    EMMC_ERR("emmc_reset: failed at CMD7 (SELECT_CARD) step");
-    return -1;
-  }
+  err = emmc_cmd7(emmc_rca);
+  EMMC_CHECK_ERR("failed at CMD7 (SELECT_CARD) step");
 
-  if (emmc_cmd13(emmc_rca, &emmc_status)) {
-    EMMC_ERR("emmc_reset: failed at CMD13 (SEND_STATUS) step");
-    return -1;
-  }
+  err = emmc_cmd13(emmc_rca, &emmc_status);
+  EMMC_CHECK_ERR("failed at CMD13 (SEND_STATUS) step");
+
   emmc_state = EMMC_CARD_STATUS_GET_CURRENT_STATE(emmc_status);
   EMMC_LOG("emmc_reset: status: %08x, curr state: %d(%s)", emmc_status,
     emmc_state,
@@ -358,20 +339,17 @@ int emmc_reset(void)
 
   emmc_set_block_size(EMMC_BLOCK_SIZE);
 
-  if (emmc_acmd51(emmc_rca, (char *)scr, sizeof(scr))) {
-    EMMC_ERR("emmc_reset: failed at ACMD51 (SEND_SCR) step");
-    return -1;
-  }
+  err = emmc_acmd51(emmc_rca, (char *)scr, sizeof(scr));
+  EMMC_CHECK_ERR("failed at ACMD51 (SEND_SCR) step");
+
   EMMC_LOG("emmc_reset: SCR: %08x.%08x", scr[0], scr[1]);
 
-  if (emmc_reset_handle_scr(emmc_rca, scr)) {
-    EMMC_ERR("emmc_reset: failed at SCR handling step");
-    return -1;
-  }
+  err = emmc_reset_handle_scr(emmc_rca, scr);
+  EMMC_CHECK_ERR("failed at SCR handling step");
 
   EMMC_LOG("emmc_reset: completed successfully");
 
-  return 0;
+  return ERR_OK;
 }
 
 

@@ -87,10 +87,8 @@ static inline void emmc_debug_registers(void)
   printf("EMMC_SLOTISR_VER   : %08x\r\n", read_reg(EMMC_SLOTISR_VER   ));
 }
 
-// volatile int xxx = 1;
 int emmc_init(void)
 {
-  // while(xxx);
   // emmc_init_gpio();
   if (emmc_reset()) {
     EMMC_ERR("emmc_init failed");
@@ -150,43 +148,10 @@ static inline int emmc_data_io(
 
 int emmc_read(int first_block_idx, int num_blocks, char *buf, int bufsz)
 {
-  //volatile int yy = 1;
-  //while(yy);
   return emmc_data_io(EMMC_IO_READ, buf, bufsz, first_block_idx, num_blocks);
-  //int block;
-  // int i;
- //  int num_fetches;
+}
 
-  // uint32_t *ptr = (uint32_t*)buf;
-  // uint32_t *ptr_end = ptr + (bufsz >> 2);
-
-  /*
-   * num_fetches - number of times we have to read from DATA register
-   * to receive a complete block of data.
-   */
-  // num_fetches = EMMC_BLOCK_SIZE / sizeof(uint32_t);
-
- // if (emmc_cmd16(EMMC_BLOCK_SIZE)) {
- //   EMMC_ERR("emmc_read: failed to set blocklen");
- //   return -1;
- // }
-
-//  emmc_debug_registers();
-//  for (block = 0; block < numblocks; ++block) {
-//    printf("emmc_read: Reading block %d\r\n", blocknum + block);
-//    if (sd_cmd(EMMC_CMD_READ_SINGLE, blocknum + block)) {
-//      printf("emmc_read: failed to send cmd EMMC_CMD_READ_SINGLE\r\n");
-//      return -1;
-//    }
-//
-//    for (i = 0; i < num_fetches; ++i) {
-//      *(ptr++) = emmc_read_reg(EMMC_DATA);
-//      // printf("fetch: %08x\r\n", *(ptr - 1));
-//      if (ptr > ptr_end)
-//        break;
-//    }
-//  }
-//
-//  return (char*)ptr - buf;
-  return 0;
+int emmc_write(int first_block_idx, int num_blocks, char *buf, int bufsz)
+{
+  return emmc_data_io(EMMC_IO_WRITE, buf, bufsz, first_block_idx, num_blocks);
 }

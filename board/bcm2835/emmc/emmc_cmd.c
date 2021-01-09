@@ -231,11 +231,10 @@ static inline emmc_cmd_status_t emmc_report_interrupt_error(const char *tag, uin
 static inline emmc_cmd_status_t emmc_wait_process_interrupts(
   const char *tag,
   uint32_t intbits,
-  bool blocking,
-  uint64_t timeout_usec)
+  uint64_t timeout_usec,
+  bool blocking)
 {
   uint32_t intval;
-  wait_msec(1);
   if (emmc_wait_reg_value(EMMC_INTERRUPT, 0, intbits, timeout_usec, blocking, &intval))
     return EMMC_CMD_TIMEOUT;
 
@@ -306,13 +305,17 @@ static inline emmc_cmd_status_t emmc_cmd_process_data(
   for (block = 0; block < c->num_blocks; ++block) {
     status = emmc_wait_process_interrupts("emmc_cmd_process_data.block",
       intbits, timeout_usec, blocking);
-    if (status != EMMC_CMD_OK)
+    if (status != EMMC_CMD_OK) {
+      EMMC_ERR("error status during data ready wait: %d", status);
       return status;
+    }
 
     buf = c->databuf + block * c->block_size;
     status = emmc_cmd_process_single_block(buf, c->block_size, is_write, intbits, timeout_usec, blocking);
-    if (status != EMMC_CMD_OK)
+    if (status != EMMC_CMD_OK) {
+      EMMC_ERR("error status during data process: status: %d, block: %d, is_write: %d", status, block, is_write);
       return status;
+    }
   }
 
   intbits = 0;
@@ -335,10 +338,14 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
   EMMC_LOG("emmc_do_issue_cmd: cmd_idx:%08x, arg:%08x, blocks:%d",
     c->cmd_idx, c->arg, c->num_blocks);
 
-  if (emmc_wait_cmd_inhibit())
+  if (emmc_wait_cmd_inhibit()) {
+    EMMC_ERR("emmc_do_issue_cmd: emmc_wait_cmd_inhibit failed");
     return -1;
-  if (emmc_wait_dat_inhibit())
+  }
+  if (emmc_wait_dat_inhibit()) {
+    EMMC_ERR("emmc_do_issue_cmd: emmc_wait_dat_inhibit failed");
     return -1;
+  }
 
   blksizecnt = 0;
   EMMC_BLKSIZECNT_CLR_SET_BLKSIZE(blksizecnt, c->block_size);
@@ -347,19 +354,23 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
   emmc_write_reg(EMMC_ARG1, c->arg);
   emmc_write_reg(EMMC_CMDTM, cmdreg);
 
-  wait_msec(1);
   err = emmc_interrupt_wait_done_or_err(timeout_usec, 1, 0, emmc_mode_blocking, &intval);
 
-  if (err)
+  if (err) {
+    EMMC_ERR("emmc_do_issue_cmd: emmc_interrupt_wait_done_or_err, err: %d ", err);
     return EMMC_CMD_TIMEOUT;
+  }
 
   if (EMMC_INTERRUPT_GET_ERR(intval)) {
+    emmc_write_reg(EMMC_INTERRUPT, intval);
     if (EMMC_INTERRUPT_GET_CTO_ERR(intval)) {
       intval_cmp = 0;
       EMMC_INTERRUPT_CLR_SET_CTO_ERR(intval_cmp, 1);
       EMMC_INTERRUPT_CLR_SET_ERR(intval_cmp, 1);
-      if (intval_cmp == intval)
+      if (intval_cmp == intval) {
+        EMMC_ERR("emmc_do_issue_cmd: exit by timeout");
         return EMMC_CMD_TIMEOUT;
+      }
     }
     emmc_interrupt_bitmask_to_string(intbuf, sizeof(intbuf), intval);
     EMMC_ERR("emmc_do_issue_cmd: error in INTERRUPT register: %08x, %s", intval, intbuf);
@@ -388,8 +399,10 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
 
   if (EMMC_CMDTM_GET_CMD_ISDATA(cmdreg)) {
     data_status = emmc_cmd_process_data(c, cmdreg, timeout_usec, emmc_mode_blocking);
-    if (data_status != EMMC_CMD_OK)
+    if (data_status != EMMC_CMD_OK) {
+      EMMC_ERR("emmc_do_issue_cmd: data_status: %d", data_status);
       return data_status;
+    }
   }
 
   if (response_type == EMMC_RESPONSE_TYPE_48_BITS_BUSY) {
@@ -399,12 +412,14 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
       return EMMC_CMD_TIMEOUT;
     emmc_write_reg(EMMC_INTERRUPT, 0xffff0002);
   }
-  EMMC_LOG("emmc_do_issue_cmd result: %d, resp: [%08x][%08x][%08x][%08x]",
+#ifdef EMMC_DEBUG
+  EMMC_DEBUG("emmc_do_issue_cmd result: %d, resp: [%08x][%08x][%08x][%08x]",
     c->status,
     c->resp0,
     c->resp1,
     c->resp2,
     c->resp3);
+#endif
   return EMMC_CMD_OK;
 }
 
@@ -444,11 +459,16 @@ int emmc_reset_cmd()
   EMMC_CONTROL1_CLR_SET_SRST_CMD(control1, 1);
   emmc_write_reg(EMMC_CONTROL1, control1);
 
-  if (emmc_wait_reg_value(EMMC_CONTROL1, EMMC_CONTROL1_MASK_SRST_CMD, 0, 1000000, emmc_mode_blocking, NULL)) {
+  if (emmc_wait_reg_value(
+    EMMC_CONTROL1,
+    EMMC_CONTROL1_MASK_SRST_CMD,
+    0,
+    EMMC_WAIT_TIMEOUT_USEC,
+    emmc_mode_blocking, NULL)) {
     EMMC_ERR("emmc_reset_cmd: timeout");
-    return -1;
+    return ERR_TIMEOUT;
   }
 
-  return 0;
+  return ERR_OK;
 }
 

@@ -9,6 +9,8 @@
 // #define CONFIG_UART_MINI
 #define CONFIG_UART_PL011
 
+// #define CONFIG_EMMC_DEBUG2
+
 #define CONFIG_DEBUG_LIST
 // #define CONFIG_DEBUG_MBOX
 

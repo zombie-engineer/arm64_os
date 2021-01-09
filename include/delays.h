@@ -1,5 +1,6 @@
 #pragma once
 #include <types.h>
+#include <time.h>
 
 void wait_cycles(uint32_t n);
 

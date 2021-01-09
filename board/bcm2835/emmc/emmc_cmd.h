@@ -1,6 +1,7 @@
 #pragma once
 #include <types.h>
 #include <stringlib.h>
+#include <error.h>
 
 /* GO_IDLE */
 #define EMMC_CMD0                 0x00000000
@@ -14,6 +15,8 @@
 #define EMMC_CMD7                 0x00000007
 /* SEND_IF_COND */
 #define EMMC_CMD8                 0x00000008
+#define EMMC_CMD8_ARG             0x000001aa
+#define EMMC_CMD8_VALID_RESP      EMMC_CMD8_ARG
 /* STOP_TRANSMISSION */
 #define EMMC_CMD12                0x0000000c
 /* SEND_STATUS */
@@ -46,6 +49,16 @@ typedef enum emmc_cmd_status {
   EMMC_CMD_TIMEOUT
 } emmc_cmd_status_t;
 
+static inline int emmc_cmd_status_to_err(emmc_cmd_status_t status)
+{
+  int errors[3] = {
+    ERR_OK,
+    ERR_GENERIC,
+    ERR_TIMEOUT
+  };
+  return errors[status];
+}
+
 struct emmc_cmd {
   uint32_t cmd_idx;
   uint32_t arg;
@@ -74,17 +87,15 @@ emmc_cmd_status_t emmc_cmd(struct emmc_cmd *c, uint64_t timeout_usec);
  */
 int emmc_reset_cmd(void);
 
+/* Select card */
 static inline int emmc_cmd7(uint32_t rca)
 {
   emmc_cmd_status_t cmd_ret;
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD7, rca << 16);
-  cmd_ret = emmc_cmd(&c, 0);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-  return 0;
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
+  return emmc_cmd_status_to_err(cmd_ret);
 }
 
 static inline int emmc_cmd13(uint32_t rca, uint32_t *out_status)
@@ -93,14 +104,14 @@ static inline int emmc_cmd13(uint32_t rca, uint32_t *out_status)
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD13, rca << 16);
-  cmd_ret = emmc_cmd(&c, 0);
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
 
   if (cmd_ret != EMMC_CMD_OK)
-    return -1;
+    return emmc_cmd_status_to_err(cmd_ret);
 
   *out_status = c.resp0;
 
-  return 0;
+  return ERR_OK;
 }
 
 /* READ_SINGLE_BLOCK */
@@ -114,29 +125,21 @@ static inline int emmc_cmd17(uint32_t block_idx, char *dstbuf)
   c.num_blocks = 1;
   c.block_size = 512;
 
-  cmd_ret = emmc_cmd(&c, 0);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-
-  return 0;
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
+  return emmc_cmd_status_to_err(cmd_ret);
 }
 
 /* WRITE_BLOCK */
-static inline int emmc_cmd24(uint32_t block_idx, char *dstbuf)
+static inline int emmc_cmd24(uint32_t block_idx, char *srcbuf)
 {
   emmc_cmd_status_t cmd_ret;
   struct emmc_cmd c;
 
   emmc_cmd_init(&c, EMMC_CMD24, block_idx);
-  c.databuf = dstbuf;
+  c.databuf = srcbuf;
   c.num_blocks = 1;
   c.block_size = 512;
 
-  cmd_ret = emmc_cmd(&c, 0);
-
-  if (cmd_ret != EMMC_CMD_OK)
-    return -1;
-
-  return 0;
+  cmd_ret = emmc_cmd(&c, EMMC_WAIT_TIMEOUT_USEC);
+  return emmc_cmd_status_to_err(cmd_ret);
 }
