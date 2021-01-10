@@ -990,18 +990,27 @@ static void __attribute__((optimize("O3"))) UNUSED test_usb()
   while(1);
 }
 
-void main()
+
+void init1(void)
 {
-  int ret;
   mbox_init();
   debug_init();
   gpio_set_init();
-  jtag_init();
   dma_area_init();
-  // spi_emulated_init();
   init_unhandled_exception_reporters();
-
   font_init_lib();
+}
+
+void init2(void)
+{
+  init_uart(1);
+  init_consoles();
+}
+
+void main()
+{
+  int ret;
+  init1();
 
 #ifdef CONFIG_HDMI
   vcanvas_init(CONFIG_DISPLAY_WIDTH, CONFIG_DISPLAY_HEIGHT);
@@ -1009,11 +1018,13 @@ void main()
   vcanvas_set_bg_color(0x00000010);
 #endif
 
-  init_uart(1);
-  init_consoles();
+  init2();
   self_test();
   emmc_init();
   fs_probe_early();
+  printf("SDCARD OVERWRITTEN3\r\n");
+  volatile int xx = 1;
+  while(xx);
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);
@@ -1082,3 +1093,18 @@ void main()
   scheduler_init(0/* log_level */, init_func);
   while(1);
 }
+
+#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+void jtag_write_image_main(void)
+{
+  mbox_init();
+  debug_init();
+  gpio_set_init();
+  dma_area_init();
+  init_unhandled_exception_reporters();
+  font_init_lib();
+  init_uart(1);
+  init_consoles();
+  jtag_write_image_to_sd();
+}
+#endif

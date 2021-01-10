@@ -218,7 +218,7 @@ struct cl_sector_iter {
   uint64_t end_sector_idx;
 };
 
-static inline void cl_sector_iter_init(struct cl_sector_iter *csi, struct fat32_fs *f, uint32_t cluster_idx)
+static inline void cl_sector_iter_init(struct cl_sector_iter *csi, struct fat32_fs *f, uint32_t cluster_idx, uint32_t num_sectors)
 {
   /* sector from where actual data clusters start */
   uint64_t first_data_sector_idx;
@@ -232,7 +232,7 @@ static inline void cl_sector_iter_init(struct cl_sector_iter *csi, struct fat32_
   csi->f = f;
   csi->cluster_idx = cluster_idx;
   csi->sector_idx = first_data_sector_idx + data_sector_idx;
-  csi->end_sector_idx = csi->sector_idx + fat32_get_sectors_per_cluster(f);
+  csi->end_sector_idx = csi->sector_idx + num_sectors;
 }
 
 static inline bool cl_sector_iter_valid(struct cl_sector_iter *csi)
@@ -264,7 +264,7 @@ static int fat32_iterate_directory(
 
   cluster_it_init(&ci, f, dir_start_cluster);
   for(; cluster_it_valid(&ci); cluster_it_next(&ci)) {
-    cl_sector_iter_init(&csi, f, ci.cluster_idx);
+    cl_sector_iter_init(&csi, f, ci.cluster_idx, fat32_get_sectors_per_cluster(f));
     for(; cl_sector_iter_valid(&csi); cl_sector_iter_next(&csi)) {
       printf("fat32_iterate_directory: reading dir sector: sector: %lld\r\n", csi.sector_idx);
       err = f->bdev->ops.read(f->bdev, buf, sizeof(buf), csi.sector_idx, 1);
@@ -408,10 +408,18 @@ int fat32_ls(struct fat32_fs *f, const char *dirpath)
   return 0;
 }
 
-int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename)
+int fat32_file_sectors_cb_print(uint32_t cluster, uint64_t sector, uint32_t num_sectors, void *cb_arg)
 {
-  int err;
-  struct fat_dentry d;
+  printf("cluster %d, sectors  %lld +%d\r\n", cluster, sector, num_sectors);
+  return 0;
+}
+
+int fat32_iterate_file_sectors(
+  struct fat32_fs *f,
+  struct fat_dentry *d,
+  int (*cb)(uint32_t, uint64_t, uint32_t, void *),
+  void *cb_arg)
+{
   struct cluster_it ci;
   struct cl_sector_iter csi;
   uint32_t size_bytes;
@@ -420,31 +428,39 @@ int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename)
   uint32_t sector_size;
   uint32_t sectors_per_cluster;
 
+  sector_size = fat32_get_logical_sector_size(f);
+  sectors_per_cluster = fat32_get_sectors_per_cluster(f);
+
+  size_bytes = fat32_dentry_get_file_size(d);
+  size_sectors = (size_bytes + sector_size - 1) / sector_size;
+
+  cluster_it_init(&ci, f, fat32_dentry_get_cluster(d));
+  for(; size_sectors && cluster_it_valid(&ci); cluster_it_next(&ci)) {
+    num_sectors = (size_sectors > sectors_per_cluster) ? sectors_per_cluster : size_sectors;
+    cl_sector_iter_init(&csi, f, ci.cluster_idx, num_sectors);
+    for (; cl_sector_iter_valid(&csi); cl_sector_iter_next(&csi)) {
+      if (cb(ci.cluster_idx, csi.sector_idx, 1, cb_arg))
+        return ERR_OK;
+    }
+    size_sectors -= num_sectors;
+  }
+
+  return ERR_OK;
+}
+
+int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename)
+{
+  int err;
+  struct fat_dentry d;
+
   err = fat32_lookup(f, filename, &d);
   if (err) {
     printf("fat32_dump_file_cluster_chain: failed to lookup file %s\r\n", filename);
     return err;
   }
+  err = fat32_iterate_file_sectors(f, &d, fat32_file_sectors_cb_print, NULL);
+  if (err)
+    printf("fat32_dump_file_cluster_chain: failed to iterate sectors %s\r\n", filename);
 
-  sector_size = fat32_get_logical_sector_size(f);
-  sectors_per_cluster = fat32_get_sectors_per_cluster(f);
-
-  size_bytes = fat32_dentry_get_file_size(&d);
-  size_sectors = (size_bytes + sector_size - 1) / sector_size;
-  printf("file %s, size: %d bytes (%d sectors), clusters: \r\n", filename, size_bytes, size_sectors);
-
-  cluster_it_init(&ci, f, fat32_dentry_get_cluster(&d));
-  for(; size_sectors && cluster_it_valid(&ci); cluster_it_next(&ci)) {
-    cl_sector_iter_init(&csi, f, ci.cluster_idx);
-
-    num_sectors = (size_sectors > sectors_per_cluster) ? sectors_per_cluster : size_sectors;
-    size_sectors -= num_sectors;
-
-    printf("cluster %d, sectors  %lld +%d\r\n",
-      ci.cluster_idx,
-      csi.sector_idx,
-      num_sectors);
-  }
-
-  return 0;
+  return err;
 }

@@ -49,6 +49,15 @@ SECTIONS
   .data : {*(.data .gnu.linkonce.d*) }
   .data.bin ALIGN(4): SUBALIGN(4) { *(.data.*) }
 
+#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+  . = ALIGN(4096);
+  .download_image (NOLOAD) :  { }
+  . += MAX_DOWNLOAD_IMAGE_SIZE;
+  __download_image_start = ADDR(.download_image);
+  __download_image_end = ADDR(.download_image) + MAX_DOWNLOAD_IMAGE_SIZE;
+#endif
+
+
   .mybss (NOLOAD) :
   {
     . = ALIGN(16);

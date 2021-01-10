@@ -37,4 +37,18 @@
 
 #define DMA_AREA_SIZE 65536
 
+/* Compile with enabled image download via UART feature */
+#define ENABLE_UART_DOWNLOAD
+
+/* Compile with debug via JTAG feature */
 #define ENABLE_JTAG
+/* Compile with enabled image download via JTAG feature */
+#define ENABLE_JTAG_DOWNLOAD
+
+#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+/*
+ * Compile with special section to provide enough scratchspace to
+ * download images if one of ENABLE_*_DOWNLOAD features is enabled
+ */
+#define MAX_DOWNLOAD_IMAGE_SIZE 0x200000
+#endif

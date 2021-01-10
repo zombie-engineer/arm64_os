@@ -35,3 +35,15 @@ void jtag_init(void)
   }
 #endif
 }
+
+#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+#include <fs/fs.h>
+extern char __download_image_start;
+extern char __download_image_end;
+void jtag_write_image_to_sd(void)
+{
+  write_image_to_sd("/u-boot.bin", &__download_image_start, &__download_image_end);
+  while(1)
+    asm volatile("hlt #0");
+}
+#endif

@@ -14,6 +14,7 @@
 
 int emmc_log_level = LOG_LEVEL_DEBUG2;
 bool emmc_mode_blocking = true;
+bool emmc_is_initialized = false;
 uint32_t emmc_device_id[4];
 uint32_t emmc_rca;
 
@@ -89,15 +90,21 @@ static inline void emmc_debug_registers(void)
 
 int emmc_init(void)
 {
+  int err;
+  if (emmc_is_initialized)
+    return ERR_OK;
+
   // emmc_init_gpio();
-  if (emmc_reset()) {
-    EMMC_ERR("emmc_init failed");
-    return -1;
+  err = emmc_reset();
+  if (err != ERR_OK) {
+    EMMC_ERR("emmc_init failed: %d", err);
+    return err;
   }
 
   EMMC_LOG("emmc_init successfull");
   // emmc_debug_registers();
-  return 0;
+  emmc_is_initialized = true;
+  return ERR_OK;
 }
 
 
@@ -155,3 +162,11 @@ int emmc_write(int first_block_idx, int num_blocks, char *buf, int bufsz)
 {
   return emmc_data_io(EMMC_IO_WRITE, buf, bufsz, first_block_idx, num_blocks);
 }
+
+#ifdef ENABLE_JTAG
+void emmc_write_kernel_to_card()
+{
+  emmc_reset();
+}
+
+#endif

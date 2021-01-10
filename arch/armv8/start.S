@@ -55,7 +55,15 @@
  */
 _start:
 #ifdef ENABLE_JTAG
-b _start
+ b _start
+#ifdef ENABLE_JTAG_DOWNLOAD
+ b 1f
+ ldr w0, =__download_image_start
+ ldr w1, =__download_image_end
+ b __jtag_write_image_trampoline
+.ltorg
+#endif
+1:
 #endif
   /*
    * Starting in EL2/SP_EL2, exceptions masked, non-MMU
@@ -334,8 +342,8 @@ __jump_addr_core0:
    * Zero out .bss section
    */
   bl __clear_bss
-2:
-  // clear GP registers
+
+.macro ZERO_GP_REGS
   mov x0, xzr
   mov x1, xzr
   mov x2, xzr
@@ -367,12 +375,24 @@ __jump_addr_core0:
   mov x28, xzr
   mov x29, xzr
   mov x30, xzr
+.endm
 
+  ZERO_GP_REGS
   bl    main
 1:
   wfe
   b 1b
 
+#ifdef ENABLE_JTAG_DOWNLOAD
+__jtag_write_image_trampoline:
+  /*
+   * Zero out .bss section
+   */
+  mov sp, 0x80000
+  bl __clear_bss
+  ZERO_GP_REGS
+  bl    jtag_write_image_main
+#endif
 
 LFUNC(_cpu_wait_for_event):
   wfe

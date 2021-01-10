@@ -276,3 +276,9 @@ int fat32_ls(struct fat32_fs *f, const char *dirpath);
 int fat32_dump_file_cluster_chain(struct fat32_fs *f, const char *filename);
 
 int fat32_lookup(struct fat32_fs *f, const char *filepath, struct fat_dentry *out_dentry);
+
+int fat32_iterate_file_sectors(
+  struct fat32_fs *f,
+  struct fat_dentry *d,
+  int (*cb)(uint32_t, uint64_t, uint32_t, void *),
+  void *cb_arg);
