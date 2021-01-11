@@ -121,6 +121,9 @@ TARGET_PREFIX_QEMU := kernel8_qemu
 $(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
+$(TARGET_PREFIX_QEMU).c: $(TARGET_PREFIX_REAL).c
+	cp -fv $^ $@
+
 %.o: %.c %.d
 	$(CC) $(CFLAGS) -c $< -o $@
 
