@@ -176,14 +176,21 @@ qemuds: $(TARGET_QEMU_IMG)
 qemuat:
 	$(GDB) -x rungdb_qemu.gdb
 
-.PHONY: jtag
-jtag:
+# JTAG
+.PHONY: j
+j:
 	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg
 # with debug trace	/mnt/ssd240/openocd-code/src/openocd -d -f openocd-jtag.cfg
 
-.PHONY: jtagd
-jtagd:
-	/mnt/sdb1/binutils-gdb/gdb/gdb -q -x openocd-jtag.gdb kernel8.elf
+# JTAG gdb
+.PHONY: jd
+jd:
+	$(GDB) -q -x openocd-jtag.gdb $(TARGET_PREFIX_REAL).elf
+
+# JTAG telnet
+.PHONY: jt
+jt:
+	telnet localhost 4444
 
 .PHONY: serial
 serial:
