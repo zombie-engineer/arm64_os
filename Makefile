@@ -6,6 +6,7 @@ LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 REGTOOL = tools/gen_reg_headers.py
+GDB     = /mnt/sdb1/binutils-gdb/gdb/gdb
 
 INCLUDES := include firmware/atmega8a/include
 
@@ -173,7 +174,7 @@ qemuds: $(TARGET_QEMU_IMG)
 # Attach to started qemu process with gdb
 .PHONY: qemuat
 qemuat:
-	/mnt/sdb1/binutils-gdb/gdb/gdb -x rungdb.gdb
+	$(GDB) -x rungdb_qemu.gdb
 
 .PHONY: jtag
 jtag:

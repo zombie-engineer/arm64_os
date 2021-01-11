@@ -1,7 +1,7 @@
 set breakpoint pending on
 set pagination off
 target remote localhost:1234
-file kernel8.elf
+file kernel8_qemu.elf
 
 define dctx
 p/x *(armv8_cpuctx_t *)__current_cpuctx
