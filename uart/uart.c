@@ -4,6 +4,7 @@
 #include <uart/mini_uart.h>
 #include <uart/uart.h>
 #include <spinlock.h>
+#include <common.h>
 
 #include <error.h>
 
@@ -14,6 +15,7 @@
 #if defined(CONFIG_UART_PL011)
 #define uart_send pl011_uart_send
 #define uart_recv pl011_uart_getc
+#define uart_rx_not_empty pl011_uart_rx_not_empty
 #define _uart_init pl011_uart_init
 #define _uart_send_buf pl011_uart_send_buf
 #define _uart_set_interrupt_mode pl011_uart_set_interrupt_mode
@@ -21,6 +23,7 @@
 #elif defined(CONFIG_UART_MINI)
 #define uart_send mini_uart_send
 #define uart_recv mini_uart_getc
+#define uart_rx_not_empty mini_uart_rx_not_empty
 #define _uart_init mini_uart_init
 #define _uart_send_buf mini_uart_send_buf
 #define _uart_set_interrupt_mode mini_uart_set_interrupt_mode
@@ -94,3 +97,28 @@ int uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *priv)
 {
   return _uart_subscribe_to_rx_event(cb, priv);
 }
+
+//#ifdef ENABLE_UART_DOWNLOAD
+void check_uart_download(void)
+{
+  char c;
+  while(1) {
+    putc('.');
+    c = uart_recv();
+    putc(',');
+    uart_send(c);
+    uart_send('-');
+  }
+  if (uart_rx_not_empty()) {
+    c = uart_recv();
+    if (c == 'd') {
+      printf("HELLO\r\n");
+      while(1) asm volatile ("wfe");
+    }
+  }
+  else {
+    printf("not hello\r\n");
+      while(1) asm volatile ("wfe");
+  }
+}
+//#endif

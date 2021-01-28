@@ -23,3 +23,7 @@ int uart_send_buf(const void *buf, size_t n);
 int uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *priv);
 
 int uart_is_initialized();
+
+#ifdef ENABLE_UART_DOWNLOAD
+void check_uart_download(void);
+#endif

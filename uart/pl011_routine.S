@@ -5,7 +5,9 @@
 .equ UART0_DR  , (UART0_BASE + 0x00)
 .equ UART0_FR  , (UART0_BASE + 0x18)
 
-  /* Transmit FIFO full*/
+/* Receive FIFO empty */
+.equ UART0_FR_RXFE, (1<<4)
+/* Transmit FIFO full*/
 .equ UART0_FR_TXFF, (1<<5)
 
 .text
@@ -37,4 +39,12 @@ pl011_uart_getchar:
   reg_set_addr32 x1, UART0_DR
   ldr   w0, [x1]
   ldp   x29, x30, [sp], #0x10
+  ret
+
+.globl pl011_uart_rx_not_empty
+pl011_uart_rx_not_empty:
+  reg_set_addr32 x1, UART0_FR
+  ldr  x1, [x1]
+  tst  x1, UART0_FR_RXFE
+  cset w0, eq
   ret
