@@ -12,8 +12,8 @@ struct spinlock {
   uint64_t lock ALIGNED(64);
 };
 
-#define DECL_SPINLOCK(name) ALIGNED(64) uint64_t name
-#define DECL_COND_SPINLOCK(name) ALIGNED(64) uint64_t name
+#define DECL_SPINLOCK(name) ALIGNED(64) struct spinlock name
+#define DECL_COND_SPINLOCK(name) ALIGNED(64) struct spinlock name
 
 #define __spinlock_init __armv8_spinlock_init
 #define __spinlock_lock __armv8_spinlock_lock
