@@ -51,6 +51,7 @@ OBJS := \
 	irq.o\
 	jtag.o\
 	kernel_panic.o\
+	mutex.o\
 	percpu.o\
 	pipe.o\
 	power.o\
@@ -60,6 +61,7 @@ OBJS := \
 	ringbuf.o\
 	sched.o\
 	self_test.o\
+	semaphore.o\
 	shiftreg.o\
 	tags.o\
 	timer.o\
