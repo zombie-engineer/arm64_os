@@ -17,6 +17,7 @@ typedef          int           bool;
 #define false 0
 
 typedef __SIZE_TYPE__  size_t;
+typedef size_t ssize_t;
 #else
 #include <stdint.h>
 #include <stddef.h>
