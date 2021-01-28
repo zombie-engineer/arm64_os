@@ -197,7 +197,7 @@ static uint32_t sd_acommands[] = {
   CMDTM_GEN(59, NA,    0, NA, 0)
 };
 
-static inline emmc_cmd_status_t emmc_cmd_process_single_block(
+static inline emmc_cmd_status_t OPTIMIZED emmc_cmd_process_single_block(
   char *buf,
   int size,
   int is_write,
@@ -248,7 +248,7 @@ static inline emmc_cmd_status_t emmc_wait_process_interrupts(
   return EMMC_CMD_OK;
 }
 
-static inline emmc_cmd_status_t emmc_cmd_process_data(
+static inline emmc_cmd_status_t OPTIMIZED emmc_cmd_process_data(
   struct emmc_cmd *c,
   uint32_t cmdreg,
   uint64_t timeout_usec,
@@ -335,8 +335,10 @@ static inline emmc_cmd_status_t emmc_do_issue_cmd(struct emmc_cmd *c, uint32_t c
   int response_type;
   char intbuf[256];
 
-  EMMC_LOG("emmc_do_issue_cmd: cmd_idx:%08x, arg:%08x, blocks:%d",
+#ifdef EMMC_DEBUG
+  EMMC_DEBUG("emmc_do_issue_cmd: cmd_idx:%08x, arg:%08x, blocks:%d",
     c->cmd_idx, c->arg, c->num_blocks);
+#endif
 
   if (emmc_wait_cmd_inhibit()) {
     EMMC_ERR("emmc_do_issue_cmd: emmc_wait_cmd_inhibit failed");
