@@ -160,3 +160,23 @@ static inline uint64_t get_boottime_usec(void)
 void print_cpu_flags();
 
 int get_cpu_num();
+
+static inline void wmb(void)
+{
+  asm volatile("dsb sy");
+}
+
+static inline void mb(void)
+{
+  asm volatile("dsb sy");
+}
+
+static inline void rmb(void)
+{
+  asm volatile("dsb sy");
+}
+
+static inline void dsb(void)
+{
+  asm volatile("dsb sy");
+}
