@@ -11,6 +11,7 @@
 #include <spinlock.h>
 #include <emmc.h>
 #include <fs/fs.h>
+#include <vchiq.h>
 #include <i2c.h>
 #include <font.h>
 #include <vcanvas.h>
@@ -47,6 +48,7 @@
 #include <pwm.h>
 #include <drivers/servo/sg90.h>
 #include <drivers/usb/usbd.h>
+#include <drivers/display/tft_lcd.h>
 
 /*
  * This is a garbage can for all possible test code
@@ -994,7 +996,7 @@ static void __attribute__((optimize("O3"))) UNUSED test_usb()
 void init1(void)
 {
   mbox_init();
-  debug_init();
+  // debug_init();
   gpio_set_init();
   dma_area_init();
   init_unhandled_exception_reporters();
@@ -1007,9 +1009,12 @@ void init2(void)
   init_consoles();
 }
 
+char vchiq_buf[4096] ALIGNED(4096);
+
 void main()
 {
   int ret;
+  uint32_t *vchiq_channel;
   init1();
 
 #ifdef CONFIG_HDMI
@@ -1019,19 +1024,20 @@ void main()
 #endif
 
   init2();
+  vchiq_init();
+  vchiq_channel = (uint32_t*)vchiq_buf;
+  mbox_init_vchiq(vchiq_channel);
+  printf("HElo");
+#ifdef ENABLE_UART_DOWNLOAD
+  check_uart_download();
+#endif
   self_test();
   emmc_init();
+  tft_lcd_init();
   fs_probe_early();
-  printf("SDCARD OVERWRITTEN3\r\n");
-  volatile int xx = 1;
-  while(xx);
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);
-  // i2c_eeprom();
-  // pwm_bcm2835_init();
-  // bcm2835_set_pwm_clk_freq(100000);
-  // servo_sg90_init();
   print_mbox_props();
   // usbd_init();
   // usbd_print_device_tree();
@@ -1039,35 +1045,12 @@ void main()
   // init_nokia5110_display(1, 0);
   // nokia5110_draw_text("Display ready", 0, 0);
 #endif
-  // nokia5110_test_draw();
-  // init_atmega8a();
-  // if (avr_update()) {
-  //  puts("halting\n");
-  // }
-  // atmega8a_drop_spi();
-  // spi_slave_test();
   cm_print_clocks();
-  // atmega8a_spi_master_test();
-  // i2c_test();
-  // gpio_irq_test(16, 21, 0 /* no poll, use interrupts */);
-  // while(1);
-
-  // i2c_init();
-  // i2c_bitbang();
-  //  if (bsc_slave_init(BSC_SLAVE_MODE_I2C, 0x66)) {
-  //
-  //    puts("Failed to init bsc_slave in I2C mode\n");
-  //  } else
-  //    bsc_slave_debug();
-  //  while(1);
 
   test_mmio_dma(false, false);
   mmu_init();
   test_mmio_dma(true, true);
-  // while(1);
   print_memory_map();
-  // test_pic(19);
-  // nokia5110_draw_text("MMU OK!", 0, 0);
   spinlocks_enabled = 1;
 
   print_cpu_info();
@@ -1082,11 +1065,6 @@ void main()
   cmdrunner_init();
   print_cache_stats();
   tags_print_cmdline();
-  // disable_l1_caches();
-
-#ifdef CONFIG_HDMI
-  vcanvas_showpicture();
-#endif
 
   rand_init();
   // cmdrunner_run_interactive_loop();

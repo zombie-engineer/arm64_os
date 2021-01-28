@@ -1,5 +1,7 @@
 #pragma once
 
+#define BIT(x) (1UL << (x))
+
 #define BITWIDTH64(x) ((long long)x)
 
 #define BITS_AT_POS(bits, pos, mask) ((BITWIDTH64(bits) & mask) << pos)

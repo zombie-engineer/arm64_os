@@ -20,6 +20,12 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	usb/hcd_hub \
 	usb/root_hub \
 	usb/usb_xfer_queue \
+	vchiq \
+	vchiq/vchiq_2835_arm \
+	vchiq/vchiq_shim \
+	vchiq/vchiq_core \
+	vchiq/vchiq_util \
+	vchiq/mmal-vchiq \
 	emmc/emmc \
 	emmc/emmc_cmd \
 	emmc/emmc_initialize \
