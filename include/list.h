@@ -83,6 +83,9 @@ static inline OPTIMIZED void __list_add(struct list_head *new,
 #define list_for_each(pos, head) \
   for (pos = (head)->next; pos != (head); pos = pos->next)
 
+#define list_for_each_safe(pos, n, head) \
+  for (pos = (head)->next, n = pos; pos != (head); pos = n, n = pos->next)
+
 #define list_next_entry_or_null(ptr, type, member) ({ \
     struct list_head *head__ = (ptr); \
     struct list_head *pos__ = head__->next; \
