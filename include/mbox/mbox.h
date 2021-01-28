@@ -64,6 +64,7 @@ extern volatile uint32_t mbox_buffer[36];
 #define MBOX_TAG_GET_PITCH             0x40008
 #define MBOX_TAG_GET_VIRT_OFFSET       0x40009
 #define MBOX_TAG_SET_VIRT_OFFSET       0x48009
+#define MBOX_TAG_SET_VCHIQ_INIT        0x48010
 #define MBOX_TAG_GET_COMMAND_LINE      0x50001
 
 #define MBOX_TAG_LAST      0

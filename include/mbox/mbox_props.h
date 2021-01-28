@@ -33,6 +33,8 @@ int mbox_set_clock_rate(uint32_t clock_id, uint32_t *clock_rate, uint32_t skip_t
 
 int mbox_get_virt_wh(uint32_t *out_width, uint32_t *out_height);
 
+int mbox_init_vchiq(uint32_t *vchiq_base);
+
 typedef struct mbox_set_fb_args {
   uint32_t psize_x;
   uint32_t psize_y;

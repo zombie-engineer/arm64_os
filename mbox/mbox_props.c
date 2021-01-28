@@ -84,6 +84,20 @@
 
 #define MBOX_GET_RSP(fld) m->tag.u.rsp.fld
 
+DECL_MBOX_REQ_1T(init_vchiq, vchiq_base);
+DECL_MBOX_RSP_1T(init_vchiq, vchiq_base);
+DECL_MBOX_1TAG_MSG_T(init_vchiq);
+
+int mbox_init_vchiq(uint32_t *vchiq_base)
+{
+  DECL_MBOX_MSG(init_vchiq, MBOX_TAG_SET_VCHIQ_INIT);
+  m->tag.u.req.vchiq_base = *vchiq_base;
+  if (!mbox_prop_call(MBOX_CH_PROP)) {
+    *vchiq_base = MBOX_GET_RSP(vchiq_base);
+    return 0;
+  }
+  return -1;
+}
 
 int mbox_get_firmware_rev()
 {
