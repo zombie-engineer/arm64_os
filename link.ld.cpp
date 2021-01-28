@@ -23,10 +23,9 @@
 
 #define DMA_AREA_SECTION\
   . = ALIGN(PAGE_SIZE);\
-  .dma_area : {}\
+  .dma_area (NOLOAD) : { dma_area.o(.dma_mem)}\
   __dma_area_start = ADDR(.dma_area);\
-  __dma_area_end = __dma_area_start + DMA_AREA_SIZE;\
-  . += DMA_AREA_SIZE;
+  __dma_area_end = __dma_area_start + SIZEOF(.dma_area);\
 
 
 SECTIONS
