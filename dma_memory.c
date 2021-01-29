@@ -1,14 +1,14 @@
-#include <memory/dma_area.h>
+#include <memory/dma_memory.h>
 #include <refs.h>
 #include <common.h>
 #include <list.h>
 #include <config.h>
 
-extern char __dma_area_start;
-extern char __dma_area_end;
+extern char __dma_memory_start;
+extern char __dma_memory_end;
 
-#define dma_area_start (void *)&__dma_area_start
-#define dma_area_end   (void *)&__dma_area_end
+#define dma_memory_start (void *)&__dma_memory_start
+#define dma_memory_end   (void *)&__dma_memory_end
 
 struct chunk {
   void *addr;
@@ -96,10 +96,10 @@ static inline struct chunk *chunk_get_by_addr(void *addr, struct chunk_area **ch
   int i;
   struct chunk_area *d;
   struct chunk *entry;
-  uint64_t base_addr = (uint64_t)dma_area_start;
+  uint64_t base_addr = (uint64_t)dma_memory_start;
   uint64_t tmp;
-  BUG(addr < dma_area_start, "attempt to free area before dma range");
-  BUG(addr >= dma_area_end, "attempt to free area after dma range");
+  BUG(addr < dma_memory_start, "attempt to free area before dma range");
+  BUG(addr >= dma_memory_end, "attempt to free area after dma range");
 
   /*
    * First detect the right area
@@ -134,14 +134,14 @@ static inline struct chunk_area *chunk_area_get_by_sz(int sz)
   return &chunk_areas[logsize_to_area_idx[logsz - 5 - 1]];
 }
 
-uint64_t dma_area_get_start_addr(void)
+uint64_t dma_memory_get_start_addr(void)
 {
-  return (uint64_t)dma_area_start;
+  return (uint64_t)dma_memory_start;
 }
 
-uint64_t dma_area_get_end_addr(void)
+uint64_t dma_memory_get_end_addr(void)
 {
-  return (uint64_t)dma_area_end;
+  return (uint64_t)dma_memory_end;
 }
 
 void *dma_alloc(int sz)
@@ -166,7 +166,7 @@ void dma_free(void *addr)
   list_add(&c->list, &a->free_list);
 }
 
-void dma_area_init(void)
+void dma_memory_init(void)
 {
   struct chunk_area *ca, *ca_end;
   struct chunk *c, *c_end;

@@ -41,7 +41,7 @@ OBJS := \
 	cpuctx_generic.o\
 	debug.o		 \
 	delays.o\
-	dma_area.o\
+	dma_memory.o\
 	dma.o\
 	exception.o\
 	exception_reporter.o\
@@ -52,6 +52,7 @@ OBJS := \
 	jtag.o\
 	kernel_panic.o\
 	mutex.o\
+	malloc.o\
 	percpu.o\
 	pipe.o\
 	power.o\

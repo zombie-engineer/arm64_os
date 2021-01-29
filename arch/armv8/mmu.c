@@ -11,7 +11,7 @@
 #include "mmu_memattr.h"
 #include "mmu_lpdesc.h"
 #include <stringlib.h>
-#include <memory/dma_area.h>
+#include <memory/dma_memory.h>
 
 /* We setup 4096 bytes GRANULE.
  *
@@ -443,10 +443,10 @@ void mmu_init(void)
   int num_ranges = 0;
 
   int pg_norm_off = 0;
-  int pg_norm_num = dma_area_get_start_addr() / MMU_PAGE_GRANULE;
+  int pg_norm_num = dma_memory_get_start_addr() / MMU_PAGE_GRANULE;
 
   int pg_dma_off  = pg_norm_num;
-  int pg_dma_num  = dma_area_get_end_addr() / MMU_PAGE_GRANULE - pg_dma_off;
+  int pg_dma_num  = dma_memory_get_end_addr() / MMU_PAGE_GRANULE - pg_dma_off;
 
   int pg_shar_off = pg_dma_off + pg_norm_num;
   int pg_shar_num = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE - pg_shar_off;
