@@ -39,7 +39,8 @@
 #include <board/bcm2835/bcm2835_systimer.h>
 #include <arch/armv8/armv8_generic_timer.h>
 #include <init_task.h>
-#include <memory/dma_area.h>
+#include <memory/dma_memory.h>
+#include <memory/kmalloc.h>
 #include <jtag.h>
 
 #include <cpu.h>
@@ -872,15 +873,16 @@ extern char __text_end;
 
 static void print_memory_map(void)
 {
-  uint64_t dma_start = dma_area_get_start_addr();
-  uint64_t dma_end = dma_area_get_end_addr();
+  uint64_t dma_start = dma_memory_get_start_addr();
+  uint64_t dma_end = dma_memory_get_end_addr();
   uint64_t bss_start = (uint64_t)&__bss_start;
   uint64_t bss_end   = (uint64_t)&__bss_end;
   uint64_t text_start = (uint64_t)&__text_start;
   uint64_t text_end   = (uint64_t)&__text_end;
-  printf(".text : [0x%016x:0x%016x]"__endline, text_start, text_end);
-  printf(".bss  : [0x%016x:0x%016x]"__endline, bss_start, bss_end);
-  printf("dma   : [0x%016x:0x%016x]"__endline, dma_start, dma_end);
+  printf(".text          : [0x%016x:0x%016x]"__endline, text_start, text_end);
+  printf(".bss           : [0x%016x:0x%016x]"__endline, bss_start, bss_end);
+  printf(".dma_memory    : [0x%016x:0x%016x]"__endline, dma_start, dma_end);
+  printf(".kernel_memory : [0x%016x:0x%016x]"__endline, __kernel_memory_start, __kernel_memory_end);
 }
 
 void UNUSED i2c_eeprom()
@@ -995,10 +997,26 @@ static void __attribute__((optimize("O3"))) UNUSED test_usb()
 
 void init1(void)
 {
+  char *buf;
   mbox_init();
+  kmalloc_init();
   // debug_init();
+  buf = kmalloc(1);
+  kfree(buf);
+  buf = kmalloc(2);
+  kfree(buf);
+  buf = kmalloc(3);
+  kfree(buf);
+  buf = kmalloc(4);
+  kfree(buf);
+  buf = kmalloc(5);
+  kfree(buf);
+  buf = kmalloc(14);
+  kfree(buf);
+  buf = kmalloc(31);
+  kfree(buf);
   gpio_set_init();
-  dma_area_init();
+  dma_memory_init();
   init_unhandled_exception_reporters();
   font_init_lib();
 }
@@ -1009,12 +1027,9 @@ void init2(void)
   init_consoles();
 }
 
-char vchiq_buf[4096] ALIGNED(4096);
-
 void main()
 {
   int ret;
-  uint32_t *vchiq_channel;
   init1();
 
 #ifdef CONFIG_HDMI
@@ -1025,9 +1040,6 @@ void main()
 
   init2();
   vchiq_init();
-  vchiq_channel = (uint32_t*)vchiq_buf;
-  mbox_init_vchiq(vchiq_channel);
-  printf("HElo");
 #ifdef ENABLE_UART_DOWNLOAD
   check_uart_download();
 #endif
@@ -1078,7 +1090,7 @@ void jtag_write_image_main(void)
   mbox_init();
   debug_init();
   gpio_set_init();
-  dma_area_init();
+  dma_memory_init();
   init_unhandled_exception_reporters();
   font_init_lib();
   init_uart(1);

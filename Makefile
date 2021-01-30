@@ -52,7 +52,7 @@ OBJS := \
 	jtag.o\
 	kernel_panic.o\
 	mutex.o\
-	malloc.o\
+	kmalloc.o\
 	percpu.o\
 	pipe.o\
 	power.o\

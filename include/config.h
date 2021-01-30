@@ -9,6 +9,7 @@
 // #define CONFIG_UART_MINI
 #define CONFIG_UART_PL011
 
+// #define CONFIG_EMMC_DEBUG
 // #define CONFIG_EMMC_DEBUG2
 
 #define CONFIG_DEBUG_LIST
@@ -35,7 +36,7 @@
 /* EL1 stack size is 1Mb */
 #define STACK_SIZE_EL1_LOG 20
 
-#define DMA_AREA_SIZE 65536
+#define DMA_MEMORY_SIZE 65536
 
 /* Compile with enabled image download via UART feature */
 #define ENABLE_UART_DOWNLOAD

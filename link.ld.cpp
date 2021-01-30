@@ -29,7 +29,7 @@
 
 #define MEMORY_SECTION\
   . = ALIGN(PAGE_SIZE);\
-  .kernel_memory (NOLOAD) : { malloc.o(.kernel_memory)}\
+  .kernel_memory (NOLOAD) : { kmalloc.o(.kernel_memory)}\
   __kernel_memory_start = ADDR(.kernel_memory);\
   __kernel_memory_end = __kernel_memory_start + SIZEOF(.kernel_memory);\
 

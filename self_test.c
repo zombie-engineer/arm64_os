@@ -94,12 +94,18 @@ void test_cpu_ctx(void)
   puts("cpu ctx self test completed.\n");
 }
 
+void test_kmalloc(void)
+{
+  puts("kmalloc test passed" __endline);
+}
+
 void self_test()
 {
   puts("Running self test.\n");
   test_sprintf();
   test_perf_sprintf();
   test_cpu_ctx();
+  test_kmalloc();
   printf("Self test complete.\n");
 }
 

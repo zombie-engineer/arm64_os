@@ -1,6 +1,8 @@
 #include <memory/dma_memory.h>
+#include <memory/chunk.h>
 #include <refs.h>
 #include <common.h>
+#include <math.h>
 #include <list.h>
 #include <config.h>
 
@@ -10,47 +12,26 @@ extern char __dma_memory_end;
 #define dma_memory_start (void *)&__dma_memory_start
 #define dma_memory_end   (void *)&__dma_memory_end
 
-struct chunk {
-  void *addr;
-  struct list_head list;
-};
-
-struct chunk_area {
-  struct chunk *chunks_table;
-  char *chunks_mem;
-  int chunk_sz_log;
-  int num_chunks;
-  struct list_head free_list;
-  struct list_head busy_list;
-};
-
 #define DMA_SIZE(__n) (ARRAY_SIZE(chunks_ ## __n) << __n)
-#define DMA_AREA_SIZE_4096 (DMA_AREA_SIZE - DMA_SIZE(6) - DMA_SIZE(7) - DMA_SIZE(9))
+#define DMA_MEMORY_SIZE_4096 (DMA_MEMORY_SIZE - DMA_SIZE(6) - DMA_SIZE(7) - DMA_SIZE(9))
 
-#define __CHUNK_GROUP(__chunk_sz_log, __num_chunks, __alignment)\
-  char chunk_mem_ ## __chunk_sz_log  [(1 <<__chunk_sz_log) * __num_chunks] SECTION(".dma_mem");\
-  static struct chunk chunk_hdr_ ## __chunk_sz_log  [1 << __chunk_sz_log] ALIGNED(__alignment)
 // SECTION(".bss")
 
-__CHUNK_GROUP(6 , 64, 64);
-__CHUNK_GROUP(7 , 64, 64);
-__CHUNK_GROUP(9 , 64, 1024);
-__CHUNK_GROUP(12, 64, 4096);
-__CHUNK_GROUP(19, 64, 4096);
+#define DMA_CHUNK_GROUP(__chunk_sz_log, __num_chunks, __alignment)\
+  __CHUNK_GROUP(__chunk_sz_log, __num_chunks, __alignment, ".dma_memory")
 
-#define __CHUNK(__chunk_sz_log) {\
-  .chunks_table = chunk_hdr_ ## __chunk_sz_log,\
-  .chunks_mem = chunk_mem_ ## __chunk_sz_log,\
-  .chunk_sz_log = __chunk_sz_log,\
-  .num_chunks = ARRAY_SIZE(chunk_hdr_ ## __chunk_sz_log),\
-}
+DMA_CHUNK_GROUP(6 , 64, 64);
+DMA_CHUNK_GROUP(7 , 64, 64);
+DMA_CHUNK_GROUP(9 , 64, 1024);
+DMA_CHUNK_GROUP(12, 64, 4096);
+DMA_CHUNK_GROUP(19, 64, 4096);
 
-static struct chunk_area chunk_areas[] = {
-    __CHUNK(6),
-    __CHUNK(7),
-    __CHUNK(9),
-    __CHUNK(12),
-    __CHUNK(19)
+static struct chunk_area dma_chunk_areas[] = {
+  __CHUNK(6),
+  __CHUNK(7),
+  __CHUNK(9),
+  __CHUNK(12),
+  __CHUNK(19)
 };
 
 static int logsize_to_area_idx[] = {
@@ -71,21 +52,6 @@ static int logsize_to_area_idx[] = {
   4, /* 262144 -> 524288 */
 };
 
-static inline int get_biggest_log2(int num)
-{
-  int res = 0;
-  int tmp;
-
-  tmp = num - 1;
-  while(tmp > 1) {
-    res++;
-    tmp >>= 1;
-  }
-  if ((tmp << res) < num)
-    res++;
-  return res;
-}
-
 static inline int chunk_area_get_szlog(struct chunk_area *a)
 {
   return a->chunk_sz_log;
@@ -104,8 +70,8 @@ static inline struct chunk *chunk_get_by_addr(void *addr, struct chunk_area **ch
   /*
    * First detect the right area
    */
-  for (i = 0; i < ARRAY_SIZE(chunk_areas); ++i) {
-    d = &chunk_areas[i];
+  for (i = 0; i < ARRAY_SIZE(dma_chunk_areas); ++i) {
+    d = &dma_chunk_areas[i];
     base_addr += d->num_chunks << chunk_area_get_szlog(d);
     if ((uint64_t)addr <= base_addr)
       break;
@@ -131,7 +97,7 @@ static inline struct chunk_area *chunk_area_get_by_sz(int sz)
     return NULL;
   }
 
-  return &chunk_areas[logsize_to_area_idx[logsz - 5 - 1]];
+  return &dma_chunk_areas[logsize_to_area_idx[logsz - 5 - 1]];
 }
 
 uint64_t dma_memory_get_start_addr(void)
@@ -172,8 +138,8 @@ void dma_memory_init(void)
   struct chunk *c, *c_end;
   char *chunk_mem;
 
-  ca = chunk_areas;
-  ca_end = ca + ARRAY_SIZE(chunk_areas);
+  ca = dma_chunk_areas;
+  ca_end = ca + ARRAY_SIZE(dma_chunk_areas);
 
   for (; ca < ca_end; ca++) {
     INIT_LIST_HEAD(&ca->free_list);
