@@ -5,6 +5,7 @@
 #include <math.h>
 #include <common.h>
 #include <bitmap.h>
+#include <stringlib.h>
 
 char kernel_memory[16 * 1024 * 1024] SECTION(".kernel_memory");
 
@@ -61,6 +62,8 @@ DECL_MALLOC_DESC(9 , 256);
 DECL_MALLOC_DESC(10, 256);
 DECL_MALLOC_DESC(11, 256);
 DECL_MALLOC_DESC(12, 256);
+DECL_MALLOC_DESC(13, 64);
+DECL_MALLOC_DESC(19, 32);
 
 struct kmalloc_descriptor *kmalloc_all_descriptors[] = {
   &kmalloc_descriptor3,
@@ -73,6 +76,8 @@ struct kmalloc_descriptor *kmalloc_all_descriptors[] = {
   &kmalloc_descriptor10,
   &kmalloc_descriptor11,
   &kmalloc_descriptor12,
+  &kmalloc_descriptor13,
+  &kmalloc_descriptor19,
 };
 
 struct kmalloc_descriptor *kmalloc_descriptors[] = {
@@ -89,15 +94,28 @@ struct kmalloc_descriptor *kmalloc_descriptors[] = {
   &kmalloc_descriptor10,
   &kmalloc_descriptor11,
   &kmalloc_descriptor12,
+  &kmalloc_descriptor13,
+  &kmalloc_descriptor19,
+  &kmalloc_descriptor19,
+  &kmalloc_descriptor19,
+  &kmalloc_descriptor19,
+  &kmalloc_descriptor19,
+  &kmalloc_descriptor19,
 };
 
-void *kmalloc(size_t size)
+void *kmalloc(size_t size, int flags)
 {
   int logsz = get_biggest_log2(size);
+  void *result;
 
   if (logsz >= ARRAY_SIZE(kmalloc_descriptors))
     return ERR_PTR(ERR_NO_RESOURCE);
-  return kmalloc_common(kmalloc_descriptors[logsz]);
+  result = kmalloc_common(kmalloc_descriptors[logsz]);
+  if (!IS_ERR(result)) {
+    if (flags & GFP_ZERO)
+      memset(result, 0, size);
+  }
+  return result;
 }
 
 static inline bool addr_in_range(char *addr, char *start, char *end)
