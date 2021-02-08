@@ -43,7 +43,5 @@ extern char __download_image_end;
 void jtag_write_image_to_sd(void)
 {
   write_image_to_sd("/u-boot.bin", &__download_image_start, &__download_image_end);
-  while(1)
-    asm volatile("hlt #0");
 }
 #endif
