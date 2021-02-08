@@ -413,12 +413,14 @@ void mmu_self_test(void)
 {
   mmu_print_va(0, 0);
   mmu_print_va(0x80000, 0);
+  mmu_print_va(0x80000, 0);
+  mmu_print_va(0x04935000, 0);
   mmu_print_va(0x3f000000, 0);
   mmu_print_va(0x3fffffff, 0);
   mmu_print_va(0x40000000, 0);
   mmu_print_va(0x40000040, 0);
   mmu_print_va(0x013d2000, 0);
-  mmu_print_va(0xb64400, 0);
+  mmu_print_va(0x00b64400, 0);
 }
 
 #define DECL_RANGE(__start, __num, __memattr, __sh) \
@@ -448,7 +450,7 @@ void mmu_init(void)
   int pg_dma_off  = pg_norm_num;
   int pg_dma_num  = dma_memory_get_end_addr() / MMU_PAGE_GRANULE - pg_dma_off;
 
-  int pg_shar_off = pg_dma_off + pg_norm_num;
+  int pg_shar_off = pg_dma_off + pg_dma_num;
   int pg_shar_num = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE - pg_shar_off;
 
   int pg_peri_off = PERIPHERAL_ADDR_RANGE_START / MMU_PAGE_GRANULE;
