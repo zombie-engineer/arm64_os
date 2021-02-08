@@ -5,6 +5,7 @@
 #include <math.h>
 #include <list.h>
 #include <config.h>
+#include <stringlib.h>
 
 extern char __dma_memory_start;
 extern char __dma_memory_end;
@@ -119,6 +120,7 @@ void *dma_alloc(int sz)
   c = list_first_entry(&a->free_list, struct chunk, list);
   list_del(&c->list);
   list_add_tail(&c->list, &a->busy_list);
+  memset(c->addr, 0, sz);
   return c->addr;
 }
 
