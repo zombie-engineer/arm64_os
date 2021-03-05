@@ -11,7 +11,6 @@
 #include <spinlock.h>
 #include <emmc.h>
 #include <fs/fs.h>
-#include <vchiq.h>
 #include <i2c.h>
 #include <font.h>
 #include <vcanvas.h>
@@ -882,7 +881,7 @@ static void print_memory_map(void)
   printf(".text          : [0x%016x:0x%016x]"__endline, text_start, text_end);
   printf(".bss           : [0x%016x:0x%016x]"__endline, bss_start, bss_end);
   printf(".dma_memory    : [0x%016x:0x%016x]"__endline, dma_start, dma_end);
-  printf(".kernel_memory : [0x%016x:0x%016x]"__endline, __kernel_memory_start, __kernel_memory_end);
+  printf(".kernel_memory : [0x%016x:0x%016x]"__endline, &__kernel_memory_start, &__kernel_memory_end);
 }
 
 void UNUSED i2c_eeprom()
@@ -997,24 +996,9 @@ static void __attribute__((optimize("O3"))) UNUSED test_usb()
 
 void init1(void)
 {
-  char *buf;
   mbox_init();
   kmalloc_init();
   // debug_init();
-  buf = kmalloc(1);
-  kfree(buf);
-  buf = kmalloc(2);
-  kfree(buf);
-  buf = kmalloc(3);
-  kfree(buf);
-  buf = kmalloc(4);
-  kfree(buf);
-  buf = kmalloc(5);
-  kfree(buf);
-  buf = kmalloc(14);
-  kfree(buf);
-  buf = kmalloc(31);
-  kfree(buf);
   gpio_set_init();
   dma_memory_init();
   init_unhandled_exception_reporters();
@@ -1039,7 +1023,6 @@ void main()
 #endif
 
   init2();
-  vchiq_init();
 #ifdef ENABLE_UART_DOWNLOAD
   check_uart_download();
 #endif
@@ -1053,10 +1036,6 @@ void main()
   print_mbox_props();
   // usbd_init();
   // usbd_print_device_tree();
-#ifndef CONFIG_QEMU
-  // init_nokia5110_display(1, 0);
-  // nokia5110_draw_text("Display ready", 0, 0);
-#endif
   cm_print_clocks();
 
   test_mmio_dma(false, false);
@@ -1084,6 +1063,14 @@ void main()
   while(1);
 }
 
+void reboot()
+{
+  write_reg(0x3f100024, (0x5a << 24) | 1);
+  write_reg(0x3f10001c, (0x5a << 24) | 0x20);
+  puts("rebooting..."__endline);
+  while(1) asm volatile("wfe");
+}
+
 #if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
 void jtag_write_image_main(void)
 {
@@ -1096,5 +1083,6 @@ void jtag_write_image_main(void)
   init_uart(1);
   init_consoles();
   jtag_write_image_to_sd();
+  reboot();
 }
 #endif

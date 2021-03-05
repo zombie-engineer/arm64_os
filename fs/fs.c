@@ -138,7 +138,7 @@ void fs_probe_early(void)
 }
 
 
-#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+// #if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
 
 struct mbr write_image_dev_mbr ALIGNED(8);
 struct partition_device write_image_dev ALIGNED(8);
@@ -240,4 +240,4 @@ int write_image_to_sd(const char *filename, char *image_start, char *image_end)
   return ctx.err;
 }
 
-#endif
+//#endif
