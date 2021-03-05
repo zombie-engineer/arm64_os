@@ -2,6 +2,7 @@
 #include <delays.h>
 #include <debug.h>
 #include <irq.h>
+#include <vchiq.h>
 #include <sched.h>
 #include <intr_ctl.h>
 #include <uart/uart.h>
@@ -140,9 +141,10 @@ void scheduler_second_cpu_startup(int cpu_n)
 int init_func(void)
 {
   SCHED_DEBUG("starting init function");
-  BUG(run_uart_thread()        != ERR_OK, "failed to run uart_thread");
-  BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
-  BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
+  BUG(run_uart_thread()           != ERR_OK, "failed to run uart_thread");
+  BUG(vchiq_init()                != ERR_OK, "failed to start vchiq");
+  // BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
+  // BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   scheduler_second_cpu_startup(1);
   scheduler_second_cpu_startup(2);
   scheduler_second_cpu_startup(3);
