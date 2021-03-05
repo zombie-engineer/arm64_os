@@ -98,17 +98,10 @@ int uart_subscribe_to_rx_event(uart_rx_event_cb cb, void *priv)
   return _uart_subscribe_to_rx_event(cb, priv);
 }
 
-//#ifdef ENABLE_UART_DOWNLOAD
+#ifdef ENABLE_UART_DOWNLOAD
 void check_uart_download(void)
 {
   char c;
-  while(1) {
-    putc('.');
-    c = uart_recv();
-    putc(',');
-    uart_send(c);
-    uart_send('-');
-  }
   if (uart_rx_not_empty()) {
     c = uart_recv();
     if (c == 'd') {
@@ -116,9 +109,6 @@ void check_uart_download(void)
       while(1) asm volatile ("wfe");
     }
   }
-  else {
-    printf("not hello\r\n");
-      while(1) asm volatile ("wfe");
-  }
+  printf("Skipping uart download stage" __endline);
 }
-//#endif
+#endif
