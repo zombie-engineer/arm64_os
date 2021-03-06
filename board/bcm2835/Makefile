@@ -31,12 +31,13 @@ OBJS_BOARD_BCM2835 := bcm2835_arm_timer \
 	emmc/emmc_cmd \
 	emmc/emmc_initialize \
 	emmc/emmc_utils \
-	bcm2835-camera/bcm2835-camera \
 	bcm2835_systimer \
 	bcm2835_gpio \
 	bcm2835_gpio_access \
 	i2c_master \
 	bsc_slave
+
+#	bcm2835-camera/bcm2835-camera \
 
 
 DIRPATH := board/bcm2835
