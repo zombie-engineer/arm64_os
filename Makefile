@@ -182,7 +182,7 @@ qemuat:
 # JTAG
 .PHONY: j
 j:
-	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg
+	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg --log_output openocd-jtag.log &
 # with debug trace	/mnt/ssd240/openocd-code/src/openocd -d -f openocd-jtag.cfg
 
 # JTAG gdb
