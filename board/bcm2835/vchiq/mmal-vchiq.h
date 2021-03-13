@@ -118,7 +118,7 @@ int vchiq_mmal_component_finalise(
 		struct vchiq_mmal_instance *instance,
 		struct vchiq_mmal_component *component);
 
-int vchiq_mmal_component_enable(
+int vchiq_mmal_component_enable2(
 		struct vchiq_mmal_instance *instance,
 		struct vchiq_mmal_component *component);
 

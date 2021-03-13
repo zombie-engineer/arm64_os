@@ -1936,7 +1936,7 @@ int vchiq_mmal_component_finalise(struct vchiq_mmal_instance *instance,
 /*
  * cause a mmal component to be enabled
  */
-int vchiq_mmal_component_enable(struct vchiq_mmal_instance *instance,
+int vchiq_mmal_component_enable2(struct vchiq_mmal_instance *instance,
 				struct vchiq_mmal_component *component)
 {
 	int ret;

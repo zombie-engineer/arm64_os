@@ -57,8 +57,9 @@
 #ifndef _UAPI__LINUX_VIDEODEV2_H
 #define _UAPI__LINUX_VIDEODEV2_H
 
-#include "v4l2-common.h"
-#include "v4l2-controls.h"
+#include <types.h>
+// #include "v4l2-common.h"
+// #include "v4l2-controls.h"
 
 /*
  * Common stuff for both V4L1 and V4L2
@@ -66,7 +67,6 @@
  */
 #define VIDEO_MAX_FRAME               32
 #define VIDEO_MAX_PLANES               8
-#define __user
 
 /*
  *	M I S C E L L A N E O U S
@@ -81,17 +81,6 @@
 #define V4L2_FOURCC_CONV_ARGS(fourcc) \
 	(fourcc) & 0x7f, ((fourcc) >> 8) & 0x7f, ((fourcc) >> 16) & 0x7f, \
 	((fourcc) >> 24) & 0x7f, (fourcc) & BIT(31) ? "-BE" : ""
-
-
-struct timespec {
-  uint64_t sec;
-  uint64_t nsec;
-};
-
-struct timeval {
-  uint64_t sec;
-  uint64_t nsec;
-};
 
 /*
  *	E N U M S
@@ -957,8 +946,8 @@ struct v4l2_buffer {
 	uint32_t			bytesused;
 	uint32_t			flags;
 	uint32_t			field;
-	struct timeval		timestamp;
-	struct v4l2_timecode	timecode;
+//	struct timeval		timestamp;
+//	struct v4l2_timecode	timecode;
 	uint32_t			sequence;
 
 	/* memory location */
@@ -1075,16 +1064,16 @@ struct v4l2_framebuffer {
 
 struct v4l2_clip {
 	struct v4l2_rect        c;
-	struct v4l2_clip	__user *next;
+	struct v4l2_clip	*next;
 };
 
 struct v4l2_window {
 	struct v4l2_rect        w;
 	uint32_t			field;	 /* enum v4l2_field */
 	uint32_t			chromakey;
-	struct v4l2_clip	__user *clips;
+	struct v4l2_clip	*clips;
 	uint32_t			clipcount;
-	void			__user *bitmap;
+	void			*bitmap;
 	uint8_t                    global_alpha;
 };
 
@@ -1612,11 +1601,11 @@ struct v4l2_ext_control {
 	union {
 		int32_t value;
 		int64_t value64;
-		char __user *string;
-		uint8_t __user *p_u8;
-		uint16_t __user *p_u16;
-		uint32_t __user *p_u32;
-		void __user *ptr;
+		char *string;
+		uint8_t *p_u8;
+		uint16_t *p_u16;
+		uint32_t *p_u32;
+		void *ptr;
 	};
 } __attribute__ ((packed));
 
@@ -2266,7 +2255,7 @@ struct v4l2_event {
 	} u;
 	uint32_t				pending;
 	uint32_t				sequence;
-	struct timespec			timestamp;
+//	struct timespec			timestamp;
 	uint32_t				id;
 	uint32_t				reserved[8];
 };
