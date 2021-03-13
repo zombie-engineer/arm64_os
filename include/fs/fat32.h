@@ -2,6 +2,7 @@
 #include <block_device.h>
 #include <compiler.h>
 #include <mem_access.h>
+#include <common.h>
 
 #define FAT32_ENTRY_SIZE 4
 #define FAT32_ENTRY_SIZE_LOG 2
@@ -113,16 +114,21 @@ static inline struct fat_dentry *fat32_dentry_next(
       continue;
     }
 
-    if (fat32_dentry_is_valid(d)) {
-      if (fat32_dentry_is_deleted(d)) {
-        *first_lfn = 0;
-        continue;
-      }
-      return d;
+    if (fat32_dentry_is_deleted(d)) {
+      *first_lfn = 0;
+      continue;
     }
+
+    if (fat32_dentry_is_valid(d))
+      return d;
 
     if (fat32_dentry_is_end_mark(d))
       return 0;
+
+    /* ?? invalid record */
+    puts("fat32_dentry_next: found invalid dentry record:" __endline);
+    hexdump_memory_ex("--", 32, d, sizeof(*d));
+    *first_lfn = 0;
   }
   return d;
 }
