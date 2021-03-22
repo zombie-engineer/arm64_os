@@ -134,11 +134,13 @@ void dma_free(void *addr)
   list_add(&c->list, &a->free_list);
 }
 
-void dma_memory_init(void)
+void OPTIMIZED dma_memory_init(void)
 {
   struct chunk_area *ca, *ca_end;
   struct chunk *c, *c_end;
   char *chunk_mem;
+  uint64_t t;
+  t = get_boottime_msec();
 
   ca = dma_chunk_areas;
   ca_end = ca + ARRAY_SIZE(dma_chunk_areas);
@@ -157,4 +159,6 @@ void dma_memory_init(void)
       chunk_mem += (1 << ca->chunk_sz_log);
     }
   }
+  t = get_boottime_msec() - t;
+  printf("dma_memory_init complete. took %lldms"__endline, t);
 }
