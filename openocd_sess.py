@@ -6,6 +6,9 @@ import sys
 
 from telnetlib import Telnet
 ENCODING = 'utf-8'
+HOST = 'localhost'
+PORT = 4444
+PI_NUM_CORES = 4
 
 class telnet_client:
     def __init__(self, t):
@@ -40,11 +43,11 @@ def tn_wait_for_regex(t, pattern, do_print=True):
         if m:
             break
 
+def wait_ready(t):
+    for i in range(PI_NUM_CORES):
+        tn_wait_for_regex(t, '.*hardware has.*breakpoints,.*watchpoints')
 
-def run_telnet():
-    num_cores = 4
-    print('Running telnet session')
-    t = telnet_client(Telnet('localhost', 4444))
+def cmd_update(t):
     t.write('targets')
     tn_wait_for_line(t, '')
     t_write_start = time.time()
@@ -55,9 +58,7 @@ def run_telnet():
     tn_wait_for_regex(t, '.*Invalid ACK.*in DAP response')
     t_sdcard_write_end = time.time()
     t_reboot_time_start = t_sdcard_write_end
-    for i in range(num_cores):
-        tn_wait_for_regex(t, '.*hardware has.*breakpoints,.*watchpoints')
-        print('matching {}'.format(i))
+    wait_ready(t)
     t_reboot_time_end = time.time()
 
     image_to_mem_time = t_write_end - t_write_start
@@ -69,10 +70,30 @@ def run_telnet():
     print('PI reboot time   : {} sec'.format(reboot_time))
     print('Total update time: {} sec'.format(total_time))
 
-def main(cmd):
-    print(cmd)
-    run_telnet()
+def cmd_reboot(t):
+    t.write('pi_reboot')
+    wait_ready(t)
+    t.write('reset init')
 
+class Pi:
+    def __init__(self, t):
+        self.__t = t
+
+    def update(self):
+        return cmd_update(self.__t)
+    def reboot(self):
+        return cmd_reboot(self.__t)
+
+    def cmd(self, cmd):
+        return {
+                'up' : self.update,
+                're' : self.reboot
+                }[cmd]()
+
+
+def main(cmd):
+    t = telnet_client(Telnet(HOST, PORT))
+    Pi(t).cmd(cmd)
 
 if __name__ == '__main__':
     cmd = sys.argv[1]
