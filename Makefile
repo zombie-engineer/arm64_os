@@ -195,9 +195,15 @@ jd:
 jt:
 	telnet localhost 4444
 
+jr:
+	./openocd_sess.py re
+
+ju:
+	./openocd_sess.py up
+
 .PHONY: serial
 serial:
-	minicom -b 115200 -D /dev/ttyUSB0 -C uart_capture_$$(date +%S).bin
+	minicom -b 115200 -D /dev/ttyUSB1 -C uart_capture_$$(date +%S).bin
 
 .PHONY: clean
 clean:
