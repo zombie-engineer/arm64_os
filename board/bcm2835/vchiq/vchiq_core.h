@@ -410,6 +410,11 @@ typedef struct vchiq_shared_state_struct {
 	** released. */
 	REMOTE_EVENT_T sync_release;
 
+	atomic_t trigger_waitflag;
+	atomic_t recycle_waitflag;
+	atomic_t sync_trigger_waitflag;
+	atomic_t sync_release_waitflag;
+
 	/* A circular buffer of slot indexes. */
 	int slot_queue[VCHIQ_MAX_SLOTS_PER_SIDE];
 

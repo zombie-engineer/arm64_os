@@ -55,12 +55,15 @@
 #include "videodev2.h"
 #include <delays.h>
 #include "vc_sm_defs.h"
+#include <intr_ctl.h>
+#include <sched.h>
+#include <irq.h>
 
 #define TOTAL_SLOTS (VCHIQ_SLOT_ZERO_SLOTS + 2 * 32)
 #define MAX_FRAGMENTS (VCHIQ_NUM_CURRENT_BULKS * 2)
 
-#define BELL0	0x00
-#define BELL2	0x08
+// #define BELL0	0x00
+// #define BELL2	0x08
 
 #define VCHIQ_ARM_ADDRESS(x) ((void *)((char *)x + RAM_BASE_BUS_UNCACHED))
 #define VCHIQ_MMAL_MAX_COMPONENTS 64
@@ -78,8 +81,8 @@ typedef struct vchiq_2835_state_struct {
 
 extern int vchiq_arm_log_level;
 
-static irqreturn_t
-vchiq_doorbell_irq(int irq, void *dev_id);
+// static irqreturn_t
+//vchiq_doorbell_irq(int irq, void *dev_id);
 
 #define MAX_PORT_COUNT 4
 
@@ -294,12 +297,13 @@ void vchiq_event_signal(struct remote_event_struct *event)
     vchiq_ring_bell();
 }
 
-void vchiq_event_wait(struct remote_event_struct *event)
+void vchiq_event_wait(atomic_t *waitflag, struct remote_event_struct *event)
 {
   if (!event->fired) {
     event->armed = 1;
     dsb();
-    while (!event->fired);
+    wait_on_waitflag(waitflag);
+    BUG(!event->fired, "wait finished but event not fired");
     event->armed = 0;
     wmb();
   }
@@ -387,7 +391,7 @@ struct vchiq_service_common *vchiq_handmade_open_sm_cma_service(struct vchiq_sta
 
   vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, 0, 0, &open_payload, sizeof(open_payload));
   vchiq_event_signal(&s->remote->trigger);
-  vchiq_event_wait(&s->local->trigger);
+  vchiq_event_wait(&s->local->trigger_waitflag, &s->local->trigger);
 
   h = vchiq_get_next_header_rx(s);
   if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
@@ -423,7 +427,7 @@ int vchiq_handmade_open_mmal(struct vchiq_state_struct *s, struct vchiq_service_
 
   vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, 0, 0, &open_payload, sizeof(open_payload));
   vchiq_event_signal(&s->remote->trigger);
-  vchiq_event_wait(&s->local->trigger);
+  vchiq_event_wait(&s->local->trigger_waitflag, &s->local->trigger);
 
   h = vchiq_get_next_header_rx(s);
   if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
@@ -452,15 +456,17 @@ void vchiq_mmal_fill_header(struct vchiq_service_common *ms, int mmal_msg_type, 
   msg->h.type = mmal_msg_type;
 }
 
-#define VCHIQ_MMAL_MSG_DECL(__ms, __msg_type, __mmal_msg_type, __msg_u, __msg_u_reply) \
-  struct mmal_msg msg; \
-  struct vchiq_header_struct *_h; \
+#define VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __msg_type, __mmal_msg_type, __msg_u) \
+  struct mmal_msg msg = { 0 }; \
   struct vchiq_service_common *_ms = __ms; \
   const int msg_type = VCHIQ_MSG_ ## __msg_type; \
   const int mmal_msg_type = MMAL_MSG_TYPE_ ## __mmal_msg_type; \
-  struct mmal_msg_ ## __msg_u *m = &msg.u. __msg_u; \
-  struct mmal_msg_ ## __msg_u_reply *r; \
-  memset(&msg, 0, sizeof(msg));
+  struct mmal_msg_ ## __msg_u *m = &msg.u. __msg_u
+
+#define VCHIQ_MMAL_MSG_DECL(__ms, __msg_type, __mmal_msg_type, __msg_u, __msg_u_reply) \
+  VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __msg_type, __mmal_msg_type, __msg_u); \
+  struct vchiq_header_struct *_h; \
+  struct mmal_msg_ ## __msg_u_reply *r;
 
 #define VCHIQ_MMAL_MSG_COMMUNICATE_ASYNC() \
   vchiq_mmal_fill_header(_ms, mmal_msg_type, &msg); \
@@ -470,7 +476,7 @@ void vchiq_mmal_fill_header(struct vchiq_service_common *ms, int mmal_msg_type, 
 
 #define VCHIQ_MMAL_MSG_COMMUNICATE_SYNC() \
   VCHIQ_MMAL_MSG_COMMUNICATE_ASYNC(); \
-  vchiq_event_wait(&_ms->s->local->trigger); \
+  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &_ms->s->local->trigger); \
   _h = vchiq_get_next_header_rx(_ms->s); \
   r = vchiq_mmal_check_reply_msg(_h, msg_type, mmal_msg_type); \
   if (!r) { \
@@ -782,7 +788,7 @@ int vchiq_bulk_rx(struct vchiq_mmal_component *c, uint32_t bufaddr, uint32_t buf
 
   vchiq_handmade_prep_msg(c->ms->s, VCHIQ_MSG_BULK_RX, c->ms->localport, c->ms->remoteport, payload, sizeof(payload));
   vchiq_event_signal(&c->ms->s->remote->trigger);
-  vchiq_event_wait(&c->ms->s->local->trigger);
+  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
 
   h = vchiq_get_next_header_rx(c->ms->s);
   if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_BULK_RX_DONE) {
@@ -827,7 +833,7 @@ int vchiq_mmal_buffer_to_host(struct vchiq_mmal_component *c)
   struct vchiq_header_struct *h;
   struct mmal_msg_buffer_from_host *r;
 
-  vchiq_event_wait(&c->ms->s->local->trigger);
+  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
   h = vchiq_get_next_header_rx(c->ms->s);
   r = vchiq_mmal_check_reply_msg(h, VCHIQ_MSG_DATA, MMAL_MSG_TYPE_BUFFER_TO_HOST);
   if (!r) {
@@ -840,8 +846,7 @@ int vchiq_mmal_buffer_to_host(struct vchiq_mmal_component *c)
 
 int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b)
 {
-  int err;
-  VCHIQ_MMAL_MSG_DECL(p->component->ms, DATA, BUFFER_FROM_HOST, buffer_from_host, buffer_from_host);
+  VCHIQ_MMAL_MSG_DECL_ASYNC(p->component->ms, DATA, BUFFER_FROM_HOST, buffer_from_host);
 
   memset(m, 0xbc, sizeof(*m));
 
@@ -877,23 +882,7 @@ int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b
   m->payload_in_message = 0;
 
   VCHIQ_MMAL_MSG_COMMUNICATE_ASYNC();
-  wait_msec(100);
-  if (!_ms->s->local->trigger.fired)
-    return ERR_OK;
   return ERR_OK;
-  vchiq_event_wait(&_ms->s->local->trigger);
-  _h = vchiq_get_next_header_rx(_ms->s);
-  r = vchiq_mmal_check_reply_msg(_h, VCHIQ_MSG_DATA, MMAL_MSG_TYPE_BUFFER_TO_HOST);
-  if (!r) {
-    MMAL_ERR("invalid reply");
-    return ERR_GENERIC;
-  }
-  if (r->buffer_header.length == 0 || r->payload_in_message) {
-    kernel_panic("if (r->length == 0 || r->payload_in_message)");
-  }
-  if (!r->is_zero_copy)
-    err = vchiq_bulk_rx(p->component, (uint32_t)(uint64_t)b->buffer | 0xc0000000, b->buffer_size);
-  return err;
 }
 
 int vchiq_mmal_component_enable(struct vchiq_mmal_component *c)
@@ -909,7 +898,7 @@ int vchiq_mmal_component_enable(struct vchiq_mmal_component *c)
   vchiq_handmade_prep_msg(c->ms->s, VCHIQ_MSG_DATA, c->ms->localport, c->ms->remoteport, &msg,
     sizeof(struct mmal_msg_header) + sizeof(msg.u.port_action_port));
   vchiq_event_signal(&c->ms->s->remote->trigger);
-  vchiq_event_wait(&c->ms->s->local->trigger);
+  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
   header = vchiq_get_next_header_rx(c->ms->s);
   r = vchiq_mmal_check_reply_msg(header, VCHIQ_MSG_DATA, MMAL_MSG_TYPE_COMPONENT_ENABLE);
   if (!r) {
@@ -1055,7 +1044,7 @@ static int vc_sm_cma_vchi_send_msg(struct vchiq_service_common *ms,
 
   vchiq_handmade_prep_msg(ms->s, VCHIQ_MSG_DATA, ms->localport, ms->remoteport, hdr, msg_size + sizeof(*hdr));
   vchiq_event_signal(&ms->s->remote->trigger);
-  vchiq_event_wait(&ms->s->local->trigger);
+  vchiq_event_wait(&ms->s->local->trigger_waitflag, &ms->s->local->trigger);
 
   h = vchiq_get_next_header_rx(ms->s);
   if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_DATA) {
@@ -1560,11 +1549,116 @@ out_err:
   return ERR_PTR(err);
 }
 
+static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
+static struct task *vchiq_task = NULL;
+static struct vchiq_state_struct *vchiq_state = NULL;
+
+#define BELL0 ((reg32_t)(0x3f00b840))
+
+static inline void vchiq_check_event(atomic_t *waitflag, struct remote_event_struct *e)
+{
+  if (e->armed && e->fired)
+    wakeup_waitflag(waitflag);
+}
+
+static void vchiq_check_local_events()
+{
+  struct vchiq_shared_state_struct *local;
+  local = vchiq_state->local;
+  vchiq_check_event(&local->trigger_waitflag, &local->trigger);
+  vchiq_check_event(&local->recycle_waitflag, &local->recycle);
+  vchiq_check_event(&local->sync_trigger_waitflag, &local->sync_trigger);
+  vchiq_check_event(&local->sync_release_waitflag, &local->sync_release);
+}
+
+static void vchiq_irq_handler(void)
+{
+  uint32_t bell_reg;
+  vchiq_events++;
+
+  /*
+   * This is a very specific undocumented part of vchiq IRQ
+   * handling code, taken as is from linux kernel.
+   * BELL0 register is obviously a clear-on-read, once we
+   * read the word at this address, the second read shows
+   * zero, thus this is a clear-on-read.
+   * Mostly in this code path bell_reg will read 0x5 in the
+   * next line. And bit 3 (1<<3 == 4) means the bell was rung
+   * on the VC side.
+   * This thread discusses the documentation for this register:
+   * https://www.raspberrypi.org/forums/viewtopic.php?f=72&t=280271&p=1830423&hilit=doorbell#p1830423
+   * The thread ends with the understanding that this register is very specific to VCHIQ and is
+   * not documented anywhere, so waste your time on your own risk.
+   *
+   * Anyways, the architecture of event handling is this:
+   * VideoCore has a couple of situations when it wants to send signals to us:
+   * 1. It needs us to recycle some old messages that waste queue space.
+   * 2. It wants to send us some message.
+   * All of which is done via special events in the zero slot.
+   * For recycling 'recycle_event' is used.
+   * For messages 'trigger_event' is used.
+   * I don't know how sync_event is used, might be for other kind of messages.
+   * To signal one of these events VideoCore sets event->fired = 1, and then writes something to BELL0,
+   * which is 0x3f00b840 on Raspberry PI 3B+.
+   * Writing to this address triggers IRQ Exception in one of the CPU cores, which one depends on where
+   * peripheral interrupts are routed. IRQ will only get triggered if DOORBELL0 iterrupts are enabled
+   * in bcm interrupt controller, the one on 0x3f00b200. To enable it set bit 2 in
+   * base interrupt enable register 0x3f00b218.
+   * DOORBELL 0 has irq number 66 in irq_table. The meaning of 66 is this:
+   *    there are 64 GPU interrupts that are in 2 32bit registers pending(0x204,0x208),
+   *    enable(0x210,0x214), etc, so they have numbers 0-63.
+   *    next number 64 is basic pending register bit 0, 65, is basic bit 1, and the
+   *    doorbell 0 is basic bit 2, thus 64+2 = 66.
+   */
+  bell_reg = read_reg(BELL0);
+  if (bell_reg & 4)
+    vchiq_check_local_events();
+}
+
+static int vchiq_loop_thread(void)
+{
+  uint64_t last_events = vchiq_events;
+  uint64_t new_events;
+
+  while(1) {
+    if (last_events != vchiq_events)
+      yield();
+    new_events = vchiq_events - last_events;
+    if (new_events) {
+      MMAL_INFO("new events: %ld", new_events);
+      last_events = vchiq_events;
+    }
+  }
+  return ERR_OK;
+}
+
+static int vchiq_start_thread(struct vchiq_state_struct *s)
+{
+  int err;
+
+  vchiq_state = s;
+  irq_set(0, INTR_CTL_IRQ_ARM_DOORBELL_0, vchiq_irq_handler);
+  intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_DOORBELL_0);
+  vchiq_task = task_create(vchiq_loop_thread, "vchiq_loop_thread");
+  CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
+  sched_queue_runnable_task(get_scheduler(), vchiq_task);
+
+  return ERR_OK;
+
+out_err:
+  vchiq_task = NULL;
+  intr_ctl_arm_irq_disable(INTR_CTL_IRQ_ARM_DOORBELL_0);
+  irq_set(0, INTR_CTL_IRQ_ARM_DOORBELL_0, 0);
+  return err;
+}
+
 void vchiq_handmade(struct vchiq_state_struct *s, struct vchiq_slot_zero_struct *z)
 {
   int err;
   struct vchiq_service_common *ms, *mem_service;
 
+  err = vchiq_start_thread(s);
+  CHECK_ERR("failed to start vchiq async primitives");
   ms = vchiq_mmal_service_run(s);
   CHECK_ERR_PTR(ms, "failed to run mmal service");
 
@@ -1779,26 +1873,26 @@ vchiq_platform_handle_timeout(VCHIQ_STATE_T *state)
  * Local functions
  */
 
-static irqreturn_t
-vchiq_doorbell_irq(int irq, void *dev_id)
-{
-#define IRQ_NONE 0
-#define IRQ_HANDLED 1
-#define IRQ_WAKE_THREAD 2
-	VCHIQ_STATE_T *state = dev_id;
-	irqreturn_t ret = IRQ_NONE;
-	unsigned int status;
-
-	/* Read (and clear) the doorbell */
-	status = read_reg(g_regs + BELL0);
-
-	if (status & 0x4) {  /* Was the doorbell rung? */
-		remote_event_pollall(state);
-		ret = IRQ_HANDLED;
-	}
-
-	return ret;
-}
+//static irqreturn_t
+//vchiq_doorbell_irq(int irq, void *dev_id)
+//{
+//#define IRQ_NONE 0
+//#define IRQ_HANDLED 1
+//#define IRQ_WAKE_THREAD 2
+//	VCHIQ_STATE_T *state = dev_id;
+//	irqreturn_t ret = IRQ_NONE;
+//	unsigned int status;
+//
+//	/* Read (and clear) the doorbell */
+//	status = read_reg(g_regs + BELL0);
+//
+//	if (status & 0x4) {  /* Was the doorbell rung? */
+//		remote_event_pollall(state);
+//		ret = IRQ_HANDLED;
+//	}
+//
+//	return ret;
+//}
 
 /* There is a potential problem with partial cache lines (pages?)
 ** at the ends of the block when reading. If the CPU accessed anything in
