@@ -251,7 +251,7 @@ struct mmal_msg_port_action_reply {
  * Signals a buffer which is the snapshot/postview image from a stills
  * capture
  */
-#define MMAL_BUFFER_HEADER_FLAGS_SNAPSHOT              BIT(8)
+#define MMAL_BUFFER_HEADER_FLAG_SNAPSHOT               BIT(8)
 /* Signals a buffer which contains data known to be corrupted */
 #define MMAL_BUFFER_HEADER_FLAG_CORRUPTED              BIT(9)
 /* Signals that a buffer failed to be transmitted */

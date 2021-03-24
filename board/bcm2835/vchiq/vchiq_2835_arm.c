@@ -97,28 +97,9 @@ struct vchi_version {
   uint32_t version;
   uint32_t version_min;
 };
+
 #define VCHI_VERSION(v_) { v_, v_ }
 #define VCHI_VERSION_EX(v_, m_) { v_, m_ }
-
-// structure used to provide the information needed to open a server or a client
-//typedef struct {
-//  struct vchi_version version;
-//  int32_t service_id;
-//  VCHI_CONNECTION_T *connection;
-//  uint32_t rx_fifo_size;
-//  uint32_t tx_fifo_size;
-//  VCHI_CALLBACK_T callback;
-//  void *callback_param;
-//  /* client intends to receive bulk transfers of
-//  odd lengths or into unaligned buffers */
-//  int32_t want_unaligned_bulk_rx;
-//  /* client intends to transmit bulk transfers of
-//  odd lengths or out of unaligned buffers */
-//  int32_t want_unaligned_bulk_tx;
-//  /* client wants to check CRCs on (bulk) xfers.
-//  Only needs to be set at 1 end - will do both directions. */
-//  int32_t want_crc;
-//} SERVICE_CREATION_T;
 
 enum {
   COMP_CAMERA = 0,
@@ -135,7 +116,6 @@ enum {
   CAM_PORT_COUNT
 };
 #define MAX_SUPPORTED_ENCODINGS 20
-
 
 
 extern int vchiq_mmal_init(struct vchiq_mmal_instance **out_instance);
@@ -212,7 +192,7 @@ static const char *const mmal_msg_type_names[] = {
 static inline void *vchiq_check_reply_msg(struct vchiq_header_struct *h, int msg_type)
 {
   if (VCHIQ_MSG_TYPE(h->msgid) != msg_type) {
-    MMAL_ERR("vchiq message from remote is not of expected type %s", msg_type_str(msg_type));
+    MMAL_ERR("expected type %s, received: %s", msg_type_str(msg_type), msg_type_str(h->msgid));
     return NULL;
   }
   return (struct mmal_msg *)h->data;
@@ -227,8 +207,9 @@ static inline void *vchiq_mmal_check_reply_msg(struct vchiq_header_struct *h, in
     return NULL;
 
   if (rmsg->h.type != mmal_msg_type) {
-    MMAL_ERR("vchiq mmal message from remote is not of expected type %s",
-      mmal_msg_type_names[mmal_msg_type]);
+    MMAL_ERR("mmal msg expected type %s, received: %s",
+      mmal_msg_type_names[mmal_msg_type],
+      mmal_msg_type_names[rmsg->h.type]);
     return NULL;
   }
   return &rmsg->u;
@@ -376,25 +357,6 @@ int vchiq_handmade_connect(struct vchiq_state_struct *s)
 #define VC_MMAL_VER 15
 #define VC_MMAL_MIN_VER 10
 
-struct vchiq_service_common {
-  int remoteport;
-  int localport;
-  struct vchiq_state_struct *s;
-};
-
-struct mmal_component {
-  struct vchiq_service_common *ms;
-  int handle;
-  char name[16];
-  bool enabled;
-  int inputs;
-  int outputs;
-  int clocks;
-  struct vchiq_mmal_port control;
-  struct vchiq_mmal_port input[MAX_PORT_COUNT];
-  struct vchiq_mmal_port output[MAX_PORT_COUNT];
-};
-
 void vchiq_handmade_prep_msg(struct vchiq_state_struct *s, int msgid, int srcport, int dstport, void *payload, int payload_sz)
 {
   struct vchiq_header_struct *h;
@@ -520,7 +482,7 @@ void vchiq_mmal_fill_header(struct vchiq_service_common *ms, int mmal_msg_type, 
     return ERR_GENERIC; \
   }
 
-int vchiq_mmal_handmade_component_disable(struct mmal_component *c)
+int vchiq_mmal_handmade_component_disable(struct vchiq_mmal_component *c)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, COMPONENT_DISABLE, component_disable,
     component_disable_reply);
@@ -535,7 +497,7 @@ int vchiq_mmal_handmade_component_disable(struct mmal_component *c)
   return ERR_OK;
 }
 
-int vchiq_mmal_handmade_component_destroy(struct vchiq_service_common *ms, struct mmal_component *c)
+int vchiq_mmal_handmade_component_destroy(struct vchiq_service_common *ms, struct vchiq_mmal_component *c)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, COMPONENT_DESTROY, component_destroy,
     component_destroy_reply);
@@ -550,7 +512,7 @@ int vchiq_mmal_handmade_component_destroy(struct vchiq_service_common *ms, struc
   return ERR_OK;
 }
 
-int vchiq_mmal_port_info_get(struct mmal_component *c, struct vchiq_mmal_port *p)
+int vchiq_mmal_port_info_get(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_INFO_GET, port_info_get, port_info_get_reply);
 
@@ -592,13 +554,31 @@ int vchiq_mmal_port_info_get(struct mmal_component *c, struct vchiq_mmal_port *p
 
   p->format.extradata_size = r->format.extradata_size;
   memcpy(p->format.extradata, r->extradata, p->format.extradata_size);
+  p->component = c;
   return ERR_OK;
 }
 
-
-int vchiq_mmal_component_create(struct vchiq_service_common *ms, const char *name, int component_idx, struct mmal_component **out_component)
+int mmal_port_create(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, enum mmal_port_type type, int index)
 {
-  struct mmal_component *c;
+  int err;
+
+  /* Type and index are needed for port info get */
+  p->type = type;
+  p->index = index;
+
+  err = vchiq_mmal_port_info_get(c, p);
+  CHECK_ERR("Failed to get port info");
+
+  INIT_LIST_HEAD(&p->buffers);
+  p->component = c;
+  return ERR_OK;
+out_err:
+  return err;
+}
+
+int mmal_component_create(struct vchiq_service_common *ms, const char *name, int component_idx, struct vchiq_mmal_component **out_component)
+{
+  struct vchiq_mmal_component *c;
   int i;
   VCHIQ_MMAL_MSG_DECL(ms, DATA, COMPONENT_CREATE, component_create, component_create_reply);
 
@@ -620,40 +600,33 @@ int vchiq_mmal_component_create(struct vchiq_service_common *ms, const char *nam
   c->outputs = r->output_num;
   c->clocks = r->clock_num;
   strncpy(c->name, name, sizeof(c->name));
+
   MMAL_INFO("vchiq component created name:%s: status:%d, handle: %d, input: %d, output: %d, clock: %d",
     c->name, r->status, c->handle, c->inputs, c->outputs, c->clocks);
 
-  c->control.type = MMAL_PORT_TYPE_CONTROL;
-  c->control.index = 0;
-  vchiq_mmal_port_info_get(c, &c->control);
+  mmal_port_create(c, &c->control, MMAL_PORT_TYPE_CONTROL, 0);
 
-  for (i = 0; i < c->inputs; ++i) {
-    c->input[i].type = MMAL_PORT_TYPE_INPUT;
-    c->input[i].index = i;
-    vchiq_mmal_port_info_get(c, &c->input[i]);
-  }
+  for (i = 0; i < c->inputs; ++i)
+    mmal_port_create(c, &c->input[i], MMAL_PORT_TYPE_INPUT, i);
 
-  for (i = 0; i < c->outputs; ++i) {
-    c->output[i].type = MMAL_PORT_TYPE_OUTPUT;
-    c->output[i].index = i;
-    vchiq_mmal_port_info_get(c, &c->output[i]);
-  }
+  for (i = 0; i < c->outputs; ++i)
+    mmal_port_create(c, &c->output[i], MMAL_PORT_TYPE_OUTPUT, i);
 
   *out_component = c;
   return ERR_OK;
 }
 
-struct mmal_component *vchiq_mmal_create_camera_info(struct vchiq_service_common *ms)
+struct vchiq_mmal_component *vchiq_mmal_create_camera_info(struct vchiq_service_common *ms)
 {
   int err;
-  struct mmal_component *c;
-  err = vchiq_mmal_component_create(ms, "camera_info", 0, &c);
+  struct vchiq_mmal_component *c;
+  err = mmal_component_create(ms, "camera_info", 0, &c);
   if (err != ERR_OK)
     return ERR_PTR(err);
   return c;
 }
 
-int vchiq_mmal_port_info_set(struct mmal_component *c, struct vchiq_mmal_port *p)
+int vchiq_mmal_port_info_set(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_INFO_SET, port_info_set, port_info_set_reply);
 
@@ -676,7 +649,7 @@ int vchiq_mmal_port_info_set(struct mmal_component *c, struct vchiq_mmal_port *p
   return ERR_OK;
 }
 
-int vchiq_mmal_port_parameter_set(struct mmal_component *c, struct vchiq_mmal_port *p,
+int vchiq_mmal_port_parameter_set(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p,
   uint32_t parameter_id, void *value, int value_size)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_PARAMETER_SET, port_parameter_set, port_parameter_set_reply);
@@ -694,7 +667,7 @@ int vchiq_mmal_port_parameter_set(struct mmal_component *c, struct vchiq_mmal_po
   return ERR_OK;
 }
 
-int vchiq_mmal_port_set_format(struct mmal_component *c, struct vchiq_mmal_port *port)
+int vchiq_mmal_port_set_format(struct vchiq_mmal_component *c, struct vchiq_mmal_port *port)
 {
   int err;
   err = vchiq_mmal_port_info_set(c, port);
@@ -707,7 +680,7 @@ out_err:
   return err;
 }
 
-int vchiq_mmal_port_parameter_get(struct mmal_component *c,
+int vchiq_mmal_port_parameter_get(struct vchiq_mmal_component *c,
   struct vchiq_mmal_port *port, int parameter_id, void *value, uint32_t *value_size)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_PARAMETER_GET, port_parameter_get, port_parameter_get_reply);
@@ -724,7 +697,7 @@ int vchiq_mmal_port_parameter_get(struct mmal_component *c,
   return ERR_OK;
 }
 
-static inline int vchiq_mmal_get_camera_info(struct vchiq_service_common *ms, struct mmal_component *c, struct mmal_parameter_camera_info_t *cam_info)
+static inline int vchiq_mmal_get_camera_info(struct vchiq_service_common *ms, struct vchiq_mmal_component *c, struct mmal_parameter_camera_info_t *cam_info)
 {
   int err;
   uint32_t param_size;
@@ -746,7 +719,7 @@ void vchiq_mmal_cam_info_print(struct mmal_parameter_camera_info_t *cam_info)
   }
 }
 
-int mmal_set_camera_parameters(struct mmal_component *c, struct mmal_parameter_camera_info_camera_t *cam_info)
+int mmal_set_camera_parameters(struct vchiq_mmal_component *c, struct mmal_parameter_camera_info_camera_t *cam_info)
 {
   uint32_t config_size;
   struct mmal_parameter_camera_config config = {
@@ -771,7 +744,7 @@ int mmal_set_camera_parameters(struct mmal_component *c, struct mmal_parameter_c
   return ERR_OK;
 }
 
-int vchiq_mmal_port_action_port(struct mmal_component *c, struct vchiq_mmal_port *p, int action)
+int vchiq_mmal_port_action_port(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, int action)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_ACTION, port_action_port, port_action_reply);
 
@@ -784,7 +757,7 @@ int vchiq_mmal_port_action_port(struct mmal_component *c, struct vchiq_mmal_port
   return ERR_OK;
 }
 
-int vchiq_mmal_port_action_handle(struct mmal_component *c, struct vchiq_mmal_port *p, int action, int dst_component_handle, int dst_port_handle)
+int vchiq_mmal_port_action_handle(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, int action, int dst_component_handle, int dst_port_handle)
 {
   VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_ACTION, port_action_handle, port_action_reply);
 
@@ -798,7 +771,7 @@ int vchiq_mmal_port_action_handle(struct mmal_component *c, struct vchiq_mmal_po
   return ERR_OK;
 }
 
-int vchiq_bulk_rx(struct mmal_component *c, uint32_t bufaddr, uint32_t bufsize)
+int vchiq_bulk_rx(struct vchiq_mmal_component *c, uint32_t bufaddr, uint32_t bufsize)
 {
   /* Service open payload */
   uint32_t payload[2];
@@ -819,7 +792,37 @@ int vchiq_bulk_rx(struct mmal_component *c, uint32_t bufaddr, uint32_t bufsize)
   return ERR_OK;
 }
 
-int vchiq_mmal_buffer_to_host(struct mmal_component *c)
+static inline void mmal_buffer_header_print_flags(struct mmal_buffer_header *h)
+{
+  char buf[256];
+  int n = 0;
+
+#define CHECK_FLAG(__name) \
+  if (h->flags & MMAL_BUFFER_HEADER_FLAG_ ## __name) { \
+    if (n != 0 && (sizeof(buf) - n >= 2)) { \
+      buf[n++] = ','; \
+      buf[n++] = ' '; \
+    } \
+    strncpy(buf + n, #__name, min(sizeof(#__name), sizeof(buf) - n));\
+  }
+
+  CHECK_FLAG(EOS);
+  CHECK_FLAG(FRAME_START);
+  CHECK_FLAG(FRAME_END);
+  CHECK_FLAG(KEYFRAME);
+  CHECK_FLAG(DISCONTINUITY);
+  CHECK_FLAG(CONFIG);
+  CHECK_FLAG(ENCRYPTED);
+  CHECK_FLAG(CODECSIDEINFO);
+  CHECK_FLAG(SNAPSHOT);
+  CHECK_FLAG(CORRUPTED);
+  CHECK_FLAG(TRANSMISSION_FAILED);
+
+#undef CHECK_FLAG
+  MMAL_INFO("buffer_header: %s", buf);
+}
+
+int vchiq_mmal_buffer_to_host(struct vchiq_mmal_component *c)
 {
   struct vchiq_header_struct *h;
   struct mmal_msg_buffer_from_host *r;
@@ -831,18 +834,19 @@ int vchiq_mmal_buffer_to_host(struct mmal_component *c)
     MMAL_ERR("invalid reply");
     return ERR_GENERIC;
   }
+  mmal_buffer_header_print_flags(&r->buffer_header);
   return ERR_OK;
 }
 
-int vchiq_mmal_buffer_from_host(struct mmal_component *c, struct vchiq_mmal_port *p, struct mmal_buffer *b)
+int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b)
 {
   int err;
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, BUFFER_FROM_HOST, buffer_from_host, buffer_from_host);
+  VCHIQ_MMAL_MSG_DECL(p->component->ms, DATA, BUFFER_FROM_HOST, buffer_from_host, buffer_from_host);
 
   memset(m, 0xbc, sizeof(*m));
 
   m->drvbuf.magic = MMAL_MAGIC;
-  m->drvbuf.component_handle = c->handle;
+  m->drvbuf.component_handle = p->component->handle;
   m->drvbuf.port_handle = p->handle;
   m->drvbuf.client_context = 0x7e7e7e7e;
 
@@ -888,11 +892,11 @@ int vchiq_mmal_buffer_from_host(struct mmal_component *c, struct vchiq_mmal_port
     kernel_panic("if (r->length == 0 || r->payload_in_message)");
   }
   if (!r->is_zero_copy)
-    err = vchiq_bulk_rx(c, (uint32_t)(uint64_t)b->buffer | 0xc0000000, b->buffer_size);
+    err = vchiq_bulk_rx(p->component, (uint32_t)(uint64_t)b->buffer | 0xc0000000, b->buffer_size);
   return err;
 }
 
-int vchiq_mmal_component_enable(struct mmal_component *c)
+int vchiq_mmal_component_enable(struct vchiq_mmal_component *c)
 {
   struct mmal_msg msg;
   struct vchiq_header_struct *header;
@@ -919,7 +923,7 @@ int vchiq_mmal_component_enable(struct mmal_component *c)
   return ERR_OK;
 }
 
-int vchiq_mmal_port_enable(struct mmal_component *c, struct vchiq_mmal_port *p)
+int vchiq_mmal_port_enable(struct vchiq_mmal_port *p)
 {
   int err;
 
@@ -927,14 +931,14 @@ int vchiq_mmal_port_enable(struct mmal_component *c, struct vchiq_mmal_port *p)
     MMAL_INFO("skipping port already enabled");
     return ERR_OK;
   }
-  err = vchiq_mmal_port_action_port(c, p, MMAL_MSG_PORT_ACTION_TYPE_ENABLE);
+  err = vchiq_mmal_port_action_port(p->component, p, MMAL_MSG_PORT_ACTION_TYPE_ENABLE);
   CHECK_ERR("port action type enable failed");
   p->enabled = 1;
 out_err:
-  return vchiq_mmal_port_info_get(c, p);
+  return vchiq_mmal_port_info_get(p->component, p);
 }
 
-int vchiq_mmal_create_tunnel(struct mmal_component *c, struct vchiq_mmal_port *src, struct mmal_component *dst_c, struct vchiq_mmal_port *dst)
+int vchiq_mmal_create_tunnel(struct vchiq_mmal_component *c, struct vchiq_mmal_port *src, struct vchiq_mmal_component *dst_c, struct vchiq_mmal_port *dst)
 {
   int err;
   /* copy src port format to dst */
@@ -1093,35 +1097,35 @@ out_err:
   return err;
 }
 
-int prep_buf(struct vchiq_service_common *sm, struct mmal_component *c, struct vchiq_mmal_port *p)
+int mmal_alloc_port_buffers(struct vchiq_service_common *mem_service, struct vchiq_mmal_port *p)
 {
   int err;
   int i;
-  struct mmal_buffer *mbuf;
+  struct mmal_buffer *buf;
   for (i = 0; i < p->minimum_buffer.num; ++i) {
-    mbuf = kzalloc(sizeof(*mbuf), GFP_KERNEL);
-    mbuf->buffer_size = p->minimum_buffer.size;
-    mbuf->buffer = dma_alloc(mbuf->buffer_size);;
-    MMAL_INFO("prep_buf: min_num: %d, min_sz:%d, min_al:%d, port_enabled:%s, buf:%08x",
+    buf = kzalloc(sizeof(*buf), GFP_KERNEL);
+    buf->buffer_size = p->minimum_buffer.size;
+    buf->buffer = dma_alloc(buf->buffer_size);;
+    MMAL_INFO("mmal_alloc_port_buffers: min_num: %d, min_sz:%d, min_al:%d, port_enabled:%s, buf:%08x",
       p->minimum_buffer.num,
       p->minimum_buffer.size,
       p->minimum_buffer.alignment,
       p->enabled ? "yes" : "no",
-      mbuf->buffer);
+      buf->buffer);
 
     if (p->zero_copy) {
-      err = vc_sm_cma_import_dmabuf(sm, mbuf, &mbuf->vcsm_handle);
+      err = vc_sm_cma_import_dmabuf(mem_service, buf, &buf->vcsm_handle);
       CHECK_ERR("failed to import dmabuf");
     }
-    err = vchiq_mmal_buffer_from_host(c, p, mbuf);
-    CHECK_ERR("mmal_buffer_from_host failed");
+    list_add_tail(&buf->list, &p->buffers);
   }
   return ERR_OK;
+
 out_err:
   return err;
 }
 
-int enable_camera(struct mmal_component *cam)
+int mmal_camera_enable(struct vchiq_mmal_component *cam)
 {
   int err;
   uint32_t camera_num;
@@ -1135,46 +1139,10 @@ out_err:
   return err;
 }
 
-int camera_start_streaming(struct vchiq_service_common *sm, struct mmal_component *cam, struct vchiq_mmal_port *camera_port, struct mmal_component *encode_component, struct vchiq_mmal_port *encode_port)
-{
-  int err;
-  int frame_count = 1;
-  uint64_t system_time = 0;
-  uint32_t param_size;
-  uint32_t zero_copy;
-
-  param_size = sizeof(system_time);
-
-  err = enable_camera(cam);
-  CHECK_ERR("Failed to enable component camera");
-
-  err = vchiq_mmal_port_enable(cam, camera_port);
-  CHECK_ERR("Failed to enable camera port");
-
-  err = vchiq_mmal_port_parameter_get(cam, camera_port,
-    MMAL_PARAMETER_SYSTEM_TIME, &system_time, &param_size);
-
-  zero_copy = 1;
-  err = vchiq_mmal_port_parameter_set(cam, camera_port,
-    MMAL_PARAMETER_ZERO_COPY, &zero_copy, sizeof(zero_copy));
-  CHECK_ERR("Failed to set zero copy param for camera port");
-
-  err = vchiq_mmal_port_enable(cam, encode_port);
-  CHECK_ERR("Failed to enable camera port");
-
-  err = vchiq_mmal_port_parameter_set(cam, camera_port,
-    MMAL_PARAMETER_CAPTURE, &frame_count, sizeof(frame_count));
-  CHECK_ERR("Failed to set camera capture port for 'ril.camera'");
-
-  err = prep_buf(sm, cam, &cam->output[CAM_PORT_CAPTURE]);
-out_err:
-  return err;
-}
-
 int vchiq_mmal_get_cam_info(struct vchiq_service_common *ms, struct mmal_parameter_camera_info_t *cam_info)
 {
   int err;
-  struct mmal_component *camera_info;
+  struct vchiq_mmal_component *camera_info;
 
   camera_info = vchiq_mmal_create_camera_info(ms);
   err = vchiq_mmal_get_camera_info(ms, camera_info, cam_info);
@@ -1351,9 +1319,9 @@ static inline struct mmal_fmt *get_format(struct v4l2_format *f)
 
 int vchiq_mmal_setup_encode_component(
   struct v4l2_format *f,
-  struct mmal_component *cam,
+  struct vchiq_mmal_component *cam,
   struct vchiq_mmal_port *camera_port,
-  struct mmal_component *encode_component,
+  struct vchiq_mmal_component *encode_component,
   struct vchiq_mmal_port *port)
 {
   int err;
@@ -1391,7 +1359,7 @@ out_err:
   return err;
 }
 
-int vchiq_mmal_setup_components(struct mmal_component *cam, struct mmal_component *encode_component, struct v4l2_format *f, struct vchiq_mmal_port **out_camera_port, struct vchiq_mmal_port **out_encode_port)
+int vchiq_mmal_setup_components(struct vchiq_mmal_component *cam, struct vchiq_mmal_component *encode_component, struct v4l2_format *f, struct vchiq_mmal_port **out_camera_port, struct vchiq_mmal_port **out_encode_port)
 {
   int err;
   struct vchiq_mmal_port *port = NULL, *camera_port = NULL;
@@ -1438,59 +1406,13 @@ out_err:
 //  .fmt.pix.sizeimage = 1024 * 768,
 //};
 
-static inline int mmal_port_set_zero_copy(struct mmal_component *c, struct vchiq_mmal_port *p)
+static inline int mmal_port_set_zero_copy(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p)
 {
   uint32_t zero_copy = 1;
   return vchiq_mmal_port_parameter_set(c, p, MMAL_PARAMETER_ZERO_COPY, &zero_copy, sizeof(zero_copy));
 }
 
-int camera_port_preview(
-  struct vchiq_service_common *sm,
-  struct mmal_component *cam,
-  struct vchiq_mmal_port *preview_port,
-  uint32_t *supported_encodings,
-  uint32_t supported_encodings_size)
-{
-  int i;
-  char buf[5];
-  int err;
-
-  buf[4] = 0;
-
-  for (i = 0; i < supported_encodings_size / 4; ++i) {
-    *(uint32_t*)buf = supported_encodings[i];
-    MMAL_INFO("capture port supports: %s", buf);
-    if (strcmp(buf, "Y420")) {
-      break;
-    }
-  }
-  vchiq_mmal_local_format_fill(&preview_port->format, MMAL_ENCODING_RGBA, 0, 320, 240);
-  vchiq_mmal_port_set_format(cam, preview_port);
-
-  err =  mmal_port_set_zero_copy(cam, preview_port);
-  CHECK_ERR("Failed to set zero copy");
-
-  err = enable_camera(cam);
-  CHECK_ERR("Failed to enable component camera");
-
-  err = vchiq_mmal_port_enable(cam, preview_port);
-  CHECK_ERR("Failed to enable camera port");
-
-  // err = vchiq_mmal_port_parameter_set(cam, preview_port, MMAL_PARAMETER_CAPTURE, &frame_count, sizeof(frame_count));
-  // CHECK_ERR("Failed to set camera capture port for 'ril.camera'");
-
-  err = prep_buf(sm, cam, preview_port);
-  err = vchiq_mmal_port_enable(cam, preview_port);
-  CHECK_ERR("Failed to enable camera port");
-
-
-  return ERR_OK;
-out_err:
-  return err;
-}
-
-
-void mmal_print_supported_encodings(uint32_t *encodings, int num)
+static inline void mmal_print_supported_encodings(uint32_t *encodings, int num)
 {
   int i, ii;
   char buf[5];
@@ -1505,28 +1427,68 @@ void mmal_print_supported_encodings(uint32_t *encodings, int num)
   }
 }
 
-int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_common *sm)
+static int mmal_camera_capture_frames(struct vchiq_mmal_component *cam, struct vchiq_mmal_port *capture_port, uint32_t num_frames)
+{
+  uint32_t frame_count = num_frames;
+  return vchiq_mmal_port_parameter_set(cam, capture_port, MMAL_PARAMETER_CAPTURE, &frame_count, sizeof(frame_count));
+}
+
+static int mmal_port_buffer_send(struct vchiq_mmal_port *p)
+{
+  int err;
+  struct mmal_buffer *b;
+
+  if (list_empty(&p->buffers)) {
+    MMAL_ERR("port buffer list is empty");
+    return ERR_NO_RESOURCE;
+  }
+
+  b = list_first_entry(&p->buffers, typeof(*b), list);
+  err = vchiq_mmal_buffer_from_host(p, b);
+  if (err) {
+    list_add_tail(&b->list, &p->buffers);
+    MMAL_ERR("failed to submit port buffer to VC");
+    return err;
+  }
+
+  return ERR_OK;
+}
+
+static int mmal_port_buffer_receive(struct vchiq_mmal_port *p)
+{
+  return vchiq_mmal_buffer_to_host(p->component);
+}
+
+
+int mmal_port_get_supp_encodings(struct vchiq_mmal_port *p, uint32_t *encodings, int max_encodings, int *num_encodings)
+{
+  int err;
+  uint32_t param_size;
+
+  param_size = max_encodings * sizeof(*encodings);
+  err = vchiq_mmal_port_parameter_get(p->component, p, MMAL_PARAMETER_SUPPORTED_ENCODINGS, encodings, &param_size);
+  CHECK_ERR("Failed to get supported_encodings");
+  *num_encodings = param_size / sizeof(*encodings);
+  mmal_print_supported_encodings(encodings, *num_encodings);
+  return ERR_OK;
+out_err:
+  return err;
+}
+
+int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_common *mem_service, int frame_width, int frame_height)
 {
   int err;
   struct mmal_parameter_camera_info_t cam_info = {0};
-  struct mmal_component *cam;
-  struct mmal_component *image_encode; //, *video_encode;
-//  struct mmal_component *preview_camera;
-//  struct vchiq_mmal_port *encoder_port;
-//  struct vchiq_mmal_port *encode_port;
+  struct vchiq_mmal_component *cam;
   struct vchiq_mmal_port *still_port, *video_port, *preview_port;
-//  struct mmal_es_format_local *format;
   uint32_t supported_encodings[MAX_SUPPORTED_ENCODINGS];
-//  int enable;
-  uint32_t frame_count;
-  uint32_t param_size; //, frame_count; //, zero_copy;
-//  bool is_zero_copy = true;
+  int num_encodings;
 
   err = vchiq_mmal_get_cam_info(ms, &cam_info);
   CHECK_ERR("Failed to get num cameras");
 
   /* mmal_init start */
-  err = vchiq_mmal_component_create(ms, "ril.camera", 0, &cam);
+  err = mmal_component_create(ms, "ril.camera", 0, &cam);
   CHECK_ERR("Failed to create component 'ril.camera'");
 
   err =  mmal_set_camera_parameters(cam, &cam_info.cameras[0]);
@@ -1536,91 +1498,42 @@ int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_commo
   video_port = &cam->output[CAM_PORT_VIDEO];
   preview_port = &cam->output[CAM_PORT_PREVIEW];
 
-  param_size = sizeof(supported_encodings);
-  err = vchiq_mmal_port_parameter_get(cam, still_port, MMAL_PARAMETER_SUPPORTED_ENCODINGS, supported_encodings, &param_size);
-  CHECK_ERR("Failed to get supported_encodings");
-  mmal_print_supported_encodings(supported_encodings, param_size / 4);
+  err = mmal_port_get_supp_encodings(still_port, supported_encodings, sizeof(supported_encodings), &num_encodings);
+  CHECK_ERR("Failed to retrieve supported encodings from port");
 
-  vchiq_mmal_local_format_fill(&still_port->format, MMAL_ENCODING_RGB24, 0, 160, 120);
+  vchiq_mmal_local_format_fill(&still_port->format, MMAL_ENCODING_RGB24, 0, frame_width, frame_height);
   err = vchiq_mmal_port_set_format(cam, still_port);
   CHECK_ERR("Failed to set format for still capture port");
 
-  vchiq_mmal_local_format_fill(&video_port->format, MMAL_ENCODING_OPAQUE, 0, 160, 120);
+  vchiq_mmal_local_format_fill(&video_port->format, MMAL_ENCODING_OPAQUE, 0, frame_width, frame_height);
   err = vchiq_mmal_port_set_format(cam, video_port);
   CHECK_ERR("Failed to set format for video capture port");
 
-  vchiq_mmal_local_format_fill(&preview_port->format, MMAL_ENCODING_OPAQUE, 0, 160, 120);
+  vchiq_mmal_local_format_fill(&preview_port->format, MMAL_ENCODING_OPAQUE, 0, frame_width, frame_height);
   err = vchiq_mmal_port_set_format(cam, preview_port);
   CHECK_ERR("Failed to set format for preview capture port");
 
-  /// camera_port_preview(sm, cam, preview_port, supported_encodings, param_size);
-
-  mmal_port_set_zero_copy(cam, still_port);
+  err = mmal_port_set_zero_copy(cam, still_port);
   CHECK_ERR("Failed to set zero copy param for camera port");
-  err = enable_camera(cam);
+  err = mmal_camera_enable(cam);
   CHECK_ERR("Failed to enable component camera");
 
-  err = vchiq_mmal_port_enable(cam, still_port);
+  err = vchiq_mmal_port_enable(still_port);
   CHECK_ERR("Failed to enable video_port");
 
-  err = prep_buf(sm, cam, still_port);
+  err = mmal_alloc_port_buffers(mem_service, still_port);
   CHECK_ERR("Failed to prepare buffer for still port");
 
   while(1) {
-    frame_count = 1;
-    err = vchiq_mmal_port_parameter_set(cam, still_port,
-      MMAL_PARAMETER_CAPTURE, &frame_count, sizeof(frame_count));
-    CHECK_ERR("Failed to set camera capture port for 'ril.camera'");
-
-    err = vchiq_mmal_buffer_to_host(cam);
+    err = mmal_port_buffer_send(still_port);
+    CHECK_ERR("Failed to send buffer to port");
+    mmal_camera_capture_frames(cam, still_port, 20);
+    CHECK_ERR("Failed to initiate frame capture");
+    err = mmal_port_buffer_receive(still_port);
+    CHECK_ERR("Failed to receive buffer from VC");
   }
+  return ERR_OK;
 
-  err = vchiq_mmal_port_enable(cam, video_port);
-  CHECK_ERR("Failed to enable video_port");
-
-  err = prep_buf(sm, cam, video_port);
-  CHECK_ERR("Failed to prepare buffer for still port");
-//
-//
-//  vchiq_bulk_rx(cam, 0x1f, 4096);
-//
-//
-//  vchiq_mmal_local_format_fill(&cam->output[CAM_PORT_PREVIEW].format  , MMAL_ENCODING_OPAQUE, MMAL_ENCODING_I420, 1024, 768);
-//  vchiq_mmal_local_format_fill(&cam->output[CAM_PORT_VIDEO].format    , MMAL_ENCODING_OPAQUE, MMAL_ENCODING_I420, 1024, 768);
-//  vchiq_mmal_local_format_fill(&cam->output[CAM_PORT_CAPTURE].format  , MMAL_ENCODING_OPAQUE, MMAL_ENCODING_I420, 32, 32);
-//  
-
-  // vchiq_mmal_port_set_format(video_encode, encoder_port);
-
-  // err = vchiq_mmal_component_create(ms, "ril.video_render", 0, &preview_camera);
-  // CHECK_ERR("Failed to create component 'ril.video_render'");
-
-  err = vchiq_mmal_component_create(ms, "ril.image_encode", 0, &image_encode);
-  CHECK_ERR("Failed to create component 'ril.image_encode'");
-
-  // err = vchiq_mmal_component_create(ms, "ril.video_encode", 0, &video_encode);
-  // CHECK_ERR("Failed to create component 'ril.video_encode'");
-
-
-  // encoder_input = &image_encode->input[0];
-
-  // encoder_port = &image_encode->output[0];
-  // encoder_port->format.encoding = MMAL_ENCODING_RGB24;
-  // vchiq_mmal_port_set_format(video_encode, encoder_port);
-
-//  enable = 1;
-//  err = vchiq_mmal_port_parameter_set(video_encode, &video_encode->control,
-//    MMAL_PARAMETER_VIDEO_IMMUTABLE_INPUT, &enable, sizeof(enable));
-//  CHECK_ERR("Failed to set MMAL_PARAMETER_VIDEO_IMMUTABLE_INPUT to 1");
-//
-//  err = vchiq_mmal_port_parameter_set(video_encode, &video_encode->control,
-//    MMAL_PARAMETER_MINIMISE_FRAGMENTATION, &enable, sizeof(enable));
-//  CHECK_ERR("Failed to set MMAL_PARAMETER_MINIMISE_FRAGMENTATION to 1");
-  /* mmal_init end */
-
-  // err = vchiq_mmal_setup_components(cam, image_encode, &default_v4l2_format, &camera_port, &encode_port);
-
- // camera_start_streaming(sm, cam, camera_port, image_encode, encode_port);
 out_err:
   return err;
 }
@@ -1650,15 +1563,15 @@ out_err:
 void vchiq_handmade(struct vchiq_state_struct *s, struct vchiq_slot_zero_struct *z)
 {
   int err;
-  struct vchiq_service_common *ms, *sm;
+  struct vchiq_service_common *ms, *mem_service;
 
   ms = vchiq_mmal_service_run(s);
   CHECK_ERR_PTR(ms, "failed to run mmal service");
 
-  sm =  vchiq_handmade_open_sm_cma_service(s);
-  CHECK_ERR_PTR(sm, "failed at open mems service");
+  mem_service =  vchiq_handmade_open_sm_cma_service(s);
+  CHECK_ERR_PTR(mem_service, "failed at open mems service");
 
-  err = vchiq_camera_run(ms, sm);
+  err = vchiq_camera_run(ms, mem_service, 160, 120);
   CHECK_ERR("failed to run camera");
 
 out_err:

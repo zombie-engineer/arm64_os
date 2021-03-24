@@ -89,7 +89,16 @@ struct vchiq_mmal_port {
 	struct mmal_msg_context *event_context;
 };
 
+struct vchiq_state_struct;
+
+struct vchiq_service_common {
+  int remoteport;
+  int localport;
+  struct vchiq_state_struct *s;
+};
+
 struct vchiq_mmal_component {
+	char name[32];
 	uint32_t in_use:1;
 	uint32_t enabled:1;
 	uint32_t handle;  /* VideoCore handle for component */
@@ -101,6 +110,7 @@ struct vchiq_mmal_component {
 	struct vchiq_mmal_port output[MAX_PORT_COUNT]; /* output ports */
 	struct vchiq_mmal_port clock[MAX_PORT_COUNT]; /* clock ports */
 	uint32_t client_component;	/* Used to ref back to client struct */
+	struct vchiq_service_common *ms;
 };
 
 int vchiq_mmal_init(struct vchiq_mmal_instance **out_instance);
