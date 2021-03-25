@@ -46,6 +46,13 @@
 /* Compile with enabled image download via JTAG feature */
 #define ENABLE_JTAG_DOWNLOAD
 
+#define ENABLE_JTAG_SDCARD
+// #define SELFTEST
+// #define TFT_LCD
+// #define TEST_MMIO
+// #define VERBOSE_STARTUP
+// #define CMDRUNNER
+
 #if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
 /*
  * Compile with special section to provide enough scratchspace to

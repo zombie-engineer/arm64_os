@@ -9,13 +9,15 @@
 #include <percpu.h>
 #include <common.h>
 #include <timer.h>
-#include <cmdrunner.h>
 #include <uart/pl011_uart.h>
 #include <drivers/usb/usbd.h>
 #include <mmu.h>
 #include <drivers/display/tft_lcd.h>
 
 static struct timer *test_timer;
+
+#ifdef CMDRUNNER
+#include <cmdrunner.h>
 
 static int run_cmdrunner_thread()
 {
@@ -26,6 +28,7 @@ static int run_cmdrunner_thread()
   sched_queue_runnable_task(get_scheduler(), t);
   return ERR_OK;
 }
+#endif
 
 static int run_uart_thread()
 {
@@ -143,7 +146,9 @@ int init_func(void)
   SCHED_DEBUG("starting init function");
   BUG(run_uart_thread()           != ERR_OK, "failed to run uart_thread");
   BUG(vchiq_init()                != ERR_OK, "failed to start vchiq");
-  // BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
+#ifdef CMDRUNNER
+  BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
+#endif
   // BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   scheduler_second_cpu_startup(1);
   scheduler_second_cpu_startup(2);

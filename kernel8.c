@@ -25,7 +25,9 @@
 #include <sched.h>
 #include <intr_ctl.h>
 #include <exception.h>
+#ifdef CMDRUNNNER
 #include <cmdrunner.h>
+#endif
 #include <max7219.h>
 #include <drivers/atmega8a.h>
 #include <drivers/display/nokia5110.h>
@@ -1026,26 +1028,41 @@ void main()
 #ifdef ENABLE_UART_DOWNLOAD
   check_uart_download();
 #endif
+#ifdef SELFTEST
   self_test();
+#endif
+#if defined(ENABLE_JTAG_DOWNLOAD) && defined(ENABLE_JTAG_DOWNLOAD)
   emmc_init();
-  tft_lcd_init();
   fs_probe_early();
+#endif
+#ifdef TFT_LCD
+  tft_lcd_init();
+#endif
   irq_init(0 /*loglevel*/);
   add_unhandled_exception_hook(report_unhandled_exception);
   add_kernel_panic_reporter(report_kernel_panic);
   print_mbox_props();
   // usbd_init();
   // usbd_print_device_tree();
+#ifdef VERBOSE_STARTUP
   cm_print_clocks();
+#endif
 
+#ifdef TEST_MMIO
   test_mmio_dma(false, false);
+#endif
   mmu_init();
+#ifdef TEST_MMIO
   test_mmio_dma(true, true);
-  print_memory_map();
+#endif
   spinlocks_enabled = 1;
-
+#ifdef VERBOSE_STARTUP
+  print_memory_map();
   print_cpu_info();
   print_current_ex_level();
+  print_cache_stats();
+  tags_print_cmdline();
+#endif
   ret = bcm2835_arm_timer_init();
   BUG(ret != ERR_OK, "Failed to init arm_timer");
   ret = bcm2835_systimer_init();
@@ -1053,12 +1070,10 @@ void main()
   ret = armv8_generic_timer_init();
   BUG(ret != ERR_OK, "Failed to init armv8 generic timer");
 
+#ifdef CMDRUNNER
   cmdrunner_init();
-  print_cache_stats();
-  tags_print_cmdline();
-
+#endif
   rand_init();
-  // cmdrunner_run_interactive_loop();
   scheduler_init(0/* log_level */, init_func);
   while(1);
 }
