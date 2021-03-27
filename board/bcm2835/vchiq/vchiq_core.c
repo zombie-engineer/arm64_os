@@ -1939,7 +1939,7 @@ bail_not_ready:
 /* Called by the slot handler thread */
 static int slot_handler_func(void)
 {
-	VCHIQ_STATE_T *state = &vchiq_state;
+	VCHIQ_STATE_T *state = NULL; //&vchiq_state;
 	VCHIQ_SHARED_STATE_T *local = state->local;
 	DEBUG_INITIALISE(local)
 
@@ -2019,7 +2019,7 @@ static int slot_handler_func(void)
 /* Called by the recycle thread */
 static int recycle_func(void)
 {
-	VCHIQ_STATE_T *state = &vchiq_state;
+	VCHIQ_STATE_T *state = NULL; //&vchiq_state;
 	VCHIQ_SHARED_STATE_T *local = state->local;
 
 	while (1) {
@@ -2034,7 +2034,7 @@ static int recycle_func(void)
 /* Called by the sync thread */
 static int sync_func(void)
 {
-	VCHIQ_STATE_T *state = &vchiq_state;
+	VCHIQ_STATE_T *state = NULL; //&vchiq_state;
 	VCHIQ_SHARED_STATE_T *local = state->local;
 	VCHIQ_HEADER_T *header = (VCHIQ_HEADER_T *)SLOT_DATA_FROM_INDEX(state,
 		state->remote->slot_sync);
@@ -2320,10 +2320,12 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero,
 
 	semaphore_init(&state->connect, 0);
 	mutex_init(&state->mutex);
-	semaphore_init(&state->trigger_event, 0);
-	semaphore_init(&state->recycle_event, 0);
-	semaphore_init(&state->sync_trigger_event, 0);
-	semaphore_init(&state->sync_release_event, 0);
+
+	waitflag_init(&state->trigger_waitflag);
+	waitflag_init(&state->recycle_waitflag);
+	waitflag_init(&state->sync_trigger_waitflag);
+	waitflag_init(&state->sync_release_waitflag);
+	waitflag_init(&state->state_waitflag);
 
 	mutex_init(&state->slot_mutex);
 	mutex_init(&state->recycle_mutex);
@@ -2356,18 +2358,18 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero,
 	state->data_use_count = 0;
 	state->data_quota = state->slot_queue_available - 1;
 
-	local->trigger.event = (unsigned)(uint64_t)&state->trigger_event;
+	// local->trigger.event = (unsigned)(uint64_t)&state->trigger_event;
 	remote_event_create(&local->trigger);
 	local->tx_pos = 0;
 
-	local->recycle.event = (unsigned)(uint64_t)&state->recycle_event;
+	// local->recycle.event = (unsigned)(uint64_t)&state->recycle_event;
 	remote_event_create(&local->recycle);
 	local->slot_queue_recycle = state->slot_queue_available;
 
-	local->sync_trigger.event = (unsigned)(uint64_t)&state->sync_trigger_event;
+	// local->sync_trigger.event = (unsigned)(uint64_t)&state->sync_trigger_event;
 	remote_event_create(&local->sync_trigger);
 
-	local->sync_release.event = (unsigned)(uint64_t)&state->sync_release_event;
+	// local->sync_release.event = (unsigned)(uint64_t)&state->sync_release_event;
 	remote_event_create(&local->sync_release);
 
 	/* At start-of-day, the slot is empty and available */

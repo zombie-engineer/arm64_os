@@ -127,7 +127,7 @@ typedef struct vchiq_arm_state_struct {
 extern int vchiq_arm_log_level;
 extern int vchiq_susp_log_level;
 
-int vchiq_platform_init(VCHIQ_STATE_T *state);
+int vchiq_platform_init(void);
 
 extern VCHIQ_STATE_T *
 vchiq_get_state(void);

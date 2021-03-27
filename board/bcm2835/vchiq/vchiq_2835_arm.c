@@ -192,26 +192,11 @@ static const char *const mmal_msg_type_names[] = {
 	"HOST_LOG",
 };
 
-static inline void *vchiq_check_reply_msg(struct vchiq_header_struct *h, int msg_type)
+static inline void *mmal_check_reply_msg(struct mmal_msg *rmsg, int msg_type)
 {
-  if (VCHIQ_MSG_TYPE(h->msgid) != msg_type) {
-    MMAL_ERR("expected type %s, received: %s", msg_type_str(msg_type), msg_type_str(h->msgid));
-    return NULL;
-  }
-  return (struct mmal_msg *)h->data;
-}
-
-static inline void *vchiq_mmal_check_reply_msg(struct vchiq_header_struct *h, int msg_type, int mmal_msg_type)
-{
-  struct mmal_msg *rmsg;
-
-  rmsg = vchiq_check_reply_msg(h, msg_type);
-  if (!rmsg)
-    return NULL;
-
-  if (rmsg->h.type != mmal_msg_type) {
+  if (rmsg->h.type != msg_type) {
     MMAL_ERR("mmal msg expected type %s, received: %s",
-      mmal_msg_type_names[mmal_msg_type],
+      mmal_msg_type_names[msg_type],
       mmal_msg_type_names[rmsg->h.type]);
     return NULL;
   }
@@ -311,21 +296,19 @@ void vchiq_event_wait(atomic_t *waitflag, struct remote_event_struct *event)
   rmb();
 }
 
+static inline void vchiq_event_check(atomic_t *waitflag, struct remote_event_struct *e)
+{
+  dsb();
+  if (e->armed && e->fired)
+    wakeup_waitflag(waitflag);
+}
+
+
 int vchiq_handmade_connect(struct vchiq_state_struct *s)
 {
-  struct vchiq_shared_state_struct *lstate, *rstate;
   struct vchiq_header_struct *header;
   int msg_size;
-
-  // rx_pos = s->rx_pos;
-  lstate = s->local;
-  rstate = s->remote;
-
-  header = vchiq_get_next_header_rx(s);
-  if (VCHIQ_MSG_TYPE(header->msgid) != VCHIQ_MSG_CONNECT) {
-    MMAL_ERR("Expected msg type CONNECT from remote");
-    return ERR_GENERIC;
-  }
+  int err;
 
   /* Send CONNECT MESSAGE */
   msg_size = 0;
@@ -334,28 +317,38 @@ int vchiq_handmade_connect(struct vchiq_state_struct *s)
   header->msgid = VCHIQ_MAKE_MSG(VCHIQ_MSG_CONNECT, 0, 0);
   header->size = msg_size;
 
-  s->conn_state = VCHIQ_CONNSTATE_CONNECTING;
+  // s->conn_state = VCHIQ_CONNSTATE_CONNECTING;
   wmb();
   /* Make the new tx_pos visible to the peer. */
-  lstate->tx_pos = s->local_tx_pos;
+  s->local->tx_pos = s->local_tx_pos;
   wmb();
 
-  vchiq_event_signal(&rstate->trigger);
-  lstate->recycle.armed = 1;
+  vchiq_event_signal(&s->remote->trigger);
 
-  /* Wait CONNECTED RESPONSE */
-  if (!lstate->trigger.fired) {
-    lstate->trigger.armed = 1;
-    dsb();
-    while (!lstate->trigger.fired);
-    lstate->trigger.armed = 0;
-    wmb();
+  // s->local->trigger.fired = 1;
+  // wakeup_waitflag(&s->trigger_waitflag);
+  // wait_on_waitflag(&s->state_waitflag);
+  // wmb();
+  if (s->conn_state != VCHIQ_CONNSTATE_CONNECTED) {
+    err = ERR_GENERIC;
+    goto out_err;
   }
-  lstate->trigger.fired = 0;
-  rmb();
+//  lstate->recycle.armed = 1;
+//
+//  /* Wait CONNECTED RESPONSE */
+//  if (!lstate->trigger.fired) {
+//    lstate->trigger.armed = 1;
+//    dsb();
+//    while (!lstate->trigger.fired);
+//    lstate->trigger.armed = 0;
+//    wmb();
+//  }
+//  lstate->trigger.fired = 0;
+//  rmb();
 
-  s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
   return ERR_OK;
+out_err:
+  return err;
 }
 
 #define VC_MMAL_VER 15
@@ -374,113 +367,351 @@ void vchiq_handmade_prep_msg(struct vchiq_state_struct *s, int msgid, int srcpor
 #define VC_SM_VER  1
 #define VC_SM_MIN_VER 0
 
-struct vchiq_service_common *vchiq_handmade_open_sm_cma_service(struct vchiq_state_struct *s)
+static struct vchiq_service_common *vchiq_service_map[10];
+
+static struct vchiq_service_common *vchiq_alloc_service(void)
 {
-  /* Service open payload */
-  int msg_id;
-  struct vchiq_open_payload open_payload;
-  struct vchiq_openack_payload *openack;
-  struct vchiq_header_struct *h;
-  struct vchiq_service_common *ms;
-  ms = kzalloc(sizeof(*ms), GFP_KERNEL);
+  struct vchiq_service_common *service;
 
-  open_payload.fourcc = MAKE_FOURCC("SMEM");
-  open_payload.client_id = 0;
-  open_payload.version = VC_SM_VER;
-  open_payload.version_min = VC_SM_MIN_VER;
-
-  vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, 0, 0, &open_payload, sizeof(open_payload));
-  vchiq_event_signal(&s->remote->trigger);
-  vchiq_event_wait(&s->local->trigger_waitflag, &s->local->trigger);
-
-  h = vchiq_get_next_header_rx(s);
-  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
-    MMAL_ERR("Expected msg type VCHIQ_MSG_OPENACK from remote");
-    return ERR_PTR(ERR_GENERIC);
+  int i;
+  for (i = 0; i < ARRAY_SIZE(vchiq_service_map); ++i) {
+    if (vchiq_service_map[i])
+      continue;
+    service = kzalloc(sizeof(*service), GFP_KERNEL);
+    if (!IS_ERR(service)) {
+      /* ser localport to non zero value or vchiq will assign something */
+      service->localport = i + 1;
+      wmb();
+      vchiq_service_map[i] = service;
+    }
+    return service;
   }
-  msg_id = h->msgid;
-  openack = (struct vchiq_openack_payload *)(h->data);
-  ms->localport = VCHIQ_MSG_DSTPORT(msg_id);
-  ms->remoteport = VCHIQ_MSG_SRCPORT(msg_id);
-  ms->s = s;
-  MMAL_INFO("OPENACK: msgid: %08x, localport: %d, remoteport: %d, version: %d",
-    msg_id,
-    ms->localport,
-    ms->remoteport,
-    openack->version);
-  return ms;
+  MMAL_ERR("No free service port");
+  return ERR_PTR(ERR_NO_RESOURCE);
 }
 
-int vchiq_handmade_open_mmal(struct vchiq_state_struct *s, struct vchiq_service_common *ms)
+static struct vchiq_service_common *vchiq_service_find_by_localport(int localport)
+{
+  int i;
+
+  for (i = 0; i < ARRAY_SIZE(vchiq_service_map); ++i) {
+    if (vchiq_service_map[i] && vchiq_service_map[i]->localport == localport)
+      return vchiq_service_map[i];
+  }
+  return NULL;
+}
+
+//struct vchiq_service_common *vchiq_handmade_open_sm_cma_service(struct vchiq_state_struct *s)
+//{
+//  /* Service open payload */
+//  int msg_id;
+//  struct vchiq_open_payload open_payload;
+//  struct vchiq_openack_payload *openack;
+//  struct vchiq_header_struct *h;
+//  struct vchiq_service_common *ms;
+//  ms = kzalloc(sizeof(*ms), GFP_KERNEL);
+//
+//  open_payload.fourcc = MAKE_FOURCC("SMEM");
+//  open_payload.client_id = 0;
+//  open_payload.version = VC_SM_VER;
+//  open_payload.version_min = VC_SM_MIN_VER;
+//
+//  vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, LOCALPORT_SMEM, 0, &open_payload, sizeof(open_payload));
+//  vchiq_event_signal(&s->remote->trigger);
+//  vchiq_event_wait(&s->trigger_waitflag, &s->local->trigger);
+//
+//  h = vchiq_get_next_header_rx(s);
+//  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
+//    MMAL_ERR("Expected msg type VCHIQ_MSG_OPENACK from remote");
+//    return ERR_PTR(ERR_GENERIC);
+//  }
+//  msg_id = h->msgid;
+//  openack = (struct vchiq_openack_payload *)(h->data);
+//  ms->localport = VCHIQ_MSG_DSTPORT(msg_id);
+//  ms->remoteport = VCHIQ_MSG_SRCPORT(msg_id);
+//  ms->s = s;
+//  MMAL_INFO("OPENACK: msgid: %08x, localport: %d, remoteport: %d, version: %d",
+//    msg_id,
+//    ms->localport,
+//    ms->remoteport,
+//    openack->version);
+//  return ms;
+//}
+
+static int vchiq_open_service(struct vchiq_state_struct *state, struct vchiq_service_common *service, uint32_t fourcc, short version, short version_min)
 {
   /* Service open payload */
-  int msg_id;
   struct vchiq_open_payload open_payload;
-  struct vchiq_openack_payload *openack;
-  struct vchiq_header_struct *h;
 
   /* Open "mmal" service */
-  open_payload.fourcc = MAKE_FOURCC("mmal");
+  open_payload.fourcc = fourcc;
   open_payload.client_id = 0;
-  open_payload.version = VC_MMAL_VER;
-  open_payload.version_min = VC_MMAL_MIN_VER;
+  open_payload.version = version;
+  open_payload.version_min = version_min;
 
-  vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, 0, 0, &open_payload, sizeof(open_payload));
-  vchiq_event_signal(&s->remote->trigger);
-  vchiq_event_wait(&s->local->trigger_waitflag, &s->local->trigger);
+  service->opened = false;
+  service->fourcc = fourcc;
 
-  h = vchiq_get_next_header_rx(s);
-  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
-    MMAL_ERR("Expected msg type VCHIQ_MSG_OPENACK from remote");
-    return ERR_GENERIC;
-  }
-  msg_id = h->msgid;
-  openack = (struct vchiq_openack_payload *)(h->data);
-  ms->localport = VCHIQ_MSG_DSTPORT(msg_id);
-  ms->remoteport = VCHIQ_MSG_SRCPORT(msg_id);
-  MMAL_INFO("OPENACK: msgid: %08x, localport: %d, remoteport: %d, version: %d",
-    msg_id,
-    ms->localport,
-    ms->remoteport,
-    openack->version);
+  vchiq_handmade_prep_msg(state, VCHIQ_MSG_OPEN, service->localport, 0, &open_payload, sizeof(open_payload));
+  vchiq_event_signal(&state->remote->trigger);
+  wait_on_waitflag(&state->state_waitflag);
+  BUG(!service->opened, "Service still not opened");
+  MMAL_INFO("opened service %08x, localport: %d, remoteport: %d",
+    service->fourcc,
+    service->localport,
+    service->remoteport);
   return ERR_OK;
 }
 
-void vchiq_mmal_fill_header(struct vchiq_service_common *ms, int mmal_msg_type, struct mmal_msg *msg)
+static struct vchiq_service_common *vchiq_alloc_open_service(struct vchiq_state_struct *state,
+  uint32_t fourcc, short version, short version_min, vchiq_data_callback_t data_callback)
+{
+  struct vchiq_service_common *service;
+  int err;
+
+  service = vchiq_alloc_service();
+  if (IS_ERR(service))
+    return service;
+
+  err = vchiq_open_service(state, service, fourcc, version, version_min);
+  if (err != ERR_OK) {
+    MMAL_ERR("failed to open service");
+    kfree(service);
+    return ERR_PTR(err);
+  }
+  service->s = state;
+  service->data_callback = data_callback;
+  return service;
+}
+
+struct mems_msg_context {
+  bool active;
+  uint32_t trans_id;
+  atomic_t completion_waitflag;
+  void *data;
+  int data_size;
+};
+
+static uint32_t mems_transaction_counter = 0;
+#define MEMS_CONTEXT_POOL_SIZE 4
+static struct mems_msg_context mems_msg_context_pool[MEMS_CONTEXT_POOL_SIZE] = { 0 };
+
+struct mems_msg_context *mems_msg_context_alloc(void)
+{
+  int i;
+  struct mems_msg_context *ctx;
+  for (i = 0; i < ARRAY_SIZE(mems_msg_context_pool); ++i) {
+    ctx = &mems_msg_context_pool[i];
+    if (!ctx->active) {
+      ctx->active = true;
+      ctx->data = NULL;
+      ctx->trans_id = mems_transaction_counter++;
+      waitflag_init(&ctx->completion_waitflag);
+      return ctx;
+    }
+  }
+  return ERR_PTR(ERR_NO_RESOURCE);
+}
+
+struct mems_msg_context *mems_msg_context_from_trans_id(uint32_t trans_id)
+{
+  int err;
+  int i;
+  struct mems_msg_context *ctx;
+  for (i = 0; i < ARRAY_SIZE(mems_msg_context_pool); ++i) {
+    ctx = &mems_msg_context_pool[i];
+    if (ctx->trans_id == trans_id) {
+      if (!ctx->active) {
+        err = ERR_GENERIC;
+        MMAL_ERR("mems data callback for inactive message");
+        return ERR_PTR(err);
+      }
+      return ctx;
+    }
+  }
+  err = ERR_NOT_FOUND;
+  MMAL_ERR("mems data callback for non-existent context");
+  return ERR_PTR(err);
+}
+
+void mems_msg_context_free(struct mems_msg_context *ctx)
+{
+  if (ctx > &mems_msg_context_pool[MEMS_CONTEXT_POOL_SIZE] || ctx < &mems_msg_context_pool[0])
+    kernel_panic("mems context free error");
+  ctx->active = 0;
+}
+
+int mems_service_data_callback(struct vchiq_service_common *s, struct vchiq_header_struct *h)
+{
+  struct vc_sm_result_t *r;
+  MMAL_INFO("mems_service_data_callback");
+  struct mems_msg_context *ctx;
+  BUG(h->size < 4, "mems message less than 4");
+  r = (struct vc_sm_result_t *)&h->data[0];
+  ctx = mems_msg_context_from_trans_id(r->trans_id);
+  BUG(IS_ERR(ctx), "mem transaction ctx problem");
+  ctx->data = h->data;
+  ctx->data_size = h->size;
+  wakeup_waitflag(&ctx->completion_waitflag);
+  return ERR_OK;
+}
+
+struct mmal_msg_context {
+  union {
+    struct {
+      int msg_type;
+      atomic_t completion_waitflag;
+      struct mmal_msg *rmsg;
+      int rmsg_size;
+    } sync;
+    struct {
+      struct vchiq_mmal_port *port;
+    } bulk;
+  } u;
+};
+
+#define MMAL_MSG_CONTEXT_INIT_SYNC(__msg_type) \
+{ \
+  .u.sync = { \
+    .msg_type = MMAL_MSG_TYPE_ ## __msg_type,\
+    .completion_waitflag = WAITFLAG_INIT,\
+    .rmsg = NULL \
+  }\
+}
+
+
+
+static uint32_t mmal_msg_context_to_handle(struct mmal_msg_context *ctx)
+{
+  return (uint32_t)(uint64_t)ctx;
+}
+
+static struct mmal_msg_context *mmal_msg_context_from_handle(uint32_t handle)
+{
+  return (struct mmal_msg_context *)(uint64_t)handle;
+}
+
+static uint32_t vchiq_service_to_handle(struct vchiq_service_common *s)
+{
+  return (uint32_t)(uint64_t)s;
+}
+
+static struct vchiq_service_common *mmal_msg_service_from_handle(uint32_t handle)
+{
+  return (struct vchiq_service_common *)(uint64_t)handle;
+}
+
+static inline void mmal_buffer_header_print_flags(struct mmal_buffer_header *h)
+{
+  char buf[256];
+  int n = 0;
+
+#define CHECK_FLAG(__name) \
+  if (h->flags & MMAL_BUFFER_HEADER_FLAG_ ## __name) { \
+    if (n != 0 && (sizeof(buf) - n >= 2)) { \
+      buf[n++] = ','; \
+      buf[n++] = ' '; \
+    } \
+    strncpy(buf + n, #__name, min(sizeof(#__name), sizeof(buf) - n));\
+  }
+
+  CHECK_FLAG(EOS);
+  CHECK_FLAG(FRAME_START);
+  CHECK_FLAG(FRAME_END);
+  CHECK_FLAG(KEYFRAME);
+  CHECK_FLAG(DISCONTINUITY);
+  CHECK_FLAG(CONFIG);
+  CHECK_FLAG(ENCRYPTED);
+  CHECK_FLAG(CODECSIDEINFO);
+  CHECK_FLAG(SNAPSHOT);
+  CHECK_FLAG(CORRUPTED);
+  CHECK_FLAG(TRANSMISSION_FAILED);
+
+#undef CHECK_FLAG
+  MMAL_INFO("buffer_header: %s", buf);
+}
+
+int mmal_buffer_to_host_cb(struct mmal_msg *rmsg)
+{
+  struct mmal_msg_buffer_from_host *r;
+  r = (struct mmal_msg_buffer_from_host *)&rmsg->u;
+  mmal_buffer_header_print_flags(&r->buffer_header);
+  return ERR_OK;
+}
+
+static int mmal_service_data_callback(struct vchiq_service_common *s, struct vchiq_header_struct *h)
+{
+  struct mmal_msg *rmsg;
+  struct mmal_msg_context *msg_ctx;
+
+  MMAL_INFO("mmal_service_data_callback");
+  rmsg = (struct mmal_msg *)h->data;
+
+  if (rmsg->h.type == MMAL_MSG_TYPE_BUFFER_TO_HOST) {
+    return mmal_buffer_to_host_cb(rmsg);
+  }
+
+  msg_ctx = mmal_msg_context_from_handle(rmsg->h.context);
+
+  if (msg_ctx->u.sync.msg_type != rmsg->h.type) {
+    MMAL_ERR("mmal msg expected type %s, received: %s",
+      mmal_msg_type_names[rmsg->h.type],
+      mmal_msg_type_names[msg_ctx->u.sync.msg_type]);
+    return ERR_INVAL_ARG;
+  }
+  msg_ctx->u.sync.rmsg = rmsg;
+  msg_ctx->u.sync.rmsg_size = h->size;
+  wakeup_waitflag(&msg_ctx->u.sync.completion_waitflag);
+
+  return ERR_OK;
+}
+
+
+static inline struct vchiq_service_common *vchiq_open_mmal_service(struct vchiq_state_struct *state)
+{
+  return vchiq_alloc_open_service(state, MAKE_FOURCC("mmal"), VC_MMAL_VER, VC_MMAL_MIN_VER,
+    mmal_service_data_callback);
+}
+
+static inline struct vchiq_service_common *vchiq_open_smem_service(struct vchiq_state_struct *state)
+{
+  return vchiq_alloc_open_service(state, MAKE_FOURCC("SMEM"), VC_SM_VER, VC_SM_MIN_VER,
+    mems_service_data_callback);
+}
+
+void vchiq_mmal_fill_header(struct vchiq_service_common *service, int mmal_msg_type, struct mmal_msg *msg, struct mmal_msg_context *ctx)
 {
   msg->h.magic = MMAL_MAGIC;
-  msg->h.context = 0x5a5a5a5a;
-  msg->h.control_service = 0x6a6a6a6a;
+  msg->h.context = mmal_msg_context_to_handle(ctx);
+  msg->h.control_service = vchiq_service_to_handle(service);
   msg->h.status = 0;
   msg->h.padding = 0;
   msg->h.type = mmal_msg_type;
 }
 
-#define VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __msg_type, __mmal_msg_type, __msg_u) \
+#define VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __msg_type, __msg_u) \
+  struct mmal_msg_context ctx = MMAL_MSG_CONTEXT_INIT_SYNC(__msg_type); \
   struct mmal_msg msg = { 0 }; \
   struct vchiq_service_common *_ms = __ms; \
-  const int msg_type = VCHIQ_MSG_ ## __msg_type; \
-  const int mmal_msg_type = MMAL_MSG_TYPE_ ## __mmal_msg_type; \
   struct mmal_msg_ ## __msg_u *m = &msg.u. __msg_u
 
-#define VCHIQ_MMAL_MSG_DECL(__ms, __msg_type, __mmal_msg_type, __msg_u, __msg_u_reply) \
-  VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __msg_type, __mmal_msg_type, __msg_u); \
-  struct vchiq_header_struct *_h; \
+#define VCHIQ_MMAL_MSG_DECL(__ms, __mmal_msg_type, __msg_u, __msg_u_reply) \
+  VCHIQ_MMAL_MSG_DECL_ASYNC(__ms, __mmal_msg_type, __msg_u); \
   struct mmal_msg_ ## __msg_u_reply *r;
 
 #define VCHIQ_MMAL_MSG_COMMUNICATE_ASYNC() \
-  vchiq_mmal_fill_header(_ms, mmal_msg_type, &msg); \
-  vchiq_handmade_prep_msg(_ms->s, msg_type, _ms->localport, _ms->remoteport, &msg, \
+  waitflag_init(&ctx.u.sync.completion_waitflag); \
+  vchiq_mmal_fill_header(_ms, ctx.u.sync.msg_type, &msg, &ctx); \
+  vchiq_handmade_prep_msg(_ms->s, VCHIQ_MSG_DATA, _ms->localport, _ms->remoteport, &msg, \
     sizeof(struct mmal_msg_header) + sizeof(*m)); \
-  vchiq_event_signal(&_ms->s->remote->trigger) \
+  vchiq_event_signal(&_ms->s->remote->trigger);
 
 #define VCHIQ_MMAL_MSG_COMMUNICATE_SYNC() \
   VCHIQ_MMAL_MSG_COMMUNICATE_ASYNC(); \
-  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &_ms->s->local->trigger); \
-  _h = vchiq_get_next_header_rx(_ms->s); \
-  r = vchiq_mmal_check_reply_msg(_h, msg_type, mmal_msg_type); \
+  wait_on_waitflag(&ctx.u.sync.completion_waitflag); \
+  r = mmal_check_reply_msg(ctx.u.sync.rmsg, ctx.u.sync.msg_type); \
   if (!r) { \
-    MMAL_ERR("invalid reply"); \
+    MMAL_ERR("invalid reply");\
     return ERR_GENERIC; \
   } \
   if (r->status != MMAL_MSG_STATUS_SUCCESS) { \
@@ -488,10 +719,10 @@ void vchiq_mmal_fill_header(struct vchiq_service_common *ms, int mmal_msg_type, 
     return ERR_GENERIC; \
   }
 
+
 int vchiq_mmal_handmade_component_disable(struct vchiq_mmal_component *c)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, COMPONENT_DISABLE, component_disable,
-    component_disable_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, COMPONENT_DISABLE, component_disable, component_disable_reply);
 
   BUG(!c->enabled, "trying to disable mmal component, which is already disabled");
   m->component_handle = c->handle;
@@ -505,8 +736,7 @@ int vchiq_mmal_handmade_component_disable(struct vchiq_mmal_component *c)
 
 int vchiq_mmal_handmade_component_destroy(struct vchiq_service_common *ms, struct vchiq_mmal_component *c)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, COMPONENT_DESTROY, component_destroy,
-    component_destroy_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, COMPONENT_DESTROY, component_destroy, component_destroy_reply);
 
   BUG(c->enabled, "trying to destroy mmal component, which is not disabled first");
   m->component_handle = c->handle;
@@ -520,14 +750,13 @@ int vchiq_mmal_handmade_component_destroy(struct vchiq_service_common *ms, struc
 
 int vchiq_mmal_port_info_get(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_INFO_GET, port_info_get, port_info_get_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_INFO_GET, port_info_get, port_info_get_reply);
 
   m->component_handle = c->handle;
   m->index = p->index;
   m->port_type = p->type;
 
   VCHIQ_MMAL_MSG_COMMUNICATE_SYNC();
-
   if (r->port.is_enabled)
     p->enabled = 1;
   else
@@ -582,17 +811,14 @@ out_err:
   return err;
 }
 
-int mmal_component_create(struct vchiq_service_common *ms, const char *name, int component_idx, struct vchiq_mmal_component **out_component)
+int mmal_component_destroy(struct vchiq_service_common *mmal_service, struct vchiq_mmal_component *c)
 {
-  struct vchiq_mmal_component *c;
-  int i;
-  VCHIQ_MMAL_MSG_DECL(ms, DATA, COMPONENT_CREATE, component_create, component_create_reply);
+  return ERR_OK;
+}
 
-  c = kzalloc(sizeof(*c), GFP_KERNEL);
-  if (IS_ERR(c)) {
-    MMAL_ERR("failed to allocate memory for mmal_component");
-    return PTR_ERR(c);
-  }
+int mmal_component_create(struct vchiq_service_common *mmal_service, const char *name, int component_idx, struct vchiq_mmal_component *c)
+{
+  VCHIQ_MMAL_MSG_DECL(mmal_service, COMPONENT_CREATE, component_create, component_create_reply);
 
   m->client_component = component_idx;
   strncpy(m->name, name, sizeof(m->name));
@@ -600,41 +826,65 @@ int mmal_component_create(struct vchiq_service_common *ms, const char *name, int
   VCHIQ_MMAL_MSG_COMMUNICATE_SYNC();
 
   c->handle = r->component_handle;
-  c->ms = ms;
+  c->ms = mmal_service;
   c->enabled = true;
   c->inputs = r->input_num;
   c->outputs = r->output_num;
   c->clocks = r->clock_num;
-  strncpy(c->name, name, sizeof(c->name));
-
-  MMAL_INFO("vchiq component created name:%s: status:%d, handle: %d, input: %d, output: %d, clock: %d",
-    c->name, r->status, c->handle, c->inputs, c->outputs, c->clocks);
-
-  mmal_port_create(c, &c->control, MMAL_PORT_TYPE_CONTROL, 0);
-
-  for (i = 0; i < c->inputs; ++i)
-    mmal_port_create(c, &c->input[i], MMAL_PORT_TYPE_INPUT, i);
-
-  for (i = 0; i < c->outputs; ++i)
-    mmal_port_create(c, &c->output[i], MMAL_PORT_TYPE_OUTPUT, i);
-
-  *out_component = c;
   return ERR_OK;
 }
 
-struct vchiq_mmal_component *vchiq_mmal_create_camera_info(struct vchiq_service_common *ms)
+struct vchiq_mmal_component *component_create(struct vchiq_service_common *mmal_service, const char *name)
 {
-  int err;
+  int err, i;
   struct vchiq_mmal_component *c;
-  err = mmal_component_create(ms, "camera_info", 0, &c);
+  c = kzalloc(sizeof(*c), GFP_KERNEL);
+  if (IS_ERR(c)) {
+    MMAL_ERR("failed to allocate memory for mmal_component");
+    return c;
+  }
+  err = mmal_component_create(mmal_service, name, 0, c);
   if (err != ERR_OK)
-    return ERR_PTR(err);
+    goto err_component_free;
+
+  strncpy(c->name, name, sizeof(c->name));
+
+  MMAL_INFO("vchiq component created name:%s: handle: %d, input: %d, output: %d, clock: %d",
+    c->name, c->handle, c->inputs, c->outputs, c->clocks);
+
+  err = mmal_port_create(c, &c->control, MMAL_PORT_TYPE_CONTROL, 0);
+  if (err != ERR_OK)
+    goto err_component_destroy;
+
+  for (i = 0; i < c->inputs; ++i) {
+    err = mmal_port_create(c, &c->input[i], MMAL_PORT_TYPE_INPUT, i);
+    if (err != ERR_OK)
+      goto err_component_destroy;
+  }
+
+  for (i = 0; i < c->outputs; ++i) {
+    err = mmal_port_create(c, &c->output[i], MMAL_PORT_TYPE_OUTPUT, i);
+    if (err != ERR_OK)
+      goto err_component_destroy;
+  }
+
   return c;
+err_component_destroy:
+  mmal_component_destroy(mmal_service, c);
+
+err_component_free:
+  kfree(c);
+  return ERR_PTR(err);
+}
+
+static inline struct vchiq_mmal_component *vchiq_mmal_create_camera_info(struct vchiq_service_common *mmal_service)
+{
+  return component_create(mmal_service, "camera_info");
 }
 
 int vchiq_mmal_port_info_set(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_INFO_SET, port_info_set, port_info_set_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_INFO_SET, port_info_set, port_info_set_reply);
 
   m->component_handle = c->handle;
   m->port_type = p->type;
@@ -658,7 +908,7 @@ int vchiq_mmal_port_info_set(struct vchiq_mmal_component *c, struct vchiq_mmal_p
 int vchiq_mmal_port_parameter_set(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p,
   uint32_t parameter_id, void *value, int value_size)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_PARAMETER_SET, port_parameter_set, port_parameter_set_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_PARAMETER_SET, port_parameter_set, port_parameter_set_reply);
 
   /* GET PARAMETER CAMERA INFO */
   m->component_handle = c->handle;
@@ -676,6 +926,7 @@ int vchiq_mmal_port_parameter_set(struct vchiq_mmal_component *c, struct vchiq_m
 int vchiq_mmal_port_set_format(struct vchiq_mmal_component *c, struct vchiq_mmal_port *port)
 {
   int err;
+
   err = vchiq_mmal_port_info_set(c, port);
   CHECK_ERR("failed to set port info");
 
@@ -689,7 +940,7 @@ out_err:
 int vchiq_mmal_port_parameter_get(struct vchiq_mmal_component *c,
   struct vchiq_mmal_port *port, int parameter_id, void *value, uint32_t *value_size)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_PARAMETER_GET, port_parameter_get, port_parameter_get_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_PARAMETER_GET, port_parameter_get, port_parameter_get_reply);
 
   m->component_handle = c->handle;
   m->port_handle = port->handle;
@@ -752,7 +1003,7 @@ int mmal_set_camera_parameters(struct vchiq_mmal_component *c, struct mmal_param
 
 int vchiq_mmal_port_action_port(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, int action)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_ACTION, port_action_port, port_action_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_ACTION, port_action_port, port_action_reply);
 
   m->component_handle = c->handle;
   m->port_handle = p->handle;
@@ -765,7 +1016,7 @@ int vchiq_mmal_port_action_port(struct vchiq_mmal_component *c, struct vchiq_mma
 
 int vchiq_mmal_port_action_handle(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, int action, int dst_component_handle, int dst_port_handle)
 {
-  VCHIQ_MMAL_MSG_DECL(c->ms, DATA, PORT_ACTION, port_action_handle, port_action_reply);
+  VCHIQ_MMAL_MSG_DECL(c->ms, PORT_ACTION, port_action_handle, port_action_reply);
 
   m->component_handle = c->handle;
   m->port_handle = p->handle;
@@ -788,7 +1039,7 @@ int vchiq_bulk_rx(struct vchiq_mmal_component *c, uint32_t bufaddr, uint32_t buf
 
   vchiq_handmade_prep_msg(c->ms->s, VCHIQ_MSG_BULK_RX, c->ms->localport, c->ms->remoteport, payload, sizeof(payload));
   vchiq_event_signal(&c->ms->s->remote->trigger);
-  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
+  vchiq_event_wait(&c->ms->s->trigger_waitflag, &c->ms->s->local->trigger);
 
   h = vchiq_get_next_header_rx(c->ms->s);
   if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_BULK_RX_DONE) {
@@ -798,55 +1049,10 @@ int vchiq_bulk_rx(struct vchiq_mmal_component *c, uint32_t bufaddr, uint32_t buf
   return ERR_OK;
 }
 
-static inline void mmal_buffer_header_print_flags(struct mmal_buffer_header *h)
-{
-  char buf[256];
-  int n = 0;
-
-#define CHECK_FLAG(__name) \
-  if (h->flags & MMAL_BUFFER_HEADER_FLAG_ ## __name) { \
-    if (n != 0 && (sizeof(buf) - n >= 2)) { \
-      buf[n++] = ','; \
-      buf[n++] = ' '; \
-    } \
-    strncpy(buf + n, #__name, min(sizeof(#__name), sizeof(buf) - n));\
-  }
-
-  CHECK_FLAG(EOS);
-  CHECK_FLAG(FRAME_START);
-  CHECK_FLAG(FRAME_END);
-  CHECK_FLAG(KEYFRAME);
-  CHECK_FLAG(DISCONTINUITY);
-  CHECK_FLAG(CONFIG);
-  CHECK_FLAG(ENCRYPTED);
-  CHECK_FLAG(CODECSIDEINFO);
-  CHECK_FLAG(SNAPSHOT);
-  CHECK_FLAG(CORRUPTED);
-  CHECK_FLAG(TRANSMISSION_FAILED);
-
-#undef CHECK_FLAG
-  MMAL_INFO("buffer_header: %s", buf);
-}
-
-int vchiq_mmal_buffer_to_host(struct vchiq_mmal_component *c)
-{
-  struct vchiq_header_struct *h;
-  struct mmal_msg_buffer_from_host *r;
-
-  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
-  h = vchiq_get_next_header_rx(c->ms->s);
-  r = vchiq_mmal_check_reply_msg(h, VCHIQ_MSG_DATA, MMAL_MSG_TYPE_BUFFER_TO_HOST);
-  if (!r) {
-    MMAL_ERR("invalid reply");
-    return ERR_GENERIC;
-  }
-  mmal_buffer_header_print_flags(&r->buffer_header);
-  return ERR_OK;
-}
 
 int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b)
 {
-  VCHIQ_MMAL_MSG_DECL_ASYNC(p->component->ms, DATA, BUFFER_FROM_HOST, buffer_from_host);
+  VCHIQ_MMAL_MSG_DECL_ASYNC(p->component->ms, BUFFER_FROM_HOST, buffer_from_host);
 
   memset(m, 0xbc, sizeof(*m));
 
@@ -887,28 +1093,10 @@ int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b
 
 int vchiq_mmal_component_enable(struct vchiq_mmal_component *c)
 {
-  struct mmal_msg msg;
-  struct vchiq_header_struct *header;
-  struct mmal_msg_component_enable_reply *r;
+  VCHIQ_MMAL_MSG_DECL(c->ms, COMPONENT_ENABLE, component_enable, component_enable_reply);
 
-  msg.u.component_enable.component_handle = c->handle;
-
-  /* send MMAL message synchronous */
-  vchiq_mmal_fill_header(c->ms, MMAL_MSG_TYPE_COMPONENT_ENABLE, &msg);
-  vchiq_handmade_prep_msg(c->ms->s, VCHIQ_MSG_DATA, c->ms->localport, c->ms->remoteport, &msg,
-    sizeof(struct mmal_msg_header) + sizeof(msg.u.port_action_port));
-  vchiq_event_signal(&c->ms->s->remote->trigger);
-  vchiq_event_wait(&c->ms->s->local->trigger_waitflag, &c->ms->s->local->trigger);
-  header = vchiq_get_next_header_rx(c->ms->s);
-  r = vchiq_mmal_check_reply_msg(header, VCHIQ_MSG_DATA, MMAL_MSG_TYPE_COMPONENT_ENABLE);
-  if (!r) {
-    MMAL_ERR("invalid reply");
-    return -1;
-  }
-  if (r->status != MMAL_MSG_STATUS_SUCCESS) {
-    MMAL_ERR("status not success: %d reply", r->status);
-    return ERR_GENERIC;
-  }
+  m->component_handle = c->handle;
+  VCHIQ_MMAL_MSG_COMMUNICATE_SYNC();
   return ERR_OK;
 }
 
@@ -1024,14 +1212,21 @@ sm_cmd_rsp_blk *vc_vchi_cmd_create(enum vc_sm_msg_type id, void *msg,
 
 #define VC_SM_RESOURCE_NAME_DEFAULT       "sm-host-resource"
 
-static int vc_sm_cma_vchi_send_msg(struct vchiq_service_common *ms,
+static int vc_sm_cma_vchi_send_msg(struct vchiq_service_common *mems_service,
   enum vc_sm_msg_type msg_id, void *msg,
   uint32_t msg_size, void *result, uint32_t result_size,
   uint32_t *cur_trans_id, uint8_t wait_reply)
 {
-  struct vchiq_header_struct *h;
+  int err;
   char buf[256];
   struct vc_sm_msg_hdr_t *hdr = (struct vc_sm_msg_hdr_t *)buf;
+  struct mems_msg_context *ctx;
+  ctx = mems_msg_context_alloc();
+  if (IS_ERR(ctx)) {
+    err = PTR_ERR(ctx);
+    MMAL_ERR("Failed to allocate mems message context");
+    return err;
+  }
   // struct sm_cmd_rsp_blk *cmd;
   hdr->type = msg_id;
   hdr->trans_id = vc_trans_id++;
@@ -1042,25 +1237,30 @@ static int vc_sm_cma_vchi_send_msg(struct vchiq_service_common *ms,
   // cmd = vc_vchi_cmd_create(msg_id, msg, msg_size, 1);
   // cmd->sent = 1;
 
-  vchiq_handmade_prep_msg(ms->s, VCHIQ_MSG_DATA, ms->localport, ms->remoteport, hdr, msg_size + sizeof(*hdr));
-  vchiq_event_signal(&ms->s->remote->trigger);
-  vchiq_event_wait(&ms->s->local->trigger_waitflag, &ms->s->local->trigger);
+  vchiq_handmade_prep_msg(
+    mems_service->s,
+    VCHIQ_MSG_DATA,
+    mems_service->localport,
+    mems_service->remoteport,
+    hdr,
+    msg_size + sizeof(*hdr));
 
-  h = vchiq_get_next_header_rx(ms->s);
-  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_DATA) {
-    MMAL_ERR("Expected msg type VCHIQ_MSG_OPENACK from remote");
-    return ERR_GENERIC;
-  }
-  memcpy(result, h->data, result_size);
+  vchiq_event_signal(&mems_service->s->remote->trigger);
+  wait_on_waitflag(&ctx->completion_waitflag);
+
+  memcpy(result, ctx->data, ctx->data_size);
+  mems_msg_context_free(ctx);
   return ERR_OK;
 }
 
-int vc_sm_cma_vchi_import(struct vchiq_service_common *ms, struct vc_sm_import *msg, struct vc_sm_import_result *result, uint32_t *cur_trans_id)
+int vc_sm_cma_vchi_import(struct vchiq_service_common *mems_service, struct vc_sm_import *msg,
+  struct vc_sm_import_result *result, uint32_t *cur_trans_id)
 {
-  return vc_sm_cma_vchi_send_msg(ms, VC_SM_MSG_TYPE_IMPORT, msg, sizeof(*msg), result, sizeof(*result), cur_trans_id, 1);
+  return vc_sm_cma_vchi_send_msg(mems_service, VC_SM_MSG_TYPE_IMPORT, msg,
+   sizeof(*msg), result, sizeof(*result), cur_trans_id, 1);
 }
 
-int vc_sm_cma_import_dmabuf(struct vchiq_service_common *ms, struct mmal_buffer *b, void **vcsm_handle)
+int vc_sm_cma_import_dmabuf(struct vchiq_service_common *mems_service, struct mmal_buffer *b, void **vcsm_handle)
 {
   int err;
   struct vc_sm_import import;
@@ -1073,7 +1273,7 @@ int vc_sm_cma_import_dmabuf(struct vchiq_service_common *ms, struct mmal_buffer 
   import.kernel_id = 0x6677;
 
   memcpy(import.name, VC_SM_RESOURCE_NAME_DEFAULT, sizeof(VC_SM_RESOURCE_NAME_DEFAULT));
-  err = vc_sm_cma_vchi_import(ms, &import, &result, &cur_trans_id);
+  err = vc_sm_cma_vchi_import(mems_service, &import, &result, &cur_trans_id);
   CHECK_ERR("Failed to import buffer to vc");
   MMAL_INFO("imported_dmabuf: addr:%08x, size: %d, trans_id: %08x, res.trans_id: %08x, res.handle: %08x",
     import.addr, import.size, cur_trans_id, result.trans_id, result.res_handle);
@@ -1086,7 +1286,7 @@ out_err:
   return err;
 }
 
-int mmal_alloc_port_buffers(struct vchiq_service_common *mem_service, struct vchiq_mmal_port *p)
+int mmal_alloc_port_buffers(struct vchiq_service_common *mems_service, struct vchiq_mmal_port *p)
 {
   int err;
   int i;
@@ -1095,7 +1295,7 @@ int mmal_alloc_port_buffers(struct vchiq_service_common *mem_service, struct vch
     buf = kzalloc(sizeof(*buf), GFP_KERNEL);
     buf->buffer_size = p->minimum_buffer.size;
     buf->buffer = dma_alloc(buf->buffer_size);;
-    MMAL_INFO("mmal_alloc_port_buffers: min_num: %d, min_sz:%d, min_al:%d, port_enabled:%s, buf:%08x",
+    MMAL_INFO("min_num: %d, min_sz:%d, min_al:%d, port_enabled:%s, buf:%08x",
       p->minimum_buffer.num,
       p->minimum_buffer.size,
       p->minimum_buffer.alignment,
@@ -1103,7 +1303,7 @@ int mmal_alloc_port_buffers(struct vchiq_service_common *mem_service, struct vch
       buf->buffer);
 
     if (p->zero_copy) {
-      err = vc_sm_cma_import_dmabuf(mem_service, buf, &buf->vcsm_handle);
+      err = vc_sm_cma_import_dmabuf(mems_service, buf, &buf->vcsm_handle);
       CHECK_ERR("failed to import dmabuf");
     }
     list_add_tail(&buf->list, &p->buffers);
@@ -1143,6 +1343,7 @@ int vchiq_mmal_get_cam_info(struct vchiq_service_common *ms, struct mmal_paramet
 
   err = vchiq_mmal_handmade_component_destroy(ms, camera_info);
   CHECK_ERR("Failed to destroy 'camera info' component");
+  return ERR_OK;
 
 out_err:
   return err;
@@ -1445,7 +1646,10 @@ static int mmal_port_buffer_send(struct vchiq_mmal_port *p)
 
 static int mmal_port_buffer_receive(struct vchiq_mmal_port *p)
 {
-  return vchiq_mmal_buffer_to_host(p->component);
+  while(1) {
+    asm volatile ("wfe");
+  }
+  return ERR_OK;
 }
 
 
@@ -1464,7 +1668,7 @@ out_err:
   return err;
 }
 
-int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_common *mem_service, int frame_width, int frame_height)
+int vchiq_camera_run(struct vchiq_service_common *mmal_service, struct vchiq_service_common *mems_service, int frame_width, int frame_height)
 {
   int err;
   struct mmal_parameter_camera_info_t cam_info = {0};
@@ -1473,12 +1677,12 @@ int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_commo
   uint32_t supported_encodings[MAX_SUPPORTED_ENCODINGS];
   int num_encodings;
 
-  err = vchiq_mmal_get_cam_info(ms, &cam_info);
+  err = vchiq_mmal_get_cam_info(mmal_service, &cam_info);
   CHECK_ERR("Failed to get num cameras");
 
   /* mmal_init start */
-  err = mmal_component_create(ms, "ril.camera", 0, &cam);
-  CHECK_ERR("Failed to create component 'ril.camera'");
+  cam = component_create(mmal_service, "ril.camera");
+  CHECK_ERR_PTR(cam, "Failed to create component 'ril.camera'");
 
   err =  mmal_set_camera_parameters(cam, &cam_info.cameras[0]);
   CHECK_ERR("Failed to set parameters to component 'ril.camera'");
@@ -1510,7 +1714,7 @@ int vchiq_camera_run(struct vchiq_service_common *ms, struct vchiq_service_commo
   err = vchiq_mmal_port_enable(still_port);
   CHECK_ERR("Failed to enable video_port");
 
-  err = mmal_alloc_port_buffers(mem_service, still_port);
+  err = mmal_alloc_port_buffers(mems_service, still_port);
   CHECK_ERR("Failed to prepare buffer for still port");
 
   while(1) {
@@ -1527,54 +1731,28 @@ out_err:
   return err;
 }
 
-struct vchiq_service_common *vchiq_mmal_service_run(struct vchiq_state_struct *s)
-{
-  int err;
-  struct vchiq_service_common *ms;
-  ms = kzalloc(sizeof(*ms), GFP_KERNEL);
-
-  ms->s = s;
-  s->rx_pos = 0;
-
-  s->conn_state = VCHIQ_CONNSTATE_DISCONNECTED;
-
-  err = vchiq_handmade_connect(s);
-  CHECK_ERR("failed at connection step");
-  err =  vchiq_handmade_open_mmal(s, ms);
-  CHECK_ERR("failed at open mmal step");
-
-  return ms;
-
-out_err:
-  return ERR_PTR(err);
-}
+static struct vchiq_state_struct vchiq_state ALIGNED(64);
 
 static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
 static struct task *vchiq_task = NULL;
-static struct vchiq_state_struct *vchiq_state = NULL;
 
 #define BELL0 ((reg32_t)(0x3f00b840))
-
-static inline void vchiq_check_event(atomic_t *waitflag, struct remote_event_struct *e)
-{
-  if (e->armed && e->fired)
-    wakeup_waitflag(waitflag);
-}
 
 static void vchiq_check_local_events()
 {
   struct vchiq_shared_state_struct *local;
-  local = vchiq_state->local;
-  vchiq_check_event(&local->trigger_waitflag, &local->trigger);
-  vchiq_check_event(&local->recycle_waitflag, &local->recycle);
-  vchiq_check_event(&local->sync_trigger_waitflag, &local->sync_trigger);
-  vchiq_check_event(&local->sync_release_waitflag, &local->sync_release);
+  local = vchiq_state.local;
+  vchiq_event_check(&vchiq_state.trigger_waitflag, &local->trigger);
+  vchiq_event_check(&vchiq_state.recycle_waitflag, &local->recycle);
+  vchiq_event_check(&vchiq_state.sync_trigger_waitflag, &local->sync_trigger);
+  vchiq_event_check(&vchiq_state.sync_release_waitflag, &local->sync_release);
 }
 
 static void vchiq_irq_handler(void)
 {
   uint32_t bell_reg;
   vchiq_events++;
+  printf("vchiq_irq_handler\r\n");
 
   /*
    * This is a very specific undocumented part of vchiq IRQ
@@ -1615,19 +1793,75 @@ static void vchiq_irq_handler(void)
     vchiq_check_local_events();
 }
 
+static int vchiq_parse_msg_openack(struct vchiq_state_struct *s, int localport, int remoteport)
+{
+  struct vchiq_service_common *service = NULL;
+  printf("vchiq_parse_msg_openack\r\n");
+
+  service = vchiq_service_find_by_localport(localport);
+  BUG(!service, "OPENACK with no service");
+  service->opened = true;
+  service->remoteport = remoteport;
+  wmb();
+  wakeup_waitflag(&s->state_waitflag);
+  return ERR_OK;
+}
+
+static int vchiq_parse_msg_data(struct vchiq_state_struct *s, int localport, int remoteport,
+  struct vchiq_header_struct *h)
+{
+  struct vchiq_service_common *service = NULL;
+  MMAL_INFO("data");
+
+  service = vchiq_service_find_by_localport(localport);
+  BUG(!service, "MSG_DATA with no service");
+  service->data_callback(service, h);
+  return ERR_OK;
+}
+
+static int vchiq_parse_rx(struct vchiq_state_struct *s)
+{
+  int err = ERR_OK;
+  struct vchiq_header_struct *h;
+  int msg_type, localport, remoteport;
+
+  h = vchiq_get_next_header_rx(s);
+  msg_type = VCHIQ_MSG_TYPE(h->msgid);
+  localport = VCHIQ_MSG_DSTPORT(h->msgid);
+  remoteport = VCHIQ_MSG_SRCPORT(h->msgid);
+  switch(msg_type) {
+    case VCHIQ_MSG_CONNECT:
+      s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
+      wakeup_waitflag(&s->state_waitflag);
+      break;
+    case VCHIQ_MSG_OPENACK:
+      err = vchiq_parse_msg_openack(s, localport, remoteport);
+      break;
+    case VCHIQ_MSG_DATA:
+      err = vchiq_parse_msg_data(s, localport, remoteport, h);
+    default:
+      err = ERR_INVAL_ARG;
+      break;
+    CHECK_ERR("failed to parse message from remote");
+  }
+  return ERR_OK;
+out_err:
+  return err;
+}
+
 static int vchiq_loop_thread(void)
 {
-  uint64_t last_events = vchiq_events;
-  uint64_t new_events;
+  struct vchiq_state_struct *s;
+  // uint64_t last_events = vchiq_events;
+  // uint64_t new_events;
 
+  s = &vchiq_state;
   while(1) {
-    if (last_events != vchiq_events)
-      yield();
-    new_events = vchiq_events - last_events;
-    if (new_events) {
-      MMAL_INFO("new events: %ld", new_events);
-      last_events = vchiq_events;
-    }
+    printf("vchiq_loop_thread: waiting trigger_waitflag\r\n");
+    vchiq_event_wait(&s->trigger_waitflag, &s->local->trigger);
+    printf("vchiq_loop_thread: waiting trigger_waitflag fired\r\n");
+    BUG(vchiq_parse_rx(s) != ERR_OK,
+      "failed to parse incoming vchiq messages");
   }
   return ERR_OK;
 }
@@ -1636,12 +1870,12 @@ static int vchiq_start_thread(struct vchiq_state_struct *s)
 {
   int err;
 
-  vchiq_state = s;
-  irq_set(0, INTR_CTL_IRQ_ARM_DOORBELL_0, vchiq_irq_handler);
+  irq_set(0, INTR_CTL_IRQ_GPU_DOORBELL_0, vchiq_irq_handler);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_DOORBELL_0);
   vchiq_task = task_create(vchiq_loop_thread, "vchiq_loop_thread");
   CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
   sched_queue_runnable_task(get_scheduler(), vchiq_task);
+  yield();
 
   return ERR_OK;
 
@@ -1655,17 +1889,23 @@ out_err:
 void vchiq_handmade(struct vchiq_state_struct *s, struct vchiq_slot_zero_struct *z)
 {
   int err;
-  struct vchiq_service_common *ms, *mem_service;
+  struct vchiq_service_common *smem_service, *mmal_service;
 
   err = vchiq_start_thread(s);
   CHECK_ERR("failed to start vchiq async primitives");
-  ms = vchiq_mmal_service_run(s);
-  CHECK_ERR_PTR(ms, "failed to run mmal service");
+  wait_on_waitflag(&s->state_waitflag);
+  // if (s->conn_state != VCHIQ_CONNSTATE_CONNECTED) {
+  err = vchiq_handmade_connect(s);
+ //   CHECK_ERR("failed at connection step");
+  //}
 
-  mem_service =  vchiq_handmade_open_sm_cma_service(s);
-  CHECK_ERR_PTR(mem_service, "failed at open mems service");
+  mmal_service = vchiq_open_mmal_service(s);
+  CHECK_ERR_PTR(mmal_service, "failed to open mmal service");
 
-  err = vchiq_camera_run(ms, mem_service, 160, 120);
+  smem_service = vchiq_open_smem_service(s);
+  CHECK_ERR_PTR(smem_service, "failed at open smem service");
+
+  err = vchiq_camera_run(mmal_service, smem_service, 160, 120);
   CHECK_ERR("failed to run camera");
 
 out_err:
@@ -1690,7 +1930,7 @@ void vchiq_prepare_fragments(char *fragments_base, uint32_t fragment_size)
 
 }
 
-int vchiq_platform_init(VCHIQ_STATE_T *state)
+int vchiq_platform_init(void)
 {
   VCHIQ_SLOT_ZERO_T *vchiq_slot_zero;
   void *slot_mem;
@@ -1699,6 +1939,7 @@ int vchiq_platform_init(VCHIQ_STATE_T *state)
   int slot_mem_size, frag_mem_size;
   int err;
   uint32_t fragment_size;
+  struct vchiq_state_struct *s = &vchiq_state;
 
   fragment_size = 2 * 64; /* g_cache_line_size */
   /* Allocate space for the channels in coherent memory */
@@ -1716,7 +1957,7 @@ int vchiq_platform_init(VCHIQ_STATE_T *state)
   if (!vchiq_slot_zero)
     return ERR_INVAL_ARG;
 
-  if (vchiq_init_state(state, vchiq_slot_zero, 0) != VCHIQ_SUCCESS)
+  if (vchiq_init_state(s, vchiq_slot_zero, 0) != VCHIQ_SUCCESS)
     return ERR_INVAL_ARG;
 
   vchiq_slot_zero->platform_data[VCHIQ_PLATFORM_FRAGMENTS_OFFSET_IDX] = ((uint32_t)slot_phys) + slot_mem_size;
@@ -1738,7 +1979,9 @@ int vchiq_platform_init(VCHIQ_STATE_T *state)
 
   vchiq_log_info(vchiq_arm_log_level, "vchiq_init - done (slots %x, phys %pad)", (unsigned int)(uint64_t)(uint32_t *)vchiq_slot_zero, &slot_phys);
 
-  vchiq_handmade(state, vchiq_slot_zero);
+  s->conn_state = VCHIQ_CONNSTATE_DISCONNECTED;
+
+  vchiq_handmade(s, vchiq_slot_zero);
 
   return ERR_OK;
 }

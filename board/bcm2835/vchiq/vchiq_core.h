@@ -409,12 +409,6 @@ typedef struct vchiq_shared_state_struct {
 	/* This event should be signalled when a synchronous message has been
 	** released. */
 	REMOTE_EVENT_T sync_release;
-
-	atomic_t trigger_waitflag;
-	atomic_t recycle_waitflag;
-	atomic_t sync_trigger_waitflag;
-	atomic_t sync_release_waitflag;
-
 	/* A circular buffer of slot indexes. */
 	int slot_queue[VCHIQ_MAX_SLOTS_PER_SIDE];
 
@@ -466,17 +460,11 @@ struct vchiq_state_struct {
 	/* Processes synchronous messages */
 	struct task *sync_thread;
 
-	/* Local implementation of the trigger remote event */
-	struct semaphore trigger_event;
-
-	/* Local implementation of the recycle remote event */
-	struct semaphore recycle_event;
-
-	/* Local implementation of the sync trigger remote event */
-	struct semaphore sync_trigger_event;
-
-	/* Local implementation of the sync release remote event */
-	struct semaphore sync_release_event;
+	atomic_t trigger_waitflag;
+	atomic_t recycle_waitflag;
+	atomic_t sync_trigger_waitflag;
+	atomic_t sync_release_waitflag;
+  atomic_t state_waitflag;
 
 	char *tx_data;
 	char *rx_data;
@@ -546,6 +534,18 @@ struct vchiq_state_struct {
 	VCHIQ_SLOT_INFO_T slot_info[VCHIQ_MAX_SLOTS];
 
 	VCHIQ_PLATFORM_STATE_T platform_state;
+};
+
+struct vchiq_service_common;
+typedef int (*vchiq_data_callback_t)(struct vchiq_service_common *, struct vchiq_header_struct *);
+
+struct vchiq_service_common {
+  uint32_t fourcc;
+  bool opened;
+  int remoteport;
+  int localport;
+  struct vchiq_state_struct *s;
+  vchiq_data_callback_t data_callback;
 };
 
 struct bulk_waiter {

@@ -89,14 +89,6 @@ struct vchiq_mmal_port {
 	struct mmal_msg_context *event_context;
 };
 
-struct vchiq_state_struct;
-
-struct vchiq_service_common {
-  int remoteport;
-  int localport;
-  struct vchiq_state_struct *s;
-};
-
 struct vchiq_mmal_component {
 	char name[32];
 	uint32_t in_use:1;

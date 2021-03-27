@@ -132,9 +132,9 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance);
 static inline VCHIQ_STATUS_T vchiq_add_service(VCHIQ_INSTANCE_T instance,
 	const VCHIQ_SERVICE_PARAMS_T *params,
 	VCHIQ_SERVICE_HANDLE_T *pservice) { return 0; }
-VCHIQ_STATUS_T vchiq_open_service(VCHIQ_INSTANCE_T instance,
-	const VCHIQ_SERVICE_PARAMS_T *params,
-	VCHIQ_SERVICE_HANDLE_T *pservice);
+//VCHIQ_STATUS_T vchiq_open_service(VCHIQ_INSTANCE_T instance,
+//	const VCHIQ_SERVICE_PARAMS_T *params,
+//	VCHIQ_SERVICE_HANDLE_T *pservice);
 extern VCHIQ_STATUS_T vchiq_close_service(VCHIQ_SERVICE_HANDLE_T service);
 extern VCHIQ_STATUS_T vchiq_remove_service(VCHIQ_SERVICE_HANDLE_T service);
 static inline VCHIQ_STATUS_T vchiq_use_service(VCHIQ_SERVICE_HANDLE_T service) { return 0; }

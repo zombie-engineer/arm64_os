@@ -646,76 +646,77 @@ static void service_free(struct shim_service *service)
 	}
 }
 
-VCHIQ_STATUS_T vchiq_open_service(
-	VCHIQ_INSTANCE_T              instance,
-	const VCHIQ_SERVICE_PARAMS_T *params,
-	VCHIQ_SERVICE_HANDLE_T       *phandle)
-{
-	VCHIQ_STATUS_T   status = VCHIQ_ERROR;
-	VCHIQ_STATE_T   *state = instance->state;
-	VCHIQ_SERVICE_T *service = NULL;
-
-	vchiq_log_trace(vchiq_core_log_level,
-		"%s(%p) called", __func__, instance);
-
-	*phandle = VCHIQ_SERVICE_HANDLE_INVALID;
-
-	//if (!vchiq_is_connected(instance))
-	//	goto failed;
-
-	service = vchiq_add_service_internal(state,
-		params,
-		VCHIQ_SRVSTATE_OPENING,
-		instance,
-		NULL);
-
-	if (service) {
-		*phandle = service->handle;
-		status = vchiq_open_service_internal(service, 0);
-//        current->pid);
-		if (status != VCHIQ_SUCCESS) {
-			vchiq_remove_service(service->handle);
-			*phandle = VCHIQ_SERVICE_HANDLE_INVALID;
-		}
-	}
-
-//failed:
-	vchiq_log_trace(vchiq_core_log_level,
-		"%s(%p): returning %d", __func__, instance, status);
-
-	return status;
-}
+//VCHIQ_STATUS_T vchiq_open_service(
+//	VCHIQ_INSTANCE_T              instance,
+//	const VCHIQ_SERVICE_PARAMS_T *params,
+//	VCHIQ_SERVICE_HANDLE_T       *phandle)
+//{
+//	VCHIQ_STATUS_T   status = VCHIQ_ERROR;
+//	VCHIQ_STATE_T   *state = instance->state;
+//	VCHIQ_SERVICE_T *service = NULL;
+//
+//	vchiq_log_trace(vchiq_core_log_level,
+//		"%s(%p) called", __func__, instance);
+//
+//	*phandle = VCHIQ_SERVICE_HANDLE_INVALID;
+//
+//	//if (!vchiq_is_connected(instance))
+//	//	goto failed;
+//
+//	service = vchiq_add_service_internal(state,
+//		params,
+//		VCHIQ_SRVSTATE_OPENING,
+//		instance,
+//		NULL);
+//
+//	if (service) {
+//		*phandle = service->handle;
+//		status = vchiq_open_service_internal(service, 0);
+////        current->pid);
+//		if (status != VCHIQ_SUCCESS) {
+//			vchiq_remove_service(service->handle);
+//			*phandle = VCHIQ_SERVICE_HANDLE_INVALID;
+//		}
+//	}
+//
+////failed:
+//	vchiq_log_trace(vchiq_core_log_level,
+//		"%s(%p): returning %d", __func__, instance, status);
+//
+//	return status;
+//}
 
 int32_t vchi_service_open(VCHI_INSTANCE_T instance_handle,
 	SERVICE_CREATION_T *setup,
 	VCHI_SERVICE_HANDLE_T *handle)
 {
-	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
-	struct shim_service *service = service_alloc(instance, setup);
-
-	*handle = (VCHI_SERVICE_HANDLE_T)service;
-
-	if (service) {
-		VCHIQ_SERVICE_PARAMS_T params;
-		VCHIQ_STATUS_T status;
-
-		memset(&params, 0, sizeof(params));
-		params.fourcc = setup->service_id;
-		params.callback = shim_callback;
-		params.userdata = service;
-		params.version = setup->version.version;
-		params.version_min = setup->version.version_min;
-
-		status = vchiq_open_service(instance, &params,
-			&service->handle);
-		if (status != VCHIQ_SUCCESS) {
-			service_free(service);
-			service = NULL;
-			*handle = NULL;
-		}
-	}
-
-	return (service != NULL) ? 0 : -1;
+//	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
+//	struct shim_service *service = service_alloc(instance, setup);
+//
+//	*handle = (VCHI_SERVICE_HANDLE_T)service;
+//
+//	if (service) {
+//		VCHIQ_SERVICE_PARAMS_T params;
+//		VCHIQ_STATUS_T status;
+//
+//		memset(&params, 0, sizeof(params));
+//		params.fourcc = setup->service_id;
+//		params.callback = shim_callback;
+//		params.userdata = service;
+//		params.version = setup->version.version;
+//		params.version_min = setup->version.version_min;
+//
+//		status = vchiq_open_service(instance, &params,
+//			&service->handle);
+//		if (status != VCHIQ_SUCCESS) {
+//			service_free(service);
+//			service = NULL;
+//			*handle = NULL;
+//		}
+//	}
+//
+//	return (service != NULL) ? 0 : -1;
+ return -1;
 }
 
 int32_t vchi_service_create(VCHI_INSTANCE_T instance_handle,

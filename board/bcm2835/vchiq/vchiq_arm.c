@@ -1564,18 +1564,19 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
 //}
 //
 
-extern VCHIQ_STATE_T vchiq_state;
+// extern VCHIQ_STATE_T vchiq_state;
 
 VCHIQ_STATE_T *vchiq_get_state(void)
 {
-	if (vchiq_state.remote == NULL)
-		printf("%s: g_state.remote == NULL\n", __func__);
-	else if (vchiq_state.remote->initialised != 1)
-		printf("%s: g_state.remote->initialised != 1 (%d)\n",
-			__func__, vchiq_state.remote->initialised);
-
-	return ((vchiq_state.remote != NULL) &&
-		(vchiq_state.remote->initialised == 1)) ? &vchiq_state : NULL;
+  return NULL;
+//	if (vchiq_state.remote == NULL)
+//		printf("%s: g_state.remote == NULL\n", __func__);
+//	else if (vchiq_state.remote->initialised != 1)
+//		printf("%s: g_state.remote->initialised != 1 (%d)\n",
+//			__func__, vchiq_state.remote->initialised);
+//
+//	return ((vchiq_state.remote != NULL) &&
+//		(vchiq_state.remote->initialised == 1)) ? &vchiq_state : NULL;
 }
 
 ///*
