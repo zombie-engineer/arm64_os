@@ -248,11 +248,6 @@ void wait_on_timer_ms(uint64_t msec)
   yield();
 }
 
-void waitflag_init(atomic_t *waitflag)
-{
-  *waitflag = 0;
-}
-
 void OPTIMIZED wait_on_waitflag(atomic_t *waitflag)
 {
   struct task *t;
