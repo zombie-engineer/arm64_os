@@ -23,6 +23,7 @@ extern int sched_log_level;
 typedef int (*task_fn)(void);
 
 typedef struct task {
+  uint64_t pid;
   /*
    * the task is attached to scheduler lists by
    * this node
@@ -72,7 +73,7 @@ extern void *get_current_ctx();
 #define get_current() (container_of(get_current_ctx(), task_t, cpuctx))
 
 struct scheduler {
-  atomic_t flag_is_set;
+  atomic_t waitflag_is_set;
 
   struct spinlock lock;
   struct list_head running;

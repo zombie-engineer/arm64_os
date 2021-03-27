@@ -29,6 +29,16 @@
 #define INTR_CTL_IRQ_ARM_ACCESS_ERR_TYPE_1 7
 #define INTR_CTL_IRQ_ARM_MAX               INTR_CTL_IRQ_ARM_ACCESS_ERR_TYPE_1
 
+/* Below are interrupts that come from broadcom peripheral interrupts controller
+ * with irq numbers above 63. They are documented as FIQ-reroutable with numbers 64,65,66,..
+ * in the docs. but can also be accepted as IRQs with same number due to logic of the irq
+ * handling routine, descibed in the same interrupts chapter in BCM2837-ARM-Peripherals pdf.
+ * Same irq handling code is used in linux kernel and here as well.
+ */
+#define INTR_CTL_IRQ_GPU_DOORBELL_0 (INTR_CTL_IRQ_TYPE_ARM + INTR_CTL_IRQ_ARM_DOORBELL_0)
+#define INTR_CTL_IRQ_GPU_DOORBELL_1 (INTR_CTL_IRQ_TYPE_ARM + INTR_CTL_IRQ_ARM_DOORBELL_1)
+
+
 uint32_t intr_ctl_read_pending_gpu_1();
 
 void intr_ctl_dump_regs(const char* tag);
