@@ -9,7 +9,7 @@
 #include <cpu.h>
 #include <debug.h>
 #include <sched.h>
-#include <memory/dma_area.h>
+#include <memory/dma_memory.h>
 
 //DECL_GPIO_SET_KEY(tft_lcd_gpio_set_key, "TFT_LCD___GPIO0");
 
@@ -103,6 +103,36 @@ typedef struct tft_lcd_canvas_control {
 #define SPI_DC_SET() write_reg(0x3f20001c, 1 << gpio_pin_dc)
 #define SPI_DC_CLEAR() write_reg(0x3f200028, 1 << gpio_pin_dc)
 
+struct tft_control {
+  int gpio_pin_mosi;
+  int gpio_pin_miso;
+  int gpio_pin_sclk;
+  int gpio_pin_blk;
+  int gpio_pin_reset;
+  int gpio_pin_dc;
+};
+
+static struct tft_control g_tft_control;
+static struct tft_control *tftc = NULL;
+
+static void tft_cmd(char cmd)
+{
+  int gpio_pin_dc = tftc->gpio_pin_dc;
+
+  if(*SPI_CS & SPI_CS_RXD)
+    *SPI_CS = SPI_CS_TA | SPI_CS_CLEAR_RX;
+ // gpio_set_off(tftc->gpio_pin_dc);
+  SPI_DC_CLEAR();
+  while(!(*SPI_CS & SPI_CS_TXD));
+  *SPI_FIFO = cmd;
+  while(!(*SPI_CS & SPI_CS_DONE));
+  // gpio_set_on(tftc->gpio_pin_dc);
+  SPI_DC_SET();
+}
+
+#define SEND_CMD(__cmd) tft_cmd(__cmd)
+
+#if 0
 #define SEND_CMD(__cmd) do { \
   if(*SPI_CS & SPI_CS_RXD) \
     *SPI_CS = SPI_CS_TA | SPI_CS_CLEAR_RX;\
@@ -112,6 +142,8 @@ typedef struct tft_lcd_canvas_control {
   while(!(*SPI_CS & SPI_CS_DONE)) /*printf("+%08x\r\n", *SPI_CS)*/;\
   SPI_DC_SET();\
 } while(0)
+
+#endif
 
 #define SEND_CMD_DATA(__cmd, __data, __datalen) do { \
   char *__ptr = (char *)(__data);\
@@ -204,14 +236,6 @@ typedef struct tft_lcd_canvas_control {
   }\
 } while(0)
 
-static int gpio_pin_mosi  = 10;
-static int gpio_pin_miso  =  9;
-static int gpio_pin_sclk  = 11;
-static int gpio_pin_bkl   =  8;
-
-static int gpio_pin_dc    = 25;
-static int gpio_pin_reset = 24;
-
 static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
 #define LO8(__v) (__v & 0xff)
@@ -230,7 +254,7 @@ static inline void tft_set_region_coords(int gpio_pin_dc, uint16_t x0, uint16_t 
 
 #define BYTES_PER_PIXEL 3
 #define BYTES_PER_FRAME (DISPLAY_WIDTH * DISPLAY_HEIGHT * BYTES_PER_PIXEL)
-#define NUM_FRAMES 400
+#define NUM_FRAMES 20
 static char tft_lcd_canvas[BYTES_PER_FRAME * NUM_FRAMES];
 
 int OPTIMIZED display_read_frame(
@@ -288,6 +312,11 @@ err:
   while(1) {
     asm volatile("wfe");
   }
+}
+
+void tft_lcd_print_data(char *data, int size)
+{
+  SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, data, size);
 }
 
 /*
@@ -385,7 +414,7 @@ void OPTIMIZED tft_fill_rect(int gpio_pin_dc, int x0, int y0, int x1, int y1, ch
 
 void OPTIMIZED fill_screen(int gpio_pin_dc)
 {
-  tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, 255);
+  tft_fill_rect(gpio_pin_dc, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 240, 0, 255);
 }
 
 #if 0
@@ -447,16 +476,16 @@ static void tft_lcd_init2(void)
 }
 #endif
 
-void OPTIMIZED tft_lcd_cube_animation(void)
+void OPTIMIZED tft_lcd_cube_animation(struct tft_control *t)
 {
   int x = 0, y = 0;
   int g = 0;
   int x_speed = 2;
   int y_speed = 5;
   while(1) {
-    tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, g, 0);
+    tft_fill_rect(t->gpio_pin_dc, x, y, x + 10, y + 10, 0, g, 0);
     wait_msec(1000 / 60);
-    tft_fill_rect(gpio_pin_dc, x, y, x + 10, y + 10, 0, 0, 255);
+    tft_fill_rect(t->gpio_pin_dc, x, y, x + 10, y + 10, 0, 0, 255);
     wait_msec(1);
     if (x_speed > 0) {
       if (x > DISPLAY_WIDTH - 10) {
@@ -479,37 +508,48 @@ void OPTIMIZED tft_lcd_cube_animation(void)
   }
 }
 
-void OPTIMIZED tft_lcd_init(void)
+static inline void tftc_gpio_init(struct tft_control *t)
 {
-  char data[8];
-  // char data[512];
-  gpio_pin_mosi  = 10;
-  gpio_pin_miso  =  9;
-  gpio_pin_sclk  = 11;
-  gpio_pin_bkl   =  6;
+  t->gpio_pin_mosi  = 10;
+  t->gpio_pin_miso  =  9;
+  t->gpio_pin_sclk  = 11;
+  t->gpio_pin_blk   = 19;
 
-  gpio_pin_dc    = 13;
-  gpio_pin_reset = 19;
+  t->gpio_pin_dc    = 13;
+  t->gpio_pin_reset =  6;
 
-  gpio_set_function(gpio_pin_mosi, GPIO_FUNC_ALT_0);
-  gpio_set_function(gpio_pin_miso, GPIO_FUNC_ALT_0);
-  gpio_set_function(gpio_pin_sclk, GPIO_FUNC_ALT_0);
-  gpio_set_function(gpio_pin_bkl, GPIO_FUNC_OUT);
-  gpio_set_function(gpio_pin_reset, GPIO_FUNC_OUT);
-  gpio_set_function(gpio_pin_dc, GPIO_FUNC_OUT);
-  gpio_set_on(gpio_pin_dc);
-  gpio_set_on(gpio_pin_bkl);
-  gpio_set_off(gpio_pin_reset);
+  gpio_set_function(t->gpio_pin_mosi, GPIO_FUNC_ALT_0);
+  gpio_set_function(t->gpio_pin_miso, GPIO_FUNC_ALT_0);
+  gpio_set_function(t->gpio_pin_sclk, GPIO_FUNC_ALT_0);
+  gpio_set_function(t->gpio_pin_blk, GPIO_FUNC_OUT);
+  gpio_set_function(t->gpio_pin_reset, GPIO_FUNC_OUT);
+  gpio_set_function(t->gpio_pin_dc, GPIO_FUNC_OUT);
+  gpio_set_on(t->gpio_pin_dc);
+  gpio_set_on(t->gpio_pin_blk);
+  gpio_set_off(t->gpio_pin_reset);
+}
 
+static inline void tftc_transport_init(struct tft_control *t)
+{
+  tftc_gpio_init(t);
   *SPI_CS = SPI_CS_CLEAR_TX | SPI_CS_CLEAR_RX;
   *SPI_CLK = 8;
   *SPI_DLEN = 2;
+  tftc = t;
+}
 
-  gpio_set_on(gpio_pin_reset);
+void /*OPTIMIZED*/ tft_lcd_init(void)
+{
+  char data[8];
+  // char data[512];
+  struct tft_control *t = &g_tft_control;
+  tftc_transport_init(t);
+
+  gpio_set_on(t->gpio_pin_reset);
   wait_msec(120);
-  gpio_set_off(gpio_pin_reset);
+  gpio_set_off(t->gpio_pin_reset);
   wait_msec(120);
-  gpio_set_on(gpio_pin_reset);
+  gpio_set_on(t->gpio_pin_reset);
   wait_msec(120);
 
   write_reg(SPI_CS, SPI_CS_TA);
@@ -557,11 +597,11 @@ void OPTIMIZED tft_lcd_init(void)
 //    RECV_CMD_DATA(ILI9341_CMD_READ_ID, data, 2);
 //    wait_usec(10);
 //  }
-  fill_screen(gpio_pin_dc);
+  fill_screen(t->gpio_pin_dc);
 }
 
 void tft_lcd_run(void)
 {
   display_payload();
-  tft_lcd_cube_animation();
+  tft_lcd_cube_animation(tftc);
 }
