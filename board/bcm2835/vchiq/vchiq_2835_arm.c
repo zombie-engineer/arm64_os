@@ -70,6 +70,12 @@
 typedef unsigned int VCHI_SERVICE_HANDLE_T;
 extern void port_to_mmal_msg(struct vchiq_mmal_port *port, struct mmal_port *p);
 
+static struct vchiq_state_struct vchiq_state ALIGNED(64);
+
+static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
+static struct task *vchiq_task = NULL;
+
+
 typedef uint32_t irqreturn_t;
 reg32_t g_regs;
 int mmal_log_level = LOG_LEVEL_DEBUG3;
@@ -123,11 +129,77 @@ enum {
 
 extern int vchiq_mmal_init(struct vchiq_mmal_instance **out_instance);
 
-void do_stuff()
+typedef int (*mmal_io_fn)(struct vchiq_mmal_component *, struct vchiq_mmal_port *, struct mmal_buffer_header *);
+
+struct mmal_io_work {
+  struct list_head list;
+  struct mmal_buffer_header *b;
+  struct vchiq_mmal_component *c;
+  struct vchiq_mmal_port *p;
+  mmal_io_fn fn;
+};
+
+static struct list_head mmal_io_work_list;
+static atomic_t mmal_io_work_waitflag;
+static struct spinlock mmal_io_work_list_lock;
+
+int mmal_io_work_push(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, struct mmal_buffer_header *b, mmal_io_fn fn)
 {
-  struct vchiq_mmal_instance *instance;
-  vchiq_mmal_init(&instance);
+  int irqflags;
+  struct mmal_io_work *w;
+  w = kzalloc(sizeof(*w), GFP_KERNEL);
+  if (IS_ERR(w))
+    return PTR_ERR(w);
+  w->c = c;
+  w->p = p;
+  w->b = b;
+  w->fn = fn;
+  MMAL_INFO("pushing work: %p", w);
+  wmb();
+  spinlock_lock_disable_irq(&mmal_io_work_list_lock, irqflags);
+  list_add_tail(&w->list, &mmal_io_work_list);
+  wakeup_waitflag(&mmal_io_work_waitflag);
+  spinlock_unlock_restore_irq(&mmal_io_work_list_lock, irqflags);
+  return ERR_OK;
 }
+
+struct mmal_io_work *mmal_io_work_pop(void)
+{
+  int irqflags;
+  struct mmal_io_work *w = NULL;
+  spinlock_lock_disable_irq(&mmal_io_work_list_lock, irqflags);
+  if (list_empty(&mmal_io_work_list))
+    goto out_unlock;
+
+  w = list_first_entry(&mmal_io_work_list, typeof(*w), list);
+  list_del_init(&w->list);
+  wmb();
+
+out_unlock:
+  spinlock_unlock_restore_irq(&mmal_io_work_list_lock, irqflags);
+  return w;
+}
+
+static int vchiq_io_thread(void)
+{
+  struct mmal_io_work *w;
+  while(1) {
+    wait_on_waitflag(&mmal_io_work_waitflag);
+    MMAL_INFO("io_thread: woke up");
+    w = mmal_io_work_pop();
+    if (w) {
+      MMAL_INFO("io_thread: have new work: %p", w);
+      w->fn(w->c, w->p, w->b);
+    }
+  }
+  return ERR_OK;
+}
+
+//void do_stuff()
+//{
+//  struct vchiq_mmal_instance *instance;
+//  vchiq_mmal_init(&instance);
+//}
 
 struct vchiq_open_payload {
   int fourcc;
@@ -601,18 +673,17 @@ static struct vchiq_service_common *mmal_msg_service_from_handle(uint32_t handle
   return (struct vchiq_service_common *)(uint64_t)handle;
 }
 
-static inline void mmal_buffer_header_print_flags(struct mmal_buffer_header *h)
+static inline void mmal_buffer_header_make_flags_string(struct mmal_buffer_header *h, char *buf, int bufsz)
 {
-  char buf[256];
   int n = 0;
 
 #define CHECK_FLAG(__name) \
   if (h->flags & MMAL_BUFFER_HEADER_FLAG_ ## __name) { \
-    if (n != 0 && (sizeof(buf) - n >= 2)) { \
+    if (n != 0 && (bufsz - n >= 2)) { \
       buf[n++] = ','; \
       buf[n++] = ' '; \
     } \
-    strncpy(buf + n, #__name, min(sizeof(#__name), sizeof(buf) - n));\
+    strncpy(buf + n, #__name, min(sizeof(#__name), bufsz - n));\
   }
 
   CHECK_FLAG(EOS);
@@ -626,17 +697,57 @@ static inline void mmal_buffer_header_print_flags(struct mmal_buffer_header *h)
   CHECK_FLAG(SNAPSHOT);
   CHECK_FLAG(CORRUPTED);
   CHECK_FLAG(TRANSMISSION_FAILED);
-
 #undef CHECK_FLAG
-  MMAL_INFO("buffer_header: %s", buf);
 }
+
+static inline void mmal_buffer_print_meta(struct mmal_buffer_header *h)
+{
+  char flagsbuf[256];
+  mmal_buffer_header_make_flags_string(h, flagsbuf, sizeof(flagsbuf));
+  MMAL_INFO("buffer_header: %p,hdl:%08x,addr:%08x,sz:%d/%d,%s", h,
+    h->data, h->user_data, h->alloc_size, h->length, flagsbuf);
+}
+
+static int mmal_port_buffer_send(struct vchiq_mmal_port *p);
+
+static int mmal_camera_capture_frames(struct vchiq_mmal_component *cam, struct vchiq_mmal_port *capture_port);
+
+
+extern void tft_lcd_print_data(char *data, int size);
+
+static int mmal_port_buffer_io_work(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p, struct mmal_buffer_header *b)
+{
+  int err;
+  tft_lcd_print_data((void*)0x279d000, 61440);
+  err = mmal_camera_capture_frames(c, p);
+  CHECK_ERR("Failed to initiate frame capture");
+  return ERR_OK;
+out_err:
+  return err;
+}
+
+void *fbaddr;
+static void *dma_addr;
 
 int mmal_buffer_to_host_cb(struct mmal_msg *rmsg)
 {
+  int err;
+  struct vchiq_mmal_port *p;
+
   struct mmal_msg_buffer_from_host *r;
+
   r = (struct mmal_msg_buffer_from_host *)&rmsg->u;
-  mmal_buffer_header_print_flags(&r->buffer_header);
+  p = (struct vchiq_mmal_port *)(uint64_t)r->drvbuf.client_context;
+  mmal_buffer_print_meta(&r->buffer_header);
+  memcpy(fbaddr, dma_addr, 500);
+
+  err = mmal_port_buffer_send(p);
+  CHECK_ERR("Failed to submit buffer");
+  err = mmal_io_work_push(p->component, p, &r->buffer_header, mmal_port_buffer_io_work);
+  CHECK_ERR("Failed to schedule mmal io work");
   return ERR_OK;
+out_err:
+  return err;
 }
 
 static int mmal_service_data_callback(struct vchiq_service_common *s, struct vchiq_header_struct *h)
@@ -1059,11 +1170,11 @@ int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b
   m->drvbuf.magic = MMAL_MAGIC;
   m->drvbuf.component_handle = p->component->handle;
   m->drvbuf.port_handle = p->handle;
-  m->drvbuf.client_context = 0x7e7e7e7e;
+  m->drvbuf.client_context = (uint32_t)(uint64_t)p;
 
   m->is_zero_copy = p->zero_copy;
   m->buffer_header.next = 0;
-  m->buffer_header.priv = 0xffaaffaa;
+  m->buffer_header.priv = 0;
   m->buffer_header.cmd = 0;
   if (p->zero_copy)
     m->buffer_header.data = (uint32_t)(uint64_t)b->vcsm_handle;
@@ -1295,6 +1406,7 @@ int mmal_alloc_port_buffers(struct vchiq_service_common *mems_service, struct vc
     buf = kzalloc(sizeof(*buf), GFP_KERNEL);
     buf->buffer_size = p->minimum_buffer.size;
     buf->buffer = dma_alloc(buf->buffer_size);;
+    dma_addr = buf->buffer;
     MMAL_INFO("min_num: %d, min_sz:%d, min_al:%d, port_enabled:%s, buf:%08x",
       p->minimum_buffer.num,
       p->minimum_buffer.size,
@@ -1617,9 +1729,9 @@ static inline void mmal_print_supported_encodings(uint32_t *encodings, int num)
   }
 }
 
-static int mmal_camera_capture_frames(struct vchiq_mmal_component *cam, struct vchiq_mmal_port *capture_port, uint32_t num_frames)
+static int mmal_camera_capture_frames(struct vchiq_mmal_component *cam, struct vchiq_mmal_port *capture_port)
 {
-  uint32_t frame_count = num_frames;
+  uint32_t frame_count = 1;
   return vchiq_mmal_port_parameter_set(cam, capture_port, MMAL_PARAMETER_CAPTURE, &frame_count, sizeof(frame_count));
 }
 
@@ -1636,7 +1748,7 @@ static int mmal_port_buffer_send(struct vchiq_mmal_port *p)
   b = list_first_entry(&p->buffers, typeof(*b), list);
   err = vchiq_mmal_buffer_from_host(p, b);
   if (err) {
-    list_add_tail(&b->list, &p->buffers);
+    // list_add_tail(&b->list, &p->buffers);
     MMAL_ERR("failed to submit port buffer to VC");
     return err;
   }
@@ -1648,6 +1760,7 @@ static int mmal_port_buffer_receive(struct vchiq_mmal_port *p)
 {
   while(1) {
     asm volatile ("wfe");
+    yield();
   }
   return ERR_OK;
 }
@@ -1720,7 +1833,7 @@ int vchiq_camera_run(struct vchiq_service_common *mmal_service, struct vchiq_ser
   while(1) {
     err = mmal_port_buffer_send(still_port);
     CHECK_ERR("Failed to send buffer to port");
-    mmal_camera_capture_frames(cam, still_port, 20);
+    mmal_camera_capture_frames(cam, still_port);
     CHECK_ERR("Failed to initiate frame capture");
     err = mmal_port_buffer_receive(still_port);
     CHECK_ERR("Failed to receive buffer from VC");
@@ -1730,11 +1843,6 @@ int vchiq_camera_run(struct vchiq_service_common *mmal_service, struct vchiq_ser
 out_err:
   return err;
 }
-
-static struct vchiq_state_struct vchiq_state ALIGNED(64);
-
-static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
-static struct task *vchiq_task = NULL;
 
 #define BELL0 ((reg32_t)(0x3f00b840))
 
@@ -1824,25 +1932,27 @@ static int vchiq_parse_rx(struct vchiq_state_struct *s)
   int err = ERR_OK;
   struct vchiq_header_struct *h;
   int msg_type, localport, remoteport;
-
-  h = vchiq_get_next_header_rx(s);
-  msg_type = VCHIQ_MSG_TYPE(h->msgid);
-  localport = VCHIQ_MSG_DSTPORT(h->msgid);
-  remoteport = VCHIQ_MSG_SRCPORT(h->msgid);
-  switch(msg_type) {
-    case VCHIQ_MSG_CONNECT:
-      s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
-      wakeup_waitflag(&s->state_waitflag);
-      break;
-    case VCHIQ_MSG_OPENACK:
-      err = vchiq_parse_msg_openack(s, localport, remoteport);
-      break;
-    case VCHIQ_MSG_DATA:
-      err = vchiq_parse_msg_data(s, localport, remoteport, h);
-    default:
-      err = ERR_INVAL_ARG;
-      break;
-    CHECK_ERR("failed to parse message from remote");
+  while(s->rx_pos != s->remote->tx_pos) {
+    h = vchiq_get_next_header_rx(s);
+    msg_type = VCHIQ_MSG_TYPE(h->msgid);
+    localport = VCHIQ_MSG_DSTPORT(h->msgid);
+    remoteport = VCHIQ_MSG_SRCPORT(h->msgid);
+    switch(msg_type) {
+      case VCHIQ_MSG_CONNECT:
+        s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
+        wakeup_waitflag(&s->state_waitflag);
+        break;
+      case VCHIQ_MSG_OPENACK:
+        err = vchiq_parse_msg_openack(s, localport, remoteport);
+        break;
+      case VCHIQ_MSG_DATA:
+        err = vchiq_parse_msg_data(s, localport, remoteport, h);
+        break;
+      default:
+        err = ERR_INVAL_ARG;
+        break;
+      CHECK_ERR("failed to parse message from remote");
+    }
   }
   return ERR_OK;
 out_err:
@@ -1870,12 +1980,21 @@ static int vchiq_start_thread(struct vchiq_state_struct *s)
 {
   int err;
 
+  INIT_LIST_HEAD(&mmal_io_work_list);
+  waitflag_init(&mmal_io_work_waitflag);
+  spinlock_init(&mmal_io_work_list_lock);
+
+  vchiq_task = task_create(vchiq_io_thread, "vchiq_io_thread");
+  CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
+  sched_queue_runnable_task(get_scheduler(), vchiq_task);
+
   irq_set(0, INTR_CTL_IRQ_GPU_DOORBELL_0, vchiq_irq_handler);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_DOORBELL_0);
   vchiq_task = task_create(vchiq_loop_thread, "vchiq_loop_thread");
   CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
   sched_queue_runnable_task(get_scheduler(), vchiq_task);
   yield();
+
 
   return ERR_OK;
 
