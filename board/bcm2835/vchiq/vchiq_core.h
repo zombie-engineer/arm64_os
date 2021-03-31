@@ -569,10 +569,6 @@ extern VCHIQ_SLOT_ZERO_T *
 vchiq_init_slots(void *mem_base, int mem_size);
 
 extern VCHIQ_STATUS_T
-vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero,
-	int is_master);
-
-extern VCHIQ_STATUS_T
 vchiq_connect_internal(VCHIQ_STATE_T *state, VCHIQ_INSTANCE_T instance);
 
 extern VCHIQ_SERVICE_T *
