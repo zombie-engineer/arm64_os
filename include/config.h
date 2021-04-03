@@ -8,6 +8,7 @@
 
 // #define CONFIG_UART_MINI
 #define CONFIG_UART_PL011
+// #define CONFIG_HDMI
 
 // #define CONFIG_EMMC_DEBUG
 // #define CONFIG_EMMC_DEBUG2
@@ -48,7 +49,7 @@
 
 #define ENABLE_JTAG_SDCARD
 // #define SELFTEST
-// #define TFT_LCD
+#define TFT_LCD
 // #define TEST_MMIO
 // #define VERBOSE_STARTUP
 // #define CMDRUNNER

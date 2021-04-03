@@ -94,8 +94,6 @@ extern void port_to_mmal_msg(struct vchiq_mmal_port *port, struct mmal_port *p);
 static struct vchiq_state_struct vchiq_state ALIGNED(64);
 
 static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
-static struct task *vchiq_task = NULL;
-
 
 typedef uint32_t irqreturn_t;
 reg32_t g_regs;
@@ -175,7 +173,7 @@ int mmal_io_work_push(struct vchiq_mmal_component *c, struct vchiq_mmal_port *p,
   w->p = p;
   w->b = b;
   w->fn = fn;
-  MMAL_INFO("pushing work: %p", w);
+  // MMAL_INFO("pushing work: %p", w);
   wmb();
   spinlock_lock_disable_irq(&mmal_io_work_list_lock, irqflags);
   list_add_tail(&w->list, &mmal_io_work_list);
@@ -206,21 +204,15 @@ static int vchiq_io_thread(void)
   struct mmal_io_work *w;
   while(1) {
     wait_on_waitflag(&mmal_io_work_waitflag);
-    MMAL_INFO("io_thread: woke up");
+    // MMAL_INFO("io_thread: woke up");
     w = mmal_io_work_pop();
     if (w) {
-      MMAL_INFO("io_thread: have new work: %p", w);
+      // MMAL_INFO("io_thread: have new work: %p", w);
       w->fn(w->c, w->p, w->b);
     }
   }
   return ERR_OK;
 }
-
-//void do_stuff()
-//{
-//  struct vchiq_mmal_instance *instance;
-//  vchiq_mmal_init(&instance);
-//}
 
 struct vchiq_open_payload {
   int fourcc;
@@ -296,7 +288,7 @@ static inline void *mmal_check_reply_msg(struct mmal_msg *rmsg, int msg_type)
   return &rmsg->u;
 }
 
-static inline int vchiq_calc_stride(int size)
+static int vchiq_calc_stride(int size)
 {
   size += sizeof(struct vchiq_header_struct);
   return (size + sizeof(struct vchiq_header_struct) - 1) & ~(sizeof(struct vchiq_header_struct) - 1);
@@ -307,9 +299,11 @@ struct vchiq_header_struct *vchiq_prep_next_header_tx(struct vchiq_state_struct 
   int tx_pos, slot_queue_index, slot_index;
   struct vchiq_header_struct *h;
   int slot_space;
+  int stride;
 
   /* Recall last position for tx */
   tx_pos = s->local_tx_pos;
+  stride = vchiq_calc_stride(msg_size);
 
   /*
    * If message can not passed in one chunk within current slot,
@@ -327,8 +321,13 @@ struct vchiq_header_struct *vchiq_prep_next_header_tx(struct vchiq_state_struct 
    * |         padding message added                                   |
    */
   slot_space = VCHIQ_SLOT_SIZE - (tx_pos & VCHIQ_SLOT_MASK);
-  if (slot_space < msg_size) {
-    h = (struct vchiq_header_struct *)s->tx_data + (tx_pos & VCHIQ_SLOT_MASK);
+  if (slot_space < stride) {
+    slot_queue_index = ((int)((unsigned int)(tx_pos) / VCHIQ_SLOT_SIZE));
+    slot_index = s->local->slot_queue[slot_queue_index & VCHIQ_SLOT_QUEUE_MASK];
+
+    s->tx_data = (char*)&s->slot_data[slot_index];
+
+    h = (struct vchiq_header_struct *)(s->tx_data + (tx_pos & VCHIQ_SLOT_MASK));
     h->msgid = VCHIQ_MSGID_PADDING;
     h->size = slot_space - sizeof(*h);
     s->local_tx_pos += slot_space;
@@ -339,7 +338,7 @@ struct vchiq_header_struct *vchiq_prep_next_header_tx(struct vchiq_state_struct 
   slot_index = s->local->slot_queue[slot_queue_index & VCHIQ_SLOT_QUEUE_MASK];
 
   s->tx_data = (char*)&s->slot_data[slot_index];
-  s->local_tx_pos += vchiq_calc_stride(msg_size);
+  s->local_tx_pos += stride;
   s->local->tx_pos = s->local_tx_pos;
 
   h = (struct vchiq_header_struct *)(s->tx_data + (tx_pos & VCHIQ_SLOT_MASK));
@@ -358,11 +357,10 @@ next_header:
   state->rx_data = (char *)(state->slot_data + slot_index);
   rx_pos = state->rx_pos;
   h = (struct vchiq_header_struct *)&state->rx_data[rx_pos & VCHIQ_SLOT_MASK];
-  if (h->msgid == VCHIQ_MSGID_PADDING) {
-    state->rx_pos += vchiq_calc_stride(h->size);
+  state->rx_pos += vchiq_calc_stride(h->size);
+  if (h->msgid == VCHIQ_MSGID_PADDING)
     goto next_header;
-  }
-  state->rx_pos = state->remote->tx_pos;
+
   return h;
 }
 
@@ -381,7 +379,13 @@ void vchiq_event_wait(atomic_t *waitflag, struct remote_event_struct *event)
     event->armed = 1;
     dsb();
     wait_on_waitflag(waitflag);
-    BUG(!event->fired, "wait finished but event not fired");
+//    if (!event->fired) {
+//      while(1) {
+//      printf("---");
+//      wait_msec(300);
+//      }
+//    }
+    // BUG(!event->fired, "wait finished but event not fired");
     event->armed = 0;
     wmb();
   }
@@ -396,7 +400,6 @@ static inline void vchiq_event_check(atomic_t *waitflag, struct remote_event_str
     wakeup_waitflag(waitflag);
 }
 
-
 int vchiq_handmade_connect(struct vchiq_state_struct *s)
 {
   struct vchiq_header_struct *header;
@@ -410,7 +413,6 @@ int vchiq_handmade_connect(struct vchiq_state_struct *s)
   header->msgid = VCHIQ_MAKE_MSG(VCHIQ_MSG_CONNECT, 0, 0);
   header->size = msg_size;
 
-  // s->conn_state = VCHIQ_CONNSTATE_CONNECTING;
   wmb();
   /* Make the new tx_pos visible to the peer. */
   s->local->tx_pos = s->local_tx_pos;
@@ -418,28 +420,13 @@ int vchiq_handmade_connect(struct vchiq_state_struct *s)
 
   vchiq_event_signal(&s->remote->trigger);
 
-  // s->local->trigger.fired = 1;
-  // wakeup_waitflag(&s->trigger_waitflag);
-  // wait_on_waitflag(&s->state_waitflag);
-  // wmb();
   if (s->conn_state != VCHIQ_CONNSTATE_CONNECTED) {
     err = ERR_GENERIC;
     goto out_err;
   }
-//  lstate->recycle.armed = 1;
-//
-//  /* Wait CONNECTED RESPONSE */
-//  if (!lstate->trigger.fired) {
-//    lstate->trigger.armed = 1;
-//    dsb();
-//    while (!lstate->trigger.fired);
-//    lstate->trigger.armed = 0;
-//    wmb();
-//  }
-//  lstate->trigger.fired = 0;
-//  rmb();
 
   return ERR_OK;
+
 out_err:
   return err;
 }
@@ -450,8 +437,10 @@ out_err:
 void vchiq_handmade_prep_msg(struct vchiq_state_struct *s, int msgid, int srcport, int dstport, void *payload, int payload_sz)
 {
   struct vchiq_header_struct *h;
+  int old_tx_pos = s->local->tx_pos;
 
   h = vchiq_prep_next_header_tx(s, payload_sz);
+  MMAL_INFO("msg sent: %p, tx_pos: %d, size: %d", h, old_tx_pos, vchiq_calc_stride(h->size));
 
   h->msgid = VCHIQ_MAKE_MSG(msgid, srcport, dstport);
   memcpy(h->data, payload, payload_sz);
@@ -493,43 +482,6 @@ static struct vchiq_service_common *vchiq_service_find_by_localport(int localpor
   }
   return NULL;
 }
-
-//struct vchiq_service_common *vchiq_handmade_open_sm_cma_service(struct vchiq_state_struct *s)
-//{
-//  /* Service open payload */
-//  int msg_id;
-//  struct vchiq_open_payload open_payload;
-//  struct vchiq_openack_payload *openack;
-//  struct vchiq_header_struct *h;
-//  struct vchiq_service_common *ms;
-//  ms = kzalloc(sizeof(*ms), GFP_KERNEL);
-//
-//  open_payload.fourcc = MAKE_FOURCC("SMEM");
-//  open_payload.client_id = 0;
-//  open_payload.version = VC_SM_VER;
-//  open_payload.version_min = VC_SM_MIN_VER;
-//
-//  vchiq_handmade_prep_msg(s, VCHIQ_MSG_OPEN, LOCALPORT_SMEM, 0, &open_payload, sizeof(open_payload));
-//  vchiq_event_signal(&s->remote->trigger);
-//  vchiq_event_wait(&s->trigger_waitflag, &s->local->trigger);
-//
-//  h = vchiq_get_next_header_rx(s);
-//  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_OPENACK) {
-//    MMAL_ERR("Expected msg type VCHIQ_MSG_OPENACK from remote");
-//    return ERR_PTR(ERR_GENERIC);
-//  }
-//  msg_id = h->msgid;
-//  openack = (struct vchiq_openack_payload *)(h->data);
-//  ms->localport = VCHIQ_MSG_DSTPORT(msg_id);
-//  ms->remoteport = VCHIQ_MSG_SRCPORT(msg_id);
-//  ms->s = s;
-//  MMAL_INFO("OPENACK: msgid: %08x, localport: %d, remoteport: %d, version: %d",
-//    msg_id,
-//    ms->localport,
-//    ms->remoteport,
-//    openack->version);
-//  return ms;
-//}
 
 static int vchiq_open_service(struct vchiq_state_struct *state, struct vchiq_service_common *service, uint32_t fourcc, short version, short version_min)
 {
@@ -637,7 +589,7 @@ void mems_msg_context_free(struct mems_msg_context *ctx)
 int mems_service_data_callback(struct vchiq_service_common *s, struct vchiq_header_struct *h)
 {
   struct vc_sm_result_t *r;
-  MMAL_INFO("mems_service_data_callback");
+  // MMAL_INFO("mems_service_data_callback");
   struct mems_msg_context *ctx;
   BUG(h->size < 4, "mems message less than 4");
   r = (struct vc_sm_result_t *)&h->data[0];
@@ -760,6 +712,7 @@ static int mmal_port_buffer_io_work(struct vchiq_mmal_component *c, struct vchiq
   int err;
   struct mmal_buffer *b;
 
+  // MMAL_INFO("io_work");
   /*
    * Find the buffer in a list of buffers bound to port
    */
@@ -770,15 +723,15 @@ static int mmal_port_buffer_io_work(struct vchiq_mmal_component *c, struct vchiq
    * Buffer payload
    */
   if (h->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END) {
+    // MMAL_INFO("Received non-EOS, pushing to display");
     tft_lcd_print_data(b->buffer, h->length);
-    MMAL_INFO("Received non-EOS, pushing to display");
   }
 
   err = mmal_port_buffer_send_one(p, b);
   CHECK_ERR("Failed to submit buffer");
 
   if (h->flags & MMAL_BUFFER_HEADER_FLAG_EOS) {
-    MMAL_INFO("EOS received, sending CAPTURE command");
+    // MMAL_INFO("EOS received, sending CAPTURE command");
     err = mmal_camera_capture_frames(c, p);
     CHECK_ERR("Failed to initiate frame capture");
   }
@@ -813,7 +766,7 @@ static int mmal_service_data_callback(struct vchiq_service_common *s, struct vch
   struct mmal_msg *rmsg;
   struct mmal_msg_context *msg_ctx;
 
-  MMAL_INFO("mmal_service_data_callback");
+  // MMAL_INFO("mmal_service_data_callback");
   rmsg = (struct mmal_msg *)h->data;
 
   if (rmsg->h.type == MMAL_MSG_TYPE_BUFFER_TO_HOST) {
@@ -1196,28 +1149,6 @@ int vchiq_mmal_port_action_handle(struct vchiq_mmal_component *c, struct vchiq_m
   VCHIQ_MMAL_MSG_COMMUNICATE_SYNC();
   return ERR_OK;
 }
-
-int vchiq_bulk_rx(struct vchiq_mmal_component *c, uint32_t bufaddr, uint32_t bufsize)
-{
-  /* Service open payload */
-  uint32_t payload[2];
-  struct vchiq_header_struct *h;
-
-  payload[0] = bufaddr;
-  payload[1] = bufsize;
-
-  vchiq_handmade_prep_msg(c->ms->s, VCHIQ_MSG_BULK_RX, c->ms->localport, c->ms->remoteport, payload, sizeof(payload));
-  vchiq_event_signal(&c->ms->s->remote->trigger);
-  vchiq_event_wait(&c->ms->s->trigger_waitflag, &c->ms->s->local->trigger);
-
-  h = vchiq_get_next_header_rx(c->ms->s);
-  if (VCHIQ_MSG_TYPE(h->msgid) != VCHIQ_MSG_BULK_RX_DONE) {
-    MMAL_ERR("Expected msg type VCHIQ_MSG_BULK_RX_DONE from remote");
-    return ERR_GENERIC;
-  }
-  return ERR_OK;
-}
-
 
 int vchiq_mmal_buffer_from_host(struct vchiq_mmal_port *p, struct mmal_buffer *b)
 {
@@ -1928,7 +1859,15 @@ static void vchiq_check_local_events()
 {
   struct vchiq_shared_state_struct *local;
   local = vchiq_state.local;
+
+//  if (local->trigger.fired) {
+//    putc('*');
+//  }
   vchiq_event_check(&vchiq_state.trigger_waitflag, &local->trigger);
+//  if (local->recycle.fired) {
+//    putc('+');
+//  }
+
   vchiq_event_check(&vchiq_state.recycle_waitflag, &local->recycle);
   vchiq_event_check(&vchiq_state.sync_trigger_waitflag, &local->sync_trigger);
   vchiq_event_check(&vchiq_state.sync_release_waitflag, &local->sync_release);
@@ -1938,7 +1877,7 @@ static void vchiq_irq_handler(void)
 {
   uint32_t bell_reg;
   vchiq_events++;
-  printf("vchiq_irq_handler\r\n");
+  // printf("vchiq_irq_handler\r\n");
 
   /*
    * This is a very specific undocumented part of vchiq IRQ
@@ -1982,7 +1921,7 @@ static void vchiq_irq_handler(void)
 static int vchiq_parse_msg_openack(struct vchiq_state_struct *s, int localport, int remoteport)
 {
   struct vchiq_service_common *service = NULL;
-  printf("vchiq_parse_msg_openack\r\n");
+  // printf("vchiq_parse_msg_openack\r\n");
 
   service = vchiq_service_find_by_localport(localport);
   BUG(!service, "OPENACK with no service");
@@ -1997,7 +1936,7 @@ static int vchiq_parse_msg_data(struct vchiq_state_struct *s, int localport, int
   struct vchiq_header_struct *h)
 {
   struct vchiq_service_common *service = NULL;
-  MMAL_INFO("data");
+  // MMAL_DEBUG("data");
 
   service = vchiq_service_find_by_localport(localport);
   BUG(!service, "MSG_DATA with no service");
@@ -2005,31 +1944,67 @@ static int vchiq_parse_msg_data(struct vchiq_state_struct *s, int localport, int
   return ERR_OK;
 }
 
+static void vchiq_release_slot(struct vchiq_state_struct *s, int slot_index)
+{
+  int slot_queue_recycle;
+
+  slot_queue_recycle = s->remote->slot_queue_recycle;
+  rmb();
+  s->remote->slot_queue[slot_queue_recycle & VCHIQ_SLOT_QUEUE_MASK] = slot_index;
+  s->remote->slot_queue_recycle = slot_queue_recycle + 1;
+  vchiq_event_signal(&s->remote->recycle);
+}
+
+static int vchiq_tx_header_to_slot_idx(struct vchiq_state_struct *s)
+{
+  return s->remote->slot_queue[(s->rx_pos / VCHIQ_SLOT_SIZE) & VCHIQ_SLOT_QUEUE_MASK];
+}
+
+static inline int vchiq_parse_rx_dispatch(struct vchiq_state_struct *s, struct vchiq_header_struct *h)
+{
+  int err;
+  int msg_type, localport, remoteport;
+  msg_type = VCHIQ_MSG_TYPE(h->msgid);
+  localport = VCHIQ_MSG_DSTPORT(h->msgid);
+  remoteport = VCHIQ_MSG_SRCPORT(h->msgid);
+  switch(msg_type) {
+    case VCHIQ_MSG_CONNECT:
+      s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
+      wakeup_waitflag(&s->state_waitflag);
+      break;
+    case VCHIQ_MSG_OPENACK:
+      err = vchiq_parse_msg_openack(s, localport, remoteport);
+      break;
+    case VCHIQ_MSG_DATA:
+      err = vchiq_parse_msg_data(s, localport, remoteport, h);
+      break;
+    default:
+      err = ERR_INVAL_ARG;
+      break;
+  }
+  return err;
+}
+
 static int vchiq_parse_rx(struct vchiq_state_struct *s)
 {
   int err = ERR_OK;
+  int rx_slot;
   struct vchiq_header_struct *h;
-  int msg_type, localport, remoteport;
+  int prev_rx_slot = vchiq_tx_header_to_slot_idx(s);
+
   while(s->rx_pos != s->remote->tx_pos) {
+    int old_rx_pos = s->rx_pos;
     h = vchiq_get_next_header_rx(s);
-    msg_type = VCHIQ_MSG_TYPE(h->msgid);
-    localport = VCHIQ_MSG_DSTPORT(h->msgid);
-    remoteport = VCHIQ_MSG_SRCPORT(h->msgid);
-    switch(msg_type) {
-      case VCHIQ_MSG_CONNECT:
-        s->conn_state = VCHIQ_CONNSTATE_CONNECTED;
-        wakeup_waitflag(&s->state_waitflag);
-        break;
-      case VCHIQ_MSG_OPENACK:
-        err = vchiq_parse_msg_openack(s, localport, remoteport);
-        break;
-      case VCHIQ_MSG_DATA:
-        err = vchiq_parse_msg_data(s, localport, remoteport, h);
-        break;
-      default:
-        err = ERR_INVAL_ARG;
-        break;
-      CHECK_ERR("failed to parse message from remote");
+    MMAL_INFO("msg received: %p, rx_pos: %d, size: %d", h, old_rx_pos, vchiq_calc_stride(h->size));
+    err = vchiq_parse_rx_dispatch(s, h);
+    CHECK_ERR("failed to parse message from remote");
+
+    rx_slot = vchiq_tx_header_to_slot_idx(s);
+//    rx_slot = s->rx_pos / VCHIQ_SLOT_SIZE;
+//  if ((s->rx_pos & VCHIQ_SLOT_MASK) == 0) {
+    if (rx_slot != prev_rx_slot) {
+      vchiq_release_slot(s, prev_rx_slot);
+      prev_rx_slot = rx_slot;
     }
   }
   return ERR_OK;
@@ -2037,17 +2012,73 @@ out_err:
   return err;
 }
 
+/*
+ * Called in the context of recycle thread when remote (VC) is
+ * done with some particular slot of our messages and signals
+ * recylce event to us, so that we can reuse these slots.
+ *
+ * In original code there is a lot of bookkeeping in this func
+ * but it seems it's not needed critically right now.
+ */
+static void vchiq_process_free_queue(struct vchiq_state_struct *s)
+{
+  int slot_queue_available, pos, slot_index;
+  char *slot_data;
+  struct vchiq_header_struct *h;
+
+  slot_queue_available = s->slot_queue_available;
+
+  mb();
+
+  while (slot_queue_available != s->local->slot_queue_recycle) {
+    slot_index = s->local->slot_queue[slot_queue_available & VCHIQ_SLOT_QUEUE_MASK];
+    slot_queue_available++;
+    slot_data = (char *)&s->slot_data[slot_index];
+
+    rmb();
+
+
+    pos = 0;
+    while (pos < VCHIQ_SLOT_SIZE) {
+      h = (struct vchiq_header_struct *)(slot_data + pos);
+
+      pos += vchiq_calc_stride(h->size);
+      BUG(pos > VCHIQ_SLOT_SIZE, "some");
+//        BUG(1, "invalid slot position");
+    }
+
+    mb();
+
+    s->slot_queue_available = slot_queue_available;
+    semaphore_up(&s->slot_available_event);
+  }
+}
+
+
+static int vchiq_recycle_thread(void)
+{
+  struct vchiq_state_struct *s;
+
+  s = &vchiq_state;
+  while (1) {
+    // puts("recycle_wait\r\n");
+    vchiq_event_wait(&s->recycle_waitflag, &s->local->recycle);
+    // puts("recycle_wakeup\r\n");
+    vchiq_process_free_queue(s);
+    yield();
+  }
+  return ERR_OK;
+}
+
 static int vchiq_loop_thread(void)
 {
   struct vchiq_state_struct *s;
-  // uint64_t last_events = vchiq_events;
-  // uint64_t new_events;
 
   s = &vchiq_state;
   while(1) {
-    printf("vchiq_loop_thread: waiting trigger_waitflag\r\n");
+    // puts("loop wait\r\n");
     vchiq_event_wait(&s->trigger_waitflag, &s->local->trigger);
-    printf("vchiq_loop_thread: waiting trigger_waitflag fired\r\n");
+    // puts("loop wakeup\r\n");
     BUG(vchiq_parse_rx(s) != ERR_OK,
       "failed to parse incoming vchiq messages");
   }
@@ -2057,27 +2088,31 @@ static int vchiq_loop_thread(void)
 static int vchiq_start_thread(struct vchiq_state_struct *s)
 {
   int err;
+  struct task *t;
 
   INIT_LIST_HEAD(&mmal_io_work_list);
   waitflag_init(&mmal_io_work_waitflag);
   spinlock_init(&mmal_io_work_list_lock);
 
-  vchiq_task = task_create(vchiq_io_thread, "vchiq_io_thread");
-  CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
-  sched_queue_runnable_task(get_scheduler(), vchiq_task);
+  t = task_create(vchiq_io_thread, "vchiq_io_thread");
+  CHECK_ERR_PTR(t, "Failed to start vchiq_thread");
+  sched_queue_runnable_task(get_scheduler(), t);
 
   irq_set(0, INTR_CTL_IRQ_GPU_DOORBELL_0, vchiq_irq_handler);
   intr_ctl_arm_irq_enable(INTR_CTL_IRQ_ARM_DOORBELL_0);
-  vchiq_task = task_create(vchiq_loop_thread, "vchiq_loop_thread");
-  CHECK_ERR_PTR(vchiq_task, "Failed to start vchiq_thread");
-  sched_queue_runnable_task(get_scheduler(), vchiq_task);
+  t = task_create(vchiq_loop_thread, "vchiq_loop_thread");
+  CHECK_ERR_PTR(t, "Failed to start vchiq_thread");
+  sched_queue_runnable_task(get_scheduler(), t);
   yield();
+
+  t = task_create(vchiq_recycle_thread, "vchiq_recycle_thread");
+  CHECK_ERR_PTR(t, "Failed to start vchiq_thread");
+  sched_queue_runnable_task(get_scheduler(), t);
 
 
   return ERR_OK;
 
 out_err:
-  vchiq_task = NULL;
   intr_ctl_arm_irq_disable(INTR_CTL_IRQ_ARM_DOORBELL_0);
   irq_set(0, INTR_CTL_IRQ_ARM_DOORBELL_0, 0);
   return err;
@@ -2091,10 +2126,7 @@ void vchiq_handmade(struct vchiq_state_struct *s, struct vchiq_slot_zero_struct 
   err = vchiq_start_thread(s);
   CHECK_ERR("failed to start vchiq async primitives");
   wait_on_waitflag(&s->state_waitflag);
-  // if (s->conn_state != VCHIQ_CONNSTATE_CONNECTED) {
   err = vchiq_handmade_connect(s);
- //   CHECK_ERR("failed at connection step");
-  //}
 
   mmal_service = vchiq_open_mmal_service(s);
   CHECK_ERR_PTR(mmal_service, "failed to open mmal service");
@@ -2102,7 +2134,7 @@ void vchiq_handmade(struct vchiq_state_struct *s, struct vchiq_slot_zero_struct 
   smem_service = vchiq_open_smem_service(s);
   CHECK_ERR_PTR(smem_service, "failed at open smem service");
 
-  err = vchiq_camera_run(mmal_service, smem_service, 160, 120);
+  err = vchiq_camera_run(mmal_service, smem_service, 320, 240);
   CHECK_ERR("failed to run camera");
 
 out_err:
@@ -2131,8 +2163,7 @@ static inline void
 remote_event_create(REMOTE_EVENT_T *event)
 {
   event->armed = 0;
-  /* Don't clear the 'fired' flag because it may already have been set by the other side. */
-  semaphore_init((struct semaphore *)(uint64_t)event->event, 0);
+  event->event = (uint32_t)(uint64_t)event;
 }
 
 static inline void
@@ -2301,65 +2332,10 @@ vchiq_platform_get_arm_state(VCHIQ_STATE_T *state)
 void
 remote_event_signal(REMOTE_EVENT_T *event)
 {
-	wmb();
-
-	event->fired = 1;
-
-	dsb();         /* data barrier operation */
-
-	if (event->armed)
+  wmb();
+  event->fired = 1;
+  /* data barrier operation */
+  dsb();
+  if (event->armed)
     vchiq_ring_bell();
-//		write_reg(g_regs + BELL2, 0); /* trigger vc interrupt */
-}
-
-void
-vchiq_complete_bulk(VCHIQ_BULK_T *bulk)
-{
-//	if (bulk && bulk->remote_data && bulk->actual)
-//		free_pagelist((PAGELIST_T *)bulk->remote_data, bulk->actual);
-}
-
-void
-vchiq_transfer_bulk(VCHIQ_BULK_T *bulk)
-{
-	/*
-	 * This should only be called on the master (VideoCore) side, but
-	 * provide an implementation to avoid the need for ifdefery.
-	 */
-	BUG(1, "vchiq_transfer_bulk");
-}
-
-VCHIQ_STATUS_T
-vchiq_platform_suspend(VCHIQ_STATE_T *state)
-{
-   return VCHIQ_ERROR;
-}
-
-VCHIQ_STATUS_T
-vchiq_platform_resume(VCHIQ_STATE_T *state)
-{
-   return VCHIQ_SUCCESS;
-}
-
-
-int
-vchiq_platform_videocore_wanted(VCHIQ_STATE_T* state)
-{
-   return 1; // autosuspend not supported - videocore always wanted
-}
-
-int
-vchiq_platform_use_suspend_timer(void)
-{
-   return ERR_OK;
-}
-void
-vchiq_dump_platform_use_state(VCHIQ_STATE_T *state)
-{
-	vchiq_log_info(vchiq_arm_log_level, "Suspend timer not in use");
-}
-void
-vchiq_platform_handle_timeout(VCHIQ_STATE_T *state)
-{
-	(void)state;
 }
