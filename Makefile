@@ -203,7 +203,7 @@ ju:
 
 .PHONY: serial
 serial:
-	minicom -b 115200 -D /dev/ttyUSB1 -C uart_capture_$$(date +%S).bin
+	minicom -b 115200 -D $$(./tools/get_serial_dev.sh) -C uart_capture_$$(date +%S).bin
 
 .PHONY: clean
 clean:
