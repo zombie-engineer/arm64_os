@@ -69,13 +69,13 @@
 typedef enum {
   DMA_TI_DREQ_T_NONE = 0,
   DMA_TI_DREQ_T_SRC,
-  DMA_TI_DREQ_T_DEST
+  DMA_TI_DREQ_T_DST
 } dma_ti_dreq_type_t;
 
 typedef enum {
-  DMA_TI_ADDR_TYPE_IGNORE = 0,
-  DMA_TI_ADDR_TYPE_INC,
-  DMA_TI_ADDR_TYPE_NOINC
+  DMA_TI_ADDR_TYPE_IGNOR = 0,
+  DMA_TI_ADDR_TYPE_INC_Y,
+  DMA_TI_ADDR_TYPE_INC_N
 } dma_addr_type_t;
 
 static inline uint32_t dma_make_ti_value(
@@ -88,20 +88,20 @@ static inline uint32_t dma_make_ti_value(
   uint32_t value = 0;
 
   switch(src_addr_type) {
-    case DMA_TI_ADDR_TYPE_IGNORE: value |= DMA_TI_SRC_IGNORE; break;
-    case DMA_TI_ADDR_TYPE_INC   : value |= DMA_TI_SRC_INC   ; break;
-    default                     : break;
+    case DMA_TI_ADDR_TYPE_IGNOR: value |= DMA_TI_SRC_IGNORE; break;
+    case DMA_TI_ADDR_TYPE_INC_Y: value |= DMA_TI_SRC_INC   ; break;
+    default                    : break;
   }
 
   switch(dst_addr_type) {
-    case DMA_TI_ADDR_TYPE_IGNORE: value |= DMA_TI_DEST_IGNORE; break;
-    case DMA_TI_ADDR_TYPE_INC   : value |= DMA_TI_DEST_INC   ; break;
-    default                     : break;
+    case DMA_TI_ADDR_TYPE_IGNOR: value |= DMA_TI_DEST_IGNORE; break;
+    case DMA_TI_ADDR_TYPE_INC_Y: value |= DMA_TI_DEST_INC   ; break;
+    default                    : break;
   }
   
   switch (dreq_type) {
     case DMA_TI_DREQ_T_SRC : value |= DMA_TI_SRC_DREQ; break;
-    case DMA_TI_DREQ_T_DEST: value |= DMA_TI_DEST_DREQ; break;
+    case DMA_TI_DREQ_T_DST: value |= DMA_TI_DEST_DREQ; break;
     default                : break;                   
   }
 
