@@ -10,6 +10,8 @@
 #include <debug.h>
 #include <sched.h>
 #include <memory/dma_memory.h>
+#include <dma.h>
+#include <dma_regs.h>
 
 //DECL_GPIO_SET_KEY(tft_lcd_gpio_set_key, "TFT_LCD___GPIO0");
 
@@ -93,7 +95,10 @@ typedef struct tft_lcd_canvas_control {
 #define SPI_DLEN ((volatile uint32_t *)0x3f20400c)
 #define SPI_CS_CLEAR_TX (1 << 4)
 #define SPI_CS_CLEAR_RX (1 << 5)
+#define SPI_CS_CLEAR    (3 << 4)
 #define SPI_CS_TA       (1 << 7)
+#define SPI_CS_DMAEN    (1 << 8)
+#define SPI_CS_ADCS     (1 << 11)
 #define SPI_CS_DONE     (1 << 16)
 #define SPI_CS_RXD      (1 << 17)
 #define SPI_CS_TXD      (1 << 18)
@@ -314,9 +319,138 @@ err:
   }
 }
 
-void tft_lcd_print_data(char *data, int size)
+extern int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in, uint32_t bytelen);
+extern int spi0_init_dma();
+
+#define DMA_SPI_TRANSFER_LEN_OFF 16
+static uint32_t dma_set_spi_word(uint32_t *word, uint32_t transfer_len)
 {
-  SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, data, size);
+  const uint32_t max_transfer_len = 65535 & ~3;
+  uint16_t spi_transfer_len;
+  if (transfer_len > max_transfer_len) {
+    spi_transfer_len = (uint16_t)max_transfer_len;
+    printf("setting transfer len from %d to %d\n", transfer_len, spi_transfer_len);
+  } else {
+    spi_transfer_len = (uint16_t)transfer_len;
+    printf("setting transfer len to %d\n", spi_transfer_len);
+  }
+
+  *word = (spi_transfer_len << DMA_SPI_TRANSFER_LEN_OFF) | SPI_CS_TA;
+  return spi_transfer_len;
+}
+
+#define SPI_CS_7E         0x7e204000
+#define SPI_FIFO_7E       0x7e204004
+#define DMA_CS0_7E        0x7e007000
+#define DMA_CONBLK_AD_7E  0x7e007004
+
+#define PTR_TO_U32(__ptr) ((uint32_t)(uint64_t)__ptr)
+#define DMA_ADDR(__ptr) (PTR_TO_U32(__ptr) | 0xc0000000)
+
+static inline void dma_program_cb(
+  struct dma_control_block *cb,
+  uint32_t src_addr,
+  uint32_t dst_addr,
+  uint32_t transfer_len,
+  dma_addr_type_t src_addr_type,
+  dma_addr_type_t dst_addr_type,
+  int dreq,
+  dma_ti_dreq_type_t dreq_type,
+  bool wait_resp,
+  void *cb_next)
+{
+  cb->ti = dma_make_ti_value(dreq, dreq_type, src_addr_type, dst_addr_type, wait_resp);
+  cb->src_addr = src_addr;
+  cb->dst_addr = dst_addr;
+  cb->transfer_length = transfer_len;
+  cb->stride = 0;
+  cb->dma_cb_next = cb_next ? DMA_ADDR(cb_next) : 0;
+  cb->res0 = 0;
+  cb->res1 = 0;
+}
+
+static uint32_t spi_stop = SPI_CS_DMAEN;
+static uint32_t dma_cs_start = DMA_CS_ACTIVE | DMA_CS_END;
+
+void tft_lcd_print_data(char *frame_data, int size)
+{
+  uint32_t transfer_len = size;
+  struct dma_control_block cbs[64] ALIGNED(64);
+  uint32_t tx_headers[64]          ALIGNED(64);
+  const uint32_t max_task_size = (0xffffU - 64) & ~3U;
+  int i;
+  int num_tasks;
+
+  struct dma_control_block *cb;
+  struct dma_control_block *cb_tx_payload;
+  struct dma_control_block *cb_tx_header;
+  struct dma_control_block *cb_rx;
+  struct dma_control_block *cb_prev_rx;
+  struct dma_control_block *cb_spi_stop;
+  struct dma_control_block *cb_set_next_tx;
+  struct dma_control_block *cb_start_next_tx;
+
+  uint32_t len;
+  uint32_t *src;
+
+#define WAIT_RESP true
+#define NO_WAIT_RESP false
+
+  cb = cbs;
+
+  SEND_CMD(ILI9341_CMD_WRITE_PIXELS);
+
+  *(int*)0x3f204000 = SPI_CS_CLEAR|SPI_CS_DMAEN|SPI_CS_ADCS;
+
+  src = (uint32_t *)frame_data;
+
+  *(int*)0x3f007000 = DMA_CS_RESET;
+  *(int*)0x3f007100 = DMA_CS_RESET;
+
+  /* fill tx headers first SPI word */
+  num_tasks = 0;
+  while(transfer_len) {
+    len = min(transfer_len, max_task_size);
+    tx_headers[num_tasks++] = (len << DMA_SPI_TRANSFER_LEN_OFF) | SPI_CS_TA;
+    transfer_len -= len;
+  }
+  cb_prev_rx = NULL;
+
+  for (i = 0; i < num_tasks; ++i) {
+    len = ((tx_headers[i] >> 16) & 0xffff);
+    cb_tx_header  = cb++;
+    cb_rx         = cb++;
+    cb_tx_payload = cb++;
+
+    dma_program_cb(cb_tx_header , DMA_ADDR(&tx_headers[i]), SPI_FIFO_7E,   4, DMA_TI_ADDR_TYPE_INC  , DMA_TI_ADDR_TYPE_NOINC , DMA_DREQ_SPI_TX, DMA_TI_DREQ_T_DEST, WAIT_RESP, cb_tx_payload);
+    dma_program_cb(cb_tx_payload, DMA_ADDR(src)           , SPI_FIFO_7E, len, DMA_TI_ADDR_TYPE_INC  , DMA_TI_ADDR_TYPE_NOINC , DMA_DREQ_SPI_TX, DMA_TI_DREQ_T_DEST, WAIT_RESP, NULL);
+    dma_program_cb(cb_rx        , SPI_FIFO_7E             , 0          , len, DMA_TI_ADDR_TYPE_NOINC, DMA_TI_ADDR_TYPE_IGNORE, DMA_DREQ_SPI_RX, DMA_TI_DREQ_T_SRC , NO_WAIT_RESP, NULL);
+    if (cb_prev_rx) {
+      cb_set_next_tx    = cb++;
+      cb_spi_stop       = cb++;
+      cb_start_next_tx  = cb++;
+      cb_prev_rx->dma_cb_next = DMA_ADDR(cb_set_next_tx);
+      dma_program_cb(cb_set_next_tx  , DMA_CONBLK_AD_7E, DMA_ADDR(cb_tx_header) , 4, DMA_TI_ADDR_TYPE_INC, DMA_TI_ADDR_TYPE_INC, DMA_DREQ_NONE, DMA_TI_DREQ_T_NONE, WAIT_RESP, cb_spi_stop);
+      dma_program_cb(cb_spi_stop     , SPI_CS_7E       , DMA_ADDR(&spi_stop)    , 4, DMA_TI_ADDR_TYPE_INC, DMA_TI_ADDR_TYPE_INC, DMA_DREQ_NONE, DMA_TI_DREQ_T_NONE, WAIT_RESP, cb_start_next_tx);
+      dma_program_cb(cb_start_next_tx, DMA_CS0_7E      , DMA_ADDR(&dma_cs_start), 4, DMA_TI_ADDR_TYPE_INC, DMA_TI_ADDR_TYPE_INC, DMA_DREQ_NONE, DMA_TI_DREQ_T_NONE, WAIT_RESP, cb_rx);
+    }
+    src += len;
+    cb_prev_rx = cb_rx;
+  }
+
+  dcache_flush(tx_headers, sizeof(tx_headers[0] * num_tasks));
+  dcache_flush(cbs, sizeof(cbs[0]) * (cb - cbs));
+
+  write_reg(0x3f007004UL + 0x100 * 0, DMA_ADDR(&cbs[0]));
+  write_reg(0x3f007004UL + 0x100 * 1, DMA_ADDR(&cbs[1]));
+
+  *(int*)0x3f007000 |= DMA_CS_ACTIVE;
+  *(int*)0x3f007100 |= DMA_CS_ACTIVE;
+  while((*(int*)0x3f007000) & DMA_CS_END == 0);
+  /* pointer archithmetic, src will inc by 4 bytes, so we divede len by 4 */
+
+ // spi0_xmit_dma(NULL, data, NULL, size);
+   SEND_CMD_DATA(ILI9341_CMD_WRITE_PIXELS, frame_data, size);
 }
 
 /*
@@ -510,6 +644,7 @@ void OPTIMIZED tft_lcd_cube_animation(struct tft_control *t)
 
 static inline void tftc_gpio_init(struct tft_control *t)
 {
+  spi0_init_dma();
   t->gpio_pin_mosi  = 10;
   t->gpio_pin_miso  =  9;
   t->gpio_pin_sclk  = 11;

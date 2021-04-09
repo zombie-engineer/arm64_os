@@ -65,19 +65,19 @@ void dma_channel_setup(int channel, void *src, void *dst, int len);
 #define DMA_TRANSFER_WIDTH_32BIT  0
 #define DMA_TRANSFER_WIDTH_128BIT 1
 
-#define DMA_TI_INTEN           (1<<0)
-#define DMA_TI_WAIT_RESP       (1<<3)
-#define DMA_TI_DEST_INC        (1<<4)
-#define DMA_TI_DEST_WIDTH_128  (1<<5)
-#define DMA_TI_DEST_DREQ       (1<<6)
-#define DMA_TI_DEST_IGNORE     (1<<7)
-#define DMA_TI_SRC_INC         (1<<8)
-#define DMA_TI_SRC_WIDTH_128   (1<<9)
-#define DMA_TI_SRC_DREQ        (1<<10)
-#define DMA_TI_SRC_IGNORE      (1<<11)
-#define DMA_TI_BURST_LENGTH(x) ((x & 0xf) << 12)
-#define DMA_TI_PERMAP(x)       ((x & 0x1f) << 16)
-#define DMA_TI_WAITS(x)        ((x & 0x1f) << 21)
+//#define DMA_TI_INTEN           (1<<0)
+//#define DMA_TI_WAIT_RESP       (1<<3)
+//#define DMA_TI_DEST_INC        (1<<4)
+//#define DMA_TI_DEST_WIDTH_128  (1<<5)
+//#define DMA_TI_DEST_DREQ       (1<<6)
+//#define DMA_TI_DEST_IGNORE     (1<<7)
+//#define DMA_TI_SRC_INC         (1<<8)
+//#define DMA_TI_SRC_WIDTH_128   (1<<9)
+//#define DMA_TI_SRC_DREQ        (1<<10)
+//#define DMA_TI_SRC_IGNORE      (1<<11)
+//#define DMA_TI_BURST_LENGTH(x) ((x & 0xf) << 12)
+//#define DMA_TI_PERMAP(x)       ((x & 0x1f) << 16)
+//#define DMA_TI_WAITS(x)        ((x & 0x1f) << 21)
 
 int dma_enable(int channel);
 int dma_reset(int channel);
