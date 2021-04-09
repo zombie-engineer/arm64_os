@@ -97,7 +97,7 @@ static uint64_t vchiq_events ALIGNED(64) = 0xfffffffffffffff4;
 
 typedef uint32_t irqreturn_t;
 reg32_t g_regs;
-int mmal_log_level = LOG_LEVEL_DEBUG3;
+int mmal_log_level = LOG_LEVEL_INFO;
 
 typedef struct vchiq_2835_state_struct {
    int inited;
@@ -440,7 +440,7 @@ void vchiq_handmade_prep_msg(struct vchiq_state_struct *s, int msgid, int srcpor
   int old_tx_pos = s->local->tx_pos;
 
   h = vchiq_prep_next_header_tx(s, payload_sz);
-  MMAL_INFO("msg sent: %p, tx_pos: %d, size: %d", h, old_tx_pos, vchiq_calc_stride(h->size));
+  MMAL_DEBUG2("msg sent: %p, tx_pos: %d, size: %d", h, old_tx_pos, vchiq_calc_stride(h->size));
 
   h->msgid = VCHIQ_MAKE_MSG(msgid, srcport, dstport);
   memcpy(h->data, payload, payload_sz);
@@ -677,7 +677,7 @@ static inline void mmal_buffer_print_meta(struct mmal_buffer_header *h)
 {
   char flagsbuf[256];
   mmal_buffer_header_make_flags_string(h, flagsbuf, sizeof(flagsbuf));
-  MMAL_INFO("buffer_header: %p,hdl:%08x,addr:%08x,sz:%d/%d,%s", h,
+  MMAL_DEBUG2("buffer_header: %p,hdl:%08x,addr:%08x,sz:%d/%d,%s", h,
     h->data, h->user_data, h->alloc_size, h->length, flagsbuf);
 }
 
@@ -1995,7 +1995,7 @@ static int vchiq_parse_rx(struct vchiq_state_struct *s)
   while(s->rx_pos != s->remote->tx_pos) {
     int old_rx_pos = s->rx_pos;
     h = vchiq_get_next_header_rx(s);
-    MMAL_INFO("msg received: %p, rx_pos: %d, size: %d", h, old_rx_pos, vchiq_calc_stride(h->size));
+    MMAL_DEBUG2("msg received: %p, rx_pos: %d, size: %d", h, old_rx_pos, vchiq_calc_stride(h->size));
     err = vchiq_parse_rx_dispatch(s, h);
     CHECK_ERR("failed to parse message from remote");
 
