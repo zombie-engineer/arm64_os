@@ -12,6 +12,8 @@ p $pc += 4
 # b mmal_port_buffer_io_work
 # b vcanvas_init
 # b mems_service_data_callback
+# b spi0_xmit_dma
+b tft_lcd_print_data
 # b tft_lcd_init
 # b tft_cmd
 # b vchiq_event_signal

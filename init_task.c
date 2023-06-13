@@ -144,7 +144,7 @@ void scheduler_second_cpu_startup(int cpu_n)
 int init_func(void)
 {
   SCHED_DEBUG("starting init function");
-  BUG(run_uart_thread()           != ERR_OK, "failed to run uart_thread");
+  // BUG(run_uart_thread()           != ERR_OK, "failed to run uart_thread");
   BUG(vchiq_init()                != ERR_OK, "failed to start vchiq");
 #ifdef CMDRUNNER
   BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");

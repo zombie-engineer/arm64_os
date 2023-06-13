@@ -7,7 +7,9 @@
 #include <mbox/mbox.h>
 #include <mbox/mbox_props.h>
 #include <arch/armv8/armv8.h>
+#ifdef CONFIG_AVR_UPDATER
 #include <avr_update.h>
+#endif
 #include <spinlock.h>
 #include <emmc.h>
 #include <fs/fs.h>
@@ -30,8 +32,12 @@
 #endif
 #include <max7219.h>
 #include <drivers/atmega8a.h>
+
+#ifdef CONFIG_NOKIA_5110
 #include <drivers/display/nokia5110.h>
 #include <drivers/display/nokia5110_console.h>
+#endif
+
 #include <debug.h>
 #include <unhandled_exception.h>
 #include <board/bcm2835/bcm2835.h>
@@ -239,7 +245,6 @@ void print_arm_features()
 
 static int current_pin1;
 static int current_pin2;
-static int cont;
 
 typedef struct print_cpuctx_ctx {
   int nr;
@@ -294,140 +299,7 @@ void gpio_handle_irq()
   putc('\n');
 }
 
-static int sda_pin = 0;
-static int scl_pin = 0;
 
-void gpio_handle_i2c_irq()
-{
-  int gpio_val = read_reg(0x3f200034) & ((1<<sda_pin)|(1<<scl_pin));
-  int gpio_trig = read_reg(0x3f200040) & ((1<<sda_pin)|(1<<scl_pin));
-  int sda = (gpio_val & (1<< sda_pin)) ? 1: 0;
-  int scl = (gpio_val & (1<< scl_pin)) ? 1: 0;
-  int sda_trig = (gpio_trig & (1<< sda_pin)) ? 1: 0;
-  int scl_trig = (gpio_trig & (1<< scl_pin)) ? 1: 0;
-  write_reg(0x3f200040, (sda_trig << sda_pin)|(scl_trig << scl_pin));
-
-  printf("%08x,%08x,%08x,%08x:", gpio_val, gpio_trig,
-      read_reg(0x3f20004c),
-      read_reg(0x3f200058)
-  );
-  if (sda_trig)
-    putc(sda ? 'D' : 'd');
-
-  if (scl_trig)
-    putc(scl ? 'C' : 'c');
-  putc('\n');
-  putc('\r');
-}
-
-DECL_GPIO_SET_KEY(gpio_i2c_test_gpiokey, "I2CTESTGPIO_KE0");
-void gpio_i2c_test(int scl, int sda, int poll)
-{
-  int x = 0;
-  volatile uint32_t *i2c_base = (uint32_t*)0x3f214000;
-//  uint32_t *dr  = i2c_base + 0;
-//  uint32_t *rsr = i2c_base + 1;
-  volatile uint32_t *slv = i2c_base + 2;
-//  uint32_t *cr  = i2c_base + 3;
-  int poll_counter = 0;
-
-  int pins[2] = { scl, sda };
-  gpio_set_handle_t gpio_set_handle;
-  gpio_set_handle = gpio_set_request_n_pins(pins, ARRAY_SIZE(pins), gpio_i2c_test_gpiokey);
-
-  if (gpio_set_handle == GPIO_SET_INVALID_HANDLE) {
-    puts("Failed to request gpio pins for SDA,SCL pins.\n");
-    while(1);
-  }
-
-  *slv = 0xcc;
-  printf("gpio_i2c_test: scl:%d, sda:%d, poll:%d\n",
-      scl, sda, poll);
-  scl_pin = scl;
-  sda_pin = sda;
-
-  gpio_set_function(scl_pin, GPIO_FUNC_IN);
-  gpio_set_function(sda_pin, GPIO_FUNC_IN);
-  if (poll) {
-    while(1) {
-      int scl_set = gpio_is_set(scl_pin);
-      int sda_set = gpio_is_set(sda_pin);
-      putc(scl_set ? 'C' : '-');
-      putc(sda_set ? 'D' : '-');
-      nokia5110_draw_dot(x, scl_set ? 8 : 4);
-      nokia5110_draw_dot(x, sda_set ? 40: 44);
-      poll_counter++;
-      if (!(poll_counter % 32))
-        puts("\r\n");
-      if (++x > NOKIA5110_PIXEL_SIZE_X) {
-        x = 0;
-        nokia5110_blank_screen();
-      }
-    }
-  }
-
-  gpio_set_detect_rising_edge(sda_pin);
-  gpio_set_detect_rising_edge(scl_pin);
-
-  gpio_set_detect_falling_edge(sda_pin);
-  gpio_set_detect_falling_edge(scl_pin);
-
-  intr_ctl_enable_gpio_irq();
-
-  irq_set(0, ARM_IRQ2_GPIO_1, gpio_handle_i2c_irq);
-  enable_irq();
-
-  do {
-//    intr_ctl_dump_regs("waiting...\r\n");
-    wait_msec(1000);
-    blink_led(2, 200);
-  } while(1);
-}
-
-/*
- * gpio_num_dout - digital output
- * poll          - poll for gpio values instead of interrupts
- */
-void gpio_irq_test(int pin1, int pin2, int poll)
-{
-  printf("gpio_irq_test: pin1:%d, pin2:%d, poll:%d\n",
-      pin1, pin2, poll);
-  current_pin1 = pin1;
-  current_pin2 = pin2;
-  cont = 1;
-
-  gpio_set_function(pin1, GPIO_FUNC_IN);
-  gpio_set_function(pin2, GPIO_FUNC_IN);
-  if (poll) {
-    while(1) {
-      if (gpio_is_set(pin1))
-        putc('1');
-      else
-        putc('-');
-      if (gpio_is_set(pin2))
-        putc('2');
-      else
-        putc('-');
-    }
-  }
-
-  gpio_set_detect_rising_edge(pin1);
-  gpio_set_detect_rising_edge(pin2);
-
-  gpio_set_detect_falling_edge(pin1);
-  gpio_set_detect_falling_edge(pin2);
-
-  irq_set(0, ARM_IRQ2_GPIO_1, gpio_handle_irq);
-  intr_ctl_enable_gpio_irq();
-  enable_irq();
-
-  do {
-   // intr_ctl_dump_regs("waiting...\r\n");
-    wait_msec(1000);
-    // asm volatile ("svc 0x1001\n");
-    blink_led(2, 200);
-  } while(1);
-}
 
 #ifndef CONFIG_QEMU
 
@@ -437,6 +309,7 @@ void gpio_irq_test(int pin1, int pin2, int poll)
 // *(volatile uint32_t *)0x3f204000 = 0;
 // printf("%08x\r\n", r);
 
+#ifdef CONFIG_NOKIA_5110
 void init_nokia5110_display(int report_exceptions, int run_test)
 {
   spi_dev_t *spidev;
@@ -474,6 +347,7 @@ void init_nokia5110_display(int report_exceptions, int run_test)
     nokia5110_test();
   }
 }
+#endif
 #endif
 
 extern void pl011_uart_print_regs();
@@ -747,19 +621,6 @@ void pullup_down_test()
   }
 }
 
-void nokia5110_test_draw()
-{
-  int i;
-  int x;
-  int y;
-  for (i = 0; i < 10; ++i) {
-    x = i % NOKIA5110_PIXEL_SIZE_X;
-    y = i % NOKIA5110_PIXEL_SIZE_Y;
-    nokia5110_blank_screen();
-    nokia5110_draw_dot(x, y);
-  }
-}
-
 int spi_slave_test_bsc()
 {
 #define BR(x) *(reg32_t)(0x3f214000 + x)
@@ -819,53 +680,6 @@ struct servo *prep_servo(int ch, int pwm_gpio_pin)
 
 #define adc_normalize(value) (((float)value) / (ADC_MAX - ADC_MIN))
 #define value_to_angle(v) ((ANGLE_RANGE * adc_normalize(v)) + ANGLE_MIN)
-
-int spi_slave_test()
-{
-  int i;
-  struct servo *servos[2];
-  const int servos_pins[2] = { 18, 19 };
-
-  const int gpio_pin_cs0   = 5;
-  const int gpio_pin_mosi  = 6;
-  const int gpio_pin_sclk  = 11;
-
-  spi_dev_t *spidev;
-  spidev = spi_allocate_emulated("spi_avr_isp",
-      gpio_pin_sclk, gpio_pin_mosi, -1, gpio_pin_cs0, -1,
-      SPI_EMU_MODE_SLAVE);
-  if (IS_ERR(spidev)) {
-    printf("Failed to initialize emulated spi. Error code: %d\n",
-        PTR_ERR(spidev));
-    return ERR_GENERIC;
-  }
-
-  for(i = 0; i < ARRAY_SIZE(servos); ++i) {
-    servos[i] = prep_servo(i, servos_pins[i]);
-    if (IS_ERR(servos[i]))
-      return (int)PTR_ERR(servos[i]);
-  }
-
-  puts("starting spi slave while loop\r\n");
-  while(1) {
-    int ch;
-    char x = 0x77;
-    char from_spi[50];
-    uint16_t value;
-    spidev->xmit_byte(spidev, x, from_spi+0);
-    spidev->xmit_byte(spidev, x, from_spi+1);
-    value = *from_spi + (*(from_spi + 1) << 8);
-    ch = (value >> 15) & 1;
-    value &= 0x3ff;
-
-    if (ch)
-      printf("            %d:%04x\r\n", ch, (int)value);
-    else
-      printf("%d:%04x\r\n", ch, (int)value);
-    servos[ch]->set_angle(servos[ch], value_to_angle(value));
-  }
-  return ERR_OK;
-}
 
 extern char __bss_start;
 extern char __bss_end;
@@ -1017,6 +831,7 @@ void main()
 {
   int ret;
   init1();
+  while(1);
 
 #ifdef CONFIG_HDMI
   vcanvas_init(CONFIG_DISPLAY_WIDTH, CONFIG_DISPLAY_HEIGHT);

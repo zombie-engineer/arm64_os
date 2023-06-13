@@ -16,6 +16,12 @@
     return BIN_SIZE(x);\
   }
 
+#ifdef CONFIG_AVR_UPDATER
 DECL_BIN_OBJECTS(atmega)
+#endif
+
+#ifdef CONFIG_NOKIA_5110
 DECL_BIN_OBJECTS(nokia5110_animation)
+#endif
+
 DECL_BIN_OBJECTS(font)

@@ -1,6 +1,7 @@
 #include <common.h>
 #include <kernel_tests.h>
 #include <dma.h>
+#include <dma_regs.h>
 #include <stringlib.h>
 #include <delays.h>
 #include <reg_access.h>

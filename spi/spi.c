@@ -7,6 +7,7 @@
 #include <gpio.h>
 #include <delays.h>
 #include <dma.h>
+#include <memory/dma_memory.h>
 
 
 #define SPI_BASE ((unsigned long long)PERIPHERAL_BASE_PHY + 0x00204000)
@@ -153,7 +154,7 @@ static int spi_init_gpio()
   return ERR_OK;
 }
 
-static int spi0_init_dma()
+int spi0_init_dma()
 {
   int err;
   RET_IF_ERR(dma_reset, DMA_CHANNEL_SPI_TX);
@@ -164,20 +165,21 @@ static int spi0_init_dma()
 }
 
 
-static int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in, uint32_t bytelen)
+int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in, uint32_t bytelen)
 {
   uint32_t stub_in, stub_out;
   // printf("spi0_xmit_dma: data_out: %08x\n", data_out);
-  dma_reset(DMA_CHANNEL_SPI_TX);
-  dma_reset(DMA_CHANNEL_SPI_RX);
-  dma_enable(DMA_CHANNEL_SPI_TX);
-  dma_enable(DMA_CHANNEL_SPI_RX);
+  // dma_reset(DMA_CHANNEL_SPI_TX);
+  // dma_reset(DMA_CHANNEL_SPI_RX);
+  // dma_enable(DMA_CHANNEL_SPI_TX);
+  // dma_enable(DMA_CHANNEL_SPI_RX);
 
   __sync_synchronize();
   if (data_out == 0 && data_in == 0) {
     puts("spi0_xmit_dma: in and out data buffers are both zero\n");
     return ERR_INVAL_ARG;
   }
+//  *SPI_CS 
 
   *SPI_CS |= (SPI_CS_CLEAR | SPI_CS_DMAEN | SPI_CS_ADCS);
   stub_out = 0;
@@ -185,7 +187,7 @@ static int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in,
   dma_ch_opts_t o = { 0 };
 
   o.width_bits = DMA_TRANSFER_WIDTH_32BIT;
-  o.dst        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
+  o.dst        = 0x7E204004; // PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
 
   o.channel    = DMA_CHANNEL_SPI_TX;
   o.src_dreq   = DMA_DREQ_NONE;
@@ -208,7 +210,7 @@ static int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in,
   dma_setup(&o);
 
   o.channel    = DMA_CHANNEL_SPI_RX;
-  o.src        = PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
+  o.src        = 0x7E204004; // PERIPHERAL_PHY_TO_BUS(SPI_FIFO);
   o.src_inc    = 0;
   o.len        = bytelen;
   o.src_dreq   = DMA_DREQ_SPI_RX;
@@ -228,8 +230,9 @@ static int spi0_xmit_dma(struct spi_dev *d, const void *data_out, void *data_in,
   dma_set_active(DMA_CHANNEL_SPI_TX);
   dma_set_active(DMA_CHANNEL_SPI_RX);
 
-  while(!dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
-  while(!dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
+  wait_msec(20);
+  // while(!dma_transfer_is_done(DMA_CHANNEL_SPI_TX));
+  // while(!dma_transfer_is_done(DMA_CHANNEL_SPI_RX));
   dma_clear_transfer(DMA_CHANNEL_SPI_TX);
   dma_clear_transfer(DMA_CHANNEL_SPI_RX);
 

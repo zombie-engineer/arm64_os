@@ -1,4 +1,4 @@
-CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+CROSS_COMPILE = ~/gcc-arm-10.3-2021.07-x86_64-aarch64-none-elf/bin/aarch64-none-elf-
 
 CC      = $(CROSS_COMPILE)gcc
 CPP     = $(CROSS_COMPILE)cpp
@@ -19,27 +19,28 @@ WARNINGS_AS_ERR := \
 	-Werror=return-type\
 	-Werror=unused-label\
 	-Werror=uninitialized\
-  -Werror=incompatible-pointer-types\
-  -Werror=unused-variable\
- 	-Werror=int-conversion\
+	-Werror=incompatible-pointer-types\
+	-Werror=unused-variable\
+	-Werror=int-conversion\
 	-Werror=implicit-function-declaration\
 	-Werror=shift-count-overflow\
-  -Werror=unused-value\
+	-Werror=unused-value\
 	-Wparentheses
 
 CFLAGS = $(WARNINGS_AS_ERR) -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
-LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
-QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
+LDFLAGS = -nostdlib -T $(LINKSCRIPT)
+# LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
+QEMU := qemu-system-aarch64
+# QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
-	avr_update.o\
 	binblock.o\
 	clock_manager.o\
-	common.o	\
+	common.o\
 	console.o\
 	cpuctx_generic.o\
-	debug.o		 \
+	debug.o\
 	delays.o\
 	dma_memory.o\
 	dma.o\
@@ -72,6 +73,10 @@ OBJS := \
 	video_console.o\
 	kernel_tests/test_dma.o
 
+ifeq (CONFIG_AVR_UPDATER, y)
+	OBJS += avr_update.o
+endif
+
 all: kernel8.img
 
 include arch/armv8/Makefile
@@ -79,9 +84,9 @@ include bins/Makefile
 include board/bcm2835/Makefile
 include cmdrunner/Makefile
 include drivers/max7219/Makefile
-include drivers/atmega8a/Makefile
+# include drivers/atmega8a/Makefile
 include drivers/f5161ah/Makefile
-include drivers/nokia5110/Makefile
+# include drivers/nokia5110/Makefile
 include drivers/tft_lcd/Makefile
 include drivers/usbd/Makefile
 include drivers/servo/sg90/Makefile
@@ -133,7 +138,8 @@ $(TARGET_PREFIX_QEMU).c: $(TARGET_PREFIX_REAL).c
 
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
-%.elf: $(LINKSCRIPT) $(OBJS) $(BINOBJS) %.o
+%.elf: $(OBJS) $(BINOBJS) %.o
+	echo $(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
 	$(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
 
 $(LINKSCRIPT): $(LINKSCRIPT).cpp

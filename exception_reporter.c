@@ -3,7 +3,11 @@
 #include <cpu.h>
 #include <uart/uart.h>
 #include <vcanvas.h>
+
+#ifdef CONFIG_NOKIA_5110
 #include <drivers/display/nokia5110.h>
+#endif
+
 #include "binblock.h"
 #include <checksum.h>
 #include <common.h>
@@ -70,12 +74,14 @@ void exception_print_summary_vcanvas(exception_info_t *e)
   vcanvas_puts(&x, &y, buf);
 }
 
+#ifdef CONFIG_NOKIA_5110
 void exception_print_summary_nokia5110(exception_info_t *e)
 {
   char buf[64];
   snprintf(buf, sizeof(buf), "E: %s", get_exception_type_string(e->type));
   nokia5110_draw_text(buf, 0, 0);
 }
+#endif
 
 
 typedef struct print_cpuctx_ctx {

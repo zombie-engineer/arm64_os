@@ -1,7 +1,6 @@
-BINOBJS =\
-	bins/nokia5110_animation.bin.o\
- 	bins/atmega.bin.o\
- 	bins/font.bin.o
+BINOBJS := bins/font.bin.o
+#	bins/nokia5110_animation.bin.o\
+# 	bins/atmega.bin.o\
 
 .SECONDARY: $(BINOBJS)
 
