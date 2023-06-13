@@ -2,19 +2,22 @@
 #include <delays.h>
 #include <debug.h>
 #include <irq.h>
+#include <vchiq.h>
 #include <sched.h>
 #include <intr_ctl.h>
 #include <uart/uart.h>
 #include <percpu.h>
 #include <common.h>
 #include <timer.h>
-#include <cmdrunner.h>
 #include <uart/pl011_uart.h>
 #include <drivers/usb/usbd.h>
 #include <mmu.h>
 #include <drivers/display/tft_lcd.h>
 
 static struct timer *test_timer;
+
+#ifdef CMDRUNNER
+#include <cmdrunner.h>
 
 static int run_cmdrunner_thread()
 {
@@ -25,6 +28,7 @@ static int run_cmdrunner_thread()
   sched_queue_runnable_task(get_scheduler(), t);
   return ERR_OK;
 }
+#endif
 
 static int run_uart_thread()
 {
@@ -140,9 +144,12 @@ void scheduler_second_cpu_startup(int cpu_n)
 int init_func(void)
 {
   SCHED_DEBUG("starting init function");
-  BUG(run_uart_thread()        != ERR_OK, "failed to run uart_thread");
+  // BUG(run_uart_thread()           != ERR_OK, "failed to run uart_thread");
+  BUG(vchiq_init()                != ERR_OK, "failed to start vchiq");
+#ifdef CMDRUNNER
   BUG(run_cmdrunner_thread()   != ERR_OK, "failed to start command runner");
-  BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
+#endif
+  // BUG(run_usb_initialization() != ERR_OK, "failed to start usb init thread");
   scheduler_second_cpu_startup(1);
   scheduler_second_cpu_startup(2);
   scheduler_second_cpu_startup(3);

@@ -1,6 +1,7 @@
 #include <common.h>
 #include <stringlib.h>
 #include <types.h>
+#include <memory/kmalloc.h>
 
 #define FAIL() while(1);
 
@@ -94,12 +95,33 @@ void test_cpu_ctx(void)
   puts("cpu ctx self test completed.\n");
 }
 
+void test_kmalloc(void)
+{
+  char *buf;
+  puts("kmalloc test passed" __endline);
+  buf = kmalloc(1, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(2, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(3, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(4, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(5, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(14, GFP_KERNEL);
+  kfree(buf);
+  buf = kmalloc(31, GFP_KERNEL);
+  kfree(buf);
+}
+
 void self_test()
 {
   puts("Running self test.\n");
   test_sprintf();
   test_perf_sprintf();
   test_cpu_ctx();
+  test_kmalloc();
   printf("Self test complete.\n");
 }
 

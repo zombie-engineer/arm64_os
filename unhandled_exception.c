@@ -19,6 +19,7 @@ static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
     .print_cpu_ctx = exception_print_cpu_ctx_vcanvas,
     .dump_cpu_ctx = 0
   },
+#ifdef CONFIG_NOKIA_5110
   {
     .name = FATAL_EXCEPTION_REPORTER_NOKIA5110,
     .reporter_id = REPORTER_ID_NOKIA5110,
@@ -27,6 +28,7 @@ static unhandled_exception_reporter_t unhandled_exception_reporters[] = {
     .print_cpu_ctx = exception_print_cpu_ctx_nokia5110,
     .dump_cpu_ctx = 0
   }
+#endif
 };
 
 void init_unhandled_exception_reporters()

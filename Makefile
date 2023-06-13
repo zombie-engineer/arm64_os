@@ -1,4 +1,4 @@
-CROSS_COMPILE = /home/zombie/projects/crosscompile/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+CROSS_COMPILE = ~/gcc-arm-10.3-2021.07-x86_64-aarch64-none-elf/bin/aarch64-none-elf-
 
 CC      = $(CROSS_COMPILE)gcc
 CPP     = $(CROSS_COMPILE)cpp
@@ -6,6 +6,7 @@ LD      = $(CROSS_COMPILE)ld
 NM      = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 REGTOOL = tools/gen_reg_headers.py
+GDB     = /mnt/sdb1/binutils-gdb/gdb/gdb
 
 INCLUDES := include firmware/atmega8a/include
 
@@ -18,29 +19,30 @@ WARNINGS_AS_ERR := \
 	-Werror=return-type\
 	-Werror=unused-label\
 	-Werror=uninitialized\
-  -Werror=incompatible-pointer-types\
-  -Werror=unused-variable\
- 	-Werror=int-conversion\
+	-Werror=incompatible-pointer-types\
+	-Werror=unused-variable\
+	-Werror=int-conversion\
 	-Werror=implicit-function-declaration\
 	-Werror=shift-count-overflow\
-  -Werror=unused-value\
+	-Werror=unused-value\
 	-Wparentheses
 
 CFLAGS = $(WARNINGS_AS_ERR) -Wall $(OPTIMIZATION_FLAGS) -ffreestanding -nostdinc -nostdlib -nostartfiles $(INCLUDES_FLAGS)
 # CFLAGS += -mstrict-align
-LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
-QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
+LDFLAGS = -nostdlib -T $(LINKSCRIPT)
+# LDFLAGS = -nostdlib -nostartfiles -T $(LINKSCRIPT)
+QEMU := qemu-system-aarch64
+# QEMU := /home/zombie/qemu/aarch64-softmmu/qemu-system-aarch64
 
 OBJS := \
-	avr_update.o\
 	binblock.o\
 	clock_manager.o\
-	common.o	\
+	common.o\
 	console.o\
 	cpuctx_generic.o\
-	debug.o		 \
+	debug.o\
 	delays.o\
-	dma_area.o\
+	dma_memory.o\
 	dma.o\
 	exception.o\
 	exception_reporter.o\
@@ -48,7 +50,10 @@ OBJS := \
 	init_task.o\
 	intr_ctl.o\
 	irq.o\
+	jtag.o\
 	kernel_panic.o\
+	mutex.o\
+	kmalloc.o\
 	percpu.o\
 	pipe.o\
 	power.o\
@@ -58,6 +63,7 @@ OBJS := \
 	ringbuf.o\
 	sched.o\
 	self_test.o\
+	semaphore.o\
 	shiftreg.o\
 	tags.o\
 	timer.o\
@@ -67,23 +73,28 @@ OBJS := \
 	video_console.o\
 	kernel_tests/test_dma.o
 
+ifeq (CONFIG_AVR_UPDATER, y)
+	OBJS += avr_update.o
+endif
+
 all: kernel8.img
 
-include bins/Makefile
-include uart/Makefile
-include spi/Makefile
-include mbox/Makefile
 include arch/armv8/Makefile
+include bins/Makefile
+include board/bcm2835/Makefile
 include cmdrunner/Makefile
 include drivers/max7219/Makefile
-include drivers/atmega8a/Makefile
+# include drivers/atmega8a/Makefile
 include drivers/f5161ah/Makefile
-include drivers/nokia5110/Makefile
+# include drivers/nokia5110/Makefile
 include drivers/tft_lcd/Makefile
 include drivers/usbd/Makefile
 include drivers/servo/sg90/Makefile
-include board/bcm2835/Makefile
+include fs/Makefile
+include mbox/Makefile
 include lib/stringlib/Makefile
+include spi/Makefile
+include uart/Makefile
 
 $(info INCLUDES = "$(INCLUDES)")
 INCLUDES_FLAGS = $(addprefix -I,$(INCLUDES))
@@ -95,6 +106,7 @@ LIBS += $(OBJS_ARMV8)
 LIBS += $(OBJS_CMDRUNNER)
 LIBS += $(OBJS_MAX7219)
 LIBS += $(OBJS_F5161AH)
+LIBS += $(OBJS_FS)
 LIBS += $(OBJS_SPI)
 LIBS += $(OBJS_NOKIA5110)
 LIBS += $(OBJS_TFT_LCD)
@@ -118,12 +130,16 @@ TARGET_PREFIX_QEMU := kernel8_qemu
 $(TARGET_PREFIX_QEMU).o: $(TARGET_PREFIX_QEMU).c
 	$(CC) $(CFLAGS) -DCONFIG_QEMU -c $< -o $@
 
+$(TARGET_PREFIX_QEMU).c: $(TARGET_PREFIX_REAL).c
+	cp -fv $^ $@
+
 %.o: %.c %.d
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .SECONDARY: $(TARGET_PREFIX_REAL).o $(TARGET_PREFIX_QEMU).o $(OBJS)
 
-%.elf: $(LINKSCRIPT) $(OBJS) $(BINOBJS) %.o
+%.elf: $(OBJS) $(BINOBJS) %.o
+	echo $(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
 	$(LD) $(LDFLAGS) --warn-section-align -o $@ -Map $(@:.elf=.map) $^
 
 $(LINKSCRIPT): $(LINKSCRIPT).cpp
@@ -167,11 +183,33 @@ qemuds: $(TARGET_QEMU_IMG)
 # Attach to started qemu process with gdb
 .PHONY: qemuat
 qemuat:
-	/mnt/sdb1/binutils-gdb/gdb/gdb -x rungdb.gdb
+	$(GDB) -x rungdb_qemu.gdb
+
+# JTAG
+.PHONY: j
+j:
+	/mnt/ssd240/openocd-code/src/openocd -f openocd-jtag.cfg --log_output openocd-jtag.log &
+# with debug trace	/mnt/ssd240/openocd-code/src/openocd -d -f openocd-jtag.cfg
+
+# JTAG gdb
+.PHONY: jd
+jd:
+	$(GDB) -q -x openocd-jtag.gdb $(TARGET_PREFIX_REAL).elf
+
+# JTAG telnet
+.PHONY: jt
+jt:
+	telnet localhost 4444
+
+jr:
+	./openocd_sess.py re
+
+ju:
+	./openocd_sess.py up
 
 .PHONY: serial
 serial:
-	minicom -b 115200 -D /dev/ttyUSB0 -C uart_capture_$$(date +%S).bin
+	minicom -b 115200 -D $$(./tools/get_serial_dev.sh) -C uart_capture_$$(date +%S).bin
 
 .PHONY: clean
 clean:

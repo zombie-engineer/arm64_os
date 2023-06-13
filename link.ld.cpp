@@ -21,12 +21,17 @@
   __init_cpu_state = ADDR(.init.cpustate);\
   . += (CPU_STATE_MAX_SIZE * NUM_CORES);\
 
-#define DMA_AREA_SECTION\
+#define DMA_MEMORY_SECTION\
   . = ALIGN(PAGE_SIZE);\
-  .dma_area : {}\
-  __dma_area_start = ADDR(.dma_area);\
-  __dma_area_end = __dma_area_start + DMA_AREA_SIZE;\
-  . += DMA_AREA_SIZE;
+  .dma_memory(NOLOAD) : { dma_memory.o(.dma_memory)}\
+  __dma_memory_start = ADDR(.dma_memory);\
+  __dma_memory_end = __dma_memory_start + SIZEOF(.dma_memory);\
+
+#define MEMORY_SECTION\
+  . = ALIGN(PAGE_SIZE);\
+  .kernel_memory (NOLOAD) : { kmalloc.o(.kernel_memory)}\
+  __kernel_memory_start = ADDR(.kernel_memory);\
+  __kernel_memory_end = __kernel_memory_start + SIZEOF(.kernel_memory);\
 
 
 SECTIONS
@@ -49,6 +54,15 @@ SECTIONS
   .data : {*(.data .gnu.linkonce.d*) }
   .data.bin ALIGN(4): SUBALIGN(4) { *(.data.*) }
 
+#if defined(ENABLE_JTAG_DOWNLOAD) || defined(ENABLE_UART_DOWNLOAD)
+  . = ALIGN(4096);
+  .download_image (NOLOAD) :  { }
+  . += MAX_DOWNLOAD_IMAGE_SIZE;
+  __download_image_start = ADDR(.download_image);
+  __download_image_end = ADDR(.download_image) + MAX_DOWNLOAD_IMAGE_SIZE;
+#endif
+
+
   .mybss (NOLOAD) :
   {
     . = ALIGN(16);
@@ -59,7 +73,8 @@ SECTIONS
   STACKS_SECTION(0)
   STACKS_SECTION(1)
   CPUSTATE_SECTION
-  DMA_AREA_SECTION
+  DMA_MEMORY_SECTION
+  MEMORY_SECTION
 
   . = ALIGN(16384);
   __mmu_table_base = .;

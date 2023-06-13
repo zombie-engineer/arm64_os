@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
-UUID=9F12-EAC7
-UUID=13B9-9226
+UUID=3362-3161
 SD_DIR=/mnt/sdcard
 DEV_NAME=$(sudo blkid -U $UUID)
 if make; then
   if (cat /proc/mounts | grep $DEV_NAME); then
-    echo has mount, unmounting ...
+    echo has mount, unmounting from $(cat /proc/mounts | grep $DEV_NAME | awk '{print $1" "$2}') ...
       sudo umount $DEV_NAME
   fi
   echo mounting device: $DEV_NAME uuid: $UUID

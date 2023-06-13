@@ -26,7 +26,7 @@ void blink_led_2(int count, unsigned int period_msec)
 
 void blink_led_3(int count, unsigned int period_msec)
 {
-  do_blink_led(count, period_msec, CONFIG_DEBUG_LED_3_GPIO_NUM);
+  // do_blink_led(count, period_msec, CONFIG_DEBUG_LED_3_GPIO_NUM);
 }
 
 void debug_event_1()
@@ -40,5 +40,5 @@ void debug_event_1()
 void debug_init()
 {
   gpio_set_function(CONFIG_DEBUG_LED_2_GPIO_NUM, GPIO_FUNC_OUT);
-  gpio_set_function(CONFIG_DEBUG_LED_3_GPIO_NUM, GPIO_FUNC_OUT);
+  // gpio_set_function(CONFIG_DEBUG_LED_3_GPIO_NUM, GPIO_FUNC_OUT);
 }
