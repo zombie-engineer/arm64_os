@@ -1,0 +1,19 @@
+INQUIRY:
+  args:
+    - name: evpd
+      bitpos: 8
+      bitwidth: 1
+    - name: page_code
+      bitpos: 16
+      bitwidth: 8
+    - name: allocation_length 
+      bitpos: 24
+      bitwidth: 16
+    - name: control
+      bitpos: 40
+      bitwidth: 8
+  errors:
+    - status: CHECK_CONDITION
+      sense_key: ILLEGAL_REQUEST
+      sense_key_2: INVALID_FIELD_IN_CDB
+
