@@ -108,4 +108,3 @@ GLOBAL_VAR(__percpu_data):
   get_cpu_id \tmp
   percpu_data_get_cpu_state \tmp, \dest
 .endm
-

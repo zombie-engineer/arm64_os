@@ -46,13 +46,10 @@ tmp_2_reg .req w5
   add   sp, sp, 8
 
   get_irqrn_preamble base_reg
-1:
   get_irqnr_and_base irqnr_reg, irqstat_reg, base_reg, tmp_1_reg, tmp_2_reg
   beq  1f
   bl   __handle_irq_\cpu_num
-  b    1b
 1:
-  bl   __handle_local_periph_irq_\cpu_num
   b     __armv8_cpuctx_eret
 .unreq base_reg
 .endm

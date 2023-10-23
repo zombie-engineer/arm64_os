@@ -2,8 +2,7 @@
 
 #include <types.h>
 
-
-// This trick helps testing scenarios on a host machine, when we should
+/* This trick helps testing scenarios on a host machine, when we should */
 #ifdef TEST_STRING
 #define strcmp     _strcmp
 #define strncmp    _strncmp
@@ -23,7 +22,6 @@
 #define isdigit    _isdigit
 #endif
 #define isspace  _isspace
-
 
 int strcmp(const char *s1, const char *s2);
 
